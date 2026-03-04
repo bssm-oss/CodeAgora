@@ -171,4 +171,73 @@ describe('Config Validation', () => {
 
     expect(() => validateConfigData(configWithClaude)).not.toThrow();
   });
+
+  it('should accept api backend with provider', () => {
+    const configWithApi = {
+      ...validConfig,
+      reviewers: [
+        {
+          id: 'r1',
+          backend: 'api' as const,
+          model: 'deepseek-r1-distill-llama-70b',
+          provider: 'groq',
+          enabled: true,
+          timeout: 120,
+        },
+      ],
+    };
+
+    expect(() => validateConfigData(configWithApi)).not.toThrow();
+  });
+
+  it('should require provider when backend is api', () => {
+    const invalidConfig = {
+      ...validConfig,
+      reviewers: [
+        {
+          id: 'r1',
+          backend: 'api' as const,
+          model: 'deepseek-r1',
+          enabled: true,
+          timeout: 120,
+          // Missing provider
+        },
+      ],
+    };
+
+    expect(() => validateConfigData(invalidConfig)).toThrow(/provider is required/i);
+  });
+
+  it('should accept mixed CLI and API backends', () => {
+    const mixedConfig = {
+      ...validConfig,
+      reviewers: [
+        {
+          id: 'r1',
+          backend: 'opencode' as const,
+          provider: 'kimi',
+          model: 'kimi-k2.5',
+          enabled: true,
+          timeout: 120,
+        },
+        {
+          id: 'r2',
+          backend: 'api' as const,
+          provider: 'groq',
+          model: 'llama-3.3-70b-versatile',
+          enabled: true,
+          timeout: 120,
+        },
+        {
+          id: 'r3',
+          backend: 'gemini' as const,
+          model: 'gemini-2.5-flash',
+          enabled: true,
+          timeout: 120,
+        },
+      ],
+    };
+
+    expect(() => validateConfigData(mixedConfig)).not.toThrow();
+  });
 });

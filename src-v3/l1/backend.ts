@@ -30,7 +30,13 @@ export interface BackendInput {
 export async function executeBackend(input: BackendInput): Promise<string> {
   const { backend, model, provider, prompt, timeout } = input;
 
-  // Write prompt to temp file to avoid shell escaping issues
+  // API backend: direct AI SDK call (no CLI subprocess)
+  if (backend === 'api') {
+    const { executeViaAISDK } = await import('./api-backend.js');
+    return executeViaAISDK(input);
+  }
+
+  // CLI backends: write prompt to temp file to avoid shell escaping issues
   const tmpFile = path.join('/tmp', `prompt-${randomUUID()}.txt`);
 
   try {
@@ -109,7 +115,7 @@ function buildCodexCommand(model: string, promptFile: string): string {
   // Codex CLI: stdin pipe with exec command
   // Format: cat prompt.txt | codex exec -
   // The '-' tells codex to read from stdin
-  return `cat "${promptFile}" | codex exec -`;
+  return `cat "${promptFile}" | codex exec -m ${model} -`;
 }
 
 function buildGeminiCommand(model: string, promptFile: string): string {

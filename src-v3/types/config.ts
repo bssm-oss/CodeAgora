@@ -9,7 +9,7 @@ import { z } from 'zod';
 // Backend Types
 // ============================================================================
 
-export const BackendSchema = z.enum(['opencode', 'codex', 'gemini', 'claude']);
+export const BackendSchema = z.enum(['opencode', 'codex', 'gemini', 'claude', 'api']);
 export type Backend = z.infer<typeof BackendSchema>;
 
 // ============================================================================
@@ -31,6 +31,13 @@ export const AgentConfigSchema = z
     (data) => data.backend !== 'opencode' || data.provider !== undefined,
     {
       message: "provider is required when backend is 'opencode'",
+      path: ['provider'],
+    }
+  )
+  .refine(
+    (data) => data.backend !== 'api' || data.provider !== undefined,
+    {
+      message: "provider is required when backend is 'api'",
       path: ['provider'],
     }
   );
