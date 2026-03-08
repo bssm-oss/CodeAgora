@@ -9,6 +9,9 @@
     "test": "cd tools && pnpm test",
     "test:watch": "cd tools && pnpm test:watch",
     "test:coverage": "cd tools && pnpm test:coverage",
+    "build:v3": "cd src-v3 && pnpm build",
+    "test:v3": "cd src-v3 && pnpm test",
+    "typecheck:v3": "cd src-v3 && pnpm typecheck",
     "ci": "pnpm typecheck && pnpm test && pnpm build"
   },
   "keywords": [

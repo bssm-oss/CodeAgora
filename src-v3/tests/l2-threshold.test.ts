@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyThreshold, resetDiscussionCounter } from '../l2/threshold.js';
+import { applyThreshold } from '../l2/threshold.js';
 import type { EvidenceDocument } from '../types/core.js';
 import type { DiscussionSettings } from '../types/config.js';
 
@@ -18,10 +18,6 @@ describe('L2 Threshold Logic', () => {
     },
     codeSnippetRange: 10,
   };
-
-  beforeEach(() => {
-    resetDiscussionCounter();
-  });
 
   it('should register HARSHLY_CRITICAL with 1 reviewer', () => {
     const docs: EvidenceDocument[] = [

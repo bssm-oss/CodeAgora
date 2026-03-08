@@ -4,6 +4,7 @@
  */
 
 import type { EvidenceDocument, Severity } from '../types/core.js';
+import { fuzzyMatchFilePath } from '../utils/diff.js';
 
 // ============================================================================
 // Evidence Document Parser
@@ -120,7 +121,6 @@ function extractFileInfo(
 
   // Fallback: Try fuzzy matching if diff file paths are provided
   if (diffFilePaths && diffFilePaths.length > 0) {
-    const { fuzzyMatchFilePath } = require('../utils/diff.js');
     const matchedPath = fuzzyMatchFilePath(problemText, diffFilePaths);
 
     if (matchedPath) {

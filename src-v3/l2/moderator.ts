@@ -193,7 +193,7 @@ async function runDiscussion(
     await writeDiscussionRound(date, sessionId, discussion.id, round);
 
     // Check for consensus
-    const consensus = checkConsensus(round);
+    const consensus = checkConsensus(round, discussion);
     if (consensus.reached) {
       const verdict: DiscussionVerdict = {
         discussionId: discussion.id,
@@ -303,15 +303,15 @@ interface ConsensusResult {
   reasoning?: string;
 }
 
-function checkConsensus(round: DiscussionRound): ConsensusResult {
+function checkConsensus(round: DiscussionRound, discussion: Discussion): ConsensusResult {
   const supporters = round.supporterResponses;
 
-  // All agree
+  // All agree — preserve the discussion's original severity
   const allAgree = supporters.every((s) => s.stance === 'agree');
   if (allAgree) {
     return {
       reached: true,
-      severity: 'CRITICAL', // Placeholder: extract from discussion
+      severity: discussion.severity as ConsensusResult['severity'],
       reasoning: 'All supporters agreed on the issue',
     };
   }

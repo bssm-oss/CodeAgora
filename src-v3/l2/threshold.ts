@@ -29,6 +29,7 @@ export function applyThreshold(
   const discussions: Discussion[] = [];
   const unconfirmed: EvidenceDocument[] = [];
   const suggestions: EvidenceDocument[] = [];
+  const counter = { value: 1 };
 
   for (const group of grouped) {
     const severityCounts = countBySeverity(group.docs);
@@ -41,20 +42,20 @@ export function applyThreshold(
 
     // HARSHLY_CRITICAL: 1명 → 즉시 등록
     if (severityCounts.HARSHLY_CRITICAL >= settings.registrationThreshold.HARSHLY_CRITICAL) {
-      discussions.push(createDiscussion(group, 'HARSHLY_CRITICAL'));
+      discussions.push(createDiscussion(group, 'HARSHLY_CRITICAL', counter));
       continue;
     }
 
     // CRITICAL: 1명 + (서포터 검증 필요)
     // For now, register if threshold met (supporter approval added in discussion phase)
     if (severityCounts.CRITICAL >= settings.registrationThreshold.CRITICAL) {
-      discussions.push(createDiscussion(group, 'CRITICAL'));
+      discussions.push(createDiscussion(group, 'CRITICAL', counter));
       continue;
     }
 
     // WARNING: 2명+
     if (severityCounts.WARNING >= settings.registrationThreshold.WARNING) {
-      discussions.push(createDiscussion(group, 'WARNING'));
+      discussions.push(createDiscussion(group, 'WARNING', counter));
       continue;
     }
 
@@ -140,10 +141,8 @@ function severityRank(severity: Severity): number {
 // Discussion Creation
 // ============================================================================
 
-let discussionCounter = 1;
-
-function createDiscussion(group: LocationGroup, severity: Severity): Discussion {
-  const id = `d${String(discussionCounter++).padStart(3, '0')}`;
+function createDiscussion(group: LocationGroup, severity: Severity, counter: { value: number }): Discussion {
+  const id = `d${String(counter.value++).padStart(3, '0')}`;
 
   return {
     id,
@@ -155,11 +154,4 @@ function createDiscussion(group: LocationGroup, severity: Severity): Discussion 
     evidenceDocs: group.docs.map((d) => `evidence-${d.issueTitle.replace(/\s+/g, '-')}.md`),
     status: 'pending',
   };
-}
-
-/**
- * Reset discussion counter (for testing)
- */
-export function resetDiscussionCounter(): void {
-  discussionCounter = 1;
 }

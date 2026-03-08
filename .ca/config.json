@@ -3,7 +3,7 @@
     {
       "id": "r1",
       "backend": "gemini",
-      "model": "gemini-2.0-flash-thinking-exp-1219",
+      "model": "gemini-2.5-flash",
       "enabled": true,
       "timeout": 120
     },
@@ -17,16 +17,16 @@
     {
       "id": "r3",
       "backend": "opencode",
-      "provider": "github-copilot",
-      "model": "claude-haiku-4.5",
+      "provider": "opencode",
+      "model": "minimax-m2.5-free",
       "enabled": true,
       "timeout": 120
     },
     {
       "id": "r4",
       "backend": "opencode",
-      "provider": "github-copilot",
-      "model": "gpt-4o-mini",
+      "provider": "opencode",
+      "model": "gpt-5-nano",
       "enabled": true,
       "timeout": 120
     }
@@ -37,7 +37,7 @@
         "id": "sp1",
         "backend": "opencode",
         "provider": "opencode",
-        "model": "kimi-k2.5-free",
+        "model": "minimax-m2.5-free",
         "enabled": true,
         "timeout": 120
       },
@@ -45,7 +45,7 @@
         "id": "sp2",
         "backend": "opencode",
         "provider": "opencode",
-        "model": "glm-4.7",
+        "model": "trinity-large-preview-free",
         "enabled": true,
         "timeout": 120
       },
@@ -53,27 +53,19 @@
         "id": "sp3",
         "backend": "opencode",
         "provider": "opencode",
-        "model": "minimax-m2.5-free",
+        "model": "gpt-5-nano",
         "enabled": true,
         "timeout": 120
       },
       {
         "id": "sp4",
-        "backend": "opencode",
-        "provider": "opencode",
-        "model": "minimax-m2.1",
+        "backend": "gemini",
+        "model": "gemini-2.5-flash",
         "enabled": true,
         "timeout": 120
       },
       {
         "id": "sp5",
-        "backend": "gemini",
-        "model": "gemini-2.0-flash-exp",
-        "enabled": true,
-        "timeout": 120
-      },
-      {
-        "id": "sp6",
         "backend": "codex",
         "model": "gpt-4o-mini",
         "enabled": true,
@@ -85,8 +77,8 @@
     "devilsAdvocate": {
       "id": "s-devil",
       "backend": "opencode",
-      "provider": "github-copilot",
-      "model": "grok-code-fast-1",
+      "provider": "opencode",
+      "model": "big-pickle",
       "persona": ".ca/personas/devil.md",
       "enabled": true,
       "timeout": 120
