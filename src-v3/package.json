@@ -13,6 +13,7 @@
     "cli": "tsx cli/index.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/groq": "^3.0.27",
     "@ai-sdk/openai-compatible": "^2.0.33",
     "@openrouter/ai-sdk-provider": "^2.2.3",
