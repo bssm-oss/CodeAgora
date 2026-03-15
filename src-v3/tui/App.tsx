@@ -10,6 +10,7 @@ import { PipelineScreen } from './screens/PipelineScreen.js';
 import { SessionsScreen } from './screens/SessionsScreen.js';
 import { ConfigScreen } from './screens/ConfigScreen.js';
 import { ResultsScreen } from './screens/ResultsScreen.js';
+import { DebateScreen } from './screens/DebateScreen.js';
 import type { Screen } from './hooks/useRouter.js';
 import type { ReviewSetupParams } from './screens/ReviewSetupScreen.js';
 import type { PipelineResult } from '../pipeline/orchestrator.js';
@@ -69,6 +70,21 @@ export function App(): React.JSX.Element {
         return <SessionsScreen />;
       case 'config':
         return <ConfigScreen />;
+      case 'debate':
+        return (
+          <DebateScreen
+            discussions={[
+              {
+                id: 'd001',
+                severity: 'CRITICAL',
+                title: 'Sample debate',
+                filePath: 'src/auth.ts',
+                rounds: [],
+                status: 'active',
+              },
+            ]}
+          />
+        );
       case 'home':
       default:
         return <HomeScreen onNavigate={navigate} onQuit={exit} />;
