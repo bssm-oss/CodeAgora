@@ -2981,7 +2981,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve2.call(this, root, ref);
+      let _sch = resolve.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref];
         const { schemaId } = this.opts;
@@ -3008,7 +3008,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve2(root, ref) {
+    function resolve(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -3583,7 +3583,7 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve2(baseURI, relativeURI, options) {
+    function resolve(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
@@ -3810,7 +3810,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize,
-      resolve: resolve2,
+      resolve,
       resolveComponent,
       equal,
       serialize,
@@ -18871,7 +18871,7 @@ var Protocol = class {
           return;
         }
         const pollInterval = task2.pollInterval ?? this._options?.defaultTaskPollInterval ?? 1e3;
-        await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
         options?.signal?.throwIfAborted();
       }
     } catch (error2) {
@@ -18888,7 +18888,7 @@ var Protocol = class {
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve, reject) => {
       const earlyReject = (error2) => {
         reject(error2);
       };
@@ -18966,7 +18966,7 @@ var Protocol = class {
           if (!parseResult.success) {
             reject(parseResult.error);
           } else {
-            resolve2(parseResult.data);
+            resolve(parseResult.data);
           }
         } catch (error2) {
           reject(error2);
@@ -19227,12 +19227,12 @@ var Protocol = class {
       }
     } catch {
     }
-    return new Promise((resolve2, reject) => {
+    return new Promise((resolve, reject) => {
       if (signal.aborted) {
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
         return;
       }
-      const timeoutId = setTimeout(resolve2, interval);
+      const timeoutId = setTimeout(resolve, interval);
       signal.addEventListener("abort", () => {
         clearTimeout(timeoutId);
         reject(new McpError(ErrorCode.InvalidRequest, "Request cancelled"));
@@ -20332,7 +20332,7 @@ var McpServer = class {
     let task = createTaskResult.task;
     const pollInterval = task.pollInterval ?? 5e3;
     while (task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled") {
-      await new Promise((resolve2) => setTimeout(resolve2, pollInterval));
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
       const updatedTask = await extra.taskStore.getTask(taskId);
       if (!updatedTask) {
         throw new McpError(ErrorCode.InternalError, `Task ${taskId} not found during polling`);
@@ -20975,12 +20975,12 @@ var StdioServerTransport = class {
     this.onclose?.();
   }
   send(message) {
-    return new Promise((resolve2) => {
+    return new Promise((resolve) => {
       const json = serializeMessage(message);
       if (this._stdout.write(json)) {
-        resolve2();
+        resolve();
       } else {
-        this._stdout.once("drain", resolve2);
+        this._stdout.once("drain", resolve);
       }
     });
   }
@@ -20989,17 +20989,15 @@ var StdioServerTransport = class {
 // bridge/mcp-server.ts
 var import_promises = require("node:fs/promises");
 var import_node_path = require("node:path");
-var PROJECT_ROOT = (0, import_node_path.resolve)(__dirname, "..", "..");
-var CORE_DIST = (0, import_node_path.join)(PROJECT_ROOT, "src", "dist");
-var SESSIONS_DIR = (0, import_node_path.join)(PROJECT_ROOT, ".ca", "sessions");
-var CONFIG_PATH = (0, import_node_path.join)(PROJECT_ROOT, ".ca", "config.json");
-async function importCore() {
-  const core = await import((0, import_node_path.join)(CORE_DIST, "index.js"));
-  return core;
+var import_node_child_process = require("node:child_process");
+var import_node_util = require("node:util");
+var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
+function getSessionsDir() {
+  return (0, import_node_path.join)(process.cwd(), ".ca", "sessions");
 }
 var server = new McpServer({
   name: "codeagora",
-  version: "0.1.0"
+  version: "1.0.0-rc.1"
 });
 server.tool(
   "agora_run_review",
@@ -21009,35 +21007,23 @@ server.tool(
   },
   async ({ diffPath }) => {
     try {
-      const { runPipeline } = await importCore();
-      const result = await runPipeline({ diffPath });
-      let verdict = "";
-      if (result.status === "success") {
-        const resultPath = (0, import_node_path.join)(SESSIONS_DIR, result.date, result.sessionId, "result.md");
-        try {
-          verdict = await (0, import_promises.readFile)(resultPath, "utf-8");
-        } catch {
-          verdict = "(result file not found)";
-        }
-      }
+      const { stdout, stderr } = await execFileAsync(
+        "npx",
+        ["codeagora", "review", diffPath, "--output", "json", "--quiet"],
+        { cwd: process.cwd(), timeout: 3e5 }
+      );
       return {
         content: [{
           type: "text",
-          text: JSON.stringify({
-            sessionId: result.sessionId,
-            date: result.date,
-            status: result.status,
-            error: result.error,
-            verdict: verdict.slice(0, 4e3)
-            // Truncate for MCP response size
-          }, null, 2)
+          text: stdout.trim() || stderr.trim() || '{"status":"error","error":"No output"}'
         }]
       };
     } catch (err) {
+      const error2 = err;
       return {
         content: [{
           type: "text",
-          text: `Error running review: ${err instanceof Error ? err.message : String(err)}`
+          text: `Error running review: ${error2.stderr || error2.stdout || error2.message}`
         }],
         isError: true
       };
@@ -21055,14 +21041,14 @@ server.tool(
     try {
       let targetDate = date3;
       if (!targetDate) {
-        const dates = await (0, import_promises.readdir)(SESSIONS_DIR);
+        const dates = await (0, import_promises.readdir)(getSessionsDir());
         const sorted = dates.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
         if (sorted.length === 0) {
           return { content: [{ type: "text", text: "No sessions found." }] };
         }
         targetDate = sorted[sorted.length - 1];
       }
-      const dateDir = (0, import_node_path.join)(SESSIONS_DIR, targetDate);
+      const dateDir = (0, import_node_path.join)(getSessionsDir(), targetDate);
       let targetId = sessionId;
       if (!targetId) {
         const sessions = await (0, import_promises.readdir)(dateDir);
@@ -21132,14 +21118,14 @@ server.tool(
     try {
       let dates;
       try {
-        dates = (await (0, import_promises.readdir)(SESSIONS_DIR)).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();
+        dates = (await (0, import_promises.readdir)(getSessionsDir())).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();
       } catch {
         return { content: [{ type: "text", text: "No sessions directory found. Run a review first." }] };
       }
       const sessions = [];
       for (const date3 of dates) {
         if (sessions.length >= limit) break;
-        const dateDir = (0, import_node_path.join)(SESSIONS_DIR, date3);
+        const dateDir = (0, import_node_path.join)(getSessionsDir(), date3);
         let ids;
         try {
           ids = (await (0, import_promises.readdir)(dateDir)).filter((s) => /^\d+$/.test(s)).sort((a, b) => Number(b) - Number(a));

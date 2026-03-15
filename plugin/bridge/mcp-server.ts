@@ -1,24 +1,19 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
-// Core path resolution — plugin sits at ./plugin/, core at ./src/
-const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..');
-const CORE_DIST = join(PROJECT_ROOT, 'src', 'dist');
-const SESSIONS_DIR = join(PROJECT_ROOT, '.ca', 'sessions');
-const CONFIG_PATH = join(PROJECT_ROOT, '.ca', 'config.json');
+const execFileAsync = promisify(execFile);
 
-// Lazy import core to avoid bundling issues
-async function importCore() {
-  const core = await import(join(CORE_DIST, 'index.js'));
-  return core;
-}
+// Sessions/config are always relative to the user's project (CWD)
+function getSessionsDir() { return join(process.cwd(), '.ca', 'sessions'); }
 
 const server = new McpServer({
   name: 'codeagora',
-  version: '0.1.0',
+  version: '1.0.0-rc.1',
 });
 
 // ─── Tool 1: agora_run_review ───────────────────────────────────────────────
@@ -31,37 +26,23 @@ server.tool(
   },
   async ({ diffPath }) => {
     try {
-      const { runPipeline } = await importCore();
-      const result = await runPipeline({ diffPath });
-
-      // Read the result file if session completed
-      let verdict = '';
-      if (result.status === 'success') {
-        const resultPath = join(SESSIONS_DIR, result.date, result.sessionId, 'result.md');
-        try {
-          verdict = await readFile(resultPath, 'utf-8');
-        } catch {
-          verdict = '(result file not found)';
-        }
-      }
+      const { stdout, stderr } = await execFileAsync(
+        'npx', ['codeagora', 'review', diffPath, '--output', 'json', '--quiet'],
+        { cwd: process.cwd(), timeout: 300000 }
+      );
 
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({
-            sessionId: result.sessionId,
-            date: result.date,
-            status: result.status,
-            error: result.error,
-            verdict: verdict.slice(0, 4000), // Truncate for MCP response size
-          }, null, 2),
+          text: stdout.trim() || stderr.trim() || '{"status":"error","error":"No output"}',
         }],
       };
     } catch (err) {
+      const error = err as Error & { stderr?: string; stdout?: string };
       return {
         content: [{
           type: 'text' as const,
-          text: `Error running review: ${err instanceof Error ? err.message : String(err)}`,
+          text: `Error running review: ${error.stderr || error.stdout || error.message}`,
         }],
         isError: true,
       };
@@ -83,7 +64,7 @@ server.tool(
       // Resolve date: use latest if not provided
       let targetDate = date;
       if (!targetDate) {
-        const dates = await readdir(SESSIONS_DIR);
+        const dates = await readdir(getSessionsDir());
         const sorted = dates.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
         if (sorted.length === 0) {
           return { content: [{ type: 'text' as const, text: 'No sessions found.' }] };
@@ -92,7 +73,7 @@ server.tool(
       }
 
       // Resolve sessionId: use latest if not provided
-      const dateDir = join(SESSIONS_DIR, targetDate);
+      const dateDir = join(getSessionsDir(), targetDate);
       let targetId = sessionId;
       if (!targetId) {
         const sessions = await readdir(dateDir);
@@ -175,7 +156,7 @@ server.tool(
     try {
       let dates: string[];
       try {
-        dates = (await readdir(SESSIONS_DIR))
+        dates = (await readdir(getSessionsDir()))
           .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
           .sort()
           .reverse();
@@ -196,7 +177,7 @@ server.tool(
       for (const date of dates) {
         if (sessions.length >= limit) break;
 
-        const dateDir = join(SESSIONS_DIR, date);
+        const dateDir = join(getSessionsDir(), date);
         let ids: string[];
         try {
           ids = (await readdir(dateDir))

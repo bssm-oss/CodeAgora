@@ -56,5 +56,5 @@ user_invocable: true
 
 ## Error Handling
 
-- `.ca/config.json`이 없으면: 설정 파일 없음 안내 + `codeagora.config.example.json` 참조 안내
+- `.ca/config.json`이 없으면: 설정 파일 없음 안내 + `npx codeagora init` 실행 안내
 - JSON 파싱 실패: 문법 오류 위치 표시
