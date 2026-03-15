@@ -9,7 +9,7 @@ interface HomeScreenProps {
 }
 
 const MENU_ITEMS = [
-  { label: 'Review — Run code review pipeline', value: 'review' },
+  { label: 'Review — Run code review pipeline', value: 'review-setup' },
   { label: 'Sessions — Browse review history', value: 'sessions' },
   { label: 'Config — View current configuration', value: 'config' },
   { label: 'Quit', value: 'quit' },

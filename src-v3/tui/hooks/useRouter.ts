@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type Screen = 'home' | 'review' | 'sessions' | 'config';
+export type Screen = 'home' | 'review-setup' | 'review' | 'pipeline' | 'sessions' | 'config' | 'results';
 
 export interface RouterState {
   screen: Screen;

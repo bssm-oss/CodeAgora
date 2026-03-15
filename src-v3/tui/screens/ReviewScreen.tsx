@@ -1,11 +1,22 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-export function ReviewScreen(): React.JSX.Element {
+interface ReviewScreenProps {
+  diffPath?: string;
+}
+
+export function ReviewScreen({ diffPath }: ReviewScreenProps): React.JSX.Element {
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold>Review Pipeline</Text>
-      <Text>Coming soon — use &apos;agora review&apos; for now</Text>
+      <Box marginTop={1}>
+        <Text>Starting review...</Text>
+      </Box>
+      {diffPath ? (
+        <Box marginTop={1}>
+          <Text>Diff: <Text color="cyan">{diffPath}</Text></Text>
+        </Box>
+      ) : null}
     </Box>
   );
 }
