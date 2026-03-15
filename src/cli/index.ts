@@ -10,7 +10,7 @@ import { loadConfig } from '../config/loader.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { runInit, runInitInteractive, UserCancelledError } from './commands/init.js';
-import { runDoctor, formatDoctorReport } from './commands/doctor.js';
+import { runDoctor, formatDoctorReport, runLiveHealthCheck } from './commands/doctor.js';
 import { listProviders, formatProviderList } from './commands/providers.js';
 import {
   listSessions, showSession, diffSessions, getSessionStats,
@@ -218,14 +218,15 @@ program
   .option('--format <format>', 'Config format (json or yaml)', 'json')
   .option('--force', 'Overwrite existing files', false)
   .option('-y, --yes', 'Skip prompts, use defaults', false)
-  .action(async (options: { format: string; force: boolean; yes: boolean }) => {
+  .option('--ci', 'also create GitHub Actions workflow', false)
+  .action(async (options: { format: string; force: boolean; yes: boolean; ci: boolean }) => {
     try {
       const format = options.format === 'yaml' ? 'yaml' : 'json';
       const isInteractive = !options.yes && process.stdin.isTTY;
       let result;
       if (isInteractive) {
         try {
-          result = await runInitInteractive({ format, force: options.force, baseDir: process.cwd() });
+          result = await runInitInteractive({ format, force: options.force, baseDir: process.cwd(), ci: options.ci });
         } catch (err) {
           if (err instanceof UserCancelledError) {
             console.log(err.message);
@@ -234,7 +235,7 @@ program
           throw err;
         }
       } else {
-        result = await runInit({ format, force: options.force, baseDir: process.cwd() });
+        result = await runInit({ format, force: options.force, baseDir: process.cwd(), ci: options.ci });
       }
       for (const f of result.created) {
         console.log(`  created: ${f}`);
@@ -248,6 +249,11 @@ program
       if (result.created.length > 0) {
         console.log('CodeAgora initialized successfully.');
       }
+      if (options.ci && result.created.some(f => f.includes('codeagora-review.yml'))) {
+        console.log('Created: .github/workflows/codeagora-review.yml');
+        console.log('  Add GROQ_API_KEY to your repository secrets:');
+        console.log('  Settings -> Secrets -> Actions -> New repository secret');
+      }
     } catch (error) {
       console.error('Init failed:', error instanceof Error ? error.message : error);
       process.exit(1);
@@ -257,9 +263,24 @@ program
 program
   .command('doctor')
   .description('Check environment and configuration')
-  .action(async () => {
+  .option('--live', 'test actual API connections', false)
+  .action(async (options: { live: boolean }) => {
     try {
       const result = await runDoctor(process.cwd());
+
+      if (options.live) {
+        try {
+          const { loadConfig } = await import('../config/loader.js');
+          const config = await loadConfig();
+          result.liveChecks = await runLiveHealthCheck(config);
+        } catch (liveErr) {
+          console.error(
+            'Live check failed:',
+            liveErr instanceof Error ? liveErr.message : liveErr
+          );
+        }
+      }
+
       console.log(formatDoctorReport(result));
       if (result.summary.fail > 0) {
         process.exit(1);

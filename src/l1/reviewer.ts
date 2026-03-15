@@ -4,7 +4,7 @@
  */
 
 import type { ReviewerConfig } from '../types/config.js';
-import type { ReviewOutput, EvidenceDocument } from '../types/core.js';
+import type { ReviewOutput } from '../types/core.js';
 import { parseEvidenceResponse } from './parser.js';
 import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '../utils/diff.js';

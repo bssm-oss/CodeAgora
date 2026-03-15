@@ -3,8 +3,8 @@
  * Writes discussion logs and moderator report
  */
 
-import type { Discussion, DiscussionRound, DiscussionVerdict, ModeratorReport, EvidenceDocument } from '../types/core.js';
-import { writeMarkdown, appendMarkdown, getDiscussionsDir, getUnconfirmedDir, getSuggestionsPath, getReportPath } from '../utils/fs.js';
+import type { DiscussionRound, DiscussionVerdict, ModeratorReport, EvidenceDocument } from '../types/core.js';
+import { writeMarkdown, getDiscussionsDir, getSuggestionsPath, getReportPath } from '../utils/fs.js';
 import path from 'path';
 import { writeFile } from 'fs/promises';
 

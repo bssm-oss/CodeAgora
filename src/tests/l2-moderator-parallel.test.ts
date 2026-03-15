@@ -33,11 +33,8 @@ import { writeSupportersLog, writeDiscussionRound, writeDiscussionVerdict } from
 // ============================================================================
 
 const moderatorConfig: ModeratorConfig = {
-  id: 'moderator',
   backend: 'codex',
   model: 'gpt-4o-mini',
-  enabled: true,
-  timeout: 120,
 };
 
 const supporterPoolConfig: SupporterPoolConfig = {
@@ -60,7 +57,13 @@ const supporterPoolConfig: SupporterPoolConfig = {
 
 const settings: DiscussionSettings = {
   maxRounds: 1,
-  consensusThreshold: 1.0,
+  registrationThreshold: {
+    HARSHLY_CRITICAL: 1,
+    CRITICAL: 1,
+    WARNING: 2,
+    SUGGESTION: null,
+  },
+  codeSnippetRange: 10,
 };
 
 function makeDiscussion(id: string, severity: Discussion['severity'] = 'WARNING'): Discussion {

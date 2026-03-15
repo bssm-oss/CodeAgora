@@ -2,7 +2,7 @@
  * Logging System for V3
  */
 
-import { writeMarkdown, appendMarkdown, getLogsDir } from './fs.js';
+import { appendMarkdown, getLogsDir } from './fs.js';
 import path from 'path';
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';

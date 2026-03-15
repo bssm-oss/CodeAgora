@@ -7,7 +7,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { parse as parseYaml } from 'yaml';
 import { Config, validateConfig, type AgentConfig, type ReviewerEntry, type DeclarativeReviewers } from '../types/config.js';
-import { readJson, getConfigPath, CA_ROOT } from '../utils/fs.js';
+import { readJson, CA_ROOT } from '../utils/fs.js';
 
 // ============================================================================
 // Config Loader

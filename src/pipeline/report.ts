@@ -4,7 +4,7 @@
  */
 
 import type { PipelineTelemetry, BackendCallRecord } from './telemetry.js';
-import { estimateCost, formatCost } from './cost-estimator.js';
+import { estimateCost } from './cost-estimator.js';
 
 export interface PerformanceReport {
   summary: {

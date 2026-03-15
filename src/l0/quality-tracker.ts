@@ -10,7 +10,7 @@
  */
 
 import type { ReviewRecord } from '../types/l0.js';
-import type { EvidenceDocument, ReviewOutput, Discussion, DiscussionVerdict } from '../types/core.js';
+import type { ReviewOutput, Discussion, DiscussionVerdict } from '../types/core.js';
 import { scoreReviewerSpecificity } from './specificity-scorer.js';
 
 // ============================================================================

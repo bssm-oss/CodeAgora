@@ -3,7 +3,7 @@
  * Merges duplicate discussions discovered during rounds
  */
 
-import type { Discussion, EvidenceDocument } from '../types/core.js';
+import type { Discussion } from '../types/core.js';
 
 /**
  * Find duplicate discussions based on file location and issue similarity

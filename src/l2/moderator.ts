@@ -3,8 +3,8 @@
  * Manages discussion lifecycle, coordinates supporters, writes final report
  */
 
-import type { Discussion, DiscussionRound, DiscussionVerdict, ModeratorReport, EvidenceDocument } from '../types/core.js';
-import type { ModeratorConfig, SupporterConfig, DiscussionSettings, SupporterPoolConfig, AgentConfig } from '../types/config.js';
+import type { Discussion, DiscussionRound, DiscussionVerdict, ModeratorReport } from '../types/core.js';
+import type { ModeratorConfig, DiscussionSettings, SupporterPoolConfig, AgentConfig } from '../types/config.js';
 import { executeBackend } from '../l1/backend.js';
 import { writeDiscussionRound, writeDiscussionVerdict, writeSupportersLog } from './writer.js';
 import { checkForObjections, handleObjections } from './objection.js';

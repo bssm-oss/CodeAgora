@@ -4,7 +4,7 @@
  */
 
 import { getSupportedProviders } from '../l1/provider-registry.js';
-import type { Config, ReviewersField } from '../types/config.js';
+import type { Config } from '../types/config.js';
 
 // ============================================================================
 // Types

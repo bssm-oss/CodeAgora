@@ -5,11 +5,13 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { getSupportedProviders } from '../../l1/provider-registry.js';
+import { getSupportedProviders, getModel } from '../../l1/provider-registry.js';
 import { loadConfigFrom } from '../../config/loader.js';
 import { strictValidateConfig } from '../../config/validator.js';
 import { getProviderEnvVar } from '../../providers/env-vars.js';
-import { statusColor } from '../utils/colors.js';
+import { statusColor, dim } from '../utils/colors.js';
+import { generateText } from 'ai';
+import type { Config, AgentConfig } from '../../types/config.js';
 
 // ============================================================================
 // Types
@@ -24,6 +26,15 @@ export interface DoctorCheck {
 export interface DoctorResult {
   checks: DoctorCheck[];
   summary: { pass: number; fail: number; warn: number };
+  liveChecks?: LiveCheckResult[];
+}
+
+export interface LiveCheckResult {
+  provider: string;
+  model: string;
+  status: 'ok' | 'error' | 'timeout';
+  latencyMs?: number;
+  error?: string;
 }
 
 // ============================================================================
@@ -160,6 +171,129 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
 // getProviderEnvVar is re-exported for backward compatibility
 export { getProviderEnvVar } from '../../providers/env-vars.js';
 
+// ============================================================================
+// Live Health Check
+// ============================================================================
+
+const LIVE_CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * Collect unique provider+model pairs from all enabled agents in config.
+ */
+function collectAgentPairs(config: Config): Array<{ provider: string; model: string }> {
+  const seen = new Set<string>();
+  const pairs: Array<{ provider: string; model: string }> = [];
+
+  function addAgent(agent: AgentConfig): void {
+    if (!agent.enabled) return;
+    if (agent.backend !== 'api') return;
+    if (!agent.provider) return;
+    const key = `${agent.provider}/${agent.model}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pairs.push({ provider: agent.provider, model: agent.model });
+  }
+
+  // reviewers
+  if (Array.isArray(config.reviewers)) {
+    for (const r of config.reviewers) {
+      if ('auto' in r && r.auto) continue;
+      addAgent(r as AgentConfig);
+    }
+  } else if ('static' in config.reviewers && config.reviewers.static) {
+    for (const r of config.reviewers.static) {
+      addAgent(r);
+    }
+  }
+
+  // supporters pool
+  for (const s of config.supporters.pool) {
+    addAgent(s);
+  }
+  addAgent(config.supporters.devilsAdvocate);
+
+  // moderator
+  if (config.moderator.backend === 'api' && config.moderator.provider) {
+    const key = `${config.moderator.provider}/${config.moderator.model}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      pairs.push({ provider: config.moderator.provider, model: config.moderator.model });
+    }
+  }
+
+  return pairs;
+}
+
+async function pingModel(provider: string, model: string): Promise<LiveCheckResult> {
+  const start = performance.now();
+  try {
+    const languageModel = getModel(provider, model);
+    const abortSignal = AbortSignal.timeout(LIVE_CHECK_TIMEOUT_MS);
+    await generateText({ model: languageModel, prompt: 'Say OK', abortSignal });
+    const latencyMs = Math.round(performance.now() - start);
+    return { provider, model, status: 'ok', latencyMs };
+  } catch (err) {
+    const latencyMs = Math.round(performance.now() - start);
+    const msg = err instanceof Error ? err.message : String(err);
+    // AbortError or TimeoutError from AbortSignal.timeout
+    if (
+      (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) ||
+      msg.toLowerCase().includes('timeout') ||
+      latencyMs >= LIVE_CHECK_TIMEOUT_MS - 100
+    ) {
+      return { provider, model, status: 'timeout', latencyMs, error: `timeout (${LIVE_CHECK_TIMEOUT_MS / 1000}s)` };
+    }
+    return { provider, model, status: 'error', latencyMs, error: msg };
+  }
+}
+
+export async function runLiveHealthCheck(config: Config): Promise<LiveCheckResult[]> {
+  const pairs = collectAgentPairs(config);
+  if (pairs.length === 0) {
+    return [];
+  }
+
+  const settled = await Promise.allSettled(
+    pairs.map(({ provider, model }) => pingModel(provider, model))
+  );
+
+  return settled.map((result, i) => {
+    if (result.status === 'fulfilled') return result.value;
+    // Promise itself rejected (shouldn't happen since pingModel catches internally)
+    return {
+      provider: pairs[i].provider,
+      model: pairs[i].model,
+      status: 'error' as const,
+      error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    };
+  });
+}
+
+export function formatLiveCheckReport(liveChecks: LiveCheckResult[]): string {
+  const lines: string[] = [];
+  lines.push('Live API Check');
+  lines.push('\u2500'.repeat(14));
+
+  for (const check of liveChecks) {
+    const label = `${check.provider}/${check.model}`;
+    if (check.status === 'ok') {
+      const latency = check.latencyMs !== undefined ? dim(`${check.latencyMs}ms`) : '';
+      lines.push(`${statusColor.pass('✓')} ${label}  ${latency}`);
+    } else if (check.status === 'timeout') {
+      lines.push(`${statusColor.fail('✗')} ${label}  ${statusColor.fail('timeout (10s)')}`);
+    } else {
+      const errMsg = check.error ? statusColor.fail(check.error) : statusColor.fail('error');
+      lines.push(`${statusColor.fail('✗')} ${label}  ${errMsg}`);
+    }
+  }
+
+  const ok = liveChecks.filter((c) => c.status === 'ok').length;
+  const failed = liveChecks.filter((c) => c.status !== 'ok').length;
+  lines.push('');
+  lines.push(`Live: ${statusColor.pass(String(ok))} passed, ${statusColor.fail(String(failed))} failed`);
+  return lines.join('\n');
+}
+
 export function formatDoctorReport(result: DoctorResult): string {
   const lines: string[] = [];
   for (const check of result.checks) {
@@ -175,5 +309,11 @@ export function formatDoctorReport(result: DoctorResult): string {
   lines.push(
     `Summary: ${statusColor.pass(String(result.summary.pass))} passed, ${statusColor.fail(String(result.summary.fail))} failed, ${statusColor.warn(String(result.summary.warn))} warnings`
   );
+
+  if (result.liveChecks && result.liveChecks.length > 0) {
+    lines.push('');
+    lines.push(formatLiveCheckReport(result.liveChecks));
+  }
+
   return lines.join('\n');
 }

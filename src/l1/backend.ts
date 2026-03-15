@@ -78,7 +78,7 @@ export async function executeBackend(input: BackendInput): Promise<string> {
 // Shell Argument Sanitization
 // ============================================================================
 
-const SAFE_SHELL_ARG = /^[a-zA-Z0-9._\/:@-]+$/;
+const SAFE_SHELL_ARG = /^[a-zA-Z0-9./:@-]+$/;
 
 function sanitizeShellArg(arg: string, name: string): string {
   if (!SAFE_SHELL_ARG.test(arg)) {

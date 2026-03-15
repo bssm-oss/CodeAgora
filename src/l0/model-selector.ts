@@ -3,7 +3,7 @@
  * Thompson Sampling + diversity constraint based model selection.
  */
 
-import type { ModelMetadata, ModelSelection, BanditArm, ModelRouterConfig } from '../types/l0.js';
+import type { ModelMetadata, ModelSelection, BanditArm } from '../types/l0.js';
 
 // ============================================================================
 // Beta Distribution Sampling
@@ -129,7 +129,7 @@ export function selectModels(request: SelectionRequest): ModelSelection {
 
   // 1. Determine exploration slots
   const explorationSlots = Math.max(0, Math.floor(actualCount * explorationRate));
-  const samplingSlots = actualCount - explorationSlots;
+  const _samplingSlots = actualCount - explorationSlots;
 
   const selected: Array<{
     model: ModelMetadata;

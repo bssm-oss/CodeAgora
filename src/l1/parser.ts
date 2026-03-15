@@ -54,7 +54,7 @@ export function parseEvidenceResponse(
         filePath: fileInfo.filePath,
         lineRange: fileInfo.lineRange,
       });
-    } catch (error) {
+    } catch (_error) {
       // Skip malformed evidence blocks
       continue;
     }

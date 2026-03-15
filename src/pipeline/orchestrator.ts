@@ -197,7 +197,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     await writeSuggestions(date, sessionId, thresholdResult.suggestions);
 
     // === L3 HEAD: Scan Unconfirmed Queue ===
-    const { promoted, dismissed } = scanUnconfirmedQueue(
+    const { promoted, dismissed: _dismissed } = scanUnconfirmedQueue(
       moderatorReport.unconfirmedIssues
     );
 

@@ -5,10 +5,13 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import * as p from '@clack/prompts';
 import { generateMinimalTemplate } from '../../config/templates.js';
 import { PROVIDER_ENV_VARS } from '../../providers/env-vars.js';
 import { stringify as yamlStringify } from 'yaml';
+
+const _dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ============================================================================
 // Types
@@ -18,6 +21,7 @@ export interface InitOptions {
   format: 'json' | 'yaml';
   force: boolean;
   baseDir: string;
+  ci?: boolean;
 }
 
 export interface InitResult {
@@ -162,11 +166,43 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
 };
 
 // ============================================================================
+// GitHub Actions workflow
+// ============================================================================
+
+/**
+ * Write the GitHub Actions workflow template to {baseDir}/.github/workflows/codeagora-review.yml.
+ * Creates .github/workflows/ if it does not exist.
+ * Skips writing (returns false) when the file already exists and force is false.
+ * Returns true when the file was written.
+ */
+export async function writeGitHubWorkflow(
+  baseDir: string,
+  force = false
+): Promise<boolean> {
+  const workflowDir = path.join(baseDir, '.github', 'workflows');
+  const workflowPath = path.join(workflowDir, 'codeagora-review.yml');
+
+  const exists = await fileExists(workflowPath);
+  if (exists && !force) {
+    return false;
+  }
+
+  // Read template from src/data/github-actions-template.yml
+  // Walk up from the compiled output location to find the data file.
+  const templatePath = path.resolve(_dirname, '../../data/github-actions-template.yml');
+  const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+  await fs.mkdir(workflowDir, { recursive: true });
+  await fs.writeFile(workflowPath, templateContent, 'utf-8');
+  return true;
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
 export async function runInit(options: InitOptions): Promise<InitResult> {
-  const { format, force, baseDir } = options;
+  const { format, force, baseDir, ci } = options;
   const created: string[] = [];
   const skipped: string[] = [];
   const warnings: string[] = [];
@@ -185,6 +221,17 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const reviewIgnorePath = path.join(baseDir, '.reviewignore');
   const reviewIgnoreContent = generateReviewIgnore();
   await writeFile(reviewIgnorePath, reviewIgnoreContent, force, created, skipped);
+
+  // GitHub Actions workflow
+  if (ci) {
+    const workflowPath = path.join(baseDir, '.github', 'workflows', 'codeagora-review.yml');
+    const written = await writeGitHubWorkflow(baseDir, force);
+    if (written) {
+      created.push(workflowPath);
+    } else {
+      skipped.push(workflowPath);
+    }
+  }
 
   return { created, skipped, warnings };
 }
