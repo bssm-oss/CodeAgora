@@ -18,15 +18,15 @@
     "static-analysis"
   ],
   "files": [
-    "src/dist/**/*.js",
-    "src/dist/**/*.d.ts",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "src/data/**",
     "README.md",
     "LICENSE"
   ],
   "bin": {
-    "codeagora": "./src/dist/cli/index.js",
-    "agora": "./src/dist/cli/index.js"
+    "codeagora": "./dist/cli/index.js",
+    "agora": "./dist/cli/index.js"
   },
   "scripts": {
     "build": "tsup",

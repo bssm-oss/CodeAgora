@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
-    "outDir": "./src/dist",
+    "outDir": "./dist",
     "rootDir": "./src",
     "types": ["node", "vitest/globals"],
     "jsx": "react-jsx"
