@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import path from 'path';
 import { PROVIDER_ENV_VARS } from '../../../providers/env-vars.js';
+import { saveCredential, getCredentialsPath } from '../../../config/credentials.js';
 
 // ============================================================================
 // Types
@@ -12,24 +11,6 @@ type Step = 'provider' | 'key-input' | 'testing' | 'result';
 
 interface Props {
   onDone: () => void;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function addEnvVar(key: string, value: string): void {
-  const sanitized = value.replace(/[\r\n]/g, '');
-  const envPath = path.join(process.cwd(), '.env');
-  const existing = existsSync(envPath) ? readFileSync(envPath, 'utf-8') : '';
-  const lines = existing.split('\n');
-  const idx = lines.findIndex(l => l.startsWith(`${key}=`));
-  if (idx >= 0) {
-    lines[idx] = `${key}=${sanitized}`;
-  } else {
-    lines.push(`${key}=${sanitized}`);
-  }
-  writeFileSync(envPath, lines.filter((l, i) => i < lines.length - 1 || l !== '').join('\n') + '\n');
 }
 
 // ============================================================================
@@ -71,8 +52,8 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
       }
       if (key.return) {
         if (!keyInput.trim()) return;
-        // Save to .env
-        addEnvVar(envVarName, keyInput.trim());
+        // Save to ~/.config/codeagora/credentials
+        saveCredential(envVarName, keyInput.trim());
         // Set in current process for immediate use
         process.env[envVarName] = keyInput.trim();
         setStep('testing');
@@ -198,7 +179,7 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
         )}
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>.env updated with {envVarName}</Text>
+        <Text dimColor>{getCredentialsPath()} updated with {envVarName}</Text>
       </Box>
       <Box marginTop={1}>
         <Text dimColor>Press Enter or Esc to continue</Text>

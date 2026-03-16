@@ -75,6 +75,10 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
   let session: SessionManager | undefined;
 
   try {
+    // Load credentials from ~/.config/codeagora/credentials
+    const { loadCredentials } = await import('../config/credentials.js');
+    loadCredentials();
+
     // Load config and normalize (expand declarative reviewers if needed)
     progress?.stageStart('init', 'Loading config...');
     const rawConfig = await loadConfig();
