@@ -2,8 +2,8 @@
 
 **Where LLMs Debate Your Code**
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue)
-![Tests](https://img.shields.io/badge/tests-1107%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-1.0.0--rc.3-blue)
+![Tests](https://img.shields.io/badge/tests-1300%20passing-brightgreen)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -141,6 +141,8 @@ agora review --dry-run
 | `--timeout <seconds>` | Pipeline-level timeout | — |
 | `--reviewer-timeout <seconds>` | Per-reviewer timeout | — |
 | `--no-discussion` | Skip L2 discussion phase | — |
+| `--pr <url-or-number>` | GitHub PR URL or number (fetches diff from GitHub) | — |
+| `--post-review` | Post review comments back to the PR (requires `--pr`) | — |
 | `--dry-run` | Validate config only | — |
 | `--quiet` | Suppress progress output | — |
 | `--verbose` | Show detailed telemetry | — |
@@ -344,16 +346,89 @@ tests/fixtures/**
 | `md` | Markdown table with severity counts |
 | `github` | GitHub-flavored markdown with emoji severity badges |
 
-**GitHub Actions example:**
+---
 
-```yaml
-- name: Run CodeAgora review
-  run: |
-    git diff ${{ github.base_ref }}...${{ github.head_ref }} \
-      | agora review --output github --quiet
-  env:
-    GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+## GitHub Actions
+
+CodeAgora can automatically review every PR with inline comments and a commit status check.
+
+### Setup
+
+1. Add a config to your repo:
+   ```bash
+   npx codeagora init
+   ```
+
+2. Set API key(s) as repository secrets (Settings → Secrets):
+   ```
+   GROQ_API_KEY=your_key_here
+   ```
+
+3. Create `.github/workflows/review.yml`:
+   ```yaml
+   name: CodeAgora Review
+   on:
+     pull_request:
+       types: [opened, synchronize, reopened]
+
+   permissions:
+     contents: read
+     pull-requests: write
+     statuses: write
+
+   jobs:
+     review:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+           with:
+             fetch-depth: 0
+         - uses: justn-hyeok/CodeAgora@main
+           with:
+             github-token: ${{ secrets.GITHUB_TOKEN }}
+           env:
+             GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+   ```
+
+That's it. Every PR will get:
+- Inline review comments on the changed lines
+- A summary comment with verdict and issue table
+- A commit status check (pass/fail) that can block merge
+
+### Action Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `github-token` | GitHub token for posting reviews | (required) |
+| `config-path` | Path to `.ca/config.json` | `.ca/config.json` |
+| `fail-on-reject` | Exit 1 on REJECT (blocks merge as required check) | `true` |
+| `max-diff-lines` | Skip review if diff exceeds this (0 = unlimited) | `5000` |
+
+### Action Outputs
+
+| Output | Description |
+|--------|-------------|
+| `verdict` | `ACCEPT`, `REJECT`, or `NEEDS_HUMAN` |
+| `review-url` | URL of the posted GitHub review |
+| `session-id` | CodeAgora session ID |
+
+### Skip Review
+
+Add the `review:skip` label to a PR to bypass the review.
+
+### CLI Alternative
+
+You can also review a PR directly from the command line:
+
+```bash
+# Fetch diff from GitHub and review locally
+agora review --pr 123
+
+# Review and post results back to the PR
+agora review --pr https://github.com/owner/repo/pull/123 --post-review
 ```
+
+Requires `GITHUB_TOKEN` in your environment.
 
 ---
 
@@ -429,11 +504,11 @@ src/
 ├── config/        # Config loading, validation, templates, migration
 ├── providers/     # Provider registry, env var mapping
 ├── session/       # Session management and storage
-├── github/        # PR diff extraction, GitHub comment posting
+├── github/        # GitHub Actions, PR review posting, diff-to-position mapping
 ├── plugins/       # Plugin system
 ├── types/         # Shared TypeScript type definitions
 ├── utils/         # Shared utilities
-└── tests/         # 67 test files, 1107 tests
+└── tests/         # 80 test files, 1300 tests
 ```
 
 ---
@@ -469,7 +544,7 @@ pnpm cli review path/to/diff.patch
 | LLM SDK | Vercel AI SDK (multi-provider) |
 | Validation | zod |
 | Config | yaml / json |
-| Testing | vitest (1107 tests across 67 files) |
+| Testing | vitest (1300 tests across 80 files) |
 | Build | tsup |
 | Prompts / wizards | @clack/prompts |
 | Spinner / colors | ora, picocolors |
