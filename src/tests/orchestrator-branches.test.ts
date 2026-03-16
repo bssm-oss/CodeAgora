@@ -50,6 +50,10 @@ vi.mock('../l3/grouping.js', () => ({
   groupDiff: vi.fn(),
 }));
 
+vi.mock('../pipeline/chunker.js', () => ({
+  chunkDiff: vi.fn(),
+}));
+
 vi.mock('../l3/verdict.js', () => ({
   makeHeadVerdict: vi.fn(),
   scanUnconfirmedQueue: vi.fn(),
@@ -107,6 +111,7 @@ import { resolveReviewers, getBanditStore } from '../l0/index.js';
 import { QualityTracker } from '../l0/quality-tracker.js';
 import { extractMultipleSnippets } from '../utils/diff.js';
 import { createLogger } from '../utils/logger.js';
+import { chunkDiff } from '../pipeline/chunker.js';
 import fs from 'fs/promises';
 
 // ============================================================================
@@ -160,6 +165,9 @@ function setupDefaultMocks() {
   (normalizeConfig as Mock).mockReturnValue(mockConfig);
   (SessionManager.create as Mock).mockResolvedValue(mockSession);
   (fs.readFile as Mock).mockResolvedValue('diff content');
+  (chunkDiff as Mock).mockReturnValue([
+    { index: 0, files: ['auth.ts'], diffContent: 'diff content', estimatedTokens: 100 },
+  ]);
   (groupDiff as Mock).mockReturnValue([
     { name: 'root', files: ['auth.ts'], diffContent: 'diff content', prSummary: 'Changes in root/' },
   ]);
@@ -205,7 +213,7 @@ describe('Orchestrator Branches', () => {
   // 1. Empty diff -> immediate success (lines 62-69)
   // --------------------------------------------------------------------------
   it('empty diff returns immediate success without calling executeReviewers', async () => {
-    (groupDiff as Mock).mockReturnValue([]);
+    (chunkDiff as Mock).mockReturnValue([]);
 
     const result = await runPipeline({ diffPath: '/tmp/test.diff' });
 
@@ -218,13 +226,13 @@ describe('Orchestrator Branches', () => {
   // --------------------------------------------------------------------------
   // 2. Forfeit threshold exceeded (lines 84-97)
   // --------------------------------------------------------------------------
-  it('forfeit threshold exceeded returns error with rate percentage', async () => {
+  it('forfeit threshold exceeded on all chunks returns error', async () => {
     (checkForfeitThreshold as Mock).mockReturnValue({ passed: false, forfeitRate: 0.8 });
 
     const result = await runPipeline({ diffPath: '/tmp/test.diff' });
 
     expect(result.status).toBe('error');
-    expect(result.error).toContain('80.0%');
+    expect(result.error).toContain('All review chunks failed');
     expect(mockSession.setStatus).toHaveBeenCalledWith('failed');
   });
 

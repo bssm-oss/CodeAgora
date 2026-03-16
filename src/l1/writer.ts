@@ -20,7 +20,9 @@ export async function writeReviewOutput(
   review: ReviewOutput
 ): Promise<string> {
   const reviewsDir = getReviewsDir(date, sessionId);
-  const filename = `${review.reviewerId}-${review.model.replace(/[^a-z0-9]/gi, '-')}.md`;
+  const sanitizedModel = review.model.replace(/[^a-z0-9]/gi, '-');
+  const chunkSuffix = review.chunkIndex != null ? `-c${review.chunkIndex}` : '';
+  const filename = `${review.reviewerId}${chunkSuffix}-${sanitizedModel}.md`;
   const filePath = path.join(reviewsDir, filename);
 
   const content = formatReviewOutput(review);

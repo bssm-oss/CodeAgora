@@ -18,9 +18,11 @@ import { makeHeadVerdict, scanUnconfirmedQueue } from '../l3/verdict.js';
 import { writeHeadVerdict } from '../l3/writer.js';
 import { QualityTracker } from '../l0/quality-tracker.js';
 import { resolveReviewers, getBanditStore } from '../l0/index.js';
-import type { EvidenceDocument } from '../types/core.js';
+import type { EvidenceDocument, ReviewOutput } from '../types/core.js';
 import { SEVERITY_ORDER } from '../types/core.js';
 import type { ProgressEmitter } from './progress.js';
+import type { ReviewerInput } from '../l1/reviewer.js';
+import { chunkDiff } from './chunker.js';
 import fs from 'fs/promises';
 
 // ============================================================================
@@ -77,11 +79,11 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     const diffContent = await fs.readFile(input.diffPath, 'utf-8');
     progress?.stageComplete('init', 'Config loaded');
 
-    // === L3 HEAD: Diff Grouping ===
-    const fileGroups = groupDiff(diffContent);
+    // === DIFF CHUNKING ===
+    const chunks = chunkDiff(diffContent, { maxTokens: 8000 });
 
-    // Guard: empty diff produces no file groups
-    if (fileGroups.length === 0) {
+    // Guard: empty diff produces no chunks
+    if (chunks.length === 0) {
       await session.setStatus('completed');
       return {
         sessionId,
@@ -90,43 +92,67 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       };
     }
 
-    // === L1 REVIEWERS: Resolve (L0 model selection for auto reviewers) + Parallel Execution ===
-    const { reviewerInputs } = await resolveReviewers(
-      config.reviewers,
-      fileGroups,
-      config.modelRouter
-    );
+    // === L1 REVIEWERS: Chunk Loop ===
+    const allReviewResults: ReviewOutput[] = [];
+    const allReviewerInputs: ReviewerInput[] = [];
 
-    progress?.stageStart('review', 'Running reviewers...');
-    const reviewResults = await executeReviewers(
-      reviewerInputs,
-      config.errorHandling.maxRetries
-    );
-    progress?.stageComplete('review', `${reviewResults.length} reviewers completed`);
+    progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
 
-    // Check forfeit threshold
-    const forfeitCheck = checkForfeitThreshold(
-      reviewResults,
-      config.errorHandling.forfeitThreshold
-    );
+    for (const chunk of chunks) {
+      const fileGroups = groupDiff(chunk.diffContent);
+      if (fileGroups.length === 0) continue;
 
-    if (!forfeitCheck.passed) {
+      const { reviewerInputs } = await resolveReviewers(
+        config.reviewers,
+        fileGroups,
+        config.modelRouter
+      );
+
+      const reviewResults = await executeReviewers(
+        reviewerInputs,
+        config.errorHandling.maxRetries
+      );
+
+      // Per-chunk forfeit check — soft skip (not hard abort)
+      const forfeitCheck = checkForfeitThreshold(
+        reviewResults,
+        config.errorHandling.forfeitThreshold
+      );
+      if (!forfeitCheck.passed) continue;
+
+      // Tag chunkIndex on results (for writer filename disambiguation)
+      if (chunks.length > 1) {
+        for (const result of reviewResults) {
+          result.chunkIndex = chunk.index;
+        }
+      }
+
+      allReviewResults.push(...reviewResults);
+      allReviewerInputs.push(...reviewerInputs);
+    }
+
+    progress?.stageComplete('review', `${allReviewResults.length} reviewer results collected`);
+
+    // Empty pipeline guard — all chunks failed
+    if (allReviewResults.length === 0) {
       await session.setStatus('failed');
       return {
         sessionId,
         date,
         status: 'error',
-        error: `Too many reviewers forfeited: ${(forfeitCheck.forfeitRate * 100).toFixed(1)}%`,
+        error: 'All review chunks failed (forfeited or errored)',
       };
     }
 
-    // Write review outputs
-    await writeAllReviews(date, sessionId, reviewResults);
+    // Write review outputs (once, after all chunks)
+    await writeAllReviews(date, sessionId, allReviewResults);
 
     // === QUALITY TRACKING: Record L1 specificity ===
+    // Merge by reviewerId so QualityTracker gets one entry per reviewer
+    const mergedForTracking = mergeReviewOutputsByReviewer(allReviewResults);
     const qualityTracker = new QualityTracker();
-    for (const result of reviewResults) {
-      const reviewerInput = reviewerInputs.find((r) => r.config.id === result.reviewerId);
+    for (const result of mergedForTracking) {
+      const reviewerInput = allReviewerInputs.find((r) => r.config.id === result.reviewerId);
       qualityTracker.recordReviewerOutput(
         result,
         reviewerInput?.config.provider ?? reviewerInput?.config.backend ?? 'unknown',
@@ -135,7 +161,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     }
 
     // === L2 MODERATOR: Discussion Registration ===
-    const allEvidenceDocs: EvidenceDocument[] = reviewResults.flatMap(
+    const allEvidenceDocs: EvidenceDocument[] = allReviewResults.flatMap(
       (r) => r.evidenceDocs
     );
 
@@ -280,8 +306,8 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       summary: {
         decision: headVerdict.decision,
         reasoning: headVerdict.reasoning,
-        totalReviewers: reviewerInputs.length,
-        forfeitedReviewers: reviewResults.filter(r => r.status === 'forfeit').length,
+        totalReviewers: allReviewerInputs.length,
+        forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
         severityCounts,
         topIssues,
         totalDiscussions: moderatorReport.summary.totalDiscussions,
@@ -302,4 +328,29 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+// ============================================================================
+// Chunk Merge Helper
+// ============================================================================
+
+/**
+ * Merge ReviewOutputs by reviewerId for QualityTracker.
+ * Same reviewer across multiple chunks → single entry with concatenated evidenceDocs.
+ */
+export function mergeReviewOutputsByReviewer(results: ReviewOutput[]): ReviewOutput[] {
+  const map = new Map<string, ReviewOutput>();
+
+  for (const r of results) {
+    const existing = map.get(r.reviewerId);
+    if (!existing) {
+      map.set(r.reviewerId, { ...r, evidenceDocs: [...r.evidenceDocs] });
+    } else {
+      existing.evidenceDocs.push(...r.evidenceDocs);
+      // If any chunk succeeded, mark as success
+      if (r.status === 'success') existing.status = 'success';
+    }
+  }
+
+  return [...map.values()];
 }

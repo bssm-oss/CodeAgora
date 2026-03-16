@@ -62,6 +62,7 @@ export interface ReviewOutput {
   rawResponse: string;
   status: 'success' | 'forfeit' | 'error';
   error?: string;
+  chunkIndex?: number; // Set when diff is split into multiple chunks
 }
 
 // ============================================================================
