@@ -144,7 +144,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
           setAddForm(null);
         } else if (key.backspace || key.delete) {
           setAddForm(f => f ? { ...f, model: f.model.slice(0, -1) } : f);
-        } else if (input && input.length === 1) {
+        } else if (input) {
           setAddForm(f => f ? { ...f, model: f.model + input } : f);
         }
       }
@@ -161,7 +161,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
         setEditForm(null);
       } else if (key.backspace || key.delete) {
         setEditForm(f => f ? { ...f, model: f.model.slice(0, -1) } : f);
-      } else if (input && input.length === 1) {
+      } else if (input) {
         setEditForm(f => f ? { ...f, model: f.model + input } : f);
       }
       return;

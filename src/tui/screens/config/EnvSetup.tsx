@@ -84,7 +84,7 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
         setKeyInput(s => s.slice(0, -1));
         return;
       }
-      if (input && input.length === 1 && !key.return) {
+      if (input && !key.return) {
         setKeyInput(s => s + input);
       }
       return;

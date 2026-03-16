@@ -128,7 +128,7 @@ export function ModelSelector({ source, onSelect, onCancel }: Props): React.JSX.
       setSelectedIndex(0);
       return;
     }
-    if (input && input.length === 1 && !key.return) {
+    if (input && !key.return) {
       setSearch(s => s + input);
       setSelectedIndex(0);
     }

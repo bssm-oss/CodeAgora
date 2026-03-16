@@ -39,7 +39,7 @@ export function ModeratorTab({ config, isActive, onConfigChange }: Props): React
         setEditMode(false);
       } else if (key.backspace || key.delete) {
         setEditModel(m => m.slice(0, -1));
-      } else if (input && input.length === 1) {
+      } else if (input) {
         setEditModel(m => m + input);
       }
     } else {
