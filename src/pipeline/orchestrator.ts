@@ -23,6 +23,7 @@ import { SEVERITY_ORDER } from '../types/core.js';
 import type { ProgressEmitter } from './progress.js';
 import type { ReviewerInput } from '../l1/reviewer.js';
 import { chunkDiff } from './chunker.js';
+import { pLimit } from '../utils/concurrency.js';
 import fs from 'fs/promises';
 
 // ============================================================================
@@ -119,15 +120,16 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       };
     }
 
-    // === L1 REVIEWERS: Chunk Loop ===
+    // === L1 REVIEWERS: Chunk Processing ===
     const allReviewResults: ReviewOutput[] = [];
     const allReviewerInputs: ReviewerInput[] = [];
 
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
 
-    for (const chunk of chunks) {
+    // Process a single chunk: resolve reviewers → execute → forfeit check → tag
+    const processChunk = async (chunk: typeof chunks[number]) => {
       const fileGroups = groupDiff(chunk.diffContent);
-      if (fileGroups.length === 0) continue;
+      if (fileGroups.length === 0) return null;
 
       const { reviewerInputs } = await resolveReviewers(
         config.reviewers,
@@ -140,22 +142,47 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         config.errorHandling.maxRetries
       );
 
-      // Per-chunk forfeit check — soft skip (not hard abort)
       const forfeitCheck = checkForfeitThreshold(
         reviewResults,
         config.errorHandling.forfeitThreshold
       );
-      if (!forfeitCheck.passed) continue;
+      if (!forfeitCheck.passed) return null;
 
-      // Tag chunkIndex on results (for writer filename disambiguation)
       if (chunks.length > 1) {
         for (const result of reviewResults) {
           result.chunkIndex = chunk.index;
         }
       }
 
-      allReviewResults.push(...reviewResults);
-      allReviewerInputs.push(...reviewerInputs);
+      return { reviewResults, reviewerInputs };
+    };
+
+    // Adaptive strategy: ≤2 chunks serial (overhead not worth it), >2 parallel
+    const CHUNK_PARALLEL_THRESHOLD = 2;
+    const CHUNK_CONCURRENCY = 3;
+
+    if (chunks.length <= CHUNK_PARALLEL_THRESHOLD) {
+      // Serial — low overhead for small diffs
+      for (const chunk of chunks) {
+        const out = await processChunk(chunk);
+        if (out) {
+          allReviewResults.push(...out.reviewResults);
+          allReviewerInputs.push(...out.reviewerInputs);
+        }
+      }
+    } else {
+      // Parallel with concurrency limit — prevents API rate-limit storms
+      const limit = pLimit(CHUNK_CONCURRENCY);
+      const settled = await Promise.allSettled(
+        chunks.map((chunk) => limit(() => processChunk(chunk)))
+      );
+      for (const result of settled) {
+        if (result.status === 'fulfilled' && result.value) {
+          allReviewResults.push(...result.value.reviewResults);
+          allReviewerInputs.push(...result.value.reviewerInputs);
+        }
+        // rejected chunks are silently skipped (same as forfeit skip)
+      }
     }
 
     progress?.stageComplete('review', `${allReviewResults.length} reviewer results collected`);
