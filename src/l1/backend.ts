@@ -4,9 +4,6 @@
  */
 
 import { spawn } from 'child_process';
-import fs from 'fs/promises';
-import path from 'path';
-import { randomUUID } from 'crypto';
 import type { Backend } from '../types/config.js';
 
 // ============================================================================

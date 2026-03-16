@@ -3,7 +3,7 @@
  * Maps CodeAgora domain types → GitHub API review shapes.
  */
 
-import type { EvidenceDocument, DiscussionVerdict, ModeratorReport } from '../types/core.js';
+import type { EvidenceDocument, DiscussionVerdict } from '../types/core.js';
 import { SEVERITY_ORDER } from '../types/core.js';
 import type { GitHubReview, GitHubReviewComment, DiffPositionIndex } from './types.js';
 import { resolveLineRange } from './diff-parser.js';

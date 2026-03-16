@@ -23,7 +23,7 @@ import { sendNotifications, type NotificationPayload } from '../notifications/we
 import ora from 'ora';
 import { ProgressEmitter } from '../pipeline/progress.js';
 import { setLocale, detectLocale } from '../i18n/index.js';
-import { parsePrUrl, parseGitRemote, createGitHubConfig } from '../github/client.js';
+import { parsePrUrl, createGitHubConfig } from '../github/client.js';
 import { fetchPrDiff } from '../github/pr-diff.js';
 import { buildDiffPositionIndex } from '../github/diff-parser.js';
 import { mapToGitHubReview } from '../github/mapper.js';
