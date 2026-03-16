@@ -29,7 +29,7 @@ function decisionBgColor(decision: string): { color: string; bold: boolean } {
   }
 }
 
-export function ResultsScreen({ result, onHome, onViewContext }: Props): React.JSX.Element {
+export function ResultsScreen({ result, onHome: _onHome, onViewContext }: Props): React.JSX.Element {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 

@@ -45,7 +45,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
   const [showModelSelector, setShowModelSelector] = useState<'add' | 'edit' | null>(null);
 
   const reviewers = Array.isArray(config.reviewers) ? config.reviewers : [];
-  const staticReviewers = reviewers.filter(isStaticReviewer) as AgentConfig[];
+  const _staticReviewers = reviewers.filter(isStaticReviewer) as AgentConfig[];
 
   function showMessage(msg: string): void {
     setMessage(msg);
