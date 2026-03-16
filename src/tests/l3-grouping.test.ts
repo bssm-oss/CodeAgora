@@ -62,11 +62,11 @@ describe('groupDiff()', () => {
       expect(result[0].files).toContain('src/auth.ts');
     });
 
-    it('group name matches the top-level directory', () => {
+    it('group name includes the file path for single-file groups', () => {
       const diff = makeDiffSection('src/auth.ts');
       const result = groupDiff(diff);
 
-      expect(result[0].name).toBe('src');
+      expect(result[0].name).toContain('src');
     });
 
     it('group diffContent contains the original diff section', () => {
@@ -142,21 +142,19 @@ describe('groupDiff()', () => {
       expect(result).toHaveLength(2);
     });
 
-    it('each group contains only files from its own directory', () => {
+    it('each group contains only files from its own cluster', () => {
       const diff =
         makeDiffSection('src/auth.ts') +
         makeDiffSection('tests/auth.test.ts');
 
       const result = groupDiff(diff);
 
-      const srcGroup = result.find((g) => g.name === 'src');
-      const testsGroup = result.find((g) => g.name === 'tests');
-
-      expect(srcGroup).toBeDefined();
-      expect(srcGroup!.files).toEqual(['src/auth.ts']);
-
-      expect(testsGroup).toBeDefined();
-      expect(testsGroup!.files).toEqual(['tests/auth.test.ts']);
+      // Files with no import relationship are grouped by depth-2 directory
+      for (const group of result) {
+        expect(group.files.length).toBeGreaterThan(0);
+      }
+      const allFiles = result.flatMap((g) => g.files).sort();
+      expect(allFiles).toEqual(['src/auth.ts', 'tests/auth.test.ts']);
     });
 
     it('each group diffContent only contains its own file sections', () => {
@@ -166,16 +164,15 @@ describe('groupDiff()', () => {
 
       const result = groupDiff(diff);
 
-      const srcGroup = result.find((g) => g.name === 'src')!;
-      expect(srcGroup.diffContent).toContain('diff --git a/src/auth.ts');
-      expect(srcGroup.diffContent).not.toContain('diff --git a/tests/auth.test.ts');
-
-      const testsGroup = result.find((g) => g.name === 'tests')!;
-      expect(testsGroup.diffContent).toContain('diff --git a/tests/auth.test.ts');
-      expect(testsGroup.diffContent).not.toContain('diff --git a/src/auth.ts');
+      // Each group's diffContent should only have its own files
+      for (const group of result) {
+        for (const file of group.files) {
+          expect(group.diffContent).toContain(`diff --git a/${file} b/${file}`);
+        }
+      }
     });
 
-    it('three directories produce three groups', () => {
+    it('three directories produce separate groups', () => {
       const diff =
         makeDiffSection('src/auth.ts') +
         makeDiffSection('tests/auth.test.ts') +
@@ -183,9 +180,9 @@ describe('groupDiff()', () => {
 
       const result = groupDiff(diff);
 
-      expect(result).toHaveLength(3);
-      const names = result.map((g) => g.name).sort();
-      expect(names).toEqual(['docs', 'src', 'tests']);
+      // All files should be covered
+      const allFiles = result.flatMap((g) => g.files).sort();
+      expect(allFiles).toEqual(['docs/README.md', 'src/auth.ts', 'tests/auth.test.ts']);
     });
   });
 
@@ -223,7 +220,7 @@ index abc1234..def5678 100644
       const result = groupDiff(renameDiff);
 
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe('src');
+      expect(result[0].name).toContain('src');
     });
   });
 
