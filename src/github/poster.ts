@@ -49,16 +49,37 @@ export async function postReview(
       body: c.body,
     }));
 
-  // Step 3: Post the review
-  const { data } = await kit.pulls.createReview({
-    owner: config.owner,
-    repo: config.repo,
-    pull_number: prNumber,
-    commit_id: review.commit_id,
-    event: review.event,
-    body: review.body,
-    comments: inlineComments,
-  });
+  // Step 3: Post the review (retry without inline comments on position errors)
+  let data;
+  try {
+    const response = await kit.pulls.createReview({
+      owner: config.owner,
+      repo: config.repo,
+      pull_number: prNumber,
+      commit_id: review.commit_id,
+      event: review.event,
+      body: review.body,
+      comments: inlineComments,
+    });
+    data = response.data;
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('position') || message.includes('422') || message.includes('Unprocessable')) {
+      // Fallback: post review without inline comments
+      const response = await kit.pulls.createReview({
+        owner: config.owner,
+        repo: config.repo,
+        pull_number: prNumber,
+        commit_id: review.commit_id,
+        event: review.event,
+        body: review.body,
+        comments: [],
+      });
+      data = response.data;
+    } else {
+      throw err;
+    }
+  }
 
   // Step 4: Post file-level comments as individual issue comments
   const fileLevelComments = comments.filter((c) => c.position === undefined);
