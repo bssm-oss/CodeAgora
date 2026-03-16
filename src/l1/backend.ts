@@ -133,10 +133,9 @@ function buildCodexCommand(model: string, promptFile: string): string {
 }
 
 function buildGeminiCommand(model: string, promptFile: string): string {
-  // Gemini CLI: -m for model, -p for prompt
-  // Format: gemini -m model -p "$(cat prompt.txt)"
-  return `gemini -m ${sanitizeShellArg(model, 'model')} -p "$(cat "${promptFile}")"`;
-
+  // Gemini CLI: pipe prompt via stdin to avoid shell injection via diff content
+  // Format: cat prompt.txt | gemini -m model
+  return `cat "${promptFile}" | gemini -m ${sanitizeShellArg(model, 'model')}`;
 }
 
 function buildClaudeCommand(model: string, promptFile: string): string {

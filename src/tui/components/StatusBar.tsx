@@ -18,6 +18,7 @@ function getScreenHints(): Record<Screen, string> {
     sessions: t('statusbar.sessions'),
     config: t('statusbar.config'),
     debate: t('statusbar.debate'),
+    context: t('statusbar.context') || 'Tab: files | j/k: scroll | c: collapse | Enter: detail | q: back',
   };
 }
 

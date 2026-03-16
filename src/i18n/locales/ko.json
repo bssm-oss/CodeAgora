@@ -57,6 +57,7 @@
   "statusbar.sessions": "j/k: 스크롤 | Enter: 상세 | f: 필터 | q: 홈",
   "statusbar.config": "Tab: 탭 전환 | j/k: 이동 | q: 홈",
   "statusbar.debate": "j/k: 스크롤 | q: 뒤로",
+  "statusbar.context": "Tab: 파일 전환 | j/k: 스크롤 | c: 축소 | Enter: 상세 | q: 뒤로",
   "statusbar.review": "q: 뒤로",
   "statusbar.quit": "q: 종료",
 

@@ -57,6 +57,7 @@
   "statusbar.sessions": "j/k: scroll | Enter: detail | f: filter | q: home",
   "statusbar.config": "Tab: switch tab | j/k: navigate | q: home",
   "statusbar.debate": "j/k: scroll | q: back",
+  "statusbar.context": "Tab: files | j/k: scroll | c: collapse | Enter: detail | q: back",
   "statusbar.review": "q: back",
   "statusbar.quit": "q: quit",
 

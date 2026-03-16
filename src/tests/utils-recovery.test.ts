@@ -7,8 +7,8 @@ import {
   retryWithBackoff,
   retryOnError,
   isRetryableError,
-  CircuitBreaker,
 } from '../utils/recovery.js';
+import { CircuitBreaker } from '../l1/circuit-breaker.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,93 +151,75 @@ describe('isRetryableError', () => {
 // ---------------------------------------------------------------------------
 
 describe('CircuitBreaker', () => {
+  const P = 'test-provider';
+  const M = 'test-model';
   let cb: CircuitBreaker;
 
   beforeEach(() => {
-    // threshold=3 failures to open; timeout=50ms so HALF_OPEN is reachable
-    cb = new CircuitBreaker(3, 50);
+    // threshold=3 failures to open; cooldownMs=50ms so half-open is reachable
+    cb = new CircuitBreaker({ failureThreshold: 3, cooldownMs: 50 });
   });
 
-  it('starts in CLOSED state', () => {
-    expect(cb.getState()).toBe('CLOSED');
+  it('starts in closed state', () => {
+    expect(cb.getState(P, M)).toBe('closed');
   });
 
-  it('executes the function and returns its value in CLOSED state', async () => {
-    const result = await cb.execute(async () => 42);
-    expect(result).toBe(42);
+  it('reports not open when closed', () => {
+    expect(cb.isOpen(P, M)).toBe(false);
   });
 
-  it('increments failure count on each failure without opening prematurely', async () => {
-    const failFn = async () => { throw new Error('boom'); };
+  it('increments failure count without opening prematurely', () => {
     // Two failures — still under threshold of 3
-    await expect(cb.execute(failFn)).rejects.toThrow();
-    await expect(cb.execute(failFn)).rejects.toThrow();
-    expect(cb.getState()).toBe('CLOSED');
+    cb.recordFailure(P, M);
+    cb.recordFailure(P, M);
+    expect(cb.getState(P, M)).toBe('closed');
   });
 
-  it('transitions to OPEN state after reaching the failure threshold', async () => {
-    const failFn = async () => { throw new Error('boom'); };
+  it('transitions to open state after reaching the failure threshold', () => {
     for (let i = 0; i < 3; i++) {
-      await expect(cb.execute(failFn)).rejects.toThrow();
+      cb.recordFailure(P, M);
     }
-    expect(cb.getState()).toBe('OPEN');
+    expect(cb.getState(P, M)).toBe('open');
   });
 
-  it('throws "Circuit breaker is OPEN" when state is OPEN and timeout not elapsed', async () => {
-    const failFn = async () => { throw new Error('boom'); };
+  it('reports isOpen when state is open and cooldown not elapsed', () => {
     for (let i = 0; i < 3; i++) {
-      await expect(cb.execute(failFn)).rejects.toThrow();
+      cb.recordFailure(P, M);
     }
-    await expect(cb.execute(async () => 'value')).rejects.toThrow('Circuit breaker is OPEN');
+    expect(cb.isOpen(P, M)).toBe(true);
   });
 
-  it('transitions to HALF_OPEN after the timeout elapses', async () => {
-    vi.useFakeTimers();
-    try {
-      const cb2 = new CircuitBreaker(3, 100);
-      const failFn = async () => { throw new Error('boom'); };
-      for (let i = 0; i < 3; i++) {
-        await cb2.execute(failFn).catch(() => {});
-      }
-      expect(cb2.getState()).toBe('OPEN');
-
-      // Advance time past the 100ms timeout
-      vi.advanceTimersByTime(101);
-
-      // Next execute call checks Date.now() vs lastFailureTime
-      await cb2.execute(async () => 'probe').catch(() => {});
-      // After timeout elapses the state should have moved to HALF_OPEN or CLOSED
-      expect(['HALF_OPEN', 'CLOSED']).toContain(cb2.getState());
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('returns to CLOSED state after a successful call in HALF_OPEN', async () => {
-    vi.useFakeTimers();
-    try {
-      const cb2 = new CircuitBreaker(3, 100);
-      const failFn = async () => { throw new Error('boom'); };
-      for (let i = 0; i < 3; i++) {
-        await cb2.execute(failFn).catch(() => {});
-      }
-      vi.advanceTimersByTime(101);
-
-      // Successful probe in HALF_OPEN → CLOSED
-      const result = await cb2.execute(async () => 'recovered');
-      expect(result).toBe('recovered');
-      expect(cb2.getState()).toBe('CLOSED');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('getState() reflects the current state accurately', async () => {
-    expect(cb.getState()).toBe('CLOSED');
-    const failFn = async () => { throw new Error('x'); };
+  it('transitions to half-open after the cooldown elapses', () => {
+    let now = 0;
+    const cb2 = new CircuitBreaker({ failureThreshold: 3, cooldownMs: 100, nowFn: () => now });
     for (let i = 0; i < 3; i++) {
-      await cb.execute(failFn).catch(() => {});
+      cb2.recordFailure(P, M);
     }
-    expect(cb.getState()).toBe('OPEN');
+    expect(cb2.getState(P, M)).toBe('open');
+
+    // Advance time past the 100ms cooldown
+    now = 101;
+    expect(cb2.getState(P, M)).toBe('half-open');
+  });
+
+  it('returns to closed state after a successful call in half-open', () => {
+    let now = 0;
+    const cb2 = new CircuitBreaker({ failureThreshold: 3, cooldownMs: 100, nowFn: () => now });
+    for (let i = 0; i < 3; i++) {
+      cb2.recordFailure(P, M);
+    }
+    now = 101;
+    expect(cb2.getState(P, M)).toBe('half-open');
+
+    cb2.recordSuccess(P, M);
+    expect(cb2.getState(P, M)).toBe('closed');
+  });
+
+  it('getState() reflects the current state accurately', () => {
+    expect(cb.getState(P, M)).toBe('closed');
+    for (let i = 0; i < 3; i++) {
+      cb.recordFailure(P, M);
+    }
+    expect(cb.getState(P, M)).toBe('open');
   });
 });

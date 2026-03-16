@@ -41,20 +41,23 @@ export function applyThreshold(
     }
 
     // HARSHLY_CRITICAL: 1명 → 즉시 등록
-    if (severityCounts.HARSHLY_CRITICAL >= settings.registrationThreshold.HARSHLY_CRITICAL) {
+    const hcThreshold = settings.registrationThreshold.HARSHLY_CRITICAL;
+    if (hcThreshold !== null && severityCounts.HARSHLY_CRITICAL >= hcThreshold) {
       discussions.push(createDiscussion(group, 'HARSHLY_CRITICAL', counter));
       continue;
     }
 
     // CRITICAL: 1명 + (서포터 검증 필요)
     // For now, register if threshold met (supporter approval added in discussion phase)
-    if (severityCounts.CRITICAL >= settings.registrationThreshold.CRITICAL) {
+    const criticalThreshold = settings.registrationThreshold.CRITICAL;
+    if (criticalThreshold !== null && severityCounts.CRITICAL >= criticalThreshold) {
       discussions.push(createDiscussion(group, 'CRITICAL', counter));
       continue;
     }
 
     // WARNING: 2명+
-    if (severityCounts.WARNING >= settings.registrationThreshold.WARNING) {
+    const warningThreshold = settings.registrationThreshold.WARNING;
+    if (warningThreshold !== null && severityCounts.WARNING >= warningThreshold) {
       discussions.push(createDiscussion(group, 'WARNING', counter));
       continue;
     }

@@ -6,7 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { extractCodeSnippet } from '../utils/diff.js';
 import { findDuplicates, mergeDiscussions, deduplicateDiscussions } from '../l2/deduplication.js';
 import { checkForObjections } from '../l2/objection.js';
-import { retryWithBackoff, isRetryableError, CircuitBreaker } from '../utils/recovery.js';
+import { retryWithBackoff, isRetryableError } from '../utils/recovery.js';
+import { CircuitBreaker } from '../l1/circuit-breaker.js';
 import type { Discussion } from '../types/core.js';
 
 describe('Code Snippet Extraction', () => {
@@ -163,22 +164,20 @@ describe('Error Recovery', () => {
     expect(isRetryableError(new Error('Invalid input'))).toBe(false);
   });
 
-  it('should open circuit after threshold', async () => {
-    const breaker = new CircuitBreaker(2, 1000);
-
-    const failingFn = async () => {
-      throw new Error('Always fails');
-    };
+  it('should open circuit after threshold', () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 2, cooldownMs: 1000 });
+    const provider = 'test-provider';
+    const model = 'test-model';
 
     // First failure
-    await expect(breaker.execute(failingFn)).rejects.toThrow();
-    expect(breaker.getState()).toBe('CLOSED');
+    breaker.recordFailure(provider, model);
+    expect(breaker.getState(provider, model)).toBe('closed');
 
     // Second failure - opens circuit
-    await expect(breaker.execute(failingFn)).rejects.toThrow();
-    expect(breaker.getState()).toBe('OPEN');
+    breaker.recordFailure(provider, model);
+    expect(breaker.getState(provider, model)).toBe('open');
 
-    // Third attempt - circuit is open
-    await expect(breaker.execute(failingFn)).rejects.toThrow('Circuit breaker is OPEN');
+    // Circuit is open
+    expect(breaker.isOpen(provider, model)).toBe(true);
   });
 });
