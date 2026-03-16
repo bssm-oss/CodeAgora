@@ -154,8 +154,9 @@ export function buildSummaryBody(params: {
   sessionDate: string;
   evidenceDocs: EvidenceDocument[];
   discussions: DiscussionVerdict[];
+  questionsForHuman?: string[];
 }): string {
-  const { summary, sessionId, sessionDate, evidenceDocs, discussions } = params;
+  const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = params;
   const lines: string[] = [];
 
   lines.push(MARKER);
@@ -244,6 +245,18 @@ export function buildSummaryBody(params: {
     lines.push('');
   }
 
+  // Open questions (NEEDS_HUMAN)
+  if (questionsForHuman && questionsForHuman.length > 0) {
+    lines.push('### Open Questions');
+    lines.push('');
+    lines.push('CodeAgora could not reach a conclusion on the following. A human reviewer has been requested.');
+    lines.push('');
+    for (let i = 0; i < questionsForHuman.length; i++) {
+      lines.push(`${i + 1}. ${questionsForHuman[i]}`);
+    }
+    lines.push('');
+  }
+
   // Footer
   lines.push('---');
   lines.push('');
@@ -270,8 +283,9 @@ export function mapToGitHubReview(params: {
   sessionId: string;
   sessionDate: string;
   reviewerMap?: Map<string, string[]>;
+  questionsForHuman?: string[];
 }): GitHubReview {
-  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap } =
+  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman } =
     params;
 
   // Filter out dismissed docs — exact match by file + line
@@ -285,7 +299,7 @@ export function mapToGitHubReview(params: {
   );
 
   const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap);
-  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions });
+  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman });
 
   // Determine event: REQUEST_CHANGES if any CRITICAL/HARSHLY_CRITICAL remains
   const hasBlocking = activeDocs.some(

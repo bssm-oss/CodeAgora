@@ -73,15 +73,60 @@ export async function postReview(
     });
   }
 
-  // Determine verdict from event
-  const verdict: PostResult['verdict'] =
-    review.event === 'REQUEST_CHANGES' ? 'REJECT' : 'ACCEPT';
+  // Determine verdict from event and body content
+  let verdict: PostResult['verdict'];
+  if (review.event === 'REQUEST_CHANGES') {
+    verdict = 'REJECT';
+  } else if (review.body.includes('NEEDS HUMAN REVIEW')) {
+    verdict = 'NEEDS_HUMAN';
+  } else {
+    verdict = 'ACCEPT';
+  }
 
   return {
     reviewId: data.id,
     reviewUrl: data.html_url,
     verdict,
   };
+}
+
+/**
+ * Handle NEEDS_HUMAN verdict: request human reviewers and add label.
+ * Failures are non-fatal — the bot may lack permission.
+ */
+export async function handleNeedsHuman(
+  config: GitHubConfig,
+  prNumber: number,
+  options: {
+    humanReviewers?: string[];
+    humanTeams?: string[];
+    needsHumanLabel?: string;
+  },
+  octokit?: Octokit,
+): Promise<void> {
+  const kit = octokit ?? createOctokit(config);
+
+  // Request human reviewers
+  const reviewers = options.humanReviewers ?? [];
+  const teams = options.humanTeams ?? [];
+  if (reviewers.length > 0 || teams.length > 0) {
+    await kit.pulls.requestReviewers({
+      owner: config.owner,
+      repo: config.repo,
+      pull_number: prNumber,
+      reviewers,
+      team_reviewers: teams,
+    }).catch(() => { /* non-fatal: reviewers may not be collaborators */ });
+  }
+
+  // Add label
+  const label = options.needsHumanLabel ?? 'needs-human-review';
+  await kit.issues.addLabels({
+    owner: config.owner,
+    repo: config.repo,
+    issue_number: prNumber,
+    labels: [label],
+  }).catch(() => { /* non-fatal */ });
 }
 
 /**

@@ -12,7 +12,8 @@ import { appendFileSync } from 'fs';
 import { runPipeline } from './pipeline/orchestrator.js';
 import { buildDiffPositionIndex } from './github/diff-parser.js';
 import { mapToGitHubReview } from './github/mapper.js';
-import { postReview, setCommitStatus } from './github/poster.js';
+import { postReview, setCommitStatus, handleNeedsHuman } from './github/poster.js';
+import { loadConfig } from './config/loader.js';
 
 // ============================================================================
 // Input Parsing
@@ -117,6 +118,18 @@ async function main(): Promise<void> {
 
   const postResult = await postReview(ghConfig, inputs.pr, review);
   await setCommitStatus(ghConfig, inputs.sha, postResult.verdict, postResult.reviewUrl);
+
+  // Handle NEEDS_HUMAN: request reviewers and add label
+  if (postResult.verdict === 'NEEDS_HUMAN') {
+    const config = await loadConfig().catch(() => null);
+    const ghIntegration = config?.github;
+    await handleNeedsHuman(ghConfig, inputs.pr, {
+      humanReviewers: ghIntegration?.humanReviewers,
+      humanTeams: ghIntegration?.humanTeams,
+      needsHumanLabel: ghIntegration?.needsHumanLabel,
+    });
+  }
+
   console.log('::endgroup::');
 
   // Set outputs
