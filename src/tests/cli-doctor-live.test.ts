@@ -1,6 +1,7 @@
 /**
  * CLI Doctor --live health check tests
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { runLiveHealthCheck, formatLiveCheckReport } from '../cli/commands/doctor.js';

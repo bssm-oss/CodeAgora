@@ -2,13 +2,13 @@
  * CLI Commands Tests — init, doctor, providers
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
 
-import { runInit, generateReviewIgnore, type InitOptions } from '../cli/commands/init.js';
-import { runDoctor, formatDoctorReport, getProviderEnvVar } from '../cli/commands/doctor.js';
+import { runInit, generateReviewIgnore } from '../cli/commands/init.js';
+import { runDoctor, formatDoctorReport } from '../cli/commands/doctor.js';
 import { listProviders, formatProviderList } from '../cli/commands/providers.js';
 
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');

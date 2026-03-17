@@ -39,7 +39,7 @@ git diff | agora review
 
 2분이면 됩니다.
 
-**사전 요구사항**: Node.js 18+
+**사전 요구사항**: Node.js 20+
 
 ```bash
 # 1. 설치

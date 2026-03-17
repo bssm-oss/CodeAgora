@@ -4,7 +4,7 @@
 
 [![Version](https://img.shields.io/npm/v/codeagora)](https://www.npmjs.com/package/codeagora)
 ![Tests](https://img.shields.io/badge/tests-1313%20passing-brightgreen)
-![Node](https://img.shields.io/badge/node-%3E%3D18-green)
+![Node](https://img.shields.io/badge/node-%3E%3D20-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 CodeAgora runs multiple LLMs in parallel to independently review your code, then routes conflicts through a structured debate before a head agent delivers the final verdict. Different models have different blind spots — running them together catches more issues and filters noise through consensus.
@@ -39,7 +39,7 @@ git diff | agora review
 
 Get running in under 2 minutes.
 
-**Prerequisites**: Node.js 18+
+**Prerequisites**: Node.js 20+
 
 ```bash
 # 1. Install
