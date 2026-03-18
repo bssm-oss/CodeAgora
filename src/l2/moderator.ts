@@ -539,42 +539,129 @@ ${snippetSection}
 Evaluate the evidence and provide your verdict.`;
 }
 
-function parseStance(response: string): 'agree' | 'disagree' | 'neutral' {
+type Stance = 'agree' | 'disagree' | 'neutral';
+type Severity = 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED';
+
+/**
+ * Parse supporter stance from LLM response.
+ *
+ * Priority:
+ * 1. Structured patterns: "Stance: AGREE", "**Verdict:** disagree", JSON "stance": "agree"
+ * 2. First-line keyword (DISAGREE checked before AGREE to avoid substring match)
+ * 3. Weighted section scan (headings and bold markers get extra weight)
+ * 4. Default: neutral
+ */
+export function parseStance(response: string): Stance {
+  // P1: Structured field patterns (case-insensitive)
+  const structuredMatch = response.match(
+    /(?:stance|verdict|decision|judgment|판단)\s*[:=]\s*\*{0,2}\s*(agree|disagree|neutral|동의|반대|중립)/im
+  );
+  if (structuredMatch) {
+    return normalizeStance(structuredMatch[1]);
+  }
+
+  // P1b: JSON-like pattern: "stance": "agree"
+  const jsonMatch = response.match(/"stance"\s*:\s*"(agree|disagree|neutral)"/i);
+  if (jsonMatch) {
+    return jsonMatch[1].toLowerCase() as Stance;
+  }
+
+  // P2: First-line explicit keyword (check DISAGREE before AGREE)
   const firstLine = response.split('\n')[0].toUpperCase().trim();
+  if (/\bDISAGREE\b/.test(firstLine)) return 'disagree';
+  if (/\bAGREE\b/.test(firstLine)) return 'agree';
+  if (/\bNEUTRAL\b/.test(firstLine)) return 'neutral';
 
-  // First line explicit stance declaration takes priority.
-  // Check DISAGREE before AGREE since "DISAGREE" contains "AGREE" as a substring.
-  if (firstLine.includes('DISAGREE')) return 'disagree';
-  if (firstLine.includes('AGREE')) return 'agree';
-  if (firstLine.includes('NEUTRAL')) return 'neutral';
+  // P3: Weighted keyword scan — headings/bold get 3x weight
+  const lines = response.split('\n');
+  let agreeScore = 0;
+  let disagreeScore = 0;
 
-  // Fallback: keyword counting on full response
-  const lower = response.toLowerCase();
-  // Count disagree first (it contains "agree" as substring)
-  const disagreeCount = (lower.match(/\bdisagree\b/g) ?? []).length;
-  // Pure agree = total agree matches minus those that are part of "disagree"
-  const agreeCount = (lower.match(/\bagree\b/g) ?? []).length - disagreeCount;
+  for (const line of lines) {
+    const isEmphasis = /^#{1,3}\s|^\*\*/.test(line.trim());
+    const weight = isEmphasis ? 3 : 1;
+    const lower = line.toLowerCase();
 
-  if (agreeCount > disagreeCount) return 'agree';
-  if (disagreeCount > agreeCount) return 'disagree';
+    // Count word-boundary matches; \bagree\b won't match inside "disagree"
+    const dMatches = (lower.match(/\bdisagree\b|반대/g) ?? []).length;
+    const aMatches = (lower.match(/\bagree\b|동의/g) ?? []).length;
+
+    disagreeScore += dMatches * weight;
+    agreeScore += aMatches * weight;
+  }
+
+  if (agreeScore > disagreeScore) return 'agree';
+  if (disagreeScore > agreeScore) return 'disagree';
   return 'neutral';
 }
 
-function parseForcedDecision(response: string): { severity: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED'; reasoning: string } {
-  // Check first few lines for explicit severity keyword
-  const firstLines = response.split('\n').slice(0, 5).join('\n').toLowerCase();
+function normalizeStance(raw: string): Stance {
+  const lower = raw.toLowerCase().trim();
+  if (lower === 'disagree' || lower === '반대') return 'disagree';
+  if (lower === 'agree' || lower === '동의') return 'agree';
+  return 'neutral';
+}
 
-  let severity: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED' = 'WARNING';
+/**
+ * Parse moderator forced decision from LLM response.
+ *
+ * Priority:
+ * 1. Structured patterns: "Severity: WARNING", "**Severity:** CRITICAL"
+ * 2. JSON-like: "severity": "WARNING"
+ * 3. Keyword scan on full response (most specific first)
+ * 4. Default: WARNING
+ */
+export function parseForcedDecision(response: string): { severity: Severity; reasoning: string } {
+  const SEVERITY_ORDER: Severity[] = [
+    'HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION', 'DISMISSED',
+  ];
 
-  // Match most specific first (harshly_critical before critical)
-  if (/\b(harshly[_\s]critical)\b/.test(firstLines)) severity = 'HARSHLY_CRITICAL';
-  else if (/\bseverity:\s*critical\b/.test(firstLines) || /^critical\b/m.test(firstLines)) severity = 'CRITICAL';
-  else if (/\bcritical\b/.test(firstLines) && !/\bnot\s+critical\b/.test(firstLines)) severity = 'CRITICAL';
-  else if (/\bwarning\b/.test(firstLines)) severity = 'WARNING';
-  else if (/\bdismissed?\b/.test(firstLines)) severity = 'DISMISSED';
+  // P1: Structured field pattern
+  const structuredMatch = response.match(
+    /(?:severity|심각도)\s*[:=]\s*\*{0,2}\s*(harshly[_\s]critical|critical|warning|suggestion|dismissed?)/im
+  );
+  if (structuredMatch) {
+    const normalized = normalizeSeverity(structuredMatch[1]);
+    if (normalized) return { severity: normalized, reasoning: response.trim() };
+  }
 
-  return {
-    severity,
-    reasoning: response.trim(),
+  // P1b: JSON-like pattern
+  const jsonMatch = response.match(
+    /"severity"\s*:\s*"(HARSHLY_CRITICAL|CRITICAL|WARNING|SUGGESTION|DISMISSED)"/i
+  );
+  if (jsonMatch) {
+    const normalized = normalizeSeverity(jsonMatch[1]);
+    if (normalized) return { severity: normalized, reasoning: response.trim() };
+  }
+
+  // P2: First 10 lines keyword scan, most specific first
+  const scanLines = response.split('\n').slice(0, 10).join('\n').toLowerCase();
+
+  for (const sev of SEVERITY_ORDER) {
+    const pattern = sev === 'HARSHLY_CRITICAL'
+      ? /\bharshly[_\s]critical\b/
+      : sev === 'DISMISSED'
+        ? /\bdismissed?\b/
+        : new RegExp(`\\b${sev.toLowerCase()}\\b`);
+
+    if (pattern.test(scanLines)) {
+      // Guard against false "critical" in phrases like "not critical"
+      if (sev === 'CRITICAL' && /\bnot\s+critical\b/.test(scanLines)) continue;
+      return { severity: sev, reasoning: response.trim() };
+    }
+  }
+
+  return { severity: 'WARNING', reasoning: response.trim() };
+}
+
+function normalizeSeverity(raw: string): Severity | null {
+  const lower = raw.toLowerCase().replace(/\s+/g, '_').replace(/dismissed$/, 'dismissed');
+  const map: Record<string, Severity> = {
+    harshly_critical: 'HARSHLY_CRITICAL',
+    critical: 'CRITICAL',
+    warning: 'WARNING',
+    suggestion: 'SUGGESTION',
+    dismissed: 'DISMISSED',
   };
+  return map[lower] ?? null;
 }
