@@ -8,12 +8,17 @@ import { TextInput } from '../../components/TextInput.js';
 import { Toast } from '../../components/Toast.js';
 import { colors, icons, getTerminalSize } from '../../theme.js';
 import { t } from '../../../i18n/index.js';
+import {
+  checkProviderHealth,
+  checkAllProviderHealth,
+  type HealthCheckResult,
+} from '../../utils/provider-status.js';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type Step = 'provider' | 'key-input' | 'testing' | 'result';
+type Step = 'provider' | 'key-input' | 'testing' | 'result' | 'bulk-testing' | 'bulk-result';
 
 interface Props {
   onDone: () => void;
@@ -29,10 +34,33 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
   const [step, setStep] = useState<Step>('provider');
   const [providerIndex, setProviderIndex] = useState(0);
   const [keyInput, setKeyInput] = useState('');
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<HealthCheckResult | null>(null);
+  const [bulkResults, setBulkResults] = useState<HealthCheckResult[]>([]);
+  const [bulkProgress, setBulkProgress] = useState('');
 
   const selectedProvider = PROVIDERS[providerIndex] ?? 'groq';
   const envVarName = PROVIDER_ENV_VARS[selectedProvider] ?? `${selectedProvider.toUpperCase()}_API_KEY`;
+
+  function startTest(provider: string): void {
+    setStep('testing');
+    checkProviderHealth(provider).then(result => {
+      setTestResult(result);
+      setStep('result');
+    });
+  }
+
+  function startBulkTest(): void {
+    setStep('bulk-testing');
+    setBulkResults([]);
+    setBulkProgress('Starting...');
+    checkAllProviderHealth((result, done, total) => {
+      setBulkResults(prev => [...prev, result]);
+      setBulkProgress(`${done}/${total} providers checked`);
+    }).then(results => {
+      setBulkResults(results);
+      setStep('bulk-result');
+    });
+  }
 
   useInput((input, key) => {
     if (step === 'provider') {
@@ -42,7 +70,17 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
       } else if (key.downArrow || input === 'j') {
         setProviderIndex(i => Math.min(PROVIDERS.length - 1, i + 1));
       } else if (key.return) {
+        setKeyInput('');
         setStep('key-input');
+      } else if (input === 'h') {
+        // Quick health check for selected provider (without changing key)
+        const hasKey = Boolean(process.env[envVarName]);
+        if (hasKey) {
+          startTest(selectedProvider);
+        }
+      } else if (input === 't') {
+        // Bulk health check all configured providers
+        startBulkTest();
       }
       return;
     }
@@ -53,8 +91,7 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
         if (!keyInput.trim()) return;
         saveCredential(envVarName, keyInput.trim());
         process.env[envVarName] = keyInput.trim();
-        setStep('testing');
-        runPingTest(selectedProvider, keyInput.trim());
+        startTest(selectedProvider);
         return;
       }
       if (key.backspace || key.delete) { setKeyInput(s => s.slice(0, -1)); return; }
@@ -66,56 +103,33 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
     }
 
     if (step === 'result') {
-      if (key.return || key.escape || input === 'q') { onDone(); }
+      if (input === 'r') {
+        // Retry test
+        startTest(selectedProvider);
+      } else if (key.return || key.escape || input === 'q') {
+        setStep('provider');
+      }
+      return;
+    }
+
+    if (step === 'bulk-result') {
+      if (key.return || key.escape || input === 'q') {
+        setStep('provider');
+      }
     }
   });
 
-  async function runPingTest(provider: string, _apiKey: string): Promise<void> {
-    const start = Date.now();
-    try {
-      const { getModel } = await import('../../../l1/provider-registry.js');
-      const { generateText } = await import('ai');
-
-      const testModels: Record<string, string> = {
-        groq: 'llama-3.3-70b-versatile',
-        'nvidia-nim': 'deepseek-r1',
-        openrouter: 'google/gemini-2.5-flash',
-        google: 'gemini-2.0-flash',
-        mistral: 'mistral-large-latest',
-        cerebras: 'llama-3.3-70b',
-        together: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',
-        xai: 'grok-2',
-        openai: 'gpt-4o-mini',
-        anthropic: 'claude-sonnet-4-20250514',
-        deepseek: 'deepseek-chat',
-        qwen: 'qwen-turbo',
-        zai: 'zai-default',
-        'github-models': 'gpt-4o-mini',
-        'github-copilot': 'gpt-4o',
-      };
-      const model = testModels[provider] ?? 'llama-3.3-70b-versatile';
-      const languageModel = getModel(provider, model);
-      const abortSignal = AbortSignal.timeout(10_000);
-      await generateText({ model: languageModel, prompt: 'Say OK', abortSignal });
-      const latency = Date.now() - start;
-      setTestResult({ ok: true, message: `${provider} connected (${latency}ms)` });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setTestResult({ ok: false, message: `Connection failed: ${msg.slice(0, 80)}` });
-    }
-    setStep('result');
-  }
-
-  const { cols } = getTerminalSize();
+  const { cols, rows } = getTerminalSize();
   const totalWidth = Math.max(cols - 4, 40);
 
+  // ---- Provider selection ----
   if (step === 'provider') {
     return (
       <Panel title={`${t('config.tabs.apiKeys')} — Select Provider`} width={totalWidth}>
         <ScrollableList
           items={PROVIDERS}
           selectedIndex={providerIndex}
-          height={Math.max(getTerminalSize().rows - 8, 8)}
+          height={Math.max(rows - 10, 8)}
           renderItem={(p, _i, isSelected) => {
             const envVar = PROVIDER_ENV_VARS[p] ?? '';
             const hasKey = Boolean(process.env[envVar]);
@@ -123,18 +137,22 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
               <Text color={isSelected ? colors.selection.bg : undefined} bold={isSelected}>
                 {p}
                 <Text dimColor> ({envVar})</Text>
-                {hasKey ? <Text color={colors.success}> {icons.check}</Text> : null}
+                {hasKey
+                  ? <Text color={colors.success}> {icons.check}</Text>
+                  : <Text color={colors.error}> {icons.cross}</Text>
+                }
               </Text>
             );
           }}
         />
         <Box marginTop={1}>
-          <Text dimColor>Enter: select  Esc: back</Text>
+          <Text dimColor>Enter: set key  h: health check  t: test all  Esc: back</Text>
         </Box>
       </Panel>
     );
   }
 
+  // ---- Key input ----
   if (step === 'key-input') {
     return (
       <Panel title={`${t('config.tabs.apiKeys')} — ${selectedProvider}`} width={totalWidth}>
@@ -149,6 +167,7 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
     );
   }
 
+  // ---- Testing single ----
   if (step === 'testing') {
     return (
       <Panel title={`${t('config.tabs.apiKeys')} — ${selectedProvider}`} width={totalWidth}>
@@ -157,19 +176,80 @@ export function EnvSetup({ onDone }: Props): React.JSX.Element {
     );
   }
 
-  // result
+  // ---- Single result (with retry) ----
+  if (step === 'result') {
+    return (
+      <Panel title={`${t('config.tabs.apiKeys')} — ${selectedProvider}`} width={totalWidth}>
+        {testResult?.ok ? (
+          <Text color={colors.success}>
+            {icons.check} {testResult.provider} connected ({testResult.latencyMs}ms)
+          </Text>
+        ) : (
+          <Box flexDirection="column">
+            <Text color={colors.error}>
+              {icons.cross} {testResult?.error ?? 'Connection failed'}
+            </Text>
+          </Box>
+        )}
+        <Box marginTop={1}>
+          <Text dimColor>{getCredentialsPath()}</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>r: retry  Enter/Esc: back to providers</Text>
+        </Box>
+      </Panel>
+    );
+  }
+
+  // ---- Bulk testing ----
+  if (step === 'bulk-testing') {
+    return (
+      <Panel title={`${t('config.tabs.apiKeys')} — Health Check All`} width={totalWidth}>
+        <Text color={colors.warning}>Testing all configured providers... {bulkProgress}</Text>
+        <Box marginTop={1} flexDirection="column">
+          {bulkResults.map(r => (
+            <Box key={r.provider}>
+              <Text color={r.ok ? colors.success : colors.error}>
+                {r.ok ? icons.check : icons.cross}
+              </Text>
+              <Text> {r.provider.padEnd(16)}</Text>
+              {r.ok
+                ? <Text dimColor>{r.latencyMs}ms</Text>
+                : <Text color={colors.error}>{r.error?.slice(0, 50)}</Text>
+              }
+            </Box>
+          ))}
+        </Box>
+      </Panel>
+    );
+  }
+
+  // ---- Bulk results ----
   return (
-    <Panel title={`${t('config.tabs.apiKeys')} — ${selectedProvider}`} width={totalWidth}>
-      <Toast
-        message={testResult?.message ?? ''}
-        type={testResult?.ok ? 'success' : 'error'}
-        visible={true}
-      />
-      <Box marginTop={1}>
-        <Text dimColor>{getCredentialsPath()}</Text>
+    <Panel title={`${t('config.tabs.apiKeys')} — Health Check Results`} width={totalWidth}>
+      <Box flexDirection="column">
+        {bulkResults.map(r => (
+          <Box key={r.provider}>
+            <Text color={r.ok ? colors.success : colors.error}>
+              {r.ok ? icons.check : icons.cross}
+            </Text>
+            <Text> {r.provider.padEnd(16)}</Text>
+            {r.ok
+              ? <Text dimColor>{r.latencyMs}ms</Text>
+              : <Text color={colors.error}>{r.error?.slice(0, 50)}</Text>
+            }
+          </Box>
+        ))}
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>Enter/Esc: continue</Text>
+        <Toast
+          message={`${bulkResults.filter(r => r.ok).length}/${bulkResults.length} providers healthy`}
+          type={bulkResults.every(r => r.ok) ? 'success' : 'error'}
+          visible={true}
+        />
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>Enter/Esc: back to providers</Text>
       </Box>
     </Panel>
   );

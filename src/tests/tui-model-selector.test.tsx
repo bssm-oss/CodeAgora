@@ -58,8 +58,8 @@ describe('ModelSelector', () => {
       <ModelSelector onSelect={() => {}} onCancel={() => {}} />
     );
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('Enter: select');
-    expect(frame).toContain('Esc: cancel');
+    expect(frame).toContain('Enter select');
+    expect(frame).toContain('Esc cancel');
   });
 
   it('shows model count', () => {
@@ -76,7 +76,8 @@ describe('ModelSelector', () => {
       <ModelSelector onSelect={() => {}} onCancel={() => {}} />
     );
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('>');
+    // Uses ▸ (arrow icon) for selection
+    expect(frame).toContain('\u25b8');
   });
 
   it('filters by source when nim is specified', () => {
@@ -116,6 +117,6 @@ describe('ModelSelector', () => {
     );
     // Verify the component renders and accepts the onCancel callback
     const frame = lastFrame() ?? '';
-    expect(frame).toContain('Esc: cancel');
+    expect(frame).toContain('Esc cancel');
   });
 });

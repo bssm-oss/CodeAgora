@@ -11,7 +11,8 @@ import { TabBar } from '../components/TabBar.js';
 import { Toast } from '../components/Toast.js';
 import { HelpOverlay } from '../components/HelpOverlay.js';
 import type { KeyBinding } from '../components/HelpOverlay.js';
-import { colors, getTerminalSize } from '../theme.js';
+import { colors, icons, getTerminalSize } from '../theme.js';
+import { getActiveProviderCount } from '../utils/provider-status.js';
 import { ReviewersTab } from './config/ReviewersTab.js';
 import { SupportersTab } from './config/SupportersTab.js';
 import { ModeratorTab } from './config/ModeratorTab.js';
@@ -241,10 +242,17 @@ export function ConfigScreen(): React.JSX.Element {
         )}
       </Box>
 
-      {/* Footer: hints + toast */}
-      <Box>
+      {/* Footer: hints + provider status + toast */}
+      <Box justifyContent="space-between">
         <Text dimColor>
-          {'  \u2191\u2193 navigate  space toggle  e edit  a add  d delete  ? help  q back'}
+          {'  \u2191\u2193 navigate  space toggle  e edit  a add  c clone  d delete  ? help  q back'}
+        </Text>
+        <Text dimColor>
+          {(() => {
+            const { active, total } = getActiveProviderCount();
+            const color = active === 0 ? colors.error : active < 3 ? colors.warning : colors.success;
+            return <Text color={color}>{icons.bullet} {active}/{total} providers</Text>;
+          })()}
         </Text>
       </Box>
       <Toast message={toast.message} type={toast.type} visible={toast.visible} />

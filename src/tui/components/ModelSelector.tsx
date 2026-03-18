@@ -1,8 +1,18 @@
+/**
+ * ModelSelector — Searchable model picker with provider filtering and API key status.
+ *
+ * Search supports:
+ * - Free text: matches model name or ID
+ * - "provider/" prefix: filters to that provider (e.g. "groq/" shows only groq models)
+ */
+
 import React, { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { colors, icons, getTerminalSize } from '../theme.js';
+import { isProviderAvailable } from '../utils/provider-status.js';
 
 // ============================================================================
 // Types
@@ -21,25 +31,31 @@ export interface SelectedModel {
   name: string;
   tier: string;
   context: string;
+  source: string;
 }
 
 interface Props {
-  source?: 'nim' | 'openrouter' | 'all';
+  source?: string;
+  provider?: string;
   onSelect: (model: SelectedModel) => void;
   onCancel: () => void;
 }
 
 // ============================================================================
-// Data loading
+// Data loading (cached)
 // ============================================================================
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+let _cachedModels: ModelEntry[] | null = null;
+
 function loadModelRankings(): ModelEntry[] {
+  if (_cachedModels) return _cachedModels;
   try {
     const raw = readFileSync(path.join(__dirname, '../../data/model-rankings.json'), 'utf-8');
     const data = JSON.parse(raw) as { models?: ModelEntry[] };
-    return data.models ?? [];
+    _cachedModels = data.models ?? [];
+    return _cachedModels;
   } catch {
     return [];
   }
@@ -59,15 +75,16 @@ const TIER_COLORS: Record<string, string> = {
   'B+': 'cyan', B: 'cyan', 'B-': 'cyan', C: 'gray',
 };
 
-const VISIBLE_COUNT = 15;
-
 // ============================================================================
 // Component
 // ============================================================================
 
-export function ModelSelector({ source, onSelect, onCancel }: Props): React.JSX.Element {
-  const [search, setSearch] = useState('');
+export function ModelSelector({ source, provider: initialProvider, onSelect, onCancel }: Props): React.JSX.Element {
+  const [search, setSearch] = useState(initialProvider ? `${initialProvider}/` : '');
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const { rows } = getTerminalSize();
+  const visibleCount = Math.max(rows - 8, 8);
 
   const allModels: ModelEntry[] = useMemo(() => {
     const raw = loadModelRankings();
@@ -84,18 +101,38 @@ export function ModelSelector({ source, onSelect, onCancel }: Props): React.JSX.
   const filtered = useMemo(() => {
     if (!search) return allModels;
     const lower = search.toLowerCase();
+
+    // "provider/" prefix filtering
+    const slashIdx = lower.indexOf('/');
+    if (slashIdx > 0) {
+      const providerQuery = lower.slice(0, slashIdx);
+      const modelQuery = lower.slice(slashIdx + 1);
+      return allModels.filter(m => {
+        const sourceMatch = m.source.toLowerCase().includes(providerQuery) ||
+                           m.model_id.toLowerCase().startsWith(providerQuery);
+        if (!sourceMatch) return false;
+        if (!modelQuery) return true;
+        return m.name.toLowerCase().includes(modelQuery) ||
+               m.model_id.toLowerCase().includes(modelQuery);
+      });
+    }
+
     return allModels.filter(m =>
       m.name.toLowerCase().includes(lower) ||
-      m.model_id.toLowerCase().includes(lower)
+      m.model_id.toLowerCase().includes(lower) ||
+      m.source.toLowerCase().includes(lower)
     );
   }, [allModels, search]);
 
-  // Clamp selectedIndex when filter changes
   const clampedIndex = Math.min(selectedIndex, Math.max(0, filtered.length - 1));
 
-  // Compute visible window
-  const startOffset = Math.max(0, clampedIndex - Math.floor(VISIBLE_COUNT / 2));
-  const endOffset = Math.min(filtered.length, startOffset + VISIBLE_COUNT);
+  // Viewport windowing
+  const halfHeight = Math.floor(visibleCount / 2);
+  let startOffset = Math.max(0, clampedIndex - halfHeight);
+  const endOffset = Math.min(filtered.length, startOffset + visibleCount);
+  if (endOffset - startOffset < visibleCount && startOffset > 0) {
+    startOffset = Math.max(0, endOffset - visibleCount);
+  }
   const visibleModels = filtered.slice(startOffset, endOffset);
 
   useInput((input, key) => {
@@ -111,6 +148,7 @@ export function ModelSelector({ source, onSelect, onCancel }: Props): React.JSX.
           name: model.name,
           tier: model.tier,
           context: model.context,
+          source: model.source,
         });
       }
       return;
@@ -137,46 +175,58 @@ export function ModelSelector({ source, onSelect, onCancel }: Props): React.JSX.
   });
 
   const tierColor = (tier: string): string => TIER_COLORS[tier] ?? 'white';
+  const hasAbove = startOffset > 0;
+  const hasBelow = endOffset < filtered.length;
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold>Select Model</Text>
+      <Text bold color={colors.primary}>Select Model</Text>
       <Box marginTop={0}>
         <Text>Search: </Text>
-        <Text color="cyan">{search}</Text>
-        <Text color="gray">_</Text>
+        <Text color={colors.primary}>{search}</Text>
+        <Text color={colors.muted}>_</Text>
         <Text dimColor>  ({filtered.length} models)</Text>
       </Box>
+      <Text dimColor>  Tip: type &quot;groq/&quot; to filter by provider</Text>
       <Box marginTop={1} flexDirection="column">
         {filtered.length === 0 ? (
-          <Text dimColor>No models match your search.</Text>
+          <Text dimColor>No models match. Try a different search or check model-rankings.json.</Text>
         ) : (
-          visibleModels.map((model, vi) => {
-            const realIndex = startOffset + vi;
-            const isSelected = realIndex === clampedIndex;
-            return (
-              <Box key={model.model_id}>
-                <Text color={isSelected ? 'cyan' : undefined} bold={isSelected}>
-                  {isSelected ? '> ' : '  '}
-                  [{model.tier.padEnd(2)}]
-                </Text>
-                <Text color={isSelected ? 'cyan' : tierColor(model.tier)} bold={isSelected}>
-                  {' '}{model.name}
-                </Text>
-                <Text dimColor={!isSelected}>
-                  {' '}({model.model_id.split('/')[0]}) {model.context}
-                </Text>
-              </Box>
-            );
-          })
-        )}
-        {filtered.length > VISIBLE_COUNT && (
-          <Text dimColor>  ... {filtered.length - VISIBLE_COUNT} more (type to filter)</Text>
+          <>
+            {hasAbove ? (
+              <Text dimColor>{`  ${icons.arrowDown} ${startOffset} more above`}</Text>
+            ) : null}
+            {visibleModels.map((model, vi) => {
+              const realIndex = startOffset + vi;
+              const isSelected = realIndex === clampedIndex;
+              const providerAvailable = isProviderAvailable(model.source);
+              const keyIcon = providerAvailable ? icons.check : icons.cross;
+              const keyColor = providerAvailable ? colors.success : colors.error;
+              return (
+                <Box key={`${model.source}-${model.model_id}`}>
+                  <Text color={isSelected ? colors.selection.bg : undefined} bold={isSelected}>
+                    {isSelected ? `${icons.arrow} ` : '  '}
+                    <Text color={keyColor}>{keyIcon}</Text>
+                    {' '}[{model.tier.padEnd(2)}]
+                  </Text>
+                  <Text color={isSelected ? colors.selection.bg : tierColor(model.tier)} bold={isSelected}>
+                    {' '}{model.name}
+                  </Text>
+                  <Text dimColor={!isSelected}>
+                    {' '}({model.source}) {model.context}
+                  </Text>
+                </Box>
+              );
+            })}
+            {hasBelow ? (
+              <Text dimColor>{`  ${icons.arrowDown} ${filtered.length - endOffset} more below`}</Text>
+            ) : null}
+          </>
         )}
       </Box>
       <Box marginTop={1}>
         <Text dimColor>
-          {'\u2191\u2193'}: scroll | Enter: select | Type to search | Esc: cancel
+          {`${icons.check}=key set  ${icons.cross}=no key  |  \u2191\u2193 scroll  Enter select  Type to search  Esc cancel`}
         </Text>
       </Box>
     </Box>

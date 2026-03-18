@@ -9,6 +9,7 @@ import { ScrollableList } from '../../components/ScrollableList.js';
 import { TextInput } from '../../components/TextInput.js';
 import { colors, icons, statusColor, statusIcon, getTerminalSize } from '../../theme.js';
 import { t } from '../../../i18n/index.js';
+import { isProviderAvailable } from '../../utils/provider-status.js';
 
 // ============================================================================
 // Helpers
@@ -251,6 +252,17 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
       if (reviewers.length > 1 && reviewers[selectedIndex] && !isAutoReviewer(reviewers[selectedIndex]!)) {
         setMode('confirm-delete');
       }
+    } else if (input === 'c') {
+      // Clone selected reviewer
+      const entry = reviewers[selectedIndex];
+      if (entry && isStaticReviewer(entry)) {
+        const clone: AgentConfig = {
+          ...entry,
+          id: `r${reviewers.length + 1}`,
+        };
+        onConfigChange({ ...config, reviewers: [...reviewers, clone] });
+        setSelectedIndex(reviewers.length);
+      }
     }
   });
 
@@ -259,6 +271,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
     return (
       <ModelSelector
         source="all"
+        provider={editState.provider}
         onSelect={(model: SelectedModel) => {
           addReviewer(editState.provider, model.id.split('/').pop() ?? model.id);
         }}
@@ -305,6 +318,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
             const isAuto = isAutoReviewer(entry);
             const agent = isAuto ? null : (entry as AgentConfig);
             const enabled = entry.enabled ?? true;
+            const providerOk = isAuto || (agent?.provider ? isProviderAvailable(agent.provider) : false);
             return (
               <Text
                 color={isSelected ? colors.selection.bg : undefined}
@@ -314,7 +328,12 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
                 {'  '}
                 {isAuto
                   ? <Text color={colors.warning}>[Auto]</Text>
-                  : <Text dimColor>{agent?.provider}/{agent?.model?.slice(0, 20)}</Text>
+                  : <>
+                      <Text color={providerOk ? undefined : colors.error} dimColor={providerOk}>
+                        {agent?.provider}/{agent?.model?.slice(0, 18)}
+                      </Text>
+                      {!providerOk ? <Text color={colors.error}> {icons.cross}</Text> : null}
+                    </>
                 }
               </Text>
             );
@@ -390,7 +409,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
               <Text dimColor>
                 {isAutoReviewer(selectedEntry)
                   ? 'Auto-selected by L0'
-                  : `[e] ${t('config.help.edit')}  [Space] ${t('config.help.toggle')}  [d] ${t('config.help.delete')}`
+                  : `[e] ${t('config.help.edit')}  [Space] ${t('config.help.toggle')}  [c] clone  [d] ${t('config.help.delete')}`
                 }
               </Text>
             </Box>

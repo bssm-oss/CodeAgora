@@ -5,6 +5,7 @@ import { Panel } from '../../components/Panel.js';
 import { ScrollableList } from '../../components/ScrollableList.js';
 import { colors, icons, getTerminalSize } from '../../theme.js';
 import { t } from '../../../i18n/index.js';
+import { getMissingProviders, isProviderAvailable } from '../../utils/provider-status.js';
 
 // ============================================================================
 // Preset Definitions
@@ -178,13 +179,37 @@ export function PresetsTab({ config, isActive, onConfigChange }: Props): React.J
               </Box>
               <Box>
                 <Text dimColor>{'Providers:'.padEnd(14)}</Text>
-                <Text>{selectedPreset.providers.join(', ')}</Text>
+                {selectedPreset.providers.map((p, i) => {
+                  const available = isProviderAvailable(p);
+                  return (
+                    <Text key={p}>
+                      {i > 0 ? ', ' : ''}
+                      <Text color={available ? colors.success : colors.error}>
+                        {available ? icons.check : icons.cross}
+                      </Text>
+                      {' '}{p}
+                    </Text>
+                  );
+                })}
               </Box>
               <Box>
                 <Text dimColor>{'Supporters:'.padEnd(14)}</Text>
                 <Text>1 + Devil&apos;s Advocate</Text>
               </Box>
             </Box>
+            {(() => {
+              const missing = getMissingProviders(selectedPreset.providers);
+              if (missing.length > 0) {
+                return (
+                  <Box marginTop={1}>
+                    <Text color={colors.warning}>
+                      {icons.cross} Missing API keys: {missing.join(', ')}
+                    </Text>
+                  </Box>
+                );
+              }
+              return null;
+            })()}
             <Box marginTop={1}>
               <Text dimColor>Enter/Space: apply</Text>
             </Box>
