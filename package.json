@@ -34,10 +34,15 @@
   },
   "scripts": {
     "build": "tsup && cp -r src/data dist/",
+    "build:ws": "pnpm -r build",
     "typecheck": "tsc --noEmit",
+    "typecheck:ws": "pnpm -r typecheck",
     "test": "vitest",
+    "test:ws": "pnpm -r test",
     "lint": "eslint src/",
-    "cli": "tsx src/cli/index.ts"
+    "lint:ws": "pnpm -r lint",
+    "cli": "tsx src/cli/index.ts",
+    "dev": "pnpm --filter @codeagora/cli dev"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
