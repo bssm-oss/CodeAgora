@@ -53,7 +53,7 @@ let _cachedModels: ModelEntry[] | null = null;
 function loadModelRankings(): ModelEntry[] {
   if (_cachedModels) return _cachedModels;
   try {
-    const raw = readFileSync(path.join(__dirname, '../../data/model-rankings.json'), 'utf-8');
+    const raw = readFileSync(path.join(__dirname, '../../../shared/src/data/model-rankings.json'), 'utf-8');
     const data = JSON.parse(raw) as { models?: ModelEntry[] };
     _cachedModels = data.models ?? [];
     return _cachedModels;

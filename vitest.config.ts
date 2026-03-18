@@ -1,5 +1,8 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import fs from 'fs';
+
+const resolveReal = (mod: string) => fs.realpathSync(path.resolve(__dirname, 'node_modules', mod));
 
 export default defineConfig({
   resolve: {
@@ -10,21 +13,18 @@ export default defineConfig({
       '@codeagora/notifications': path.resolve(__dirname, 'packages/notifications/src'),
       '@codeagora/cli': path.resolve(__dirname, 'packages/cli/src'),
       '@codeagora/tui': path.resolve(__dirname, 'packages/tui/src'),
-      // Pin shared dependencies to root node_modules to prevent duplicates
-      'react': path.resolve(__dirname, 'node_modules/react'),
-      'ink': path.resolve(__dirname, 'node_modules/ink'),
-      'ink-select-input': path.resolve(__dirname, 'node_modules/ink-select-input'),
-      'ai': path.resolve(__dirname, 'node_modules/ai'),
-      '@ai-sdk/groq': path.resolve(__dirname, 'node_modules/@ai-sdk/groq'),
-      '@ai-sdk/google': path.resolve(__dirname, 'node_modules/@ai-sdk/google'),
-      '@ai-sdk/openai': path.resolve(__dirname, 'node_modules/@ai-sdk/openai'),
-      '@ai-sdk/openai-compatible': path.resolve(__dirname, 'node_modules/@ai-sdk/openai-compatible'),
-      '@ai-sdk/anthropic': path.resolve(__dirname, 'node_modules/@ai-sdk/anthropic'),
-      '@openrouter/ai-sdk-provider': path.resolve(__dirname, 'node_modules/@openrouter/ai-sdk-provider'),
-      '@octokit/rest': path.resolve(__dirname, 'node_modules/@octokit/rest'),
-      'zod': path.resolve(__dirname, 'node_modules/zod'),
-      'yaml': path.resolve(__dirname, 'node_modules/yaml'),
+      // Pin npm deps to real pnpm store paths for vi.mock interception
+      'ai': resolveReal('ai'),
+      '@ai-sdk/groq': resolveReal('@ai-sdk/groq'),
+      '@ai-sdk/google': resolveReal('@ai-sdk/google'),
+      '@ai-sdk/openai': resolveReal('@ai-sdk/openai'),
+      '@ai-sdk/openai-compatible': resolveReal('@ai-sdk/openai-compatible'),
+      '@ai-sdk/anthropic': resolveReal('@ai-sdk/anthropic'),
+      '@openrouter/ai-sdk-provider': resolveReal('@openrouter/ai-sdk-provider'),
+      '@octokit/rest': resolveReal('@octokit/rest'),
     },
+    // Deduplicate React/Ink to single instance (prevents "multiple copies" in monorepo)
+    dedupe: ['react', 'ink', 'ink-select-input', 'ink-testing-library', 'zod', 'yaml'],
   },
   test: {
     globals: true,

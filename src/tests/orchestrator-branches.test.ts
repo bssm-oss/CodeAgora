@@ -314,7 +314,7 @@ describe('Orchestrator Branches', () => {
     (getBanditStore as Mock).mockReturnValue(null);
 
     // Mock the dynamic import of BanditStore
-    vi.doMock('../l0/bandit-store.js', () => ({
+    vi.doMock('../../packages/core/src/l0/bandit-store.js', () => ({
       BanditStore: vi.fn().mockImplementation(() => mockBanditInstance),
     }));
 
@@ -373,7 +373,7 @@ describe('Orchestrator Branches', () => {
     (normalizeConfig as Mock).mockReturnValue(configWithAutoApprove);
 
     // Mock analyzeTrivialDiff via the auto-approve module
-    vi.doMock('../pipeline/auto-approve.js', () => ({
+    vi.doMock('../../packages/core/src/pipeline/auto-approve.js', () => ({
       analyzeTrivialDiff: vi.fn().mockReturnValue({ isTrivial: true, reason: 'only-docs' }),
     }));
 
