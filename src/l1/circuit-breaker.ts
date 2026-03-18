@@ -101,6 +101,20 @@ export class CircuitBreaker {
     return this.getState(provider, model) === 'open';
   }
 
+  /**
+   * Get full internal state for a circuit (for monitoring/debugging).
+   */
+  getFullState(provider: string, model: string): {
+    state: CircuitState;
+    failCount: number;
+    lastFailure: number | null;
+    cooldownMs: number;
+  } {
+    const entry = this.getOrCreate(provider, model);
+    this.evaluate(entry);
+    return { ...entry };
+  }
+
   recordSuccess(provider: string, model: string): void {
     const entry = this.getOrCreate(provider, model);
     this.evaluate(entry);

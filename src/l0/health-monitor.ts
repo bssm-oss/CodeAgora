@@ -1,44 +1,40 @@
 /**
  * Health Monitor
- * Per-model circuit breaker with exponential cooldown + daily RPD budget tracking.
+ * Delegates circuit breaker logic to the unified L1 CircuitBreaker (#84).
+ * Adds daily RPD budget tracking and ping functionality on top.
  */
 
-import type { CircuitBreakerState, PingResult } from '../types/l0.js';
-
-// ============================================================================
-// Circuit Breaker Config Defaults
-// ============================================================================
-
-interface CircuitBreakerConfig {
-  failureThreshold: number;
-  cooldownMs: number;
-  maxCooldownMs: number;
-}
-
-const DEFAULT_CB_CONFIG: CircuitBreakerConfig = {
-  failureThreshold: 3,
-  cooldownMs: 60_000,
-  maxCooldownMs: 300_000,
-};
+import type { PingResult } from '../types/l0.js';
+import { CircuitBreaker } from '../l1/circuit-breaker.js';
 
 // ============================================================================
 // Health Monitor
 // ============================================================================
 
 export class HealthMonitor {
-  private circuits = new Map<string, CircuitBreakerState>();
+  private readonly cb: CircuitBreaker;
   private dailyCounts = new Map<string, number>();
   private dailyBudgets = new Map<string, number>();
-  private cbConfig: CircuitBreakerConfig;
   private nowFn: () => number;
 
   constructor(options?: {
-    circuitBreaker?: Partial<CircuitBreakerConfig>;
+    circuitBreaker?: Partial<{
+      failureThreshold: number;
+      cooldownMs: number;
+      maxCooldownMs: number;
+    }>;
     dailyBudget?: Record<string, number>;
     nowFn?: () => number;
   }) {
-    this.cbConfig = { ...DEFAULT_CB_CONFIG, ...options?.circuitBreaker };
     this.nowFn = options?.nowFn ?? (() => Date.now());
+
+    // Delegate to unified CircuitBreaker from L1
+    this.cb = new CircuitBreaker({
+      failureThreshold: options?.circuitBreaker?.failureThreshold,
+      cooldownMs: options?.circuitBreaker?.cooldownMs,
+      maxCooldownMs: options?.circuitBreaker?.maxCooldownMs,
+      nowFn: this.nowFn,
+    });
 
     if (options?.dailyBudget) {
       for (const [provider, limit] of Object.entries(options.dailyBudget)) {
@@ -48,49 +44,19 @@ export class HealthMonitor {
   }
 
   // ==========================================================================
-  // Circuit Breaker
+  // Circuit Breaker (delegated to unified L1 CircuitBreaker)
   // ==========================================================================
 
-  private getKey(provider: string, modelId: string): string {
-    return `${provider}/${modelId}`;
-  }
-
-  private getCircuit(key: string): CircuitBreakerState {
-    let circuit = this.circuits.get(key);
-    if (!circuit) {
-      circuit = {
-        state: 'closed',
-        failCount: 0,
-        lastFailure: null,
-        cooldownMs: this.cbConfig.cooldownMs,
-        successCount: 0,
-      };
-      this.circuits.set(key, circuit);
-    }
-    return circuit;
-  }
-
-  getCircuitState(provider: string, modelId: string): CircuitBreakerState {
-    return this.getCircuit(this.getKey(provider, modelId));
+  getCircuitState(provider: string, modelId: string) {
+    return this.cb.getFullState(provider, modelId);
   }
 
   /**
    * Check if a model is available (circuit not open + within RPD budget).
    */
   isAvailable(provider: string, modelId: string): boolean {
-    const key = this.getKey(provider, modelId);
-    const circuit = this.getCircuit(key);
-
-    // Check circuit breaker
-    if (circuit.state === 'open') {
-      const now = this.nowFn();
-      if (now - (circuit.lastFailure ?? 0) >= circuit.cooldownMs) {
-        // Transition to half-open
-        circuit.state = 'half-open';
-        circuit.successCount = 0;
-      } else {
-        return false;
-      }
+    if (this.cb.isOpen(provider, modelId)) {
+      return false;
     }
 
     // Check RPD budget
@@ -102,38 +68,11 @@ export class HealthMonitor {
   }
 
   recordSuccess(provider: string, modelId: string): void {
-    const key = this.getKey(provider, modelId);
-    const circuit = this.getCircuit(key);
-
-    if (circuit.state === 'half-open') {
-      // Half-open success → close circuit, reset cooldown
-      circuit.state = 'closed';
-      circuit.failCount = 0;
-      circuit.cooldownMs = this.cbConfig.cooldownMs;
-      circuit.successCount = 0;
-    } else {
-      circuit.failCount = 0;
-    }
+    this.cb.recordSuccess(provider, modelId);
   }
 
   recordFailure(provider: string, modelId: string): void {
-    const key = this.getKey(provider, modelId);
-    const circuit = this.getCircuit(key);
-    const now = this.nowFn();
-
-    circuit.failCount++;
-    circuit.lastFailure = now;
-
-    if (circuit.state === 'half-open') {
-      // Half-open failure → back to open, double cooldown
-      circuit.state = 'open';
-      circuit.cooldownMs = Math.min(
-        circuit.cooldownMs * 2,
-        this.cbConfig.maxCooldownMs
-      );
-    } else if (circuit.failCount >= this.cbConfig.failureThreshold) {
-      circuit.state = 'open';
-    }
+    this.cb.recordFailure(provider, modelId);
   }
 
   // ==========================================================================
