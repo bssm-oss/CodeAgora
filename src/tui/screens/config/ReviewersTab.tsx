@@ -294,9 +294,9 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
   if (!Array.isArray(config.reviewers)) {
     return (
       <Panel title={t('config.tabs.reviewers')}>
-        <Text color={colors.warning}>Declarative reviewers config</Text>
+        <Text color={colors.warning}>{t('config.reviewer.declarative')}</Text>
         <Text>count: {(config.reviewers as { count: number }).count}</Text>
-        <Text dimColor>Edit .ca/config.json directly to change declarative settings.</Text>
+        <Text dimColor>{t('config.reviewer.declarativeHint')}</Text>
       </Panel>
     );
   }
@@ -305,7 +305,7 @@ export function ReviewersTab({ config, isActive, onConfigChange }: Props): React
   if (reviewers.length === 0) {
     return (
       <Panel title={t('config.tabs.reviewers')}>
-        <Text dimColor>No reviewers. Press <Text bold>a</Text> to add one.</Text>
+        <Text dimColor>{t('config.reviewer.noReviewers').replace('{key}', 'a')}</Text>
       </Panel>
     );
   }

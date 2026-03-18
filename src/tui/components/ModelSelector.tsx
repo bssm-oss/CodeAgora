@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { colors, icons, getTerminalSize } from '../theme.js';
 import { isProviderAvailable } from '../utils/provider-status.js';
+import { t } from '../../i18n/index.js';
 
 // ============================================================================
 // Types
@@ -180,17 +181,17 @@ export function ModelSelector({ source, provider: initialProvider, onSelect, onC
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold color={colors.primary}>Select Model</Text>
+      <Text bold color={colors.primary}>{t('model.selector.title')}</Text>
       <Box marginTop={0}>
-        <Text>Search: </Text>
+        <Text>{t('model.selector.search')}</Text>
         <Text color={colors.primary}>{search}</Text>
         <Text color={colors.muted}>_</Text>
-        <Text dimColor>  ({filtered.length} models)</Text>
+        <Text dimColor>  {t('model.selector.count').replace('{count}', String(filtered.length))}</Text>
       </Box>
-      <Text dimColor>  Tip: type &quot;groq/&quot; to filter by provider</Text>
+      <Text dimColor>  {t('model.selector.tip')}</Text>
       <Box marginTop={1} flexDirection="column">
         {filtered.length === 0 ? (
-          <Text dimColor>No models match. Try a different search or check model-rankings.json.</Text>
+          <Text dimColor>{t('model.selector.noMatch')}</Text>
         ) : (
           <>
             {hasAbove ? (
@@ -226,7 +227,7 @@ export function ModelSelector({ source, provider: initialProvider, onSelect, onC
       </Box>
       <Box marginTop={1}>
         <Text dimColor>
-          {`${icons.check}=key set  ${icons.cross}=no key  |  \u2191\u2193 scroll  Enter select  Type to search  Esc cancel`}
+          {t('model.selector.hints').replace('{check}', icons.check).replace('{cross}', icons.cross)}
         </Text>
       </Box>
     </Box>

@@ -55,12 +55,22 @@ export function formatText(result: PipelineResult): string {
     lines.push('');
   }
 
-  // Top issues (up to 5)
+  // Top issues (up to 5) — with confidence badge if available
   if (s.topIssues.length > 0) {
     lines.push(bold('Top Issues:'));
     for (const issue of s.topIssues.slice(0, 5)) {
       const fn = severityColor[issue.severity as keyof typeof severityColor] ?? ((x: string) => x);
-      const sev = fn(issue.severity.padEnd(16));
+      // Look up confidence from evidenceDocs by matching filePath + lineRange
+      const matchingDoc = result.evidenceDocs?.find(
+        (d) => d.filePath === issue.filePath &&
+               d.lineRange[0] === issue.lineRange[0] &&
+               d.issueTitle === issue.title
+      );
+      const confidenceBadge = matchingDoc?.confidence != null
+        ? ` (${matchingDoc.confidence}%)`
+        : '';
+      const sevLabel = `${issue.severity}${confidenceBadge}`;
+      const sev = fn(sevLabel.padEnd(16 + confidenceBadge.length));
       const loc = dim(`${issue.filePath}:${issue.lineRange[0]}`);
       lines.push(`  ${sev}  ${loc}  ${issue.title}`);
     }
@@ -74,6 +84,18 @@ export function formatText(result: PipelineResult): string {
         t('review.discussions', { total: s.totalDiscussions, resolved: s.resolved, escalated: s.escalated })
       )
     );
+  }
+
+  // Reviewer completion summary (Task 4)
+  if (s.totalReviewers > 0) {
+    const completed = s.totalReviewers - s.forfeitedReviewers;
+    if (s.forfeitedReviewers > 0) {
+      lines.push(
+        dim(`Reviewers: ${completed}/${s.totalReviewers} completed (${s.forfeitedReviewers} skipped)`)
+      );
+    } else {
+      lines.push(dim(`Reviewers: ${completed}/${s.totalReviewers} completed`));
+    }
   }
 
   // Session reference

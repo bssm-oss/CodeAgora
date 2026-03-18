@@ -1,5 +1,35 @@
 # 변경 이력
 
+## 1.1.1-rc.1 (2026-03-19)
+
+### 개선 사항
+- **TUI 전면 개편** — lazygit 스타일 마스터-상세 패널로 8개 화면 전면 재작성
+- **테마 시스템** — 중앙화된 색상, 유니코드 아이콘 (●/○/▸/✓/✗), 둥근 테두리
+- **7개 공유 컴포넌트** — Panel, ScrollableList, TextInput, Toast, HelpOverlay, TabBar, DetailRow
+- **Config 화면** — reviewers/supporters/moderator 전체 CRUD, ? 도움말 오버레이, Ctrl+e $EDITOR, 1-5 탭 단축키
+- **ModelSelector** — provider/ 프리픽스 검색, API 키 상태 아이콘, 캐시 로딩, 반응형 높이
+- **상태 검사** — API Keys 탭에서 단일 프로바이더 (h), 전체 검사 (t), 재시도 (r)
+- **프로바이더 상태** — 프리셋의 missing key 경고, 푸터의 키 개수, 리뷰어 목록의 상태 아이콘
+- **Results 화면** — 모든 이슈 표시 (상위 5개만 아님), 심각도 요약 바, 마스터-상세 레이아웃
+- **파이프라인 진행률** — 리뷰어 개수 표시, 스테이지 아이콘 (●/◐/○), 취소 힌트
+- **리뷰어 복제** — c 키로 선택된 리뷰어 복제
+- **검증자 경고** — 리뷰어 개수, 서포터 풀 크기, 토론 라운드 권장사항
+
+### 버그 수정
+- 설정에 moderator/discussion/errorHandling 필드 누락 시 preset apply 크래시 수정
+- delete+add 시 리뷰어 ID 충돌 수정 (이제 max suffix 전략 사용)
+- API 키가 소독되지 않은 상태로 process.env에 저장되는 문제 수정
+- toast 알림의 setTimeout 타이머 누수 수정
+- 상태 검사 promise rejection이 UI를 프리징하는 문제 수정
+- spawn 전 $EDITOR 경로 검증 안 하는 문제 수정
+- null config type cast가 런타임 크래시를 초래할 수 있는 문제 수정
+- 대량 상태 검사에서 프로바이더 ID를 잃어버리는 문제 수정
+
+### 내부
+- L0: 모델 선택 시 includeReasoning 제약 강제 적용
+- 57개 신규 테스트 (1386→1443), provider-status, theme, shared components 포함
+- 3개 탭 파일에서 DetailRow 공유 컴포넌트 추출
+
 ## 1.1.0 (2026-03-17)
 
 ### 새 기능

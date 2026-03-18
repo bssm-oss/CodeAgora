@@ -6,6 +6,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { colors, icons } from '../theme.js';
+import { t } from '../../i18n/index.js';
 
 interface ScrollableListProps<T> {
   items: T[];
@@ -20,12 +21,13 @@ export function ScrollableList<T>({
   selectedIndex,
   renderItem,
   height = 10,
-  emptyMessage = 'No items',
+  emptyMessage,
 }: ScrollableListProps<T>): React.JSX.Element {
+  const resolvedEmptyMessage = emptyMessage ?? t('list.noItems');
   if (items.length === 0) {
     return (
       <Box>
-        <Text dimColor>{emptyMessage}</Text>
+        <Text dimColor>{resolvedEmptyMessage}</Text>
       </Box>
     );
   }

@@ -5,6 +5,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { colors, borders } from '../theme.js';
+import { t } from '../../i18n/index.js';
 
 export interface KeyBinding {
   key: string;
@@ -20,8 +21,9 @@ interface HelpOverlayProps {
 export function HelpOverlay({
   bindings,
   visible,
-  title = 'Keyboard Shortcuts',
+  title,
 }: HelpOverlayProps): React.JSX.Element | null {
+  const resolvedTitle = title ?? t('help.title');
   if (!visible) return null;
 
   // Find max key length for alignment
@@ -36,7 +38,7 @@ export function HelpOverlay({
       paddingY={1}
     >
       <Box marginBottom={1}>
-        <Text bold color={colors.primary}>{title}</Text>
+        <Text bold color={colors.primary}>{resolvedTitle}</Text>
       </Box>
       {bindings.map((binding) => (
         <Box key={binding.key} gap={1}>
@@ -47,7 +49,7 @@ export function HelpOverlay({
         </Box>
       ))}
       <Box marginTop={1}>
-        <Text dimColor>Press ? to close</Text>
+        <Text dimColor>{t('help.close')}</Text>
       </Box>
     </Box>
   );

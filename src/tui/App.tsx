@@ -127,21 +127,17 @@ export function App(): React.JSX.Element {
         return <SessionsScreen />;
       case 'config':
         return <ConfigScreen />;
-      case 'debate':
-        return (
-          <DebateScreen
-            discussions={[
-              {
-                id: 'd001',
-                severity: 'CRITICAL',
-                title: 'Sample debate',
-                filePath: 'src/auth.ts',
-                rounds: [],
-                status: 'active',
-              },
-            ]}
-          />
-        );
+      case 'debate': {
+        const discussions = (pipelineResult?.discussions ?? []).map((d) => ({
+          id: d.discussionId,
+          severity: d.finalSeverity === 'DISMISSED' ? 'SUGGESTION' : d.finalSeverity,
+          title: d.reasoning,
+          filePath: d.filePath,
+          rounds: [],
+          status: (d.consensusReached ? 'resolved' : 'active') as 'pending' | 'active' | 'resolved' | 'escalated',
+        }));
+        return <DebateScreen discussions={discussions} />;
+      }
       case 'home':
       default:
         return <HomeScreen onNavigate={navigate} onQuit={exit} />;
