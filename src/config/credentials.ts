@@ -4,7 +4,7 @@
  * Similar to gh CLI (~/.config/gh/) and aws CLI (~/.aws/credentials).
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'fs';
 import path from 'path';
 import os from 'os';
 
@@ -17,6 +17,11 @@ const CREDENTIALS_PATH = path.join(CONFIG_DIR, 'credentials');
  */
 export function loadCredentials(): void {
   if (!existsSync(CREDENTIALS_PATH)) return;
+
+  // Verify file permissions are 0o600 (owner read/write only)
+  if (!checkFilePermissions(CREDENTIALS_PATH, 0o600)) {
+    return;
+  }
 
   const content = readFileSync(CREDENTIALS_PATH, 'utf-8');
   for (const line of content.split('\n')) {
@@ -70,4 +75,31 @@ export function saveCredential(key: string, value: string): void {
  */
 export function getCredentialsPath(): string {
   return CREDENTIALS_PATH;
+}
+
+/**
+ * Check that a file has the expected permission mode.
+ * On Windows this check is skipped (always returns true).
+ * Warns and returns false if permissions are too loose.
+ */
+export function checkFilePermissions(filePath: string, expectedMode: number): boolean {
+  // Skip permission checks on Windows (no Unix permission model)
+  if (process.platform === 'win32') return true;
+
+  try {
+    const stat = statSync(filePath);
+    const actualMode = stat.mode & 0o777;
+    if (actualMode !== expectedMode) {
+      const actual = `0o${actualMode.toString(8)}`;
+      const expected = `0o${expectedMode.toString(8)}`;
+      console.warn(
+        `[Security] ${filePath} has permissions ${actual}, expected ${expected}. ` +
+        `Fix with: chmod ${expectedMode.toString(8)} "${filePath}"`
+      );
+      return false;
+    }
+    return true;
+  } catch {
+    return true; // If stat fails, let the caller handle the read error
+  }
 }
