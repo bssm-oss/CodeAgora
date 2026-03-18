@@ -89,6 +89,8 @@ program
     pr?: string;
     postReview: boolean;
   }) => {
+    // Hoist stdinTmpPath so finally block can clean it up (#77)
+    let stdinTmpPath: string | undefined;
     try {
       if (options.quiet && options.verbose) {
         options.verbose = false; // --quiet takes precedence
@@ -99,7 +101,6 @@ program
 
       // Handle --pr: fetch diff from GitHub
       let resolvedPath: string;
-      let stdinTmpPath: string | undefined;
       let prContext: { owner: string; repo: string; prNumber: number; headSha: string; diff: string } | undefined;
 
       if (options.pr) {
@@ -302,11 +303,6 @@ program
         }
       }
 
-      // Clean up stdin temp file if created
-      if (stdinTmpPath) {
-        try { await fs.unlink(stdinTmpPath); } catch { /* ignore */ }
-      }
-
       if (result.summary?.decision === 'REJECT') {
         process.exit(1);
       }
@@ -319,6 +315,11 @@ program
       console.error(formatError(error, options.verbose));
       const { exitCode } = classifyError(error);
       process.exit(exitCode);
+    } finally {
+      // Clean up stdin/PR temp file — guaranteed even on error (#77)
+      if (stdinTmpPath) {
+        try { await fs.unlink(stdinTmpPath); } catch { /* ignore */ }
+      }
     }
   });
 
