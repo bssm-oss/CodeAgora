@@ -46,9 +46,9 @@ export async function loadConfigFrom(baseDir: string): Promise<Config> {
     return loadYamlConfig(yamlFilePath);
   }
 
-  // Neither exists — preserve original error message
+  // Neither exists — suggest running init
   throw new Error(
-    `Config file not found at ${jsonPath}. Run setup first.`
+    `Config file not found. Run \`agora init\` to create one.`
   );
 }
 
