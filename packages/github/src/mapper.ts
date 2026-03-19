@@ -3,7 +3,7 @@
  * Maps CodeAgora domain types → GitHub API review shapes.
  */
 
-import type { EvidenceDocument, DiscussionVerdict } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, DiscussionRound } from '@codeagora/core/types/core.js';
 import { SEVERITY_ORDER } from '@codeagora/core/types/core.js';
 import type { GitHubReview, GitHubReviewComment, DiffPositionIndex } from './types.js';
 import { resolveLineRange } from './diff-parser.js';
@@ -15,6 +15,15 @@ import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 // ============================================================================
 
 const MARKER = '<!-- codeagora-v3 -->';
+
+/** Truncate a response to N chars, ending at sentence boundary if possible. */
+function truncateResponse(text: string, maxLen: number): string {
+  const clean = text.replace(/\n/g, ' ').trim();
+  if (clean.length <= maxLen) return clean;
+  const cut = clean.slice(0, maxLen);
+  const lastDot = cut.lastIndexOf('.');
+  return (lastDot > maxLen * 0.5 ? cut.slice(0, lastDot + 1) : cut) + '...';
+}
 
 const SEVERITY_BADGE: Record<string, { emoji: string; label: string }> = {
   HARSHLY_CRITICAL: { emoji: '\u{1F534}', label: 'HARSHLY CRITICAL' },
@@ -48,6 +57,8 @@ export function mapToInlineCommentBody(
   discussion?: DiscussionVerdict,
   reviewerIds?: string[],
   options?: MapperOptions,
+  /** Per-round debate data for this discussion (1.2) */
+  rounds?: DiscussionRound[],
 ): string {
   const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\u26AA', label: doc.severity };
   const lines: string[] = [];
@@ -92,7 +103,24 @@ export function mapToInlineCommentBody(
         `<summary>${consensusIcon} Discussion ${discussion.discussionId} \u2014 ${discussion.rounds} round(s), ${consensusText}</summary>`,
       );
       lines.push('');
-      lines.push(`> ${discussion.reasoning}`);
+
+      // Per-round debate logs (1.2)
+      if (rounds && rounds.length > 0) {
+        for (const round of rounds) {
+          if (round.round > 100) continue; // Skip synthetic objection rounds
+          lines.push(`**Round ${round.round}**`);
+          lines.push('| Supporter | Stance | Summary |');
+          lines.push('|-----------|--------|---------|');
+          for (const resp of round.supporterResponses) {
+            const stanceIcon = resp.stance === 'agree' ? '\u2705' : resp.stance === 'disagree' ? '\u274C' : '\u2796';
+            const summary = truncateResponse(resp.response, 100);
+            lines.push(`| ${resp.supporterId} | ${stanceIcon} ${resp.stance.toUpperCase()} | ${summary} |`);
+          }
+          lines.push('');
+        }
+      }
+
+      lines.push(`**Verdict:** ${discussion.finalSeverity} \u2014 ${discussion.reasoning}`);
       lines.push('');
       lines.push('</details>');
     } else {
@@ -128,6 +156,10 @@ export function buildReviewComments(
   positionIndex: DiffPositionIndex,
   reviewerMap?: Map<string, string[]>,
   options?: MapperOptions,
+  /** Per-discussion round data for inline debate logs (1.2) */
+  roundsPerDiscussion?: Record<string, DiscussionRound[]>,
+  /** Minimum confidence threshold for inline comments (1.6) */
+  minConfidence?: number,
 ): GitHubReviewComment[] {
   // Build discussion lookup by filePath:startLine for exact matching
   const discussionByLocation = new Map<string, DiscussionVerdict>();
@@ -145,9 +177,17 @@ export function buildReviewComments(
 
     if (matchingDiscussion?.finalSeverity === 'DISMISSED') continue;
 
+    // Confidence filtering (1.6): skip inline comment if below threshold
+    if (minConfidence !== undefined && minConfidence > 0) {
+      if ((doc.confidence ?? 0) < minConfidence) continue;
+    }
+
     const position = resolveLineRange(positionIndex, doc.filePath, doc.lineRange);
     const reviewerIds = reviewerMap?.get(`${doc.filePath}:${doc.lineRange[0]}`);
-    let body = mapToInlineCommentBody(doc, matchingDiscussion, reviewerIds, options);
+    const discussionRounds = matchingDiscussion
+      ? roundsPerDiscussion?.[matchingDiscussion.discussionId]
+      : undefined;
+    let body = mapToInlineCommentBody(doc, matchingDiscussion, reviewerIds, options, discussionRounds);
 
     if (position !== null) {
       comments.push({
@@ -187,6 +227,10 @@ export function buildSummaryBody(params: {
   questionsForHuman?: string[];
   /** Pre-formatted performance report text (1.4) */
   performanceText?: string;
+  /** Per-discussion round data for debate detail (1.3) */
+  roundsPerDiscussion?: Record<string, DiscussionRound[]>;
+  /** Suppressed issues for transparency (1.5) */
+  suppressedIssues?: Array<{ filePath: string; lineRange: [number, number]; issueTitle: string; dismissCount?: number }>;
 }): string {
   const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = params;
   const lines: string[] = [];
@@ -297,18 +341,52 @@ export function buildSummaryBody(params: {
     lines.push('');
   }
 
-  // Discussion log (collapsible)
+  // Discussion log with round detail (1.3)
   if (discussions.length > 0) {
     lines.push('<details>');
     lines.push(`<summary>Agent consensus log (${discussions.length} discussion(s))</summary>`);
     lines.push('');
-    lines.push('| Discussion | Rounds | Consensus | Final Severity |');
-    lines.push('|-----------|--------|-----------|----------------|');
     for (const d of discussions) {
-      const consensusCell = d.consensusReached ? '\u2705 Yes' : '\u26A0\uFE0F Forced';
-      lines.push(
-        `| ${d.discussionId} | ${d.rounds} | ${consensusCell} | ${d.finalSeverity} |`,
-      );
+      const consensusIcon = d.consensusReached ? '\u2705' : '\u26A0\uFE0F';
+      const consensusText = d.consensusReached ? 'consensus' : 'forced';
+      lines.push(`<details>`);
+      lines.push(`<summary>${consensusIcon} ${d.discussionId} \u2014 ${d.rounds} round(s), ${consensusText} \u2192 ${d.finalSeverity}</summary>`);
+      lines.push('');
+
+      // Round-by-round detail if available
+      const rounds = params.roundsPerDiscussion?.[d.discussionId];
+      if (rounds && rounds.length > 0) {
+        for (const round of rounds) {
+          if (round.round > 100) continue; // Skip synthetic objection rounds
+          lines.push(`**Round ${round.round}**`);
+          lines.push('| Supporter | Stance | Summary |');
+          lines.push('|-----------|--------|---------|');
+          for (const resp of round.supporterResponses) {
+            const stanceIcon = resp.stance === 'agree' ? '\u2705' : resp.stance === 'disagree' ? '\u274C' : '\u2796';
+            const summary = truncateResponse(resp.response, 80);
+            lines.push(`| ${resp.supporterId} | ${stanceIcon} ${resp.stance.toUpperCase()} | ${summary} |`);
+          }
+          lines.push('');
+        }
+      }
+
+      lines.push(`**Verdict:** ${d.finalSeverity} \u2014 ${d.reasoning}`);
+      lines.push('');
+      lines.push('</details>');
+      lines.push('');
+    }
+    lines.push('</details>');
+    lines.push('');
+  }
+
+  // Suppressed issues transparency (1.5)
+  if (params.suppressedIssues && params.suppressedIssues.length > 0) {
+    lines.push('<details>');
+    lines.push(`<summary>${params.suppressedIssues.length} issue(s) suppressed by learned patterns</summary>`);
+    lines.push('');
+    for (const s of params.suppressedIssues) {
+      const countInfo = s.dismissCount ? ` (dismissed ${s.dismissCount} times previously)` : '';
+      lines.push(`- \`${s.filePath}:${s.lineRange[0]}\` \u2014 "${s.issueTitle}"${countInfo}`);
     }
     lines.push('');
     lines.push('</details>');
@@ -337,6 +415,25 @@ export function buildSummaryBody(params: {
   return lines.join('\n');
 }
 
+/**
+ * Generate a shields.io badge URL for the review verdict (1.11).
+ */
+export function buildReviewBadgeUrl(decision: string, severityCounts: Record<string, number>): string {
+  const colorMap: Record<string, string> = {
+    ACCEPT: 'brightgreen',
+    REJECT: 'red',
+    NEEDS_HUMAN: 'yellow',
+  };
+  const color = colorMap[decision] ?? 'lightgrey';
+
+  const criticalCount = (severityCounts['HARSHLY_CRITICAL'] ?? 0) + (severityCounts['CRITICAL'] ?? 0);
+  const detail = criticalCount > 0
+    ? `${decision}%20(${criticalCount}%20critical)`
+    : decision;
+
+  return `https://img.shields.io/badge/CodeAgora-${encodeURIComponent(detail)}-${color}`;
+}
+
 // ============================================================================
 // Full Review Builder
 // ============================================================================
@@ -357,8 +454,14 @@ export function mapToGitHubReview(params: {
   options?: MapperOptions;
   /** Pre-formatted performance report text (1.4) */
   performanceText?: string;
+  /** Per-discussion round data (1.2, 1.3) */
+  roundsPerDiscussion?: Record<string, DiscussionRound[]>;
+  /** Suppressed issues for transparency (1.5) */
+  suppressedIssues?: Array<{ filePath: string; lineRange: [number, number]; issueTitle: string; dismissCount?: number }>;
+  /** Minimum confidence for inline comments (1.6) */
+  minConfidence?: number;
 }): GitHubReview {
-  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText } =
+  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence } =
     params;
 
   // Filter out dismissed docs — exact match by file + line
@@ -371,8 +474,8 @@ export function mapToGitHubReview(params: {
     (doc) => !dismissedLocations.has(`${doc.filePath}:${doc.lineRange[0]}`),
   );
 
-  const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options);
-  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText });
+  const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence);
+  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues });
 
   // Determine event: REQUEST_CHANGES if any CRITICAL/HARSHLY_CRITICAL remains
   const hasBlocking = activeDocs.some(
