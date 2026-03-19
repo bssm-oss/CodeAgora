@@ -21,20 +21,15 @@ CLI Layer → L0 (Model Intelligence) → L1 (Parallel Reviewers) → L2 (Discus
 
 ## Directory Structure
 ```
-src/
-├── cli/            # CLI entrypoint, commands/, formatters/, utils/
-├── l0/             # Model intelligence (Thompson Sampling, bandit, health monitor)
-├── l1/             # Parallel reviewers (backend abstraction, parser, provider registry)
-├── l2/             # Discussion layer (moderator, deduplication, objection protocol)
-├── l3/             # Head agent (verdict, file grouping)
-├── pipeline/       # Orchestration (chunking, progress, telemetry, cost estimation, DSL)
-├── session/        # Session lifecycle (.ca/sessions/)
-├── github/         # GitHub integration (PR review posting, SARIF, diff parsing)
-├── config/         # Config loading/validation/migration/credentials
-├── notifications/  # Discord/Slack webhooks
-├── plugins/        # Plugin system
-├── types/          # Type definitions (core, config, l0, etc.)
-└── utils/          # Shared utilities (diff, fs, logger, concurrency, etc.)
+packages/
+├── shared/         # @codeagora/shared — types, utils, config, zod schemas
+├── core/           # @codeagora/core — L0/L1/L2/L3 pipeline, session, pipeline orchestrator
+├── github/         # @codeagora/github — PR review posting, SARIF, diff parsing, Actions
+├── notifications/  # @codeagora/notifications — Discord/Slack webhooks, event stream
+├── cli/            # @codeagora/cli — CLI entrypoint, commands, formatters
+├── tui/            # @codeagora/tui — interactive terminal UI (ink + React)
+├── mcp/            # @codeagora/mcp — MCP server (7 tools, multi-platform)
+└── web/            # @codeagora/web — Hono.js REST API + React SPA dashboard
 ```
 
 ## Development Conventions
@@ -68,12 +63,16 @@ src/
 - Config: validation tests for valid/invalid configs
 - Integration: sample diff → full pipeline execution
 - Parallelization: concurrency limits and partial failure scenarios
+- Total: 131 test files, 1880 tests
 
 ### Key Commands
-- `pnpm dev` — dev mode
-- `pnpm build` — production build
-- `pnpm test` — run tests
-- `pnpm typecheck` — type check
+- `pnpm dev` — dev mode (CLI package)
+- `pnpm build` — build root package
+- `pnpm build:ws` — build all workspace packages
+- `pnpm test` — run tests (root)
+- `pnpm test:ws` — run tests across all packages
+- `pnpm typecheck` — type check (root)
+- `pnpm typecheck:ws` — type check all workspace packages
 - `pnpm lint` — lint
 - `pnpm cli` — run CLI directly via tsx
 
@@ -114,3 +113,4 @@ src/
 2. [PHASE_PLAN](docs/2_PHASE_PLAN.md)
 3. [V3_DESIGN](docs/3_V3_DESIGN.md)
 4. [IMPLEMENT_PLAN](docs/4_IMPLEMENT_PLAN.md)
+5. [WEB_AND_UX_EXPANSION](docs/6_WEB_AND_UX_EXPANSION.md)

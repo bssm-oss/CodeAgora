@@ -1,5 +1,39 @@
 # 변경 이력
 
+## 2.0.0-rc.1 (2026-03-19)
+
+### 주요 변경 사항 (Breaking Changes)
+- **모노레포 마이그레이션** — 단일 패키지가 8개 pnpm 워크스페이스 패키지로 재구성됨 (`@codeagora/shared`, `@codeagora/core`, `@codeagora/github`, `@codeagora/notifications`, `@codeagora/cli`, `@codeagora/tui`, `@codeagora/mcp`, `@codeagora/web`)
+- import 경로가 상대 경로 (`../types/core.js`)에서 패키지 import (`@codeagora/core`)로 변경됨
+
+### 신규 패키지
+- **@codeagora/mcp** — 7개 도구를 가진 MCP 서버 (review_quick, review_full, review_pr, dry_run, explain_session, get_leaderboard, get_stats). Claude Code, Cursor, Windsurf, VS Code 호환.
+- **@codeagora/web** — Hono.js REST API + React SPA 웹 대시보드. 8개 페이지: 리뷰 결과, 실시간 파이프라인 진행, 모델 인텔리전스, 세션 히스토리, 비용 분석, 토론 뷰어, 설정 관리.
+
+### 신규 기능 (Sprint 1-7)
+- **GitHub 강화** — 인라인 토론 로그, 요약 토론 상세, 억제된 이슈 표시, 신뢰도 필터링, 리뷰 상태 배지, 성능 리포트, 이슈 히트맵, SARIF 토론 메타데이터, 재리뷰 시 세션 diff, 드라이런 미리보기 코멘트
+- **웹훅** — HMAC 서명이 포함된 범용 웹훅, 이벤트 스트림 웹훅 (실시간 파이프라인 이벤트)
+- **Discord** — 실시간 토론 스레드, 파이프라인 요약 임베드, 모더레이터 이벤트 이미터
+- **밈 모드** — 배지, 판결, 토론, 성능 리포트의 대체 텍스트 (한국어 + 영어)
+- **CLI 명령어** — `agora models` (리더보드), `agora explain` (세션 내러티브), `agora replay` (세션 재생), `agora agreement` (리뷰어 합의 매트릭스)
+- **모델 인텔리전스** — Thompson Sampling 시각화, Devil's Advocate 추적, diff 복잡도 추정기, 리뷰어 다양성 점수
+- **MCP 서버** — MCP 호환 클라이언트에 전체 파이프라인을 노출하는 7개 도구, 경량 리뷰 모드 (L1만), 컴팩트 출력 형식
+- **웹 대시보드** — 실시간 WebSocket 파이프라인 진행, 어노테이션 diff 뷰어, 모델 리더보드, 비용 분석, 세션 히스토리 브라우저, 토론/디베이트 뷰어, 설정 관리 UI
+
+### 보안 수정
+- 페르소나 로딩, SARIF 출력, 세션 라우트, 설정 API에 경로 탐색 방지 적용
+- 웹 서버를 127.0.0.1(루프백 전용)에 바인딩
+- 범용 웹훅에 HMAC-SHA256 서명 검증
+- 모든 사용자 대면 API 엔드포인트에 정규식 입력 검증
+- CORS를 localhost 출처로만 제한
+
+### 내부
+- 4개 파서 재작성 (parseStance, 구조화 출력 포함 parseForcedDecision)
+- 서킷 브레이커 통합 (L0 + L1 → 단일 구현)
+- readFileSync → readFile 비동기 마이그레이션
+- spawn 타임아웃 시 SIGKILL 에스컬레이션
+- 437개 신규 테스트 (1443 → 1880), @testing-library/react 컴포넌트 렌더링 테스트 포함
+
 ## 1.1.1-rc.1 (2026-03-19)
 
 ### 개선 사항

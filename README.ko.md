@@ -7,7 +7,8 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-1313%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1880%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/version-2.0.0--rc.1-%2305A6B9" alt="v2.0.0-rc.1">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
@@ -200,6 +201,30 @@ agora doctor
 
 ```bash
 agora tui
+```
+
+### `agora models`
+
+모델 리더보드를 출력합니다 — Thompson Sampling 점수, 사용 횟수, 승률, 상태.
+
+```bash
+agora models
+```
+
+### `agora explain <session>`
+
+과거 리뷰 세션의 내러티브 설명을 생성합니다 — 무엇이 발견되었고, 왜 플래그되었으며, 토론이 어떤 결론을 냈는지.
+
+```bash
+agora explain 2026-03-16/001
+```
+
+### `agora replay <session>`
+
+과거 세션의 파이프라인 이벤트를 인터랙티브하게 재생합니다.
+
+```bash
+agora replay 2026-03-16/001
 ```
 
 ---
@@ -422,40 +447,89 @@ API 키: `~/.config/codeagora/credentials` (홈 디렉토리, git 밖)
 
 ### 소스 구조
 
+v2는 8개 패키지로 구성된 pnpm 모노레포입니다:
+
 ```
-src/
-+-- cli/           # CLI 명령어, 포맷터, 옵션, 에러 유틸
-+-- tui/           # 인터랙티브 터미널 UI (ink + React)
-+-- pipeline/      # 파이프라인 오케스트레이터, 진행 이미터
-+-- l0/            # 모델 레지스트리, 품질 추적 (Thompson Sampling)
-+-- l1/            # 병렬 리뷰어 실행, 프로바이더 레지스트리
-+-- l2/            # 토론 모더레이터, 중복 제거, 임계값 로직
-+-- l3/            # Head 판결, 이슈 그룹핑
-+-- config/        # 설정 로드, 검증, 템플릿, 마이그레이션, 크레덴셜
-+-- providers/     # 프로바이더 레지스트리, 환경 변수 매핑
-+-- session/       # 세션 관리 및 저장
-+-- github/        # GitHub Actions, PR 리뷰 게시, SARIF 출력
-+-- types/         # 공유 TypeScript 타입 정의
-+-- utils/         # 공유 유틸리티
-+-- tests/         # 81 테스트 파일, 1313 테스트
+packages/
++-- shared/        # @codeagora/shared — 타입, 유틸, zod 스키마, 설정
++-- core/          # @codeagora/core — L0/L1/L2/L3 파이프라인, 세션 관리
++-- github/        # @codeagora/github — PR 리뷰 게시, SARIF, diff 파싱
++-- notifications/ # @codeagora/notifications — Discord/Slack 웹훅, 이벤트 스트림
++-- cli/           # @codeagora/cli — CLI 명령어, 포맷터, 옵션
++-- tui/           # @codeagora/tui — 인터랙티브 터미널 UI (ink + React)
++-- mcp/           # @codeagora/mcp — MCP 서버 (7개 도구)
++-- web/           # @codeagora/web — Hono.js REST API + React SPA 대시보드
+                   #   총 131 테스트 파일, 1880 테스트
 ```
+
+---
+
+## MCP 서버
+
+`@codeagora/mcp`은 CodeAgora 파이프라인 전체를 MCP 서버로 노출합니다. Claude Code, Cursor, Windsurf, VS Code와 호환됩니다.
+
+**7개 도구:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`
+
+```json
+{
+  "mcpServers": {
+    "codeagora": {
+      "command": "npx",
+      "args": ["@codeagora/mcp"],
+      "env": { "GROQ_API_KEY": "your_key_here" }
+    }
+  }
+}
+```
+
+`review_quick`은 L1만 실행(토론 없음)하여 빠른 피드백을 제공합니다. `review_full`은 전체 L1→L2→L3 파이프라인을 실행합니다.
+
+---
+
+## 웹 대시보드
+
+`@codeagora/web`은 로컬 웹 대시보드를 제공합니다 — Hono.js REST API 백엔드 + 8개 페이지의 React SPA:
+
+- 어노테이션 diff 뷰어가 포함된 리뷰 결과
+- 실시간 파이프라인 진행 (WebSocket)
+- 모델 인텔리전스 (Thompson Sampling, 리더보드)
+- 세션 히스토리 브라우저
+- 비용 분석
+- 토론/디베이트 뷰어
+- 설정 관리 UI
+
+```bash
+# 대시보드 실행
+agora dashboard
+
+# 또는 독립 실행
+npx @codeagora/web
+```
+
+`127.0.0.1`(루프백 전용)에 바인딩됩니다. CORS는 localhost 출처로만 제한됩니다.
 
 ---
 
 ## 개발
 
 ```bash
-# 모든 테스트 실행
-pnpm test
+# 의존성 설치
+pnpm install
+
+# 모든 패키지 빌드
+pnpm build:ws
+
+# 모든 패키지 테스트
+pnpm test:ws
 
 # 특정 테스트 파일 실행
 pnpm test -- l1-reviewer
 
-# 타입 체크
-pnpm typecheck
+# 모든 패키지 타입 체크
+pnpm typecheck:ws
 
-# 빌드
-pnpm build
+# 단일 패키지 빌드
+pnpm --filter @codeagora/core build
 
 # CLI 직접 실행 (빌드 불필요)
 pnpm cli review path/to/diff.patch
@@ -469,9 +543,12 @@ pnpm cli review path/to/diff.patch
 | CLI 프레임워크 | commander |
 | TUI | ink + React |
 | LLM SDK | Vercel AI SDK (멀티 프로바이더) |
+| 웹 API | Hono.js |
+| MCP | @modelcontextprotocol/sdk |
 | 검증 | zod |
 | 설정 | yaml / json |
-| 테스트 | vitest (81 파일, 1313 테스트) |
+| 테스트 | vitest (131 파일, 1880 테스트) |
+| 컴포넌트 테스트 | @testing-library/react |
 | 빌드 | tsup |
 | 프롬프트 / 위자드 | @clack/prompts |
 | 스피너 / 색상 | ora, picocolors |

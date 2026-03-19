@@ -7,7 +7,8 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-1313%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1880%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/version-2.0.0--rc.1-%2305A6B9" alt="v2.0.0-rc.1">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
@@ -248,6 +249,30 @@ Launch the interactive terminal UI — review setup wizard, real-time pipeline p
 
 ```bash
 agora tui
+```
+
+### `agora models`
+
+Show the model leaderboard — Thompson Sampling scores, usage counts, win rates, and health status for all models seen in past sessions.
+
+```bash
+agora models
+```
+
+### `agora explain <session>`
+
+Generate a narrative explanation of a past review session — what was found, why it was flagged, and what the debate concluded.
+
+```bash
+agora explain 2026-03-16/001
+```
+
+### `agora replay <session>`
+
+Replay a past session's pipeline events interactively.
+
+```bash
+agora replay 2026-03-16/001
 ```
 
 ---
@@ -515,43 +540,89 @@ Use `agora sessions list` and `agora sessions show` to browse past sessions with
 
 ### Project Structure
 
+v2 is a pnpm monorepo with 8 packages:
+
 ```
-src/
-├── cli/           # CLI commands, formatters, options, error utilities
-├── tui/           # Interactive terminal UI (ink + React)
-├── pipeline/      # Pipeline orchestrator, progress emitter
-├── l0/            # Model registry, quality tracking (Thompson Sampling)
-├── l1/            # Parallel reviewer execution, provider registry
-├── l2/            # Discussion moderator, deduplication, threshold logic
-├── l3/            # Head verdict, issue grouping
-├── config/        # Config loading, validation, templates, migration
-├── providers/     # Provider registry, env var mapping
-├── session/       # Session management and storage
-├── github/        # GitHub Actions, PR review posting, diff-to-position mapping
-├── plugins/       # Plugin system
-├── types/         # Shared TypeScript type definitions
-├── utils/         # Shared utilities
-└── tests/         # 81 test files, 1313 tests
+packages/
+├── shared/        # @codeagora/shared — types, utils, zod schemas, config
+├── core/          # @codeagora/core — L0/L1/L2/L3 pipeline, session management
+├── github/        # @codeagora/github — PR review posting, SARIF, diff parsing
+├── notifications/ # @codeagora/notifications — Discord/Slack webhooks, event stream
+├── cli/           # @codeagora/cli — CLI commands, formatters, options
+├── tui/           # @codeagora/tui — interactive terminal UI (ink + React)
+├── mcp/           # @codeagora/mcp — MCP server with 7 tools
+└── web/           # @codeagora/web — Hono.js REST API + React SPA dashboard
+                   #   131 test files, 1880 tests total
 ```
+
+---
+
+## MCP Server
+
+`@codeagora/mcp` exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code, Cursor, Windsurf, and VS Code.
+
+**7 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`
+
+```json
+{
+  "mcpServers": {
+    "codeagora": {
+      "command": "npx",
+      "args": ["@codeagora/mcp"],
+      "env": { "GROQ_API_KEY": "your_key_here" }
+    }
+  }
+}
+```
+
+`review_quick` runs L1 only (no discussion) for fast feedback. `review_full` runs the complete L1→L2→L3 pipeline.
+
+---
+
+## Web Dashboard
+
+`@codeagora/web` provides a local web dashboard — Hono.js REST API backend + React SPA with 8 pages:
+
+- Review results with annotated diff viewer
+- Real-time pipeline progress (WebSocket)
+- Model intelligence (Thompson Sampling, leaderboard)
+- Session history browser
+- Cost analytics
+- Discussion/debate viewer
+- Config management UI
+
+```bash
+# Launch the dashboard
+agora dashboard
+
+# Or run standalone
+npx @codeagora/web
+```
+
+Binds to `127.0.0.1` (loopback only). CORS restricted to localhost origins.
 
 ---
 
 ## Development
 
 ```bash
-cd src
+# Install dependencies
+pnpm install
 
-# Run all tests
-pnpm test
+# Build all packages
+pnpm build:ws
+
+# Run all tests (all packages)
+pnpm test:ws
 
 # Run a specific test file
 pnpm test -- l1-reviewer
 
-# Type check
-pnpm typecheck
+# Type check all packages
+pnpm typecheck:ws
 
-# Build
-pnpm build
+# Build single package
+pnpm --filter @codeagora/core build
 
 # Run CLI directly (no build needed)
 pnpm cli review path/to/diff.patch
@@ -565,9 +636,12 @@ pnpm cli review path/to/diff.patch
 | CLI framework | commander |
 | TUI | ink + React |
 | LLM SDK | Vercel AI SDK (multi-provider) |
+| Web API | Hono.js |
+| MCP | @modelcontextprotocol/sdk |
 | Validation | zod |
 | Config | yaml / json |
-| Testing | vitest (1313 tests across 81 files) |
+| Testing | vitest (1880 tests across 131 files) |
+| Component tests | @testing-library/react |
 | Build | tsup |
 | Prompts / wizards | @clack/prompts |
 | Spinner / colors | ora, picocolors |
