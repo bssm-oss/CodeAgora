@@ -35,8 +35,9 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
+    "test": "vitest run",
+    "test:web": "cd packages/web && vitest run",
+    "test:all": "vitest run && cd packages/web && vitest run",
     "dev": "pnpm --filter @codeagora/cli dev"
   },
   "dependencies": {

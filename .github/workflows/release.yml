@@ -26,9 +26,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm test -- --no-file-parallelism
+      - run: pnpm test --no-file-parallelism
       - name: Web package tests
-        run: cd packages/web && npx vitest run
+        run: pnpm test:web
 
       - name: Publish packages
         run: |

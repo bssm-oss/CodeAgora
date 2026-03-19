@@ -23,7 +23,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm test -- --no-file-parallelism
+      - run: pnpm test --no-file-parallelism
       - name: Web package tests
-        run: cd packages/web && npx vitest run
+        run: pnpm test:web
       - run: pnpm build
