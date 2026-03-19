@@ -28,6 +28,9 @@ import { analyzeTrivialDiff } from './auto-approve.js';
 import { computeL1Confidence, adjustConfidenceFromDiscussion } from './confidence.js';
 import { loadLearnedPatterns } from '../learning/store.js';
 import { applyLearnedPatterns } from '../learning/filter.js';
+import { DiscussionEmitter } from '../l2/event-emitter.js';
+import { estimateDiffComplexity } from './diff-complexity.js';
+import { generateReport, formatReportText } from './report.js';
 import { PipelineTelemetry } from './telemetry.js';
 import fs from 'fs/promises';
 
@@ -72,6 +75,8 @@ export interface PipelineResult {
   discussions?: DiscussionVerdict[];
   /** Per-discussion round data (supporter stances, responses, prompts) */
   roundsPerDiscussion?: Record<string, import('../types/core.js').DiscussionRound[]>;
+  /** Pre-formatted performance report text */
+  performanceText?: string;
   /** Maps "filePath:startLine" → reviewer IDs that flagged the issue */
   reviewerMap?: Record<string, string[]>;
 }
@@ -319,6 +324,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
       // === L2 MODERATOR: Run Discussions ===
       progress?.stageStart('discuss', 'Moderating discussions...');
+      const discussionEmitter = new DiscussionEmitter();
       moderatorReport = await runModerator({
         config: config.moderator,
         supporterPoolConfig: config.supporters,
@@ -326,6 +332,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         settings: config.discussion,
         date,
         sessionId,
+        emitter: discussionEmitter,
       });
 
       progress?.stageComplete('discuss', 'Discussions complete');
@@ -452,6 +459,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       evidenceDocs: allEvidenceDocs,
       discussions: moderatorReport.discussions,
       roundsPerDiscussion: moderatorReport.roundsPerDiscussion,
+      performanceText: await generatePerformanceText(_telemetry),
       reviewerMap: buildReviewerMap(allReviewResults),
     };
   } catch (error) {
@@ -509,4 +517,18 @@ export function mergeReviewOutputsByReviewer(results: ReviewOutput[]): ReviewOut
   }
 
   return [...map.values()];
+}
+
+/**
+ * Generate performance report text from telemetry data.
+ * Returns empty string if no telemetry records.
+ */
+async function generatePerformanceText(telemetry: PipelineTelemetry): Promise<string> {
+  try {
+    const report = await generateReport(telemetry);
+    if (report.summary.totalCalls === 0) return '';
+    return formatReportText(report);
+  } catch {
+    return '';
+  }
 }

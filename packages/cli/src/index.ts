@@ -30,6 +30,10 @@ import { mapToGitHubReview } from '@codeagora/github/mapper.js';
 import { postReview, setCommitStatus } from '@codeagora/github/poster.js';
 import { loadCredentials } from '@codeagora/core/config/credentials.js';
 import { registerLearnCommand } from './commands/learn.js';
+import { getModelLeaderboard, formatLeaderboard } from './commands/models.js';
+import { explainSession } from './commands/explain.js';
+import { computeAgreementMatrix, formatAgreementMatrix } from './commands/agreement.js';
+import { loadSessionForReplay } from './commands/replay.js';
 
 // Load API keys from ~/.config/codeagora/credentials
 loadCredentials();
@@ -577,6 +581,75 @@ program
   });
 
 registerLearnCommand(program);
+
+// === Sprint 4+5 CLI commands ===
+
+program
+  .command('models')
+  .description('Show model performance leaderboard')
+  .action(async () => {
+    try {
+      const entries = await getModelLeaderboard();
+      console.log(formatLeaderboard(entries));
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('explain <session>')
+  .description('Explain a past review session (e.g. 2026-03-19/001)')
+  .action(async (session: string) => {
+    try {
+      const result = await explainSession(process.cwd(), session);
+      console.log(result.narrative);
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('agreement <session>')
+  .description('Show reviewer agreement matrix for a session')
+  .action(async (session: string) => {
+    try {
+      const [date, id] = session.split('/');
+      if (!date || !id) { console.error('Session must be YYYY-MM-DD/NNN'); process.exit(1); }
+      const sessionDir = path.join(process.cwd(), '.ca', 'sessions', date, id);
+      const raw = await fs.readFile(path.join(sessionDir, 'result.json'), 'utf-8');
+      const result = JSON.parse(raw) as { reviewerMap?: Record<string, string[]> };
+      if (!result.reviewerMap) { console.error('No reviewer map in session'); process.exit(1); }
+      const allIds = [...new Set(Object.values(result.reviewerMap).flat())];
+      const matrix = computeAgreementMatrix(result.reviewerMap, allIds);
+      console.log(formatAgreementMatrix(matrix));
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('replay <session>')
+  .description('Re-render a past review session locally (no LLM calls)')
+  .action(async (session: string) => {
+    try {
+      const result = await loadSessionForReplay(process.cwd(), session);
+      console.log(`Session ${result.sessionPath} — ${result.decision}`);
+      console.log(`Evidence documents: ${result.evidenceDocs.length}`);
+      if (result.evidenceDocs.length > 0) {
+        const output = formatOutput({ status: 'success', sessionId: session.split('/')[1] ?? '', date: session.split('/')[0] ?? '', evidenceDocs: result.evidenceDocs } as Parameters<typeof formatOutput>[0], 'text');
+        console.log(output);
+      }
+      if (!result.diffContent) {
+        console.log('(Original diff file not available for annotated output)');
+      }
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
 
 // Only parse argv when this file is the direct entry point (not imported by tests).
 // In ESM the canonical check is comparing import.meta.url to the process entry module.
