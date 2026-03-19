@@ -243,7 +243,7 @@ codeagora/
 │   │
 │   └── web/                  # @codeagora/web (Phase 5, created empty)
 │       └── src/
-│           ├── server/       # Fastify REST API + WebSocket
+│           ├── server/       # Hono.js REST API + WebSocket
 │           └── frontend/     # React SPA
 ```
 
@@ -272,7 +272,7 @@ codeagora/
 | `notifications` | `core`, `shared` | (none — uses native `fetch`) |
 | `cli` | `core`, `github`, `notifications`, `shared` | `commander`, `ora`, `@clack/prompts` |
 | `tui` | `core`, `shared` | `ink`, `react`, `ink-select-input` |
-| `web` | `core`, `shared` | `fastify` (or similar), `react-dom`, `vite` |
+| `web` | `core`, `shared` | `hono`, `react-dom`, `vite` |
 
 ### Dependency Distribution Benefit
 
@@ -952,7 +952,7 @@ Reviewer Diversity: 83%
 
 #### 5.1 Web Server Infrastructure
 
-**Description:** Lightweight HTTP server (Fastify or Express) serving:
+**Description:** Lightweight HTTP server (Hono.js) serving:
 - REST API wrapping session file system
 - WebSocket/SSE bridge for `ProgressEmitter` events
 - Static file serving for frontend SPA
@@ -1461,7 +1461,7 @@ This is a data structure choice (not strictly a TS limitation), but Go/Rust's ty
 | "TS can't handle concurrency" | Pipeline is I/O-bound (LLM API waits). `Promise.allSettled` + `pLimit` is optimal. Goroutines would add complexity without benefit. |
 | "TS doesn't scale" | Source is ~800KB. Zod schemas enforce boundaries. Monorepo packages will add structural enforcement. |
 | "AI SDK lock-in to TS" | Vercel AI SDK is TS-first — this is an **advantage**. Go/Rust would need hand-rolled API clients for 5+ providers. |
-| "Web server performance" | Dashboard serves ~10 concurrent users max. Fastify handles 30K+ req/s. Not a bottleneck. |
+| "Web server performance" | Dashboard serves ~10 concurrent users max. Hono.js handles 30K+ req/s. Not a bottleneck. |
 | "Can't do real-time" | `EventEmitter` + WebSocket is native. `ProgressEmitter` already exists and works. |
 
 ### Fitness Assessment
@@ -1662,119 +1662,61 @@ Sprint 6:  TDD MANDATORY
 
 ## 10. Recommended Execution Order
 
-### Sprint 0: Monorepo Migration + Stabilization (FIRST)
+### ~~Sprint 0: Monorepo Migration + Stabilization~~ ✅ DONE
 
-```
-Monorepo:
-  Step 1: pnpm-workspace.yaml + tsconfig.base.json
-  Step 2: Extract @codeagora/shared (utils, i18n, data, providers)
-  Step 3: Extract @codeagora/core (types, l0-l3, pipeline, config, session, learning, rules, plugins)
-  Step 4: Extract @codeagora/github + @codeagora/notifications
-  Step 5: Extract @codeagora/cli + @codeagora/tui
-  Step 6: Update cross-package imports (../ → @codeagora/*)
-  Step 7: Per-package tsup build + CI update
+> **Completed:** PRs #112–#129 (15 PRs). All 11 issues resolved. 1506/1506 tests.
 
-Security fixes (absorbs #102, #107, #83, #75):
-  - loadPersona() path traversal restriction
-  - SARIF output path validation
-  - Credentials file permission check (600)
-  - .ca/ directory permission check (700)
+~~Monorepo migration (7 steps), 4 security fixes (#102, #107, #83, #75), 3 critical bugs (#96, #88, #110), 4 stability fixes (#84, #91, #79, #77), readFileSync→readFile async migration.~~
 
-Critical bugs (absorbs #96, #88, #110):
-  - parseStance() → structured output parsing (replace keyword counting)
-  - parseForcedDecision() → same parser rewrite
-  - Objection round maxRounds boundary guard
+---
 
-Stability fixes (absorbs #84, #91, #79, #77):
-  - Circuit breaker consolidation (L0 + L1 → unified)
-  - spawn() SIGKILL escalation for timeout cancellation
-  - Config not found → suggest agora init
-  - stdin temp file cleanup (try-finally)
-  - readFileSync → readFile (cost-estimator.ts, chunker.ts)
-```
+### ~~Sprint 1: Foundation + Quick Wins~~ ✅ DONE
 
-**Absorbs 11 GitHub issues:** #75, #77, #79, #83, #84, #88, #91, #96, #102, #107, #110
-**Estimated effort:** 1-2 days (monorepo migration + fixes in new package structure)
-**Impact:** Clean package boundaries, security hardened, critical parser bugs fixed, stable foundation for all feature work.
+> **Completed:** PR #131. 6 features implemented and wired.
 
-### Sprint 1: Foundation + Quick Wins
+~~1.1 DiscussionRound propagation (keystone), 1.4 Performance in summary comment, 1.9 Issue heatmap, 1.7 SARIF discussion metadata, 4.7 Reviewer diversity score, 1.5.1 Webhook payload enrichment.~~
 
-```
-1.1 DiscussionRound propagation (keystone)     → @codeagora/core
-1.4 Performance in summary comment              → @codeagora/github
-1.9 Issue heatmap                               → @codeagora/github
-1.7 SARIF discussion metadata                   → @codeagora/github
-4.7 Reviewer diversity score                    → @codeagora/core
-1.5.1 Webhook payload enrichment                → @codeagora/notifications
-```
+---
 
-**Estimated effort:** 1 day
-**Impact:** Surfaces hidden data in existing outputs with minimal code changes.
+### ~~Sprint 2: GitHub Comment Enrichment~~ ✅ DONE
 
-### Sprint 2: GitHub Comment Enrichment
+> **Completed:** PR #133. 5 features implemented and wired.
 
-```
-1.2 Inline debate logs                          → @codeagora/github
-1.3 Summary debate detail                       → @codeagora/github
-1.5 Suppressed issues display                   → @codeagora/github + @codeagora/core
-1.6 Confidence filtering                        → @codeagora/github
-1.11 Review status badge                        → @codeagora/github
-```
+~~1.2 Inline debate logs, 1.3 Summary debate detail, 1.5 Suppressed issues display, 1.6 Confidence filtering, 1.11 Review status badge.~~
 
-**Estimated effort:** 1-2 days
-**Impact:** GitHub PR comments become significantly more informative.
+---
 
-### Sprint 3: Webhook + Discord
+### ~~Sprint 3: Webhook + Discord~~ ✅ DONE
 
-```
-2.1 Moderator event emitter (keystone)          → @codeagora/core (l2/moderator)
-1.5.2 Generic webhook + HMAC                    → @codeagora/notifications
-2.2 Discord live chat + threads                 → @codeagora/notifications
-2.3 Discord pipeline summary                    → @codeagora/notifications
-```
+> **Completed:** PR #135. 4 features implemented.
 
-**Estimated effort:** 2-3 days
-**Impact:** Real-time review visibility in Discord.
+~~2.1 Moderator event emitter (keystone), 1.5.2 Generic webhook + HMAC, 2.2 Discord live chat + threads, 2.3 Discord pipeline summary.~~
 
-### Sprint 4: Meme Mode + CLI
+---
 
-```
-3.1 Meme mode (full implementation)             → @codeagora/shared (meme/) + all consumer packages
-4.1 Model leaderboard CLI                       → @codeagora/cli
-4.3 Session explain command                     → @codeagora/cli
-```
+### ~~Sprint 4: Meme Mode + CLI~~ ✅ DONE
 
-**Estimated effort:** 1-2 days
-**Impact:** Fun factor + model intelligence visibility.
+> **Completed:** PR #137. 3 features implemented and CLI commands registered.
 
-### Sprint 5: Advanced Features
+~~3.1 Meme mode (full implementation), 4.1 Model leaderboard CLI, 4.3 Session explain command.~~
 
-```
-1.5.3 Event stream webhook                     → @codeagora/notifications
-1.8 Session diff on re-review                   → @codeagora/github
-1.10 Dry-run preview comment                    → @codeagora/github
-4.2 Agreement matrix                            → @codeagora/cli
-4.4 Session replay                              → @codeagora/cli
-4.5 Diff complexity estimator                   → @codeagora/core (pipeline/)
-4.6 Devil's advocate tracking                   → @codeagora/core (l0/ or l2/)
-```
+---
 
-**Estimated effort:** 2-3 days
-**Impact:** Power user features + CI/CD integration.
+### ~~Sprint 5: Advanced Features~~ ✅ DONE
 
-### Sprint 6: MCP Server & Platform Integration
+> **Completed:** PR #139 + #141 (wiring). 7 features implemented, CLI commands registered, pipeline integrated.
 
-```
-6.2 Lightweight review mode                     → @codeagora/core (pipeline option)
-6.1 MCP server package                          → @codeagora/mcp (new package)
-6.4 Context-optimized output                    → @codeagora/core (compact formatter)
-6.3 Claude Code hook integration                → documentation + example configs
-6.5 Multi-platform MCP distribution             → documentation + testing
-```
+~~1.5.3 Event stream webhook, 1.8 Session diff on re-review, 1.10 Dry-run preview comment, 4.2 Agreement matrix, 4.4 Session replay, 4.5 Diff complexity estimator, 4.6 Devil's advocate tracking.~~
 
-**Estimated effort:** 2-3 days
-**Impact:** CodeAgora available as MCP tool in Claude Code, Cursor, Windsurf, OpenCode. Killer differentiator: cross-model peer review for AI-generated code.
-**Prerequisite:** Sprint 3 complete (core enriched, event emitter exists, pipeline stable).
+---
+
+### ~~Sprint 6: MCP Server & Platform Integration~~ ✅ DONE
+
+> **Completed:** PR #145. `@codeagora/mcp` package with 7 tools, lightweight mode, compact output. Code review fixes in PR #143 (14 issues, 22 tests added).
+
+~~6.2 Lightweight review mode, 6.1 MCP server package, 6.4 Context-optimized output, 6.3 Claude Code hook integration, 6.5 Multi-platform MCP distribution.~~
+
+---
 
 ### Sprint 7+: Web Dashboard
 
@@ -1790,6 +1732,7 @@ Stability fixes (absorbs #84, #91, #79, #77):
 ```
 
 **Estimated effort:** 1-2 weeks
+**Stack:** Hono.js (REST API + WebSocket) + React SPA (Vite)
 **Impact:** Full web-based review analytics platform. Adding `@codeagora/web` is a one-line change in `pnpm-workspace.yaml` thanks to Sprint 0.
 
 ---
