@@ -3,7 +3,7 @@
  * Wraps useWebSocket and maintains pipeline state from ProgressEvents and DiscussionEvents.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useWebSocket } from './useWebSocket.js';
 
 // ============================================================================
@@ -293,30 +293,50 @@ export function getCurrentStage(stages: StageState[]): PipelineStage | null {
 
 export function usePipelineEvents(): UsePipelineEventsResult {
   const { messages, connected } = useWebSocket('/ws');
+  const lastProcessedRef = useRef(0);
+  const stateRef = useRef<{
+    stages: StageState[];
+    discussions: DiscussionState[];
+    events: PipelineEventEntry[];
+    eventId: number;
+  }>({
+    stages: createInitialStages(),
+    discussions: [],
+    events: [],
+    eventId: 0,
+  });
 
   const result = useMemo(() => {
-    let stages = createInitialStages();
-    let discussions: DiscussionState[] = [];
-    const events: PipelineEventEntry[] = [];
-    let eventId = 0;
+    const state = stateRef.current;
 
-    for (const msg of messages) {
+    // Reset if messages were trimmed (buffer wrapped)
+    if (messages.length < lastProcessedRef.current) {
+      state.stages = createInitialStages();
+      state.discussions = [];
+      state.events = [];
+      state.eventId = 0;
+      lastProcessedRef.current = 0;
+    }
+
+    // Only process new messages since last run
+    for (let i = lastProcessedRef.current; i < messages.length; i++) {
+      const msg = messages[i];
       if (!isWebSocketMessage(msg)) continue;
 
       if (msg.type === 'progress' && isProgressEvent(msg.data)) {
         const progressEvent = msg.data as ProgressEvent;
-        stages = processProgressEvent(stages, progressEvent);
-        events.push({
-          id: eventId++,
+        state.stages = processProgressEvent(state.stages, progressEvent);
+        state.events.push({
+          id: state.eventId++,
           source: 'progress',
           event: progressEvent,
           timestamp: progressEvent.timestamp,
         });
       } else if (msg.type === 'discussion' && isDiscussionEvent(msg.data)) {
         const discussionEvent = msg.data as DiscussionEvent;
-        discussions = processDiscussionEvent(discussions, discussionEvent);
-        events.push({
-          id: eventId++,
+        state.discussions = processDiscussionEvent(state.discussions, discussionEvent);
+        state.events.push({
+          id: state.eventId++,
           source: 'discussion',
           event: discussionEvent,
           timestamp: Date.now(),
@@ -324,14 +344,21 @@ export function usePipelineEvents(): UsePipelineEventsResult {
       }
     }
 
-    // Limit to MAX_EVENTS (keep most recent)
-    const trimmedEvents = events.length > MAX_EVENTS
-      ? events.slice(events.length - MAX_EVENTS)
-      : events;
+    lastProcessedRef.current = messages.length;
 
-    const currentStage = getCurrentStage(stages);
+    // Trim events to MAX_EVENTS
+    if (state.events.length > MAX_EVENTS) {
+      state.events = state.events.slice(state.events.length - MAX_EVENTS);
+    }
 
-    return { stages, currentStage, events: trimmedEvents, discussions };
+    const currentStage = getCurrentStage(state.stages);
+
+    return {
+      stages: state.stages,
+      currentStage,
+      events: state.events,
+      discussions: state.discussions,
+    };
   }, [messages]);
 
   return { ...result, connected };

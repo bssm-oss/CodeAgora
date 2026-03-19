@@ -68,9 +68,21 @@ const statusClassMap: Record<string, string> = {
 
 export function ReviewDetail(): React.JSX.Element {
   const { date, id } = useParams<{ date: string; id: string }>();
+
+  const isValidParams = date && id && /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{3}$/.test(id);
+
   const { data: session, loading, error } = useApi<SessionDetail>(
-    `/api/sessions/${date}/${id}`,
+    isValidParams ? `/api/sessions/${date}/${id}` : '',
   );
+
+  if (!isValidParams) {
+    return (
+      <div className="page">
+        <h2>Error</h2>
+        <p>Invalid session identifier</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -3,7 +3,7 @@
  * Syntax-highlighted read-only code block with copy to clipboard.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 interface ConfigPreviewProps {
   config: Record<string, unknown>;
@@ -85,11 +85,16 @@ export function ConfigPreview({ config }: ConfigPreviewProps): React.JSX.Element
 
   const jsonStr = JSON.stringify(config, null, 2);
 
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => () => { clearTimeout(copyTimerRef.current); }, []);
+
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(jsonStr);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may not be available
     }

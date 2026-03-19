@@ -6,7 +6,6 @@
 import { Hono } from 'hono';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { readJsonSafe, readdirSafe } from '../utils/fs-helpers.js';
 
 const CA_ROOT = '.ca';
@@ -75,8 +74,7 @@ costRoutes.get('/', async (c) => {
  */
 costRoutes.get('/pricing', async (c) => {
   try {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const pricingPath = path.resolve(__dirname, '../../../../shared/src/data/pricing.json');
+    const pricingPath = path.join(process.cwd(), 'packages', 'shared', 'src', 'data', 'pricing.json');
     const content = await readFile(pricingPath, 'utf-8');
     return c.json(JSON.parse(content));
   } catch {

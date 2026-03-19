@@ -104,6 +104,7 @@ export function Sessions(): React.JSX.Element {
   // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setFocusedIndex((prev) => Math.min(prev + 1, sorted.length - 1));
