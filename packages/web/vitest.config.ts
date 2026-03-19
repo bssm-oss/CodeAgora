@@ -5,6 +5,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    environmentMatchGlobs: [
+      ['tests/frontend/render/**', 'jsdom'],
+    ],
+    setupFiles: ['tests/frontend/render/setup.ts'],
   },
   resolve: {
     alias: {
