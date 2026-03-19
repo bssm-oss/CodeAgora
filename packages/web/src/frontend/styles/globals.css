@@ -1525,6 +1525,72 @@ a:hover {
    ============================================================================ */
 
 .model-dashboard {
+   Discussion/Debate Viewer — Session Selector
+   ============================================================================ */
+
+.disc-selector {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.disc-selector__load {
+  padding: 6px 20px;
+  background-color: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.disc-selector__load:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.disc-selector__load:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.disc-change-session {
+  margin-left: auto;
+  padding: 4px 12px;
+  background: none;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.disc-change-session:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-secondary);
+}
+
+.disc-session-info {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.disc-empty {
+  color: var(--color-text-secondary);
+  font-style: italic;
+  padding: 24px 0;
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Layout
+   ============================================================================ */
+
+.disc-layout {
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -1772,6 +1838,106 @@ a:hover {
   font-size: 13px;
   color: var(--color-text);
   font-family: var(--font-mono);
+.disc-layout__list {
+  width: 100%;
+}
+
+.disc-layout__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Summary Stats
+   ============================================================================ */
+
+.disc-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.disc-summary__item {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.disc-summary__item--da {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Discussion List
+   ============================================================================ */
+
+.disc-list__filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.disc-list__empty {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-style: italic;
+  padding: 16px 0;
+}
+
+.disc-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.disc-list__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  text-align: left;
+  color: var(--color-text);
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.disc-list__row:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+.disc-list__row--selected {
+  border-color: var(--color-accent);
+  background-color: rgba(88, 166, 255, 0.06);
+}
+
+.disc-list__id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-accent);
+  min-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.disc-list__file {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1811,6 +1977,208 @@ a:hover {
 
 .provider-card {
   padding: 14px;
+.disc-list__line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.disc-list__rounds {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.disc-list__consensus {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.disc-list__consensus--reached {
+  color: var(--color-success);
+  background-color: rgba(63, 185, 80, 0.15);
+}
+
+.disc-list__consensus--not-reached {
+  color: var(--color-warning);
+  background-color: rgba(210, 153, 34, 0.15);
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Severity Badges
+   ============================================================================ */
+
+.disc-severity {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.disc-severity--harshly-critical {
+  background-color: rgba(188, 107, 255, 0.15);
+  color: #bc6bff;
+}
+
+.disc-severity--critical {
+  background-color: rgba(248, 81, 73, 0.15);
+  color: var(--color-error);
+}
+
+.disc-severity--warning {
+  background-color: rgba(210, 153, 34, 0.15);
+  color: var(--color-warning);
+}
+
+.disc-severity--suggestion {
+  background-color: rgba(63, 185, 80, 0.15);
+  color: var(--color-success);
+}
+
+.disc-severity--dismissed {
+  background-color: rgba(139, 148, 158, 0.15);
+  color: var(--color-text-secondary);
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Debate Timeline
+   ============================================================================ */
+
+.debate-timeline {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.debate-timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.debate-timeline__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.debate-timeline__rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.debate-round {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.debate-round__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.debate-round__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.debate-round__consensus {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.debate-round__moderator {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background-color: rgba(88, 166, 255, 0.04);
+}
+
+.debate-round__moderator-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.debate-round__moderator-prompt {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.debate-round__responses {
+  display: flex;
+  flex-direction: column;
+}
+
+.debate-response {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.debate-response:last-child {
+  border-bottom: none;
+}
+
+.debate-response--devil {
+  background-color: rgba(210, 153, 34, 0.04);
+}
+
+.debate-response__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.debate-response__supporter {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.debate-response__da-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-warning);
+  background-color: rgba(210, 153, 34, 0.15);
+  border-radius: 3px;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+}
+
+.debate-response__text {
+  font-size: 13px;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.debate-timeline__verdict {
+  margin-top: 16px;
+  padding: 14px 16px;
   background-color: var(--color-bg-tertiary);
   border-radius: 6px;
   border: 1px solid var(--color-border);
@@ -1917,6 +2285,39 @@ a:hover {
 }
 
 .cost-breakdown__title {
+.debate-timeline__verdict-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.debate-timeline__verdict-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.debate-timeline__verdict-reasoning {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Stance Visualization
+   ============================================================================ */
+
+.stance-viz {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.stance-viz__title {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -1956,6 +2357,43 @@ a:hover {
 }
 
 .cost-breakdown__legend-item {
+.stance-viz__empty {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.stance-viz__scroll {
+  overflow-x: auto;
+}
+
+.stance-viz__svg {
+  display: block;
+}
+
+.stance-viz__header-text {
+  font-size: 11px;
+  fill: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.stance-viz__row-label {
+  font-size: 11px;
+  fill: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.stance-viz__row-label--da {
+  fill: var(--color-warning);
+}
+
+.stance-viz__legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.stance-viz__legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1979,4 +2417,64 @@ a:hover {
   color: var(--color-text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.stance-viz__legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* ============================================================================
+   Discussion/Debate Viewer — Consensus Progress
+   ============================================================================ */
+
+.consensus-progress {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.consensus-progress__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.consensus-progress__empty {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.consensus-progress__svg {
+  display: block;
+}
+
+.consensus-progress__bar-label {
+  font-size: 11px;
+  fill: var(--color-text-secondary);
+  font-family: var(--font-sans);
+}
+
+.consensus-progress__pct-label {
+  font-size: 11px;
+  fill: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.consensus-progress__threshold-label {
+  font-size: 10px;
+  fill: var(--color-warning);
+  font-family: var(--font-mono);
+}
+
+.consensus-progress__result {
+  margin-top: 10px;
 }
