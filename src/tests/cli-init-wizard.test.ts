@@ -7,7 +7,7 @@ import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
 
-import { buildCustomConfig, runInit, type CustomConfigParams } from '../cli/commands/init.js';
+import { buildCustomConfig, runInit, type CustomConfigParams } from '@codeagora/cli/commands/init.js';
 
 // ============================================================================
 // buildCustomConfig

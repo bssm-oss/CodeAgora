@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { DebatePanel } from '../tui/components/DebatePanel.js';
-import { DebateScreen } from '../tui/screens/DebateScreen.js';
-import type { DebateRound } from '../tui/components/DebatePanel.js';
-import type { DebateDiscussion } from '../tui/screens/DebateScreen.js';
+import { DebatePanel } from '@codeagora/tui/components/DebatePanel.js';
+import { DebateScreen } from '@codeagora/tui/screens/DebateScreen.js';
+import type { DebateRound } from '@codeagora/tui/components/DebatePanel.js';
+import type { DebateDiscussion } from '@codeagora/tui/screens/DebateScreen.js';
 
 // ============================================================================
 // Mock data

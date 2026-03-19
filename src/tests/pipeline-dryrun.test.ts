@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { estimateTokensFromDiff, dryRun, formatDryRunText } from '../pipeline/dryrun.js';
-import type { Config } from '../types/config.js';
+import { estimateTokensFromDiff, dryRun, formatDryRunText } from '@codeagora/core/pipeline/dryrun.js';
+import type { Config } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // Fixtures
@@ -109,11 +109,11 @@ index abc..def 100644
 // ============================================================================
 
 describe('estimateTokensFromDiff', () => {
-  it('empty diff returns 0', () => {
+  it('empty diff returns 0', async () => {
     expect(estimateTokensFromDiff('')).toBe(0);
   });
 
-  it('short diff returns reasonable estimate', () => {
+  it('short diff returns reasonable estimate', async () => {
     const tokens = estimateTokensFromDiff(SAMPLE_DIFF);
     // SAMPLE_DIFF is ~190 chars → ~48 tokens
     expect(tokens).toBeGreaterThan(0);
@@ -122,7 +122,7 @@ describe('estimateTokensFromDiff', () => {
     expect(tokens).toBe(Math.ceil(SAMPLE_DIFF.length / 4));
   });
 
-  it('longer diff scales linearly', () => {
+  it('longer diff scales linearly', async () => {
     const longDiff = SAMPLE_DIFF.repeat(10);
     const tokens = estimateTokensFromDiff(longDiff);
     expect(tokens).toBe(Math.ceil(longDiff.length / 4));
@@ -145,12 +145,12 @@ describe('dryRun', () => {
     process.env = originalEnv;
   });
 
-  it('returns correct reviewer list from array config', () => {
+  it('returns correct reviewer list from array config', async () => {
     delete process.env.GROQ_API_KEY;
     delete process.env.GOOGLE_API_KEY;
     delete process.env.MISTRAL_API_KEY;
 
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     expect(result.reviewers).toHaveLength(3);
     expect(result.reviewers[0].id).toBe('r1-groq');
@@ -159,10 +159,10 @@ describe('dryRun', () => {
     expect(result.reviewers[0].isAuto).toBe(false);
   });
 
-  it('cost estimates are positive values', () => {
+  it('cost estimates are positive values', async () => {
     process.env.GROQ_API_KEY = 'test-key';
 
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     expect(result.estimation.estimatedL1Tokens).toBeGreaterThan(0);
     expect(result.estimation.estimatedL2Tokens).toBeGreaterThan(0);
@@ -173,12 +173,12 @@ describe('dryRun', () => {
     expect(result.estimation.totalEstimatedCost).toMatch(/^\$[\d.]+$|^N\/A$/);
   });
 
-  it('provider with no API key gets no-api-key health status', () => {
+  it('provider with no API key gets no-api-key health status', async () => {
     delete process.env.GROQ_API_KEY;
     delete process.env.GOOGLE_API_KEY;
     delete process.env.MISTRAL_API_KEY;
 
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     const groqHealth = result.health.find((h) => h.provider === 'groq');
     expect(groqHealth).toBeDefined();
@@ -189,12 +189,12 @@ describe('dryRun', () => {
     expect(googleHealth!.status).toBe('no-api-key');
   });
 
-  it('provider with API key set gets available health status', () => {
+  it('provider with API key set gets available health status', async () => {
     process.env.GROQ_API_KEY = 'test-key-groq';
     delete process.env.GOOGLE_API_KEY;
     delete process.env.MISTRAL_API_KEY;
 
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     const groqHealth = result.health.find((h) => h.provider === 'groq');
     expect(groqHealth!.status).toBe('available');
@@ -203,12 +203,12 @@ describe('dryRun', () => {
     expect(googleHealth!.status).toBe('no-api-key');
   });
 
-  it('missing API key adds warning message', () => {
+  it('missing API key adds warning message', async () => {
     delete process.env.GROQ_API_KEY;
     delete process.env.GOOGLE_API_KEY;
     delete process.env.MISTRAL_API_KEY;
 
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     expect(result.warnings.length).toBeGreaterThan(0);
     // At least one warning mentions an env var
@@ -216,7 +216,7 @@ describe('dryRun', () => {
     expect(hasKeyWarning).toBe(true);
   });
 
-  it('auto reviewer entry has isAuto: true', () => {
+  it('auto reviewer entry has isAuto: true', async () => {
     delete process.env.GROQ_API_KEY;
 
     const config = makeConfig({
@@ -234,7 +234,7 @@ describe('dryRun', () => {
       ],
     });
 
-    const result = dryRun(config, SAMPLE_DIFF);
+    const result = await dryRun(config, SAMPLE_DIFF);
 
     const autoReviewers = result.reviewers.filter((r) => r.isAuto);
     expect(autoReviewers).toHaveLength(2);
@@ -246,15 +246,15 @@ describe('dryRun', () => {
     expect(staticReviewers[0].isAuto).toBe(false);
   });
 
-  it('config summary reflects reviewerCount and supporterCount', () => {
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+  it('config summary reflects reviewerCount and supporterCount', async () => {
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     expect(result.config.reviewerCount).toBe(3);
     expect(result.config.supporterCount).toBe(2);
     expect(result.config.maxDiscussionRounds).toBe(3);
   });
 
-  it('declarative reviewers config: static + auto slots', () => {
+  it('declarative reviewers config: static + auto slots', async () => {
     delete process.env.GROQ_API_KEY;
 
     const config: Config = {
@@ -277,7 +277,7 @@ describe('dryRun', () => {
       errorHandling: makeConfig().errorHandling,
     } as Config;
 
-    const result = dryRun(config, SAMPLE_DIFF);
+    const result = await dryRun(config, SAMPLE_DIFF);
 
     expect(result.config.reviewerCount).toBe(4);
 
@@ -287,8 +287,8 @@ describe('dryRun', () => {
     expect(autoR).toHaveLength(3);
   });
 
-  it('zero-length diff produces 0 L1 tokens', () => {
-    const result = dryRun(makeConfig(), '');
+  it('zero-length diff produces 0 L1 tokens', async () => {
+    const result = await dryRun(makeConfig(), '');
 
     expect(result.estimation.estimatedL1Tokens).toBe(0);
   });
@@ -309,8 +309,8 @@ describe('formatDryRunText', () => {
     // clean up any keys set during tests
   });
 
-  it('output contains all major section headers', () => {
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+  it('output contains all major section headers', async () => {
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
     const text = formatDryRunText(result);
 
     expect(text).toContain('Pipeline Dry Run Report');
@@ -320,8 +320,8 @@ describe('formatDryRunText', () => {
     expect(text).toContain('Provider Health:');
   });
 
-  it('output contains reviewer ids', () => {
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+  it('output contains reviewer ids', async () => {
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
     const text = formatDryRunText(result);
 
     expect(text).toContain('r1-groq');
@@ -329,8 +329,8 @@ describe('formatDryRunText', () => {
     expect(text).toContain('r3-mistral');
   });
 
-  it('output contains L1/L2/L3 cost lines', () => {
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+  it('output contains L1/L2/L3 cost lines', async () => {
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
     const text = formatDryRunText(result);
 
     expect(text).toContain('L1 (Review)');
@@ -339,8 +339,8 @@ describe('formatDryRunText', () => {
     expect(text).toContain('Total');
   });
 
-  it('output contains Warnings section when warnings exist', () => {
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+  it('output contains Warnings section when warnings exist', async () => {
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
     // All API keys missing → warnings should be present
     expect(result.warnings.length).toBeGreaterThan(0);
 
@@ -348,26 +348,26 @@ describe('formatDryRunText', () => {
     expect(text).toContain('Warnings:');
   });
 
-  it('output does not contain Warnings section when no warnings', () => {
+  it('output does not contain Warnings section when no warnings', async () => {
     process.env.GROQ_API_KEY = 'key1';
     process.env.GOOGLE_API_KEY = 'key2';
     process.env.MISTRAL_API_KEY = 'key3';
 
-    const result = dryRun(makeConfig(), SAMPLE_DIFF);
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
     const text = formatDryRunText(result);
 
     // Warnings section should be absent when there are none
     expect(text).not.toContain('Warnings:');
   });
 
-  it('auto reviewer shows "auto" label in output', () => {
+  it('auto reviewer shows "auto" label in output', async () => {
     const config = makeConfig({
       reviewers: [
         { id: 'auto-1', auto: true as const, enabled: true },
       ],
     });
 
-    const result = dryRun(config, SAMPLE_DIFF);
+    const result = await dryRun(config, SAMPLE_DIFF);
     const text = formatDryRunText(result);
 
     expect(text).toContain('auto-1');

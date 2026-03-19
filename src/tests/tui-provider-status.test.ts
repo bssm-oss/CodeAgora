@@ -3,13 +3,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { PROVIDER_ENV_VARS } from '../providers/env-vars.js';
+import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
 import {
   isProviderAvailable,
   getAllProviderStatuses,
   getActiveProviderCount,
   getMissingProviders,
-} from '../tui/utils/provider-status.js';
+} from '@codeagora/tui/utils/provider-status.js';
 
 // ============================================================================
 // Helpers

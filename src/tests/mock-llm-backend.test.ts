@@ -10,7 +10,7 @@ import {
   createMockDebateResponse,
   createMockBackend,
 } from './helpers/mock-backend.js';
-import type { BackendInput } from '../l1/backend.js';
+import type { BackendInput } from '@codeagora/core/l1/backend.js';
 
 // ============================================================================
 // Helpers

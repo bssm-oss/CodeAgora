@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CircuitBreaker, CircuitOpenError } from '../l1/circuit-breaker.js';
-import type { CircuitState } from '../l1/circuit-breaker.js';
+import { CircuitBreaker, CircuitOpenError } from '@codeagora/core/l1/circuit-breaker.js';
+import type { CircuitState } from '@codeagora/core/l1/circuit-breaker.js';
 
 describe('CircuitBreaker', () => {
   let currentTime: number;

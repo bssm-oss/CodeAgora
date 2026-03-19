@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { pLimit } from '../utils/concurrency.js';
+import { pLimit } from '@codeagora/shared/utils/concurrency.js';
 
 describe('pLimit', () => {
   it('throws on concurrency < 1', () => {

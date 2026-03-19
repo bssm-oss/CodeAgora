@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import path from 'path';
-import { validateDiffPath } from '../utils/path-validation.js';
+import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
 
 describe('validateDiffPath', () => {
   // 1. Normal absolute path — success

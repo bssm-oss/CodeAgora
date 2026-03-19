@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { makeHeadVerdict, scanUnconfirmedQueue } from '../l3/verdict.js';
-import type { ModeratorReport, DiscussionVerdict, EvidenceDocument } from '../types/core.js';
+import { makeHeadVerdict, scanUnconfirmedQueue } from '@codeagora/core/l3/verdict.js';
+import type { ModeratorReport, DiscussionVerdict, EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -26,6 +26,7 @@ function makeVerdict(overrides: Partial<DiscussionVerdict> = {}): DiscussionVerd
 function makeReport(overrides: Partial<ModeratorReport> = {}): ModeratorReport {
   return {
     discussions: [],
+    roundsPerDiscussion: {},
     unconfirmedIssues: [],
     suggestions: [],
     summary: { totalDiscussions: 0, resolved: 0, escalated: 0 },

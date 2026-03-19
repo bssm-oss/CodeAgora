@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { PROVIDER_ENV_VARS, getProviderEnvVar } from '../providers/env-vars.js';
+import { PROVIDER_ENV_VARS, getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 
 describe('PROVIDER_ENV_VARS', () => {
   it('should map all 15 known providers', () => {

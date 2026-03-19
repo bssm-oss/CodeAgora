@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseEvidenceResponse } from '../l1/parser.js';
-import { checkForfeitThreshold } from '../l1/reviewer.js';
-import type { ReviewOutput } from '../types/core.js';
+import { parseEvidenceResponse } from '@codeagora/core/l1/parser.js';
+import { checkForfeitThreshold } from '@codeagora/core/l1/reviewer.js';
+import type { ReviewOutput } from '@codeagora/core/types/core.js';
 
 describe('L1 Evidence Parser', () => {
   it('should parse valid evidence document', () => {

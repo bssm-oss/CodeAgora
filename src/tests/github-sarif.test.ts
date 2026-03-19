@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildSarifReport, serializeSarif } from '../github/sarif.js';
-import type { EvidenceDocument } from '../types/core.js';
+import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 
 const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   issueTitle: 'SQL injection vulnerability',

@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "jsx": "react-jsx",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@codeagora/core": ["../core/src/index.ts"],
+      "@codeagora/core/*": ["../core/src/*"],
+      "@codeagora/shared": ["../shared/src/index.ts"],
+      "@codeagora/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["./src/**/*.ts", "./src/**/*.tsx"]
+}

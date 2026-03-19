@@ -6,12 +6,12 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
-import { Panel } from '../tui/components/Panel.js';
-import { ScrollableList } from '../tui/components/ScrollableList.js';
-import { TextInput } from '../tui/components/TextInput.js';
-import { Toast } from '../tui/components/Toast.js';
-import { TabBar } from '../tui/components/TabBar.js';
-import { HelpOverlay } from '../tui/components/HelpOverlay.js';
+import { Panel } from '@codeagora/tui/components/Panel.js';
+import { ScrollableList } from '@codeagora/tui/components/ScrollableList.js';
+import { TextInput } from '@codeagora/tui/components/TextInput.js';
+import { Toast } from '@codeagora/tui/components/Toast.js';
+import { TabBar } from '@codeagora/tui/components/TabBar.js';
+import { HelpOverlay } from '@codeagora/tui/components/HelpOverlay.js';
 
 // ============================================================================
 // Panel

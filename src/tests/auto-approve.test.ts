@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { analyzeTrivialDiff } from '../pipeline/auto-approve.js';
+import { analyzeTrivialDiff } from '@codeagora/core/pipeline/auto-approve.js';
 
 const DEFAULT_CONFIG = {
   maxLines: 5,

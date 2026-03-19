@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { Readable, Writable } from 'stream';
-import type { BackendInput } from '../l1/backend.js';
+import type { BackendInput } from '@codeagora/core/l1/backend.js';
 
 // ============================================================================
 // Mocks
@@ -32,12 +32,12 @@ vi.mock('child_process', () => ({
   spawn: mockSpawn,
 }));
 
-vi.mock('../l1/api-backend.js', () => ({
+vi.mock('../../packages/core/src/l1/api-backend.js', () => ({
   executeViaAISDK: vi.fn(),
 }));
 
-import { executeBackend } from '../l1/backend.js';
-import { executeViaAISDK } from '../l1/api-backend.js';
+import { executeBackend } from '@codeagora/core/l1/backend.js';
+import { executeViaAISDK } from '@codeagora/core/l1/api-backend.js';
 
 const mockExecuteViaAISDK = vi.mocked(executeViaAISDK);
 

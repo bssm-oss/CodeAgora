@@ -12,9 +12,9 @@ import {
   chunkDiffFiles,
   chunkDiff,
   filterIgnoredFiles,
-} from '../pipeline/chunker.js';
-import { mergeReviewOutputsByReviewer } from '../pipeline/orchestrator.js';
-import type { ReviewOutput, EvidenceDocument } from '../types/core.js';
+} from '@codeagora/core/pipeline/chunker.js';
+import { mergeReviewOutputsByReviewer } from '@codeagora/core/pipeline/orchestrator.js';
+import type { ReviewOutput, EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ============================================================================
 // Helpers
@@ -302,17 +302,17 @@ describe('chunkDiffFiles', () => {
 // ============================================================================
 
 describe('chunkDiff', () => {
-  it('returns empty array for empty diff', () => {
-    expect(chunkDiff('', { maxTokens: 8000 })).toEqual([]);
+  it('returns empty array for empty diff', async () => {
+    expect(await chunkDiff('', { maxTokens: 8000 })).toEqual([]);
   });
 
-  it('returns empty array for whitespace-only diff', () => {
-    expect(chunkDiff('   \n\n  ', { maxTokens: 8000 })).toEqual([]);
+  it('returns empty array for whitespace-only diff', async () => {
+    expect(await chunkDiff('   \n\n  ', { maxTokens: 8000 })).toEqual([]);
   });
 
-  it('returns single chunk for small diff', () => {
+  it('returns single chunk for small diff', async () => {
     const diff = makeDiffSection('src/auth.ts', 5);
-    const chunks = chunkDiff(diff, { maxTokens: 8000 });
+    const chunks = await chunkDiff(diff, { maxTokens: 8000 });
 
     expect(chunks).toHaveLength(1);
     expect(chunks[0].index).toBe(0);
@@ -320,9 +320,9 @@ describe('chunkDiff', () => {
     expect(chunks[0].estimatedTokens).toBeLessThanOrEqual(8000);
   });
 
-  it('splits large diff into multiple chunks within budget', () => {
+  it('splits large diff into multiple chunks within budget', async () => {
     const diff = generateLargeDiff(100, 20);
-    const chunks = chunkDiff(diff, { maxTokens: 8000 });
+    const chunks = await chunkDiff(diff, { maxTokens: 8000 });
 
     expect(chunks.length).toBeGreaterThan(1);
 
@@ -331,27 +331,27 @@ describe('chunkDiff', () => {
     }
   });
 
-  it('preserves all file paths across chunks', () => {
+  it('preserves all file paths across chunks', async () => {
     const diff = generateLargeDiff(30, 20);
-    const chunks = chunkDiff(diff, { maxTokens: 8000 });
+    const chunks = await chunkDiff(diff, { maxTokens: 8000 });
 
     const allFiles = chunks.flatMap((c) => c.files);
     // All 30 files should be represented
     expect(allFiles.length).toBeGreaterThanOrEqual(30);
   });
 
-  it('each chunk has non-empty diffContent', () => {
+  it('each chunk has non-empty diffContent', async () => {
     const diff = generateLargeDiff(20, 10);
-    const chunks = chunkDiff(diff, { maxTokens: 8000 });
+    const chunks = await chunkDiff(diff, { maxTokens: 8000 });
 
     for (const chunk of chunks) {
       expect(chunk.diffContent.length).toBeGreaterThan(0);
     }
   });
 
-  it('uses default maxTokens of 8000 when options omitted', () => {
+  it('uses default maxTokens of 8000 when options omitted', async () => {
     const diff = generateLargeDiff(100, 20);
-    const chunks = chunkDiff(diff);
+    const chunks = await chunkDiff(diff);
 
     for (const chunk of chunks) {
       expect(chunk.estimatedTokens).toBeLessThanOrEqual(8000);

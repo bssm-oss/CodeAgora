@@ -9,7 +9,7 @@ import {
   sendNotifications,
   type NotificationPayload,
   type NotificationConfig,
-} from '../notifications/webhook.js';
+} from '@codeagora/notifications/webhook.js';
 
 // ============================================================================
 // Fixtures

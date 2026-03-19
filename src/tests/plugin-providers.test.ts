@@ -4,10 +4,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { createBuiltinProviderPlugin, getBuiltinProviderPlugins } from '../plugins/builtin-providers.js';
-import { ProviderPluginManager } from '../plugins/provider-manager.js';
-import { PluginRegistry } from '../plugins/registry.js';
-import type { ProviderPlugin } from '../plugins/types.js';
+import { createBuiltinProviderPlugin, getBuiltinProviderPlugins } from '@codeagora/core/plugins/builtin-providers.js';
+import { ProviderPluginManager } from '@codeagora/core/plugins/provider-manager.js';
+import { PluginRegistry } from '@codeagora/core/plugins/registry.js';
+import type { ProviderPlugin } from '@codeagora/core/plugins/types.js';
 
 // Mock SDK packages used inside builtin-providers factory functions
 vi.mock('@ai-sdk/groq', () => ({

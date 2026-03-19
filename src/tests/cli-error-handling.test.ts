@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyError, formatError } from '../cli/utils/errors.js';
+import { classifyError, formatError } from '@codeagora/cli/utils/errors.js';
 
 // ============================================================================
 // classifyError

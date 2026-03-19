@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateConfigData, getEnabledReviewers, checkMinReviewers } from '../config/loader.js';
-import type { Config } from '../types/config.js';
+import { validateConfigData, getEnabledReviewers, checkMinReviewers } from '@codeagora/core/config/loader.js';
+import type { Config } from '@codeagora/core/types/config.js';
 
 describe('Config Validation', () => {
   const validConfig: Config = {

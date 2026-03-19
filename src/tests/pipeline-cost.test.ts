@@ -7,18 +7,18 @@ import {
   loadPricing,
   estimateCost,
   formatCost,
-} from '../pipeline/cost-estimator.js';
-import type { TokenUsage, CostEstimate } from '../pipeline/cost-estimator.js';
+} from '@codeagora/core/pipeline/cost-estimator.js';
+import type { TokenUsage, CostEstimate } from '@codeagora/core/pipeline/cost-estimator.js';
 
 describe('Cost Estimator', () => {
   // Test 1: groq/llama-3.3-70b — pricing lookup 성공, 비용 계산 정확
-  it('groq/llama-3.3-70b pricing lookup 성공 및 비용 계산 정확', () => {
+  it('groq/llama-3.3-70b pricing lookup 성공 및 비용 계산 정확', async () => {
     const usage: TokenUsage = {
       promptTokens: 1000,
       completionTokens: 500,
       totalTokens: 1500,
     };
-    const result = estimateCost(usage, 'groq', 'llama-3.3-70b-versatile');
+    const result = await estimateCost(usage, 'groq', 'llama-3.3-70b-versatile');
     expect(result.provider).toBe('groq');
     expect(result.model).toBe('llama-3.3-70b-versatile');
     expect(result.inputCost).toBeCloseTo((1000 / 1000) * 0.00059, 8);
@@ -28,24 +28,24 @@ describe('Cost Estimator', () => {
   });
 
   // Test 2: 알 수 없는 모델 — totalCost = -1
-  it('알 수 없는 모델은 totalCost = -1 반환', () => {
+  it('알 수 없는 모델은 totalCost = -1 반환', async () => {
     const usage: TokenUsage = {
       promptTokens: 1000,
       completionTokens: 500,
       totalTokens: 1500,
     };
-    const result = estimateCost(usage, 'unknown-provider', 'unknown-model');
+    const result = await estimateCost(usage, 'unknown-provider', 'unknown-model');
     expect(result.totalCost).toBe(-1);
   });
 
   // Test 3: token usage → 비용 계산 공식
-  it('비용 계산 공식: inputTokens * inputPrice / 1000 + outputTokens * outputPrice / 1000', () => {
+  it('비용 계산 공식: inputTokens * inputPrice / 1000 + outputTokens * outputPrice / 1000', async () => {
     const usage: TokenUsage = {
       promptTokens: 2000,
       completionTokens: 1000,
       totalTokens: 3000,
     };
-    const result = estimateCost(usage, 'groq', 'llama-3.1-8b-instant');
+    const result = await estimateCost(usage, 'groq', 'llama-3.1-8b-instant');
     const expectedInput = (2000 / 1000) * 0.00005;
     const expectedOutput = (1000 / 1000) * 0.00008;
     expect(result.inputCost).toBeCloseTo(expectedInput, 8);
@@ -54,12 +54,12 @@ describe('Cost Estimator', () => {
   });
 
   // Test 4: 여러 provider 혼합 비용 합산
-  it('여러 provider 혼합 비용 합산', () => {
+  it('여러 provider 혼합 비용 합산', async () => {
     const usage1: TokenUsage = { promptTokens: 1000, completionTokens: 500, totalTokens: 1500 };
     const usage2: TokenUsage = { promptTokens: 2000, completionTokens: 1000, totalTokens: 3000 };
 
-    const cost1 = estimateCost(usage1, 'google', 'gemini-2.5-flash');
-    const cost2 = estimateCost(usage2, 'mistral', 'mistral-large-latest');
+    const cost1 = await estimateCost(usage1, 'google', 'gemini-2.5-flash');
+    const cost2 = await estimateCost(usage2, 'mistral', 'mistral-large-latest');
 
     expect(cost1.totalCost).toBeGreaterThanOrEqual(0);
     expect(cost2.totalCost).toBeGreaterThanOrEqual(0);
@@ -71,13 +71,13 @@ describe('Cost Estimator', () => {
   });
 
   // Test 5: 무료 tier 모델 (cerebras) — $0.0000
-  it('무료 tier 모델 (cerebras) — totalCost = 0', () => {
+  it('무료 tier 모델 (cerebras) — totalCost = 0', async () => {
     const usage: TokenUsage = {
       promptTokens: 5000,
       completionTokens: 2000,
       totalTokens: 7000,
     };
-    const result = estimateCost(usage, 'cerebras', 'llama-3.3-70b');
+    const result = await estimateCost(usage, 'cerebras', 'llama-3.3-70b');
     expect(result.totalCost).toBe(0);
     expect(formatCost(result)).toBe('$0.0000');
   });
@@ -109,8 +109,8 @@ describe('Cost Estimator', () => {
   });
 
   // Test 8: loadPricing — pricing table에 key가 존재하는지
-  it('loadPricing — pricing table에 기대하는 key들이 존재', () => {
-    const pricing = loadPricing();
+  it('loadPricing — pricing table에 기대하는 key들이 존재', async () => {
+    const pricing = await loadPricing();
     expect(pricing).toHaveProperty('groq/llama-3.3-70b-versatile');
     expect(pricing).toHaveProperty('groq/llama-3.1-8b-instant');
     expect(pricing).toHaveProperty('groq/deepseek-r1-distill-llama-70b');

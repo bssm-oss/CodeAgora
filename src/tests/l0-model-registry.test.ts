@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { initFromData, setRegistry, getModel, getModelsByProvider, getModelsByFamily, getReasoningModels, getAvailableModels, getAllModels, getModelCount } from '../l0/model-registry.js';
+import { initFromData, setRegistry, getModel, getModelsByProvider, getModelsByFamily, getReasoningModels, getAvailableModels, getAllModels, getModelCount } from '@codeagora/core/l0/model-registry.js';
 
 const FIXTURE_RANKINGS = {
   source: 'https://artificialanalysis.ai',

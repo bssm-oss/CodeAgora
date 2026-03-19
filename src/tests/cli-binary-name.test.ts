@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectBinaryName } from '../cli/index.js';
+import { detectBinaryName } from '@codeagora/cli/index.js';
 
 describe('detectBinaryName()', () => {
   it('returns "agora" when argv1 basename is "agora"', () => {

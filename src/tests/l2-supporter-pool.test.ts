@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { selectSupporters } from '../l2/moderator.js';
-import type { SupporterPoolConfig } from '../types/config.js';
+import { selectSupporters } from '@codeagora/core/l2/moderator.js';
+import type { SupporterPoolConfig } from '@codeagora/core/types/config.js';
 
 describe('Supporter Pool Selection', () => {
   const poolConfig: SupporterPoolConfig = {

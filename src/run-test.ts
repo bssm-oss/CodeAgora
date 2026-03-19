@@ -4,7 +4,7 @@
  * Usage: tsx run-test.ts [path-to-diff]
  */
 
-import { runPipeline } from './pipeline/orchestrator.js';
+import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
 import path from 'path';
 
 const diffPath = process.argv[2] || '../test-pr.diff';

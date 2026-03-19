@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { applyLearnedPatterns } from '../learning/filter.js';
-import type { EvidenceDocument } from '../types/core.js';
-import type { DismissedPattern } from '../learning/store.js';
+import { applyLearnedPatterns } from '@codeagora/core/learning/filter.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import type { DismissedPattern } from '@codeagora/core/learning/store.js';
 
 // ============================================================================
 // Fixtures

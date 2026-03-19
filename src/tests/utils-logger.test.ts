@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SessionLogger, createLogger } from '../utils/logger.js';
-import type { LogLevel } from '../utils/logger.js';
+import { SessionLogger, createLogger } from '@codeagora/shared/utils/logger.js';
+import type { LogLevel } from '@codeagora/shared/utils/logger.js';
 
 // Suppress console output during all tests.
 const originalNodeEnv = process.env.NODE_ENV;

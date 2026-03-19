@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { mapIssuesToLines } from '../utils/issue-mapper.js';
-import type { EvidenceDocument } from '../types/core.js';
+import { mapIssuesToLines } from '@codeagora/shared/utils/issue-mapper.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures

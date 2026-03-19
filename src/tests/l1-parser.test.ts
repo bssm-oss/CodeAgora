@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseEvidenceResponse } from '../l1/parser.js';
+import { parseEvidenceResponse } from '@codeagora/core/l1/parser.js';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers

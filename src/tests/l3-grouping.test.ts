@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { groupDiff } from '../l3/grouping.js';
-import type { FileGroup } from '../l3/grouping.js';
+import { groupDiff } from '@codeagora/core/l3/grouping.js';
+import type { FileGroup } from '@codeagora/core/l3/grouping.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

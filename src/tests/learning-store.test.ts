@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadLearnedPatterns, saveLearnedPatterns, mergePatterns } from '../learning/store.js';
-import type { DismissedPattern, LearnedPatterns } from '../learning/store.js';
+import { loadLearnedPatterns, saveLearnedPatterns, mergePatterns } from '@codeagora/core/learning/store.js';
+import type { DismissedPattern, LearnedPatterns } from '@codeagora/core/learning/store.js';
 
 // ============================================================================
 // Mock fs/promises

@@ -8,7 +8,7 @@ import {
   fuzzyMatchFilePath,
   extractCodeSnippet,
   extractMultipleSnippets,
-} from '../utils/diff.js';
+} from '@codeagora/shared/utils/diff.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures

@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyThreshold } from '../l2/threshold.js';
-import type { EvidenceDocument } from '../types/core.js';
-import type { DiscussionSettings } from '../types/config.js';
+import { applyThreshold } from '@codeagora/core/l2/threshold.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import type { DiscussionSettings } from '@codeagora/core/types/config.js';
 
 describe('L2 Threshold Logic', () => {
   const settings: DiscussionSettings = {

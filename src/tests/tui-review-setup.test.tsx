@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React, { useState } from 'react';
 import { render } from 'ink-testing-library';
 import { Box, Text } from 'ink';
-import { ReviewSetupScreen } from '../tui/screens/ReviewSetupScreen.js';
-import type { AgentConfig } from '../types/config.js';
+import { ReviewSetupScreen } from '@codeagora/tui/screens/ReviewSetupScreen.js';
+import type { AgentConfig } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // Mocks
@@ -15,7 +15,7 @@ vi.mock('fs', () => ({
   },
 }));
 
-vi.mock('../config/loader.js', () => ({
+vi.mock('../../packages/core/src/config/loader.js', () => ({
   loadConfigFrom: vi.fn(),
   getEnabledReviewers: vi.fn(),
 }));
@@ -124,7 +124,7 @@ describe('ReviewSetupScreen', () => {
 
   it('shows reviewer list when config is loaded', async () => {
     const fs = await import('fs');
-    const loader = await import('../config/loader.js');
+    const loader = await import('@codeagora/core/config/loader.js');
 
     const reviewers = [makeReviewer('r1'), makeReviewer('r2')];
     vi.mocked(fs.default.existsSync).mockReturnValue(true);
@@ -157,7 +157,7 @@ describe('ReviewSetupScreen', () => {
   });
 
   it('shows no-config message when config is missing', async () => {
-    const loader = await import('../config/loader.js');
+    const loader = await import('@codeagora/core/config/loader.js');
     vi.mocked(loader.loadConfigFrom).mockRejectedValue(new Error('Config file not found'));
 
     // Render a component showing the no-config state directly

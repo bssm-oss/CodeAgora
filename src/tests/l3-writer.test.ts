@@ -3,19 +3,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { writeHeadVerdict } from '../l3/writer.js';
-import type { HeadVerdict } from '../types/core.js';
+import { writeHeadVerdict } from '@codeagora/core/l3/writer.js';
+import type { HeadVerdict } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('../utils/fs.js', () => ({
+vi.mock('../../packages/shared/src/utils/fs.js', () => ({
   writeMarkdown: vi.fn(),
   getResultPath: vi.fn(),
 }));
 
-import { writeMarkdown, getResultPath } from '../utils/fs.js';
+import { writeMarkdown, getResultPath } from '@codeagora/shared/utils/fs.js';
 
 const mockWriteMarkdown = vi.mocked(writeMarkdown);
 const mockGetResultPath = vi.mocked(getResultPath);

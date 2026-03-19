@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { formatAnnotated } from '../cli/formatters/annotated-output.js';
-import type { EvidenceDocument } from '../types/core.js';
+import { formatAnnotated } from '@codeagora/cli/formatters/annotated-output.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures

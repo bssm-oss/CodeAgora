@@ -1,0 +1,27 @@
+{
+  "name": "@codeagora/cli",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "codeagora": "./dist/index.js",
+    "agora": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@codeagora/core": "workspace:*",
+    "@codeagora/github": "workspace:*",
+    "@codeagora/notifications": "workspace:*",
+    "@codeagora/shared": "workspace:*",
+    "commander": "^14.0.3",
+    "ora": "^9.3.0",
+    "@clack/prompts": "^1.1.0"
+  }
+}

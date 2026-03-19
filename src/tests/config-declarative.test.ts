@@ -4,9 +4,9 @@ import {
   expandDeclarativeReviewers,
   normalizeConfig,
   validateConfigData,
-} from '../config/loader.js';
-import { DeclarativeReviewersSchema, ConfigSchema } from '../types/config.js';
-import type { DeclarativeReviewers, Config } from '../types/config.js';
+} from '@codeagora/core/config/loader.js';
+import { DeclarativeReviewersSchema, ConfigSchema } from '@codeagora/core/types/config.js';
+import type { DeclarativeReviewers, Config } from '@codeagora/core/types/config.js';
 
 // Minimal valid config parts for building test configs
 const baseConfig = {

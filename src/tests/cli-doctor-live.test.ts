@@ -4,13 +4,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runLiveHealthCheck, formatLiveCheckReport } from '../cli/commands/doctor.js';
-import type { Config } from '../types/config.js';
+import { runLiveHealthCheck, formatLiveCheckReport } from '@codeagora/cli/commands/doctor.js';
+import type { Config } from '@codeagora/core/types/config.js';
 
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 // Mock provider registry
-vi.mock('../l1/provider-registry.js', () => ({
+vi.mock('../../packages/core/src/l1/provider-registry.js', () => ({
   getModel: vi.fn(),
   getSupportedProviders: vi.fn(() => []),
   clearProviderCache: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('ai', () => ({
   generateText: vi.fn(),
 }));
 
-import { getModel } from '../l1/provider-registry.js';
+import { getModel } from '@codeagora/core/l1/provider-registry.js';
 import { generateText } from 'ai';
 
 const mockGetModel = vi.mocked(getModel);

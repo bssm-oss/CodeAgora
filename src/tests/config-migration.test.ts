@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { migrateConfig, applyMigration, needsMigration } from '../config/migrator.js';
-import type { Config } from '../types/config.js';
+import { migrateConfig, applyMigration, needsMigration } from '@codeagora/core/config/migrator.js';
+import type { Config } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // Shared fixtures

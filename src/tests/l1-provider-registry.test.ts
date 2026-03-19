@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createGroq } from '@ai-sdk/groq';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { getModel, getSupportedProviders, clearProviderCache } from '../l1/provider-registry.js';
+import { getModel, getSupportedProviders, clearProviderCache } from '@codeagora/core/l1/provider-registry.js';
 
 // Mock all provider packages
 vi.mock('@ai-sdk/groq', () => ({

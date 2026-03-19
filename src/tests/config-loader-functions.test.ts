@@ -12,8 +12,8 @@ import {
   isDeclarativeReviewers,
   expandDeclarativeReviewers,
   normalizeConfig,
-} from '../config/loader.js';
-import type { Config, DeclarativeReviewers } from '../types/config.js';
+} from '@codeagora/core/config/loader.js';
+import type { Config, DeclarativeReviewers } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // Shared fixtures

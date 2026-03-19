@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectLanguage, detectScope } from '../utils/scope-detector.js';
+import { detectLanguage, detectScope } from '@codeagora/shared/utils/scope-detector.js';
 
 // ---------------------------------------------------------------------------
 // detectLanguage

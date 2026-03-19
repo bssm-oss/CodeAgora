@@ -3,12 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { extractCodeSnippet } from '../utils/diff.js';
-import { findDuplicates, mergeDiscussions, deduplicateDiscussions } from '../l2/deduplication.js';
-import { checkForObjections } from '../l2/objection.js';
-import { retryWithBackoff, isRetryableError } from '../utils/recovery.js';
-import { CircuitBreaker } from '../l1/circuit-breaker.js';
-import type { Discussion } from '../types/core.js';
+import { extractCodeSnippet } from '@codeagora/shared/utils/diff.js';
+import { findDuplicates, mergeDiscussions, deduplicateDiscussions } from '@codeagora/core/l2/deduplication.js';
+import { checkForObjections } from '@codeagora/core/l2/objection.js';
+import { retryWithBackoff, isRetryableError } from '@codeagora/shared/utils/recovery.js';
+import { CircuitBreaker } from '@codeagora/core/l1/circuit-breaker.js';
+import type { Discussion } from '@codeagora/core/types/core.js';
 
 describe('Code Snippet Extraction', () => {
   const sampleDiff = `diff --git a/auth.ts b/auth.ts

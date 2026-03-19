@@ -9,66 +9,66 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 // Mock all dependencies before importing orchestrator
 // ============================================================================
 
-vi.mock('../config/loader.js', () => ({
+vi.mock('../../packages/core/src/config/loader.js', () => ({
   loadConfig: vi.fn(),
   normalizeConfig: vi.fn(),
 }));
 
-vi.mock('../session/manager.js', () => ({
+vi.mock('../../packages/core/src/session/manager.js', () => ({
   SessionManager: {
     create: vi.fn(),
   },
 }));
 
-vi.mock('../l1/reviewer.js', () => ({
+vi.mock('../../packages/core/src/l1/reviewer.js', () => ({
   executeReviewers: vi.fn(),
   checkForfeitThreshold: vi.fn(),
 }));
 
-vi.mock('../l1/writer.js', () => ({
+vi.mock('../../packages/core/src/l1/writer.js', () => ({
   writeAllReviews: vi.fn(),
 }));
 
-vi.mock('../l2/threshold.js', () => ({
+vi.mock('../../packages/core/src/l2/threshold.js', () => ({
   applyThreshold: vi.fn(),
 }));
 
-vi.mock('../l2/moderator.js', () => ({
+vi.mock('../../packages/core/src/l2/moderator.js', () => ({
   runModerator: vi.fn(),
 }));
 
-vi.mock('../l2/writer.js', () => ({
+vi.mock('../../packages/core/src/l2/writer.js', () => ({
   writeModeratorReport: vi.fn(),
   writeSuggestions: vi.fn(),
 }));
 
-vi.mock('../l2/deduplication.js', () => ({
+vi.mock('../../packages/core/src/l2/deduplication.js', () => ({
   deduplicateDiscussions: vi.fn(),
 }));
 
-vi.mock('../l3/grouping.js', () => ({
+vi.mock('../../packages/core/src/l3/grouping.js', () => ({
   groupDiff: vi.fn(),
 }));
 
-vi.mock('../pipeline/chunker.js', () => ({
+vi.mock('../../packages/core/src/pipeline/chunker.js', () => ({
   chunkDiff: vi.fn(),
 }));
 
-vi.mock('../l3/verdict.js', () => ({
+vi.mock('../../packages/core/src/l3/verdict.js', () => ({
   makeHeadVerdict: vi.fn(),
   scanUnconfirmedQueue: vi.fn(),
 }));
 
-vi.mock('../l3/writer.js', () => ({
+vi.mock('../../packages/core/src/l3/writer.js', () => ({
   writeHeadVerdict: vi.fn(),
 }));
 
-vi.mock('../l0/index.js', () => ({
+vi.mock('../../packages/core/src/l0/index.js', () => ({
   resolveReviewers: vi.fn(),
   getBanditStore: vi.fn(),
 }));
 
-vi.mock('../l0/quality-tracker.js', () => ({
+vi.mock('../../packages/core/src/l0/quality-tracker.js', () => ({
   QualityTracker: vi.fn().mockImplementation(() => ({
     recordReviewerOutput: vi.fn(),
     recordDiscussionResults: vi.fn(),
@@ -77,11 +77,11 @@ vi.mock('../l0/quality-tracker.js', () => ({
   })),
 }));
 
-vi.mock('../utils/diff.js', () => ({
+vi.mock('../../packages/shared/src/utils/diff.js', () => ({
   extractMultipleSnippets: vi.fn(),
 }));
 
-vi.mock('../utils/logger.js', () => ({
+vi.mock('../../packages/shared/src/utils/logger.js', () => ({
   createLogger: vi.fn(),
 }));
 
@@ -95,22 +95,22 @@ vi.mock('fs/promises', () => ({
 // Imports
 // ============================================================================
 
-import { runPipeline } from '../pipeline/orchestrator.js';
-import { loadConfig, normalizeConfig } from '../config/loader.js';
-import { SessionManager } from '../session/manager.js';
-import { executeReviewers, checkForfeitThreshold } from '../l1/reviewer.js';
-import { writeAllReviews } from '../l1/writer.js';
-import { applyThreshold } from '../l2/threshold.js';
-import { runModerator } from '../l2/moderator.js';
-import { writeModeratorReport, writeSuggestions } from '../l2/writer.js';
-import { deduplicateDiscussions } from '../l2/deduplication.js';
-import { groupDiff } from '../l3/grouping.js';
-import { makeHeadVerdict, scanUnconfirmedQueue } from '../l3/verdict.js';
-import { writeHeadVerdict } from '../l3/writer.js';
-import { resolveReviewers, getBanditStore } from '../l0/index.js';
-import { extractMultipleSnippets } from '../utils/diff.js';
-import { createLogger } from '../utils/logger.js';
-import { chunkDiff } from '../pipeline/chunker.js';
+import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
+import { loadConfig, normalizeConfig } from '@codeagora/core/config/loader.js';
+import { SessionManager } from '@codeagora/core/session/manager.js';
+import { executeReviewers, checkForfeitThreshold } from '@codeagora/core/l1/reviewer.js';
+import { writeAllReviews } from '@codeagora/core/l1/writer.js';
+import { applyThreshold } from '@codeagora/core/l2/threshold.js';
+import { runModerator } from '@codeagora/core/l2/moderator.js';
+import { writeModeratorReport, writeSuggestions } from '@codeagora/core/l2/writer.js';
+import { deduplicateDiscussions } from '@codeagora/core/l2/deduplication.js';
+import { groupDiff } from '@codeagora/core/l3/grouping.js';
+import { makeHeadVerdict, scanUnconfirmedQueue } from '@codeagora/core/l3/verdict.js';
+import { writeHeadVerdict } from '@codeagora/core/l3/writer.js';
+import { resolveReviewers, getBanditStore } from '@codeagora/core/l0/index.js';
+import { extractMultipleSnippets } from '@codeagora/shared/utils/diff.js';
+import { createLogger } from '@codeagora/shared/utils/logger.js';
+import { chunkDiff } from '@codeagora/core/pipeline/chunker.js';
 import fs from 'fs/promises';
 
 // ============================================================================

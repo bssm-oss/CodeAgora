@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { t, setLocale, getLocale, detectLocale } from '../i18n/index.js';
+import { t, setLocale, getLocale, detectLocale } from '@codeagora/shared/i18n/index.js';
 
 describe('i18n', () => {
   beforeEach(() => {

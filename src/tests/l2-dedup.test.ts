@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { findDuplicates, mergeDiscussions, deduplicateDiscussions } from '../l2/deduplication.js';
-import type { Discussion, Severity } from '../types/core.js';
+import { findDuplicates, mergeDiscussions, deduplicateDiscussions } from '@codeagora/core/l2/deduplication.js';
+import type { Discussion, Severity } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Helper factory

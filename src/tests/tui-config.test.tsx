@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { ConfigScreen } from '../tui/screens/ConfigScreen.js';
-import type { Config } from '../types/config.js';
+import { ConfigScreen } from '@codeagora/tui/screens/ConfigScreen.js';
+import type { Config } from '@codeagora/core/types/config.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -57,11 +57,11 @@ const mockConfig: Config = {
   },
 };
 
-vi.mock('../config/loader.js', () => ({
+vi.mock('../../packages/core/src/config/loader.js', () => ({
   loadConfigFrom: vi.fn(),
 }));
 
-import { loadConfigFrom } from '../config/loader.js';
+import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 const mockLoadConfigFrom = vi.mocked(loadConfigFrom);
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ describe('ConfigScreen', () => {
     unmount();
 
     // Test PresetsTab in isolation
-    const { PresetsTab } = await import('../tui/screens/config/PresetsTab.js');
+    const { PresetsTab } = await import('@codeagora/tui/screens/config/PresetsTab.js');
     const { lastFrame: presetsFrame, unmount: unmount2 } = render(
       <PresetsTab config={mockConfig} isActive={true} onConfigChange={() => {}} />
     );
@@ -153,7 +153,7 @@ describe('ConfigScreen', () => {
 
 describe('ReviewersTab', () => {
   it('renders reviewer ids and providers', async () => {
-    const { ReviewersTab } = await import('../tui/screens/config/ReviewersTab.js');
+    const { ReviewersTab } = await import('@codeagora/tui/screens/config/ReviewersTab.js');
     const { lastFrame, unmount } = render(
       <ReviewersTab config={mockConfig} isActive={true} onConfigChange={() => {}} />
     );
@@ -164,7 +164,7 @@ describe('ReviewersTab', () => {
   });
 
   it('shows enabled/disabled status for each reviewer', async () => {
-    const { ReviewersTab } = await import('../tui/screens/config/ReviewersTab.js');
+    const { ReviewersTab } = await import('@codeagora/tui/screens/config/ReviewersTab.js');
     const { lastFrame, unmount } = render(
       <ReviewersTab config={mockConfig} isActive={true} onConfigChange={() => {}} />
     );
@@ -178,7 +178,7 @@ describe('ReviewersTab', () => {
 
 describe('SupportersTab', () => {
   it('shows pool and devils advocate', async () => {
-    const { SupportersTab } = await import('../tui/screens/config/SupportersTab.js');
+    const { SupportersTab } = await import('@codeagora/tui/screens/config/SupportersTab.js');
     const { lastFrame, unmount } = render(
       <SupportersTab config={mockConfig} isActive={true} onConfigChange={() => {}} />
     );
@@ -189,7 +189,7 @@ describe('SupportersTab', () => {
   });
 
   it('shows pickCount and pickStrategy', async () => {
-    const { SupportersTab } = await import('../tui/screens/config/SupportersTab.js');
+    const { SupportersTab } = await import('@codeagora/tui/screens/config/SupportersTab.js');
     const { lastFrame, unmount } = render(
       <SupportersTab config={mockConfig} isActive={true} onConfigChange={() => {}} />
     );
@@ -202,7 +202,7 @@ describe('SupportersTab', () => {
 
 describe('ModeratorTab', () => {
   it('shows moderator provider and model', async () => {
-    const { ModeratorTab } = await import('../tui/screens/config/ModeratorTab.js');
+    const { ModeratorTab } = await import('@codeagora/tui/screens/config/ModeratorTab.js');
     const { lastFrame, unmount } = render(
       <ModeratorTab config={mockConfig} isActive={true} onConfigChange={() => {}} />
     );
@@ -215,7 +215,7 @@ describe('ModeratorTab', () => {
 
 describe('ReviewersTab edge cases', () => {
   it('shows empty state when reviewers array is empty', async () => {
-    const { ReviewersTab } = await import('../tui/screens/config/ReviewersTab.js');
+    const { ReviewersTab } = await import('@codeagora/tui/screens/config/ReviewersTab.js');
     const emptyConfig = { ...mockConfig, reviewers: [] };
     const { lastFrame, unmount } = render(
       <ReviewersTab config={emptyConfig} isActive={true} onConfigChange={() => {}} />

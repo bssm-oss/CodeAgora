@@ -7,8 +7,8 @@ import {
   retryWithBackoff,
   retryOnError,
   isRetryableError,
-} from '../utils/recovery.js';
-import { CircuitBreaker } from '../l1/circuit-breaker.js';
+} from '@codeagora/shared/utils/recovery.js';
+import { CircuitBreaker } from '@codeagora/core/l1/circuit-breaker.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

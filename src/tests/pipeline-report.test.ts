@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PipelineTelemetry } from '../pipeline/telemetry.js';
-import { generateReport, formatReportText, formatReportJson } from '../pipeline/report.js';
+import { PipelineTelemetry } from '@codeagora/core/pipeline/telemetry.js';
+import { generateReport, formatReportText, formatReportJson } from '@codeagora/core/pipeline/report.js';
 
 describe('generateReport', () => {
   let telemetry: PipelineTelemetry;
@@ -13,8 +13,8 @@ describe('generateReport', () => {
     telemetry = new PipelineTelemetry();
   });
 
-  it('빈 telemetry → 빈 리포트', () => {
-    const report = generateReport(telemetry);
+  it('빈 telemetry → 빈 리포트', async () => {
+    const report = await generateReport(telemetry);
     expect(report.summary.totalCalls).toBe(0);
     expect(report.summary.totalLatencyMs).toBe(0);
     expect(report.summary.totalTokens).toBe(0);
@@ -25,7 +25,7 @@ describe('generateReport', () => {
     expect(report.mostExpensive).toBeNull();
   });
 
-  it('단일 reviewer → 올바른 집계', () => {
+  it('단일 reviewer → 올바른 집계', async () => {
     telemetry.record({
       reviewerId: 'reviewer-a',
       provider: 'groq',
@@ -35,7 +35,7 @@ describe('generateReport', () => {
       success: true,
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     expect(report.summary.totalCalls).toBe(1);
     expect(report.summary.totalLatencyMs).toBe(500);
     expect(report.summary.totalTokens).toBe(1500);
@@ -54,7 +54,7 @@ describe('generateReport', () => {
     expect(r.error).toBeUndefined();
   });
 
-  it('다중 reviewer → perReviewer 배열, slowest, mostExpensive 정확', () => {
+  it('다중 reviewer → perReviewer 배열, slowest, mostExpensive 정확', async () => {
     telemetry.record({
       reviewerId: 'fast-cheap',
       provider: 'groq',
@@ -80,7 +80,7 @@ describe('generateReport', () => {
       success: true,
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     expect(report.summary.totalCalls).toBe(3);
     expect(report.perReviewer).toHaveLength(3);
 
@@ -92,7 +92,7 @@ describe('generateReport', () => {
     expect(report.mostExpensive!.reviewerId).toBe('slow-expensive');
   });
 
-  it('실패한 reviewer 포함 → success: false, error 표시', () => {
+  it('실패한 reviewer 포함 → success: false, error 표시', async () => {
     telemetry.record({
       reviewerId: 'failing-reviewer',
       provider: 'groq',
@@ -102,14 +102,14 @@ describe('generateReport', () => {
       error: 'timeout after 30s',
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     expect(report.perReviewer).toHaveLength(1);
     const r = report.perReviewer[0];
     expect(r.success).toBe(false);
     expect(r.error).toBe('timeout after 30s');
   });
 
-  it('알 수 없는 모델 (pricing 없음) → cost "N/A"', () => {
+  it('알 수 없는 모델 (pricing 없음) → cost "N/A"', async () => {
     telemetry.record({
       reviewerId: 'unknown-reviewer',
       provider: 'unknown-provider',
@@ -119,14 +119,14 @@ describe('generateReport', () => {
       success: true,
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     expect(report.perReviewer[0].cost).toBe('N/A');
     expect(report.summary.totalCost).toBe('N/A');
     // No real cost → mostExpensive is null
     expect(report.mostExpensive).toBeNull();
   });
 
-  it('averageLatencyMs 계산 정확', () => {
+  it('averageLatencyMs 계산 정확', async () => {
     telemetry.record({
       reviewerId: 'r1',
       provider: 'groq',
@@ -144,11 +144,11 @@ describe('generateReport', () => {
       success: true,
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     expect(report.summary.averageLatencyMs).toBe(500); // (300+700)/2
   });
 
-  it('usage 없는 record → cost N/A', () => {
+  it('usage 없는 record → cost N/A', async () => {
     telemetry.record({
       reviewerId: 'cli-reviewer',
       provider: 'cli',
@@ -158,13 +158,13 @@ describe('generateReport', () => {
       // no usage
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     expect(report.perReviewer[0].cost).toBe('N/A');
   });
 });
 
 describe('formatReportText', () => {
-  it('마크다운 테이블 포맷 검증', () => {
+  it('마크다운 테이블 포맷 검증', async () => {
     const telemetry = new PipelineTelemetry();
     telemetry.record({
       reviewerId: 'reviewer-a',
@@ -175,7 +175,7 @@ describe('formatReportText', () => {
       success: true,
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     const text = formatReportText(report);
 
     expect(text).toContain('## Performance Report');
@@ -191,7 +191,7 @@ describe('formatReportText', () => {
     expect(text).toContain('Total calls: 1');
   });
 
-  it('실패한 reviewer → FAIL: <error> 표시', () => {
+  it('실패한 reviewer → FAIL: <error> 표시', async () => {
     const telemetry = new PipelineTelemetry();
     telemetry.record({
       reviewerId: 'broken',
@@ -202,14 +202,14 @@ describe('formatReportText', () => {
       error: 'connection refused',
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     const text = formatReportText(report);
     expect(text).toContain('FAIL: connection refused');
   });
 
-  it('빈 리포트 → 테이블 헤더만 있고 Summary는 0 값', () => {
+  it('빈 리포트 → 테이블 헤더만 있고 Summary는 0 값', async () => {
     const telemetry = new PipelineTelemetry();
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     const text = formatReportText(report);
 
     expect(text).toContain('| Reviewer | Provider | Model | Latency | Tokens | Cost | Status |');
@@ -219,7 +219,7 @@ describe('formatReportText', () => {
 });
 
 describe('formatReportJson', () => {
-  it('valid JSON 반환', () => {
+  it('valid JSON 반환', async () => {
     const telemetry = new PipelineTelemetry();
     telemetry.record({
       reviewerId: 'reviewer-a',
@@ -230,7 +230,7 @@ describe('formatReportJson', () => {
       success: true,
     });
 
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     const json = formatReportJson(report);
 
     expect(() => JSON.parse(json)).not.toThrow();
@@ -242,9 +242,9 @@ describe('formatReportJson', () => {
     expect(parsed.perReviewer).toHaveLength(1);
   });
 
-  it('빈 리포트도 valid JSON', () => {
+  it('빈 리포트도 valid JSON', async () => {
     const telemetry = new PipelineTelemetry();
-    const report = generateReport(telemetry);
+    const report = await generateReport(telemetry);
     const json = formatReportJson(report);
     expect(() => JSON.parse(json)).not.toThrow();
     const parsed = JSON.parse(json);

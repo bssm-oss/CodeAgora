@@ -4,13 +4,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse as yamlParse } from 'yaml';
-import { jsonToYaml, yamlToJson, configToYaml } from '../config/converter.js';
+import { jsonToYaml, yamlToJson, configToYaml } from '@codeagora/core/config/converter.js';
 import {
   generateFullTemplate,
   generateMinimalTemplate,
   generateDeclarativeTemplate,
-} from '../config/templates.js';
-import { validateConfig } from '../types/config.js';
+} from '@codeagora/core/config/templates.js';
+import { validateConfig } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // Shared fixture

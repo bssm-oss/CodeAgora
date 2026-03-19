@@ -7,9 +7,9 @@ import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
 
-import { runInit, generateReviewIgnore } from '../cli/commands/init.js';
-import { runDoctor, formatDoctorReport } from '../cli/commands/doctor.js';
-import { listProviders, formatProviderList } from '../cli/commands/providers.js';
+import { runInit, generateReviewIgnore } from '@codeagora/cli/commands/init.js';
+import { runDoctor, formatDoctorReport } from '@codeagora/cli/commands/doctor.js';
+import { listProviders, formatProviderList } from '@codeagora/cli/commands/providers.js';
 
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
@@ -287,21 +287,21 @@ describe('formatProviderList()', () => {
   });
 
   it('shows "available" for a provider with API key set', () => {
-    const providers: import('../cli/commands/providers.js').ProviderInfo[] = [
+    const providers: import('@codeagora/cli/commands/providers.js').ProviderInfo[] = [
       { name: 'groq', apiKeyEnvVar: 'GROQ_API_KEY', apiKeySet: true },
     ];
     expect(formatProviderList(providers)).toContain('available');
   });
 
   it('shows "no key" for a provider without API key', () => {
-    const providers: import('../cli/commands/providers.js').ProviderInfo[] = [
+    const providers: import('@codeagora/cli/commands/providers.js').ProviderInfo[] = [
       { name: 'groq', apiKeyEnvVar: 'GROQ_API_KEY', apiKeySet: false },
     ];
     expect(formatProviderList(providers)).toContain('no key');
   });
 
   it('shows ✓ for providers with key and ✗ for those without', () => {
-    const providers: import('../cli/commands/providers.js').ProviderInfo[] = [
+    const providers: import('@codeagora/cli/commands/providers.js').ProviderInfo[] = [
       { name: 'groq', apiKeyEnvVar: 'GROQ_API_KEY', apiKeySet: true },
       { name: 'google', apiKeyEnvVar: 'GOOGLE_API_KEY', apiKeySet: false },
     ];

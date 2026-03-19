@@ -7,7 +7,7 @@ import {
   parsePipelineDsl,
   serializePipelineDsl,
   getDefaultPipelineDefinition,
-} from '../pipeline/dsl-parser.js';
+} from '@codeagora/core/pipeline/dsl-parser.js';
 
 describe('parsePipelineDsl', () => {
   // 1. 유효한 YAML → 성공

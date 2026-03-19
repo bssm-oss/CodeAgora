@@ -4,29 +4,29 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ModeratorInput } from '../l2/moderator.js';
-import type { Discussion } from '../types/core.js';
-import type { ModeratorConfig, SupporterPoolConfig, DiscussionSettings } from '../types/config.js';
+import type { ModeratorInput } from '@codeagora/core/l2/moderator.js';
+import type { Discussion } from '@codeagora/core/types/core.js';
+import type { ModeratorConfig, SupporterPoolConfig, DiscussionSettings } from '@codeagora/core/types/config.js';
 
 // Mock dependencies
-vi.mock('../l1/backend.js', () => ({
+vi.mock('../../packages/core/src/l1/backend.js', () => ({
   executeBackend: vi.fn(),
 }));
 
-vi.mock('../l2/writer.js', () => ({
+vi.mock('../../packages/core/src/l2/writer.js', () => ({
   writeDiscussionRound: vi.fn().mockResolvedValue(undefined),
   writeDiscussionVerdict: vi.fn().mockResolvedValue(undefined),
   writeSupportersLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../l2/objection.js', () => ({
+vi.mock('../../packages/core/src/l2/objection.js', () => ({
   checkForObjections: vi.fn().mockResolvedValue({ objections: [] }),
   handleObjections: vi.fn().mockReturnValue({ shouldExtend: false }),
 }));
 
-import { runModerator } from '../l2/moderator.js';
-import { executeBackend } from '../l1/backend.js';
-import { writeSupportersLog, writeDiscussionRound, writeDiscussionVerdict } from '../l2/writer.js';
+import { runModerator } from '@codeagora/core/l2/moderator.js';
+import { executeBackend } from '@codeagora/core/l1/backend.js';
+import { writeSupportersLog, writeDiscussionRound, writeDiscussionVerdict } from '@codeagora/core/l2/writer.js';
 
 // ============================================================================
 // Shared fixtures

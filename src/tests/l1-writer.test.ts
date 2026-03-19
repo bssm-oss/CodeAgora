@@ -3,19 +3,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ReviewOutput, EvidenceDocument } from '../types/core.js';
+import type { ReviewOutput, EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ============================================================================
 // Mocks
 // ============================================================================
 
-vi.mock('../utils/fs.js', () => ({
+vi.mock('../../packages/shared/src/utils/fs.js', () => ({
   writeMarkdown: vi.fn().mockResolvedValue(undefined),
   getReviewsDir: vi.fn(),
 }));
 
-import { writeReviewOutput, writeAllReviews } from '../l1/writer.js';
-import { writeMarkdown, getReviewsDir } from '../utils/fs.js';
+import { writeReviewOutput, writeAllReviews } from '@codeagora/core/l1/writer.js';
+import { writeMarkdown, getReviewsDir } from '@codeagora/shared/utils/fs.js';
 
 const mockWriteMarkdown = vi.mocked(writeMarkdown);
 const mockGetReviewsDir = vi.mocked(getReviewsDir);

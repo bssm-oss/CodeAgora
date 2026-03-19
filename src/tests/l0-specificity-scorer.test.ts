@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { scoreSpecificity, scoreReviewerSpecificity } from '../l0/specificity-scorer.js';
-import type { EvidenceDocument } from '../types/core.js';
+import { scoreSpecificity, scoreReviewerSpecificity } from '@codeagora/core/l0/specificity-scorer.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 
 function makeDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
   return {

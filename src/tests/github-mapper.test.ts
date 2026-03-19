@@ -4,10 +4,10 @@ import {
   buildReviewComments,
   buildSummaryBody,
   mapToGitHubReview,
-} from '../github/mapper.js';
-import type { EvidenceDocument, DiscussionVerdict } from '../types/core.js';
-import type { DiffPositionIndex } from '../github/types.js';
-import type { PipelineSummary } from '../pipeline/orchestrator.js';
+} from '@codeagora/github/mapper.js';
+import type { EvidenceDocument, DiscussionVerdict } from '@codeagora/core/types/core.js';
+import type { DiffPositionIndex } from '@codeagora/github/types.js';
+import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
 
 const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   issueTitle: 'SQL injection vulnerability',

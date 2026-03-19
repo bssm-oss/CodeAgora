@@ -17,7 +17,7 @@ import {
   type SessionEntry,
   type SessionDetail,
   type SessionDiff,
-} from '../cli/commands/sessions.js';
+} from '@codeagora/cli/commands/sessions.js';
 
 // ============================================================================
 // Helpers

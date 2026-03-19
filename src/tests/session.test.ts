@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SessionManager } from '../session/manager.js';
-import { readSessionMetadata, getSessionDir } from '../utils/fs.js';
+import { SessionManager } from '@codeagora/core/session/manager.js';
+import { readSessionMetadata, getSessionDir } from '@codeagora/shared/utils/fs.js';
 import fs from 'fs/promises';
 
 describe('SessionManager', () => {

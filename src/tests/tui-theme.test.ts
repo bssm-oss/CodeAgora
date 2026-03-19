@@ -11,7 +11,7 @@ import {
   decisionColor,
   icons,
   colors,
-} from '../tui/theme.js';
+} from '@codeagora/tui/theme.js';
 
 // ============================================================================
 // severityColor

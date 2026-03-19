@@ -4,15 +4,15 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PluginRegistry } from '../plugins/registry.js';
-import { validatePlugin, loadPlugins, filterEnabled } from '../plugins/loader.js';
+import { PluginRegistry } from '@codeagora/core/plugins/registry.js';
+import { validatePlugin, loadPlugins, filterEnabled } from '@codeagora/core/plugins/loader.js';
 import type {
   ProviderPlugin,
   BackendPlugin,
   OutputPlugin,
   HookPlugin,
   Plugin,
-} from '../plugins/types.js';
+} from '@codeagora/core/plugins/types.js';
 
 // ============================================================================
 // Fixtures

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { ModelSelector } from '../tui/components/ModelSelector.js';
-import type { SelectedModel } from '../tui/components/ModelSelector.js';
+import { ModelSelector } from '@codeagora/tui/components/ModelSelector.js';
+import type { SelectedModel } from '@codeagora/tui/components/ModelSelector.js';
 
 // ============================================================================
 // Tests

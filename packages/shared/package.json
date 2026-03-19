@@ -1,0 +1,17 @@
+{
+  "name": "@codeagora/shared",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "picocolors": "^1.1.1",
+    "zod": "^3.22.4"
+  }
+}

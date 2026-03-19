@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import React, { useState } from 'react';
 import { render } from 'ink-testing-library';
 import { Text, Box } from 'ink';
-import { Header } from '../tui/components/Header.js';
-import { StatusBar } from '../tui/components/StatusBar.js';
-import { HomeScreen } from '../tui/screens/HomeScreen.js';
-import { useRouter } from '../tui/hooks/useRouter.js';
+import { Header } from '@codeagora/tui/components/Header.js';
+import { StatusBar } from '@codeagora/tui/components/StatusBar.js';
+import { HomeScreen } from '@codeagora/tui/screens/HomeScreen.js';
+import { useRouter } from '@codeagora/tui/hooks/useRouter.js';
 
 // Helper component to expose useRouter state
 function RouterTestComponent({ action }: { action?: (state: ReturnType<typeof useRouter>) => void }) {

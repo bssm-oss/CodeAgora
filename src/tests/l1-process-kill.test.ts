@@ -4,7 +4,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawn, ChildProcess } from 'child_process';
-import { killProcessTree, gracefulKill } from '../utils/process-kill.js';
+import { killProcessTree, gracefulKill } from '@codeagora/shared/utils/process-kill.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

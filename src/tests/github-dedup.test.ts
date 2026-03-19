@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { findPriorReviews, dismissPriorReviews } from '../github/dedup.js';
-import type { GitHubConfig } from '../github/client.js';
+import { findPriorReviews, dismissPriorReviews } from '@codeagora/github/dedup.js';
+import type { GitHubConfig } from '@codeagora/github/client.js';
 
 const config: GitHubConfig = { token: 'tok', owner: 'owner', repo: 'repo' };
 

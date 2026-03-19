@@ -1,0 +1,17 @@
+{
+  "name": "@codeagora/notifications",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@codeagora/core": "workspace:*",
+    "@codeagora/shared": "workspace:*"
+  }
+}

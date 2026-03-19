@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { HealthMonitor } from '../l0/health-monitor.js';
+import { HealthMonitor } from '@codeagora/core/l0/health-monitor.js';
 
 describe('HealthMonitor', () => {
   let monitor: HealthMonitor;

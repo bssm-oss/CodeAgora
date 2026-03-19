@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { selectModels, sampleBeta, createBanditState, updateBandit } from '../l0/model-selector.js';
-import type { ModelMetadata, BanditArm } from '../types/l0.js';
+import { selectModels, sampleBeta, createBanditState, updateBandit } from '@codeagora/core/l0/model-selector.js';
+import type { ModelMetadata, BanditArm } from '@codeagora/core/types/l0.js';
 
 // ============================================================================
 // Fixtures

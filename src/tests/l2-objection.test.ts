@@ -3,19 +3,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkForObjections, handleObjections } from '../l2/objection.js';
-import type { SupporterConfig } from '../types/config.js';
-import type { DiscussionRound } from '../types/core.js';
+import { checkForObjections, handleObjections } from '@codeagora/core/l2/objection.js';
+import type { SupporterConfig } from '@codeagora/core/types/config.js';
+import type { DiscussionRound } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Mock executeBackend
 // ---------------------------------------------------------------------------
 
-vi.mock('../l1/backend.js', () => ({
+vi.mock('../../packages/core/src/l1/backend.js', () => ({
   executeBackend: vi.fn(),
 }));
 
-import { executeBackend } from '../l1/backend.js';
+import { executeBackend } from '@codeagora/core/l1/backend.js';
 
 const mockExecuteBackend = vi.mocked(executeBackend);
 

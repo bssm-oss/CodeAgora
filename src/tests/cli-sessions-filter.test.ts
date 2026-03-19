@@ -12,7 +12,7 @@ import {
   getSessionStats,
   formatSessionStats,
   type SessionStats,
-} from '../cli/commands/sessions.js';
+} from '@codeagora/cli/commands/sessions.js';
 
 // ============================================================================
 // Helpers

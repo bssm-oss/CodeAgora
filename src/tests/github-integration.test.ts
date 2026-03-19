@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { parsePrUrl, parseGitRemote, createGitHubConfig } from '../github/client.js';
-import type { GitHubConfig } from '../github/client.js';
+import { parsePrUrl, parseGitRemote, createGitHubConfig } from '@codeagora/github/client.js';
+import type { GitHubConfig } from '@codeagora/github/client.js';
 
 // ============================================================================
 // Mock @octokit/rest
@@ -167,7 +167,7 @@ describe('fetchPrDiff', () => {
   });
 
   it('returns PullRequestInfo with diff from mocked Octokit', async () => {
-    const { fetchPrDiff } = await import('../github/pr-diff.js');
+    const { fetchPrDiff } = await import('@codeagora/github/pr-diff.js');
 
     const prMeta = {
       number: 42,
@@ -205,7 +205,7 @@ describe('postPrComment', () => {
   });
 
   it('returns id and url from mocked createComment', async () => {
-    const { postPrComment } = await import('../github/comment.js');
+    const { postPrComment } = await import('@codeagora/github/comment.js');
 
     mockCreateComment.mockResolvedValue({
       data: { id: 101, html_url: 'https://github.com/o/r/issues/1#issuecomment-101' },
@@ -237,7 +237,7 @@ describe('findExistingComment', () => {
   });
 
   it('returns id when a comment containing the marker is found', async () => {
-    const { findExistingComment } = await import('../github/comment.js');
+    const { findExistingComment } = await import('@codeagora/github/comment.js');
 
     mockPaginate.mockResolvedValue([
       { id: 200, body: 'Some other comment' },
@@ -251,7 +251,7 @@ describe('findExistingComment', () => {
   });
 
   it('returns null when no comment contains the marker', async () => {
-    const { findExistingComment } = await import('../github/comment.js');
+    const { findExistingComment } = await import('@codeagora/github/comment.js');
 
     mockPaginate.mockResolvedValue([
       { id: 300, body: 'Unrelated comment' },
@@ -264,7 +264,7 @@ describe('findExistingComment', () => {
   });
 
   it('returns null when there are no comments', async () => {
-    const { findExistingComment } = await import('../github/comment.js');
+    const { findExistingComment } = await import('@codeagora/github/comment.js');
 
     mockPaginate.mockResolvedValue([]);
 

@@ -4,11 +4,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { runPipeline } from '../pipeline/orchestrator.js';
+import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { tmpdir } from 'os';
-import * as backend from '../l1/backend.js';
+import * as backend from '@codeagora/core/l1/backend.js';
 
 describe('E2E Pipeline', () => {
   let testBaseDir: string;

@@ -3,8 +3,8 @@ import {
   computeL1Confidence,
   adjustConfidenceFromDiscussion,
   getConfidenceBadge,
-} from '../pipeline/confidence.js';
-import type { EvidenceDocument } from '../types/core.js';
+} from '@codeagora/core/pipeline/confidence.js';
+import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 
 const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   issueTitle: 'Test issue',

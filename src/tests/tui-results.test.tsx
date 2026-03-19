@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { ResultsScreen } from '../tui/screens/ResultsScreen.js';
-import type { PipelineResult } from '../pipeline/orchestrator.js';
+import { ResultsScreen } from '@codeagora/tui/screens/ResultsScreen.js';
+import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
 
 // ============================================================================
 // Mock data

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { extractFamily, isReasoningModel, getDistilledBaseFamily } from '../l0/family-classifier.js';
+import { extractFamily, isReasoningModel, getDistilledBaseFamily } from '@codeagora/core/l0/family-classifier.js';
 
 describe('FamilyClassifier', () => {
   describe('extractFamily', () => {

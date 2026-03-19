@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowJs": true,
@@ -13,10 +13,33 @@
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "types": ["node", "vitest/globals"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@codeagora/shared": ["./packages/shared/src/index.ts"],
+      "@codeagora/shared/*": ["./packages/shared/src/*"],
+      "@codeagora/core": ["./packages/core/src/index.ts"],
+      "@codeagora/core/*": ["./packages/core/src/*"],
+      "@codeagora/github": ["./packages/github/src/index.ts"],
+      "@codeagora/github/*": ["./packages/github/src/*"],
+      "@codeagora/notifications": ["./packages/notifications/src/index.ts"],
+      "@codeagora/notifications/*": ["./packages/notifications/src/*"],
+      "@codeagora/cli": ["./packages/cli/src/index.ts"],
+      "@codeagora/cli/*": ["./packages/cli/src/*"],
+      "@codeagora/tui": ["./packages/tui/src/index.ts"],
+      "@codeagora/tui/*": ["./packages/tui/src/*"],
+      "@codeagora/mcp": ["./packages/mcp/src/index.ts"],
+      "@codeagora/mcp/*": ["./packages/mcp/src/*"],
+      "@codeagora/web": ["./packages/web/src/index.ts"],
+      "@codeagora/web/*": ["./packages/web/src/*"]
+    }
   },
-  "include": ["./src/**/*.ts", "./src/**/*.tsx"],
-  "exclude": ["node_modules", "src/dist", "src/test-real.ts"]
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "./packages/*/src/**/*.ts",
+    "./packages/*/src/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist", "src/test-real.ts"]
 }

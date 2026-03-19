@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDiffPositionIndex, resolvePosition, resolveLineRange } from '../github/diff-parser.js';
+import { buildDiffPositionIndex, resolvePosition, resolveLineRange } from '@codeagora/github/diff-parser.js';
 
 const SIMPLE_DIFF = `diff --git a/src/foo.ts b/src/foo.ts
 --- a/src/foo.ts

@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { fetchPrDiff } from '../github/pr-diff.js';
-import type { GitHubConfig } from '../github/client.js';
+import { fetchPrDiff } from '@codeagora/github/pr-diff.js';
+import type { GitHubConfig } from '@codeagora/github/client.js';
 
 const config: GitHubConfig = { token: 'tok', owner: 'owner', repo: 'repo' };
 

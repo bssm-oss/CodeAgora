@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { BanditStore } from '../l0/bandit-store.js';
+import { BanditStore } from '@codeagora/core/l0/bandit-store.js';
 import { unlink, mkdir } from 'fs/promises';
 import path from 'path';
 import os from 'os';

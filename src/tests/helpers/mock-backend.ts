@@ -5,7 +5,7 @@
  */
 
 import { vi } from 'vitest';
-import type { BackendInput } from '../../l1/backend.js';
+import type { BackendInput } from '@codeagora/core/l1/backend.js';
 
 // ============================================================================
 // Types
@@ -216,7 +216,7 @@ export function createMockDebateResponse(
 
 /**
  * Install MockLLMBackend onto an already-mocked executeBackend.
- * Caller must have vi.mock('../l1/backend.js') at module level first,
+ * Caller must have vi.mock('../../packages/core/src/l1/backend.js') at module level first,
  * then pass the mocked function here.
  */
 export function installMockBackend(

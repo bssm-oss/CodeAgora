@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { DiffViewer } from '../tui/components/DiffViewer.js';
-import type { DiffFile } from '../tui/components/DiffViewer.js';
+import { DiffViewer } from '@codeagora/tui/components/DiffViewer.js';
+import type { DiffFile } from '@codeagora/tui/components/DiffViewer.js';
 
 // ============================================================================
 // Fixtures

@@ -9,12 +9,12 @@ import {
   formatMarkdown,
   formatGithub,
   formatOutput,
-} from '../cli/formatters/review-output.js';
+} from '@codeagora/cli/formatters/review-output.js';
 import {
   parseReviewerOption,
   isStdinPiped,
-} from '../cli/options/review-options.js';
-import type { PipelineResult } from '../pipeline/orchestrator.js';
+} from '@codeagora/cli/options/review-options.js';
+import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures

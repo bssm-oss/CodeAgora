@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { strictValidateConfig } from '../config/validator.js';
-import type { Config } from '../types/config.js';
+import { strictValidateConfig } from '@codeagora/core/config/validator.js';
+import type { Config } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // Helper

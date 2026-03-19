@@ -7,7 +7,7 @@ import {
   generateFullTemplate,
   generateMinimalTemplate,
   generateDeclarativeTemplate,
-} from '../config/templates.js';
+} from '@codeagora/core/config/templates.js';
 
 describe('generateFullTemplate', () => {
   it('should return valid parseable JSON', () => {

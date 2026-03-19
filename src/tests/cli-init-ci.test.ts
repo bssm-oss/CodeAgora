@@ -8,7 +8,7 @@ import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
 
-import { writeGitHubWorkflow, runInit } from '../cli/commands/init.js';
+import { writeGitHubWorkflow, runInit } from '@codeagora/cli/commands/init.js';
 
 // ============================================================================
 // writeGitHubWorkflow

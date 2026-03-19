@@ -7,8 +7,8 @@ import {
   ProgressEmitter,
   formatProgressLine,
   formatProgressJson,
-} from '../pipeline/progress.js';
-import type { ProgressEvent, PipelineStage } from '../pipeline/progress.js';
+} from '@codeagora/core/pipeline/progress.js';
+import type { ProgressEvent, PipelineStage } from '@codeagora/core/pipeline/progress.js';
 
 describe('ProgressEmitter', () => {
   let emitter: ProgressEmitter;

@@ -136,7 +136,7 @@ afterEach(async () => {
 });
 
 // Import the testable loader function (explicit base dir — no chdir needed)
-import { loadConfigFrom } from '../config/loader.js';
+import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 
 // ============================================================================
 // Tests

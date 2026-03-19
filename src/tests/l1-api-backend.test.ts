@@ -3,10 +3,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeViaAISDK } from '../l1/api-backend.js';
+import { executeViaAISDK } from '@codeagora/core/l1/api-backend.js';
 
 // Mock the provider registry
-vi.mock('../l1/provider-registry.js', () => ({
+vi.mock('../../packages/core/src/l1/provider-registry.js', () => ({
   getModel: vi.fn(),
 }));
 
@@ -15,7 +15,7 @@ vi.mock('ai', () => ({
   generateText: vi.fn(),
 }));
 
-import { getModel } from '../l1/provider-registry.js';
+import { getModel } from '@codeagora/core/l1/provider-registry.js';
 import { generateText } from 'ai';
 
 const mockGetModel = vi.mocked(getModel);

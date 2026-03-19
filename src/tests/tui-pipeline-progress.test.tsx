@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { render } from 'ink-testing-library';
-import { ProgressEmitter } from '../pipeline/progress.js';
-import { PipelineProgress } from '../tui/components/PipelineProgress.js';
+import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
+import { PipelineProgress } from '@codeagora/tui/components/PipelineProgress.js';
 
 // ============================================================================
 // Tests

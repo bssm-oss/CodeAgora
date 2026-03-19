@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { QualityTracker } from '../l0/quality-tracker.js';
-import type { ReviewOutput, Discussion, DiscussionVerdict, EvidenceDocument } from '../types/core.js';
+import { QualityTracker } from '@codeagora/core/l0/quality-tracker.js';
+import type { ReviewOutput, Discussion, DiscussionVerdict, EvidenceDocument } from '@codeagora/core/types/core.js';
 
 function makeEvidenceDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
   return {

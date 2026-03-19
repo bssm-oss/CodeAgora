@@ -10,14 +10,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../l1/backend.js', () => ({
+vi.mock('../../packages/core/src/l1/backend.js', () => ({
   executeBackend: vi.fn(),
 }));
 
-import { executeReviewer } from '../l1/reviewer.js';
-import { executeBackend } from '../l1/backend.js';
-import type { ReviewerInput } from '../l1/reviewer.js';
-import type { BackendInput } from '../l1/backend.js';
+import { executeReviewer } from '@codeagora/core/l1/reviewer.js';
+import { executeBackend } from '@codeagora/core/l1/backend.js';
+import type { ReviewerInput } from '@codeagora/core/l1/reviewer.js';
+import type { BackendInput } from '@codeagora/core/l1/backend.js';
 
 const mockExecuteBackend = vi.mocked(executeBackend);
 
