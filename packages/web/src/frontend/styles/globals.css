@@ -1628,12 +1628,140 @@ a:hover {
 /* Selection Frequency */
 
 .frequency-bars {
+   Cost Summary Cards
+   ============================================================================ */
+
+.cost-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .cost-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .cost-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cost-card {
+  padding: 16px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.cost-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.cost-card__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+
+.cost-card__detail {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  font-family: var(--font-mono);
+}
+
+/* ============================================================================
+   Cost Trend Chart
+   ============================================================================ */
+
+.cost-trend {
+  margin-bottom: 20px;
+  padding: 12px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.cost-trend__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.cost-trend__svg {
+  display: block;
+  width: 100%;
+}
+
+.cost-trend__label {
+  font-size: 10px;
+  fill: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.cost-trend__tooltip-text {
+  font-size: 11px;
+  fill: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+.cost-trend__empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+/* ============================================================================
+   Reviewer Cost Bars
+   ============================================================================ */
+
+.reviewer-costs {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.reviewer-costs__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.reviewer-costs__empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.reviewer-costs__list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .frequency-bar {
+.reviewer-costs__row {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1734,4 +1862,121 @@ a:hover {
 .provider-card__stat-value {
   color: var(--color-text);
   font-family: var(--font-mono);
+.reviewer-costs__info {
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.reviewer-costs__name {
+  font-size: 13px;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.reviewer-costs__provider {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.reviewer-costs__bar-wrapper {
+  flex: 1;
+  height: 14px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.reviewer-costs__bar {
+  height: 100%;
+  background-color: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.3s ease-out;
+  min-width: 2px;
+}
+
+.reviewer-costs__amount {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  min-width: 72px;
+  text-align: right;
+}
+
+/* ============================================================================
+   Cost Breakdown (Provider Distribution)
+   ============================================================================ */
+
+.cost-breakdown {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.cost-breakdown__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.cost-breakdown__empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.cost-breakdown__bar {
+  display: flex;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--color-bg-tertiary);
+  margin-bottom: 12px;
+}
+
+.cost-breakdown__segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4px;
+  transition: width 0.3s ease-out;
+}
+
+.cost-breakdown__legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cost-breakdown__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.cost-breakdown__legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cost-breakdown__legend-label {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.cost-breakdown__legend-value {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
