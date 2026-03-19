@@ -205,5 +205,16 @@
   "cli.language.current": "현재 언어: {lang}",
   "cli.language.set": "언어가 {lang}(으)로 설정되었습니다",
   "cli.learn.list.empty": "학습된 패턴이 없습니다",
-  "cli.learn.cleared": "모든 학습 패턴이 초기화되었습니다"
+  "cli.learn.cleared": "모든 학습 패턴이 초기화되었습니다",
+
+  "cli.status.title": "CodeAgora 상태",
+  "cli.status.config": "설정",
+  "cli.status.providers": "프로바이더",
+  "cli.status.sessions": "세션",
+  "cli.status.lastReview": "마지막 리뷰",
+  "cli.status.noSessions": "아직 리뷰 세션이 없습니다",
+  "cli.config.set.success": "설정 업데이트: {key} = {value}",
+  "cli.config.set.invalidKey": "잘못된 설정 키: {key}",
+  "cli.providers.test.title": "프로바이더 상태",
+  "cli.staged.empty": "스테이지된 변경이 없습니다. 먼저 'git add'로 파일을 스테이지하세요."
 }

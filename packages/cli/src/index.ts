@@ -36,6 +36,9 @@ import { computeAgreementMatrix, formatAgreementMatrix } from './commands/agreem
 import { loadSessionForReplay } from './commands/replay.js';
 import { startDashboard } from './commands/dashboard.js';
 import { getCostSummary } from './commands/costs.js';
+import { getStatus } from './commands/status.js';
+import { setConfigValue, editConfig } from './commands/config-set.js';
+import { testProviders, formatProviderTestResults } from './commands/providers-test.js';
 
 // Load API keys from ~/.config/codeagora/credentials
 loadCredentials();
@@ -81,6 +84,8 @@ program
   .option('--pr <url-or-number>', 'GitHub PR URL or number (fetches diff from GitHub)')
   .option('--post-review', 'Post review comments back to the PR (requires --pr)', false)
   .option('--quick', 'Quick review (L1 only, skip discussion and verdict)')
+  .option('--staged', 'Review staged changes (git diff --staged)')
+  .option('--json-stream', 'Stream NDJSON events during review (for CI/pipelines)')
   .action(async (diffPath: string | undefined, options: {
     dryRun?: boolean;
     output: string;
@@ -96,6 +101,8 @@ program
     pr?: string;
     postReview: boolean;
     quick?: boolean;
+    staged?: boolean;
+    jsonStream?: boolean;
   }) => {
     // Hoist stdinTmpPath so finally block can clean it up (#77)
     let stdinTmpPath: string | undefined;
@@ -106,6 +113,28 @@ program
 
       const outputFormat = (['text', 'json', 'md', 'github', 'annotated'].includes(options.output)
         ? options.output : 'text') as OutputFormat;
+
+      // Handle --staged: run git diff --staged and use as input
+      if (options.staged) {
+        const { execFileSync } = await import('child_process');
+        let stagedDiff: string;
+        try {
+          stagedDiff = execFileSync('git', ['diff', '--staged'], { encoding: 'utf-8' });
+        } catch {
+          console.error('Failed to run "git diff --staged". Are you in a git repository?');
+          process.exit(1);
+        }
+        if (!stagedDiff.trim()) {
+          console.error(t('cli.staged.empty'));
+          process.exit(1);
+        }
+        const tmpDir = path.join(process.cwd(), '.ca', 'tmp');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const tmpPath = path.join(tmpDir, `staged-${Date.now()}.diff`);
+        await fs.writeFile(tmpPath, stagedDiff, 'utf-8');
+        diffPath = tmpPath;
+        stdinTmpPath = tmpPath; // reuse cleanup variable
+      }
 
       // Handle --pr: fetch diff from GitHub
       let resolvedPath: string;
@@ -217,8 +246,15 @@ program
       let progress: ProgressEmitter | undefined;
       let spinner: ReturnType<typeof ora> | undefined;
 
+      if (options.jsonStream) {
+        progress = progress ?? new ProgressEmitter();
+        progress.onProgress((event) => {
+          process.stdout.write(JSON.stringify(event) + '\n');
+        });
+      }
+
       if (!options.quiet) {
-        progress = new ProgressEmitter();
+        progress = progress ?? new ProgressEmitter();
         spinner = ora({ stream: process.stderr });
 
         const stageLabels: Record<string, string> = {
@@ -265,6 +301,11 @@ program
         }
       }
       console.log(formatOutput(result, outputFormat, annotatedOptions));
+
+      // Emit final result as NDJSON for --json-stream consumers
+      if (options.jsonStream) {
+        process.stdout.write(JSON.stringify({ type: 'result', ...result }) + '\n');
+      }
 
       // Post review to GitHub if --post-review and --pr were used
       if (options.postReview && prContext && result.status === 'success' && result.summary) {
@@ -747,6 +788,54 @@ program
     }
   });
 
+// === CLI Improvements Batch 2 ===
+
+program
+  .command('status')
+  .description('Show CodeAgora status overview')
+  .action(async () => {
+    try {
+      const output = await getStatus(process.cwd());
+      console.log(output);
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('config-set <key> <value>')
+  .description('Set a config value (dot notation: discussion.maxRounds)')
+  .action(async (key: string, value: string) => {
+    try {
+      await setConfigValue(process.cwd(), key, value);
+      console.log(t('cli.config.set.success', { key, value }));
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('config-edit')
+  .description('Open config in $EDITOR')
+  .action(async () => {
+    try {
+      await editConfig(process.cwd());
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('providers-test')
+  .description('Verify API key status for all providers')
+  .action(() => {
+    const results = testProviders();
+    console.log(formatProviderTestResults(results));
+  });
+
 // === Help text examples (#169) ===
 
 // Find registered commands and add help text
@@ -759,8 +848,10 @@ Examples:
   git diff HEAD~1 | ${displayName} review          Review last commit
   ${displayName} review changes.diff               Review a diff file
   ${displayName} review --pr 123                   Review a GitHub PR
+  ${displayName} review --staged                   Review staged changes
   ${displayName} review --quick                    Quick review (L1 only)
   ${displayName} review --output json              JSON output for CI
+  ${displayName} review --json-stream              Stream NDJSON for CI
 `);
       break;
     case 'init':
@@ -830,6 +921,31 @@ Examples:
   ${displayName} language                          Show current language
   ${displayName} language en                       Set language to English
   ${displayName} language ko                       Set language to Korean
+`);
+      break;
+    case 'status':
+      cmd.addHelpText('after', `
+Examples:
+  ${displayName} status                            Show CodeAgora status
+`);
+      break;
+    case 'config-set':
+      cmd.addHelpText('after', `
+Examples:
+  ${displayName} config-set discussion.maxRounds 5 Set max discussion rounds
+  ${displayName} config-set language ko            Set language to Korean
+`);
+      break;
+    case 'config-edit':
+      cmd.addHelpText('after', `
+Examples:
+  ${displayName} config-edit                       Open config in editor
+`);
+      break;
+    case 'providers-test':
+      cmd.addHelpText('after', `
+Examples:
+  ${displayName} providers-test                    Check API key status
 `);
       break;
   }

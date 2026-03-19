@@ -205,5 +205,16 @@
   "cli.language.current": "Current language: {lang}",
   "cli.language.set": "Language set to {lang}",
   "cli.learn.list.empty": "No learned patterns",
-  "cli.learn.cleared": "All learned patterns cleared"
+  "cli.learn.cleared": "All learned patterns cleared",
+
+  "cli.status.title": "CodeAgora Status",
+  "cli.status.config": "Config",
+  "cli.status.providers": "Providers",
+  "cli.status.sessions": "Sessions",
+  "cli.status.lastReview": "Last review",
+  "cli.status.noSessions": "No review sessions yet",
+  "cli.config.set.success": "Config updated: {key} = {value}",
+  "cli.config.set.invalidKey": "Invalid config key: {key}",
+  "cli.providers.test.title": "Provider Status",
+  "cli.staged.empty": "No staged changes. Stage files with 'git add' first."
 }
