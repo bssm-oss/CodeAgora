@@ -28,7 +28,9 @@
       "@codeagora/cli": ["./packages/cli/src/index.ts"],
       "@codeagora/cli/*": ["./packages/cli/src/*"],
       "@codeagora/tui": ["./packages/tui/src/index.ts"],
-      "@codeagora/tui/*": ["./packages/tui/src/*"]
+      "@codeagora/tui/*": ["./packages/tui/src/*"],
+      "@codeagora/mcp": ["./packages/mcp/src/index.ts"],
+      "@codeagora/mcp/*": ["./packages/mcp/src/*"]
     }
   },
   "include": [

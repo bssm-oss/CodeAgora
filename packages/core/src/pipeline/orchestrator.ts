@@ -46,6 +46,8 @@ export interface PipelineInput {
   timeoutMs?: number;
   reviewerTimeoutMs?: number;
   skipDiscussion?: boolean;
+  /** Skip L3 head verdict — return raw L1 evidence docs (6.2 lightweight mode) */
+  skipHead?: boolean;
   reviewerSelection?: { count?: number; names?: string[] };
   /** Optional event emitter for real-time discussion events (2.1). Attach listeners before calling runPipeline. */
   discussionEmitter?: DiscussionEmitter;
@@ -369,6 +371,35 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // Write moderator report
     await writeModeratorReport(date, sessionId, moderatorReport);
     await writeSuggestions(date, sessionId, thresholdResult.suggestions);
+
+    // === LIGHTWEIGHT MODE: Skip L3 head verdict (6.2) ===
+    if (input.skipHead) {
+      await session.setStatus('completed');
+      progress?.stageComplete('verdict', 'Skipped (lightweight mode)');
+      const severityCounts: Record<string, number> = {};
+      for (const doc of allEvidenceDocs) {
+        severityCounts[doc.severity] = (severityCounts[doc.severity] ?? 0) + 1;
+      }
+      return {
+        sessionId, date, status: 'success',
+        summary: {
+          decision: 'NEEDS_HUMAN', reasoning: 'Lightweight mode — no head verdict',
+          totalReviewers: allReviewerInputs.length,
+          forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
+          severityCounts,
+          topIssues: allEvidenceDocs.slice(0, 5).map(d => ({ severity: d.severity, filePath: d.filePath, lineRange: d.lineRange, title: d.issueTitle })),
+          totalDiscussions: moderatorReport.summary.totalDiscussions,
+          resolved: moderatorReport.summary.resolved,
+          escalated: moderatorReport.summary.escalated,
+        },
+        evidenceDocs: allEvidenceDocs,
+        discussions: moderatorReport.discussions,
+        roundsPerDiscussion: moderatorReport.roundsPerDiscussion,
+        performanceText: await generatePerformanceText(telemetry),
+        diffComplexity,
+        reviewerMap: buildReviewerMap(allReviewResults),
+      };
+    }
 
     // === L3 HEAD: Scan Unconfirmed Queue ===
     const { promoted, dismissed: _dismissed } = scanUnconfirmedQueue(
