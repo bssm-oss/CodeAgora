@@ -566,6 +566,56 @@ function formatModelOption(model: ModelEntry): { value: string; label: string } 
 }
 
 /**
+ * Search + select helper: optional text filter → filtered select/multiselect.
+ * If options are <= 10, skip search and show directly.
+ */
+async function searchAndSelect<T extends string>(
+  options: Array<{ value: T; label: string; hint?: string }>,
+  message: string,
+  multi: boolean,
+  ko: boolean,
+): Promise<T | T[]> {
+  let filtered = options;
+
+  // Only offer search when list is long
+  if (options.length > 10) {
+    const searchQuery = await p.text({
+      message: ko ? `${message} (검색어 입력, 빈 칸이면 전체 표시)` : `${message} (type to search, enter for all)`,
+      placeholder: ko ? '검색...' : 'search...',
+      defaultValue: '',
+    });
+    if (p.isCancel(searchQuery)) {
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
+      throw new UserCancelledError();
+    }
+    const query = (searchQuery as string).toLowerCase().trim();
+    if (query) {
+      filtered = options.filter((o) => o.label.toLowerCase().includes(query) || o.value.toLowerCase().includes(query));
+      if (filtered.length === 0) {
+        p.log.warn(ko ? '\uAC80\uC0C9 \uACB0\uACFC \uC5C6\uC74C. \uC804\uCCB4 \uBAA9\uB85D \uD45C\uC2DC.' : 'No matches. Showing all.');
+        filtered = options;
+      }
+    }
+  }
+
+  if (multi) {
+    const result = await p.multiselect({ message, options: filtered as any, required: true });
+    if (p.isCancel(result)) {
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
+      throw new UserCancelledError();
+    }
+    return result as T[];
+  } else {
+    const result = await p.select({ message, options: filtered as any });
+    if (p.isCancel(result)) {
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
+      throw new UserCancelledError();
+    }
+    return result as T;
+  }
+}
+
+/**
  * Detect if any provider API keys are set in the environment.
  */
 function detectApiKeys(): string[] {
@@ -843,15 +893,9 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
           const topModels = getTopModels(catalog, mappedProvider, 20);
           if (topModels.length > 0) {
             const modelOptions = topModels.map((m) => formatModelOption(m));
-            const modelSelection = await p.select({
-              message: ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`,
-              options: modelOptions,
-            });
-            if (p.isCancel(modelSelection)) {
-              p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
-              throw new UserCancelledError();
-            }
-            selections.push({ provider: backend, model: modelSelection as string, backend: 'cli' });
+            const msg = ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`;
+            const modelSelection = await searchAndSelect(modelOptions, msg, false, ko) as string;
+            selections.push({ provider: backend, model: modelSelection, backend: 'cli' });
             continue;
           }
         }
@@ -869,15 +913,9 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
               const opt = formatModelOption(m);
               return { value: opt.value, label: `${providerName}/${opt.label}` };
             });
-            const modelSelection = await p.select({
-              message: ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`,
-              options: modelOptions,
-            });
-            if (p.isCancel(modelSelection)) {
-              p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
-              throw new UserCancelledError();
-            }
-            selections.push({ provider: backend, model: modelSelection as string, backend: 'cli' });
+            const msg = ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`;
+            const modelSelection = await searchAndSelect(modelOptions, msg, false, ko) as string;
+            selections.push({ provider: backend, model: modelSelection, backend: 'cli' });
             continue;
           }
         }
@@ -898,18 +936,10 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
       if (catalog) {
         const topModels = getTopModels(catalog, prov, 20);
         if (topModels.length > 0) {
-          // Show model list — allow multiselect for multiple reviewers from same provider
+          // Show model list with search — allow multiselect for diverse reviewers
           const modelOptions = topModels.map((m) => formatModelOption(m));
-          const modelSelection = await p.multiselect({
-            message: ko ? `${prov} \uBAA8\uB378 \uC120\uD0DD (\uC5EC\uB7EC \uAC1C \uAC00\uB2A5)` : `Models for ${prov} (select multiple for diverse reviewers)`,
-            options: modelOptions,
-            required: true,
-          });
-          if (p.isCancel(modelSelection)) {
-            p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
-            throw new UserCancelledError();
-          }
-          const selectedModels = modelSelection as string[];
+          const msg = ko ? `${prov} \uBAA8\uB378 \uC120\uD0DD (\uC5EC\uB7EC \uAC1C \uAC00\uB2A5)` : `Models for ${prov} (select multiple)`;
+          const selectedModels = await searchAndSelect(modelOptions, msg, true, ko) as string[];
 
           for (const selectedModel of selectedModels) {
             const entry = topModels.find((m) => {
