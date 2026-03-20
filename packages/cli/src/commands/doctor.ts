@@ -9,6 +9,7 @@ import { getSupportedProviders, getModel } from '@codeagora/core/l1/provider-reg
 import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 import { strictValidateConfig } from '@codeagora/core/config/validator.js';
 import { getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
+import { detectCliBackends, type DetectedCli } from '@codeagora/shared/utils/cli-detect.js';
 import { statusColor, dim } from '../utils/colors.js';
 import { generateText } from 'ai';
 import type { Config, AgentConfig } from '@codeagora/core/types/config.js';
@@ -27,6 +28,7 @@ export interface DoctorResult {
   checks: DoctorCheck[];
   summary: { pass: number; fail: number; warn: number };
   liveChecks?: LiveCheckResult[];
+  cliBackends?: DetectedCli[];
 }
 
 export interface LiveCheckResult {
@@ -159,13 +161,30 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
     });
   }
 
+  // 6. CLI backend detection
+  let cliBackends: DetectedCli[] | undefined;
+  try {
+    cliBackends = await detectCliBackends();
+    if (cliBackends) {
+      for (const cli of cliBackends) {
+        checks.push({
+          name: `CLI: ${cli.backend}`,
+          status: cli.available ? 'pass' : 'warn',
+          message: cli.available ? `CLI: ${cli.backend} found` : `CLI: ${cli.backend} not found`,
+        });
+      }
+    }
+  } catch {
+    // CLI detection is optional — skip on failure
+  }
+
   const summary = {
     pass: checks.filter((c) => c.status === 'pass').length,
     fail: checks.filter((c) => c.status === 'fail').length,
     warn: checks.filter((c) => c.status === 'warn').length,
   };
 
-  return { checks, summary };
+  return { checks, summary, cliBackends };
 }
 
 // getProviderEnvVar is re-exported for backward compatibility

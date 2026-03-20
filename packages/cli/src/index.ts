@@ -39,6 +39,8 @@ import { getCostSummary } from './commands/costs.js';
 import { getStatus } from './commands/status.js';
 import { setConfigValue, editConfig } from './commands/config-set.js';
 import { testProviders, formatProviderTestResults } from './commands/providers-test.js';
+import { loadModelsCatalog } from '@codeagora/shared/data/models-dev.js';
+import { detectCliBackends } from '@codeagora/shared/utils/cli-detect.js';
 
 // Load API keys from ~/.config/codeagora/credentials
 loadCredentials();
@@ -497,9 +499,15 @@ program
 program
   .command('providers')
   .description('List supported providers and API key status')
-  .action(() => {
-    const providers = listProviders();
-    console.log(formatProviderList(providers));
+  .action(async () => {
+    let catalog;
+    try { catalog = await loadModelsCatalog(); } catch { /* optional */ }
+
+    let cliBackends;
+    try { cliBackends = await detectCliBackends(); } catch { /* optional */ }
+
+    const providers = listProviders(catalog);
+    console.log(formatProviderList(providers, cliBackends));
   });
 
 const sessionsCmd = program
