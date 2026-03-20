@@ -78,15 +78,21 @@ function migrateAgentConfig(
     provider: targetProvider,
   };
 
-  // Migrate fallback if present
-  if (agent.fallback && isCliBackend(agent.fallback.backend)) {
-    const fallbackProvider =
-      agent.fallback.provider ?? BACKEND_TO_PROVIDER[agent.fallback.backend] ?? mappedProvider;
-    migrated.fallback = {
-      ...agent.fallback,
-      backend: 'api',
-      provider: fallbackProvider,
-    };
+  // Migrate fallback(s) if present
+  if (agent.fallback) {
+    const fallbackArray = Array.isArray(agent.fallback) ? agent.fallback : [agent.fallback];
+    const migratedFallbacks = fallbackArray.map((fb) => {
+      if (isCliBackend(fb.backend)) {
+        const fallbackProvider =
+          fb.provider ?? BACKEND_TO_PROVIDER[fb.backend] ?? mappedProvider;
+        return { ...fb, backend: 'api' as const, provider: fallbackProvider };
+      }
+      return fb;
+    });
+    // Preserve original shape: single object if input was single, array if array
+    migrated.fallback = Array.isArray(agent.fallback)
+      ? migratedFallbacks
+      : migratedFallbacks[0];
   }
 
   return migrated;
@@ -213,14 +219,20 @@ export function applyMigration(config: Config, result: MigrationResult): Config 
       provider: change.to.provider,
     };
 
-    if (agent.fallback && isCliBackend(agent.fallback.backend)) {
-      const fallbackProvider =
-        agent.fallback.provider ?? BACKEND_TO_PROVIDER[agent.fallback.backend] ?? change.to.provider;
-      updated.fallback = {
-        ...agent.fallback,
-        backend: 'api',
-        provider: fallbackProvider,
-      };
+    if (agent.fallback) {
+      const fallbackArray = Array.isArray(agent.fallback) ? agent.fallback : [agent.fallback];
+      const migratedFallbacks = fallbackArray.map((fb) => {
+        if (isCliBackend(fb.backend)) {
+          const fallbackProvider =
+            fb.provider ?? BACKEND_TO_PROVIDER[fb.backend] ?? change.to.provider;
+          return { ...fb, backend: 'api' as const, provider: fallbackProvider };
+        }
+        return fb;
+      });
+      // Preserve original shape: single object if input was single, array if array
+      updated.fallback = Array.isArray(agent.fallback)
+        ? migratedFallbacks
+        : migratedFallbacks[0];
     }
 
     return updated;

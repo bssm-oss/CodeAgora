@@ -464,7 +464,11 @@ function renderDetailView(entry: ReviewerEntry): React.JSX.Element {
       <DetailRow label={t('config.detail.persona')} value={agent.persona ?? t('config.detail.none')} />
       <DetailRow label={t('config.detail.status')} value={enabled ? t('config.detail.enabled') : t('config.detail.disabled')} color={statusColor(enabled)} />
       {agent.fallback ? (
-        <DetailRow label={t('config.detail.fallback')} value={`${agent.fallback.provider ?? ''}/${agent.fallback.model}`} />
+        <DetailRow label={t('config.detail.fallback')} value={
+          Array.isArray(agent.fallback)
+            ? agent.fallback.map((fb) => `${fb.provider ?? ''}/${fb.model}`).join(' → ')
+            : `${agent.fallback.provider ?? ''}/${agent.fallback.model}`
+        } />
       ) : null}
     </Box>
   );

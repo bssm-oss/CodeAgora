@@ -3,13 +3,28 @@
  * Executes 5 reviewers in parallel, each writes evidence documents
  */
 
-import type { ReviewerConfig } from '../types/config.js';
+import type { ReviewerConfig, FallbackConfig } from '../types/config.js';
 import type { ReviewOutput } from '../types/core.js';
 import { parseEvidenceResponse } from './parser.js';
 import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '@codeagora/shared/utils/diff.js';
 import { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 import { HealthMonitor } from '../l0/health-monitor.js';
+
+// ============================================================================
+// Fallback Normalization
+// ============================================================================
+
+/**
+ * Normalize fallback config to an array for uniform iteration.
+ * Supports both single-object and array forms for backward compatibility.
+ */
+export function normalizeFallbacks(
+  fallback: FallbackConfig | FallbackConfig[] | undefined
+): FallbackConfig[] {
+  if (!fallback) return [];
+  return Array.isArray(fallback) ? fallback : [fallback];
+}
 
 // ============================================================================
 // Reviewer Execution
@@ -78,13 +93,14 @@ export async function executeReviewer(
     }
   }
 
-  // All retries failed — try fallback if configured
-  if (lastError && config.fallback) {
+  // All retries failed — try fallback chain if configured
+  const fallbacks = normalizeFallbacks(config.fallback);
+  for (const fb of fallbacks) {
     try {
       const response = await executeBackend({
-        backend: config.fallback.backend,
-        model: config.fallback.model,
-        provider: config.fallback.provider,
+        backend: fb.backend,
+        model: fb.model,
+        provider: fb.provider,
         prompt: buildReviewerPrompt(diffContent, prSummary),
         timeout: config.timeout,
       });
@@ -93,14 +109,14 @@ export async function executeReviewer(
 
       return {
         reviewerId: config.id,
-        model: config.fallback.model,
+        model: fb.model,
         group: groupName,
         evidenceDocs,
         rawResponse: response,
         status: 'success',
       };
     } catch {
-      // fallback also failed — forfeit
+      // this fallback failed — continue to next in chain
     }
   }
 
@@ -257,35 +273,36 @@ async function executeReviewerWithGuards(
     }
   }
 
-  // All retries failed — try fallback if configured
-  if (lastError && config.fallback) {
-    const fallbackProvider = config.fallback.provider;
+  // All retries failed — try fallback chain if configured
+  const fallbacks = normalizeFallbacks(config.fallback);
+  for (const fb of fallbacks) {
+    const fallbackProvider = fb.provider;
     const useFallbackGuards = !!fallbackProvider;
     try {
       if (useFallbackGuards) hm.recordRequest(fallbackProvider!);
 
       const response = await executeBackend({
-        backend: config.fallback.backend,
-        model: config.fallback.model,
-        provider: config.fallback.provider,
+        backend: fb.backend,
+        model: fb.model,
+        provider: fb.provider,
         prompt: buildReviewerPrompt(diffContent, prSummary),
         timeout: config.timeout,
       });
 
-      if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, config.fallback.model);
+      if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
 
       return {
         reviewerId: config.id,
-        model: config.fallback.model,
+        model: fb.model,
         group: groupName,
         evidenceDocs,
         rawResponse: response,
         status: 'success',
       };
     } catch {
-      if (useFallbackGuards) cb.recordFailure(fallbackProvider!, config.fallback.model);
-      // fallback also failed — forfeit
+      if (useFallbackGuards) cb.recordFailure(fallbackProvider!, fb.model);
+      // this fallback failed — continue to next in chain
     }
   }
 

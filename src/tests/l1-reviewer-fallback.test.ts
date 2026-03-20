@@ -3,6 +3,7 @@
  *
  * Verifies that executeReviewer falls back to the configured fallback
  * backend+model when the primary backend fails all retries.
+ * Supports both single-object and array fallback chains (#89).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -11,7 +12,7 @@ vi.mock('../../packages/core/src/l1/backend.js', () => ({
   executeBackend: vi.fn(),
 }));
 
-import { executeReviewer } from '@codeagora/core/l1/reviewer.js';
+import { executeReviewer, normalizeFallbacks } from '@codeagora/core/l1/reviewer.js';
 import { executeBackend } from '@codeagora/core/l1/backend.js';
 import type { ReviewerInput } from '@codeagora/core/l1/reviewer.js';
 import type { BackendInput } from '@codeagora/core/l1/backend.js';
@@ -189,5 +190,211 @@ describe('executeReviewer — fallback mechanism', () => {
     expect(fallbackCall.model).toBe('claude-3-5-sonnet');
     expect(fallbackCall.provider).toBeUndefined();
     expect(fallbackCall.timeout).toBe(30); // inherited from primary config
+  });
+});
+
+// ============================================================================
+// Fallback Chain (Array) Tests — #89
+// ============================================================================
+
+describe('normalizeFallbacks helper', () => {
+  it('returns empty array for undefined', () => {
+    expect(normalizeFallbacks(undefined)).toEqual([]);
+  });
+
+  it('wraps single object in array', () => {
+    const single = { model: 'gpt-4o', backend: 'api' as const, provider: 'openai' };
+    expect(normalizeFallbacks(single)).toEqual([single]);
+  });
+
+  it('returns array as-is', () => {
+    const arr = [
+      { model: 'gpt-4o', backend: 'api' as const },
+      { model: 'claude-3-haiku', backend: 'claude' as const },
+    ];
+    expect(normalizeFallbacks(arr)).toEqual(arr);
+  });
+
+  it('returns empty array for empty array input', () => {
+    expect(normalizeFallbacks([])).toEqual([]);
+  });
+});
+
+describe('executeReviewer — fallback chain (array)', () => {
+  beforeEach(() => {
+    mockExecuteBackend.mockReset();
+  });
+
+  it('9. array fallback: first fallback fails, second succeeds', async () => {
+    mockExecuteBackend
+      .mockRejectedValueOnce(new Error('primary failed'))    // primary
+      .mockRejectedValueOnce(new Error('fallback-1 failed')) // fallback[0]
+      .mockResolvedValueOnce(MOCK_RESPONSE);                 // fallback[1]
+
+    const input = makeInput({
+      fallback: [
+        { model: 'claude-3-haiku', backend: 'claude' },
+        { model: 'gemini-pro', backend: 'gemini' },
+      ],
+    });
+
+    const result = await executeReviewer(input, 0);
+
+    expect(result.status).toBe('success');
+    expect(result.model).toBe('gemini-pro');
+    expect(mockExecuteBackend).toHaveBeenCalledTimes(3);
+  });
+
+  it('10. array fallback: all fallbacks fail → forfeit', async () => {
+    mockExecuteBackend.mockRejectedValue(new Error('everything down'));
+
+    const input = makeInput({
+      fallback: [
+        { model: 'claude-3-haiku', backend: 'claude' },
+        { model: 'gemini-pro', backend: 'gemini' },
+        { model: 'gpt-4o-mini', backend: 'api', provider: 'openai' },
+      ],
+    });
+
+    const result = await executeReviewer(input, 0);
+
+    expect(result.status).toBe('forfeit');
+    expect(result.error).toBeDefined();
+    // primary (1) + 3 fallbacks = 4 calls
+    expect(mockExecuteBackend).toHaveBeenCalledTimes(4);
+  });
+
+  it('11. array fallback: first succeeds — rest not called', async () => {
+    mockExecuteBackend
+      .mockRejectedValueOnce(new Error('primary failed'))
+      .mockResolvedValueOnce(MOCK_RESPONSE); // fallback[0] succeeds
+
+    const input = makeInput({
+      fallback: [
+        { model: 'claude-3-haiku', backend: 'claude' },
+        { model: 'gemini-pro', backend: 'gemini' },
+      ],
+    });
+
+    const result = await executeReviewer(input, 0);
+
+    expect(result.status).toBe('success');
+    expect(result.model).toBe('claude-3-haiku');
+    // primary (1) + fallback[0] (1) = 2, fallback[1] never called
+    expect(mockExecuteBackend).toHaveBeenCalledTimes(2);
+  });
+
+  it('12. empty fallback array → no fallback attempted, forfeit', async () => {
+    mockExecuteBackend.mockRejectedValue(new Error('primary failed'));
+
+    const input = makeInput({ fallback: [] });
+
+    const result = await executeReviewer(input, 0);
+
+    expect(result.status).toBe('forfeit');
+    // only primary attempt
+    expect(mockExecuteBackend).toHaveBeenCalledTimes(1);
+  });
+
+  it('13. array fallback passes correct backend/model/provider for each entry', async () => {
+    mockExecuteBackend
+      .mockRejectedValueOnce(new Error('primary failed'))
+      .mockRejectedValueOnce(new Error('fallback-1 failed'))
+      .mockResolvedValueOnce(MOCK_RESPONSE);
+
+    const input = makeInput({
+      fallback: [
+        { model: 'claude-3-haiku', backend: 'claude' },
+        { model: 'gpt-4o-mini', backend: 'api', provider: 'openai' },
+      ],
+    });
+
+    await executeReviewer(input, 0);
+
+    // Verify fallback[0] call args
+    const fb0Call = mockExecuteBackend.mock.calls[1][0] as BackendInput;
+    expect(fb0Call.backend).toBe('claude');
+    expect(fb0Call.model).toBe('claude-3-haiku');
+    expect(fb0Call.provider).toBeUndefined();
+
+    // Verify fallback[1] call args
+    const fb1Call = mockExecuteBackend.mock.calls[2][0] as BackendInput;
+    expect(fb1Call.backend).toBe('api');
+    expect(fb1Call.model).toBe('gpt-4o-mini');
+    expect(fb1Call.provider).toBe('openai');
+  });
+});
+
+describe('AgentConfigSchema — fallback array validation (#89)', () => {
+  it('14. accepts single fallback object (backward compat)', () => {
+    const raw = {
+      id: 'r1',
+      model: 'gpt-4o',
+      backend: 'api',
+      provider: 'openai',
+      fallback: { model: 'claude-3-haiku', backend: 'claude' },
+    };
+
+    expect(() => AgentConfigSchema.parse(raw)).not.toThrow();
+    const parsed = AgentConfigSchema.parse(raw);
+    // Single object should still parse correctly
+    expect(parsed.fallback).toBeDefined();
+  });
+
+  it('15. accepts fallback array', () => {
+    const raw = {
+      id: 'r1',
+      model: 'gpt-4o',
+      backend: 'api',
+      provider: 'openai',
+      fallback: [
+        { model: 'claude-3-haiku', backend: 'claude' },
+        { model: 'gemini-pro', backend: 'gemini' },
+      ],
+    };
+
+    expect(() => AgentConfigSchema.parse(raw)).not.toThrow();
+    const parsed = AgentConfigSchema.parse(raw);
+    expect(Array.isArray(parsed.fallback)).toBe(true);
+    expect((parsed.fallback as Array<unknown>)).toHaveLength(2);
+  });
+
+  it('16. accepts empty fallback array', () => {
+    const raw = {
+      id: 'r1',
+      model: 'gpt-4o',
+      backend: 'api',
+      provider: 'openai',
+      fallback: [],
+    };
+
+    expect(() => AgentConfigSchema.parse(raw)).not.toThrow();
+  });
+
+  it('17. rejects invalid fallback (missing required fields)', () => {
+    const raw = {
+      id: 'r1',
+      model: 'gpt-4o',
+      backend: 'api',
+      provider: 'openai',
+      fallback: { model: 'claude-3-haiku' }, // missing backend
+    };
+
+    expect(() => AgentConfigSchema.parse(raw)).toThrow();
+  });
+
+  it('18. rejects invalid entry in fallback array', () => {
+    const raw = {
+      id: 'r1',
+      model: 'gpt-4o',
+      backend: 'api',
+      provider: 'openai',
+      fallback: [
+        { model: 'claude-3-haiku', backend: 'claude' },
+        { model: 'gemini-pro' }, // missing backend
+      ],
+    };
+
+    expect(() => AgentConfigSchema.parse(raw)).toThrow();
   });
 });

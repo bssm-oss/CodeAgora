@@ -18,6 +18,17 @@ export const BackendSchema = z.enum([
 export type Backend = z.infer<typeof BackendSchema>;
 
 // ============================================================================
+// Fallback Config
+// ============================================================================
+
+export const FallbackSchema = z.object({
+  model: z.string(),
+  backend: BackendSchema,
+  provider: z.string().optional(),
+});
+export type FallbackConfig = z.infer<typeof FallbackSchema>;
+
+// ============================================================================
 // Agent Config (Unified for Reviewers, Supporters, Moderator)
 // ============================================================================
 
@@ -31,13 +42,7 @@ export const AgentConfigSchema = z
     persona: z.string().optional(),
     timeout: z.number().default(120),
     enabled: z.boolean().default(true),
-    fallback: z
-      .object({
-        model: z.string(),
-        backend: BackendSchema,
-        provider: z.string().optional(),
-      })
-      .optional(),
+    fallback: z.union([FallbackSchema, z.array(FallbackSchema)]).optional(),
   })
   .refine(
     (data) => data.backend !== 'opencode' || data.provider !== undefined,
