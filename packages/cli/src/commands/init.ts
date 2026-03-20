@@ -18,7 +18,7 @@ import { detectCliBackends } from '@codeagora/shared/utils/cli-detect.js';
 import type { DetectedCli } from '@codeagora/shared/utils/cli-detect.js';
 import { stringify as yamlStringify } from 'yaml';
 import { t, detectLocale } from '@codeagora/shared/i18n/index.js';
-import type { ReviewMode, Language } from '@codeagora/core/types/config.js';
+import type { ReviewMode, Language, Backend } from '@codeagora/core/types/config.js';
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -48,7 +48,7 @@ export interface CustomConfigParams {
   language?: Language;
 }
 
-interface AgentEntry { id: string; label?: string; model: string; backend: string; provider: string; enabled: boolean; timeout: number }
+interface AgentEntry { id: string; label?: string; model: string; backend: string; provider?: string; enabled: boolean; timeout: number }
 
 export interface GeneratedConfig {
   reviewers: AgentEntry[];
@@ -275,15 +275,16 @@ export function buildMultiProviderConfig(params: MultiProviderConfigParams): Gen
   const reviewers: AgentEntry[] = [];
   for (let i = 0; i < reviewerCount; i++) {
     const sel = selections[i % selections.length]!;
+    const isCli = sel.backend === 'cli';
     reviewers.push({
       id: `r${i + 1}`,
       label: `${sel.provider} ${sel.model} Reviewer ${i + 1}`,
       model: sel.model,
-      backend: sel.backend,
-      provider: sel.provider,
+      backend: (isCli ? sel.provider : 'api') as Backend,
+      provider: isCli ? undefined : sel.provider,
       enabled: true,
       timeout: 120,
-    });
+    } as AgentEntry);
   }
 
   // Supporters: prefer a different provider than the first reviewer for diversity
@@ -764,10 +765,20 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     }
     format = formatSelection as 'json' | 'yaml';
 
-    // Provider multiselect — detect available API keys, include catalog stats
+    // Provider multiselect — detect available API keys + CLI backends, include catalog stats
     const providerOptions = Object.entries(PROVIDER_ENV_VARS).map(([name, envVar]) =>
       formatProviderOption(name, envVar, catalog),
     );
+
+    // Add detected CLI backends as selectable options
+    const availableCliTools = cliBackends.filter((c) => c.available);
+    for (const cli of availableCliTools) {
+      providerOptions.push({
+        value: `cli:${cli.backend}`,
+        label: `${cli.backend}  \u2713 CLI detected`,
+        hint: `backend: ${cli.bin}`,
+      });
+    }
 
     // Default selections: providers with detected API keys
     const defaultProviders = env.apiProviders.filter((p) => p.available).map((p) => p.provider);
@@ -787,10 +798,17 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     // Per-provider model selection
     const selections: ProviderModelSelection[] = [];
     for (const prov of selectedProviders) {
+      // Handle CLI backend selections (e.g. "cli:claude")
+      if (prov.startsWith('cli:')) {
+        const backend = prov.slice(4);
+        selections.push({ provider: backend, model: backend, backend: 'cli' });
+        continue;
+      }
+
       let selectedModel: string;
 
       if (catalog) {
-        const topModels = getTopModels(catalog, prov, 5);
+        const topModels = getTopModels(catalog, prov, 20);
         if (topModels.length > 0) {
           // Show model recommendation
           const modelOptions = topModels.map((m) => formatModelOption(m));
