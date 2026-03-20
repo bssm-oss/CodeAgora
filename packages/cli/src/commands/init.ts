@@ -10,6 +10,12 @@ import * as p from '@clack/prompts';
 import { generateMinimalTemplate } from '@codeagora/core/config/templates.js';
 import { getModePreset } from '@codeagora/core/config/mode-presets.js';
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { loadModelsCatalog, getTopModels, getProviderStats } from '@codeagora/shared/data/models-dev.js';
+import type { ModelsCatalog, ModelEntry } from '@codeagora/shared/data/models-dev.js';
+import { detectEnvironment } from '@codeagora/shared/utils/env-detect.js';
+import type { EnvironmentReport, ApiProviderStatus } from '@codeagora/shared/utils/env-detect.js';
+import { detectCliBackends } from '@codeagora/shared/utils/cli-detect.js';
+import type { DetectedCli } from '@codeagora/shared/utils/cli-detect.js';
 import { stringify as yamlStringify } from 'yaml';
 import { t, detectLocale } from '@codeagora/shared/i18n/index.js';
 import type { ReviewMode, Language } from '@codeagora/core/types/config.js';
@@ -55,6 +61,37 @@ export interface GeneratedConfig {
 
 export class UserCancelledError extends Error {
   constructor() { super('Setup cancelled by user.'); this.name = 'UserCancelledError'; }
+}
+
+// ============================================================================
+// Multi-provider types (#173 Phase 3)
+// ============================================================================
+
+export interface ProviderModelSelection {
+  provider: string;
+  model: string;
+  backend: 'api' | 'cli';
+  contextWindow?: number;
+  isFree?: boolean;
+}
+
+export interface MultiProviderConfigParams {
+  selections: ProviderModelSelection[];
+  reviewerCount: number;
+  discussion: boolean;
+  mode?: ReviewMode;
+  language?: Language;
+}
+
+export interface DynamicPreset {
+  id: string;
+  label: string;
+  labelKo: string;
+  providers: string[];
+  models: Record<string, string>;
+  reviewerCount: number;
+  discussion: boolean;
+  backend: 'api' | 'cli';
 }
 
 // ============================================================================
@@ -150,7 +187,7 @@ async function writePersonas(
 }
 
 // ============================================================================
-// buildCustomConfig
+// buildCustomConfig (original single-provider — kept for backward compat)
 // ============================================================================
 
 /**
@@ -213,6 +250,91 @@ export function buildCustomConfig(params: CustomConfigParams): GeneratedConfig {
 }
 
 // ============================================================================
+// buildMultiProviderConfig (#173 Phase 3-4)
+// ============================================================================
+
+/**
+ * Build a config object distributing reviewers across multiple providers/models.
+ * - Reviewers: distributed evenly across selections
+ * - Supporters: use different providers than reviewers (diversity)
+ * - Moderator/Head: strongest model (highest context window from selections)
+ */
+export function buildMultiProviderConfig(params: MultiProviderConfigParams): GeneratedConfig {
+  const { selections, reviewerCount, discussion, mode = 'pragmatic', language = 'en' } = params;
+
+  if (reviewerCount < 1 || reviewerCount > 10) {
+    throw new Error(`reviewerCount must be between 1 and 10, got ${reviewerCount}`);
+  }
+  if (selections.length === 0) {
+    throw new Error('At least one provider/model selection is required');
+  }
+
+  const preset = getModePreset(mode);
+
+  // Distribute reviewers across providers evenly
+  const reviewers: AgentEntry[] = [];
+  for (let i = 0; i < reviewerCount; i++) {
+    const sel = selections[i % selections.length]!;
+    reviewers.push({
+      id: `r${i + 1}`,
+      label: `${sel.provider} ${sel.model} Reviewer ${i + 1}`,
+      model: sel.model,
+      backend: sel.backend,
+      provider: sel.provider,
+      enabled: true,
+      timeout: 120,
+    });
+  }
+
+  // Supporters: prefer a different provider than the first reviewer for diversity
+  const supporterSel = selections.length > 1 ? selections[1]! : selections[0]!;
+  const supporterBase = {
+    model: supporterSel.model,
+    backend: supporterSel.backend,
+    provider: supporterSel.provider,
+    enabled: true,
+    timeout: 120,
+  };
+
+  // Moderator/Head: strongest model (highest context window, then first in list)
+  const strongest = [...selections].sort((a, b) => (b.contextWindow ?? 0) - (a.contextWindow ?? 0))[0]!;
+
+  return {
+    mode,
+    language,
+    reviewers,
+    supporters: {
+      pool: [{ id: 's1', ...supporterBase }],
+      pickCount: 1,
+      pickStrategy: 'random',
+      devilsAdvocate: { id: 'da', ...supporterBase },
+      personaPool: preset.personaPool,
+      personaAssignment: 'random',
+    },
+    moderator: {
+      model: strongest.model,
+      backend: strongest.backend,
+      provider: strongest.provider,
+    },
+    head: {
+      backend: strongest.backend,
+      model: strongest.model,
+      provider: strongest.provider,
+      enabled: true,
+    },
+    discussion: {
+      maxRounds: discussion ? preset.maxRounds : 0,
+      registrationThreshold: preset.registrationThreshold,
+      codeSnippetRange: 10,
+    },
+    errorHandling: {
+      maxRetries: 2,
+      forfeitThreshold: 0.7,
+    },
+  };
+}
+
+// ============================================================================
 // Default model per provider
 // ============================================================================
 
@@ -228,48 +350,219 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
 };
 
 // ============================================================================
-// Init Presets (#166)
+// Static fallback presets (used when catalog/detection unavailable)
 // ============================================================================
 
-interface InitPreset {
-  id: string;
-  label: string;
-  labelKo: string;
-  provider: string;
-  model: string;
-  reviewerCount: number;
-  discussion: boolean;
-}
-
-const INIT_PRESETS: InitPreset[] = [
+const FALLBACK_PRESETS: DynamicPreset[] = [
   {
     id: 'quick',
     label: 'Quick review (Groq only)',
-    labelKo: '빠른 리뷰 (Groq만 사용)',
-    provider: 'groq',
-    model: 'llama-3.3-70b-versatile',
+    labelKo: '\uBE60\uB978 \uB9AC\uBDF0 (Groq\uB9CC \uC0AC\uC6A9)',
+    providers: ['groq'],
+    models: { groq: 'llama-3.3-70b-versatile' },
     reviewerCount: 1,
     discussion: false,
+    backend: 'api',
   },
   {
     id: 'thorough',
     label: 'Thorough review (multi-provider)',
-    labelKo: '심층 리뷰 (멀티 프로바이더)',
-    provider: 'groq',
-    model: 'llama-3.3-70b-versatile',
+    labelKo: '\uC2EC\uCE35 \uB9AC\uBDF0 (\uBA40\uD2F0 \uD504\uB85C\uBC14\uC774\uB354)',
+    providers: ['groq'],
+    models: { groq: 'llama-3.3-70b-versatile' },
     reviewerCount: 3,
     discussion: true,
+    backend: 'api',
   },
   {
     id: 'free',
     label: 'Free review (Groq + GitHub Models)',
-    labelKo: '무료 리뷰 (Groq + GitHub Models)',
-    provider: 'groq',
-    model: 'llama-3.3-70b-versatile',
+    labelKo: '\uBB34\uB8CC \uB9AC\uBDF0 (Groq + GitHub Models)',
+    providers: ['groq'],
+    models: { groq: 'llama-3.3-70b-versatile' },
     reviewerCount: 2,
     discussion: false,
+    backend: 'api',
   },
 ];
+
+// ============================================================================
+// Dynamic Preset Generation (#173 Phase 3-3)
+// ============================================================================
+
+/**
+ * FREE_PROVIDERS — providers known to offer free models.
+ */
+const FREE_PROVIDERS = new Set(['groq', 'cerebras', 'nvidia-nim', 'github-models']);
+
+/**
+ * Generate presets dynamically based on detected environment and catalog.
+ * Falls back to groq-based presets when nothing is detected.
+ */
+export function generatePresets(
+  env: EnvironmentReport,
+  catalog: ModelsCatalog | null,
+  cliBackends?: DetectedCli[],
+): DynamicPreset[] {
+  const detected = env.apiProviders.filter((p: ApiProviderStatus) => p.available).map((p: ApiProviderStatus) => p.provider);
+  const presets: DynamicPreset[] = [];
+
+  // If nothing detected at all, return fallback presets
+  if (detected.length === 0 && (!cliBackends || cliBackends.filter((c) => c.available).length === 0)) {
+    return FALLBACK_PRESETS;
+  }
+
+  // Helper: get best model for a provider from catalog or fallback
+  function bestModel(provider: string): string {
+    if (catalog) {
+      const top = getTopModels(catalog, provider, 1);
+      if (top.length > 0 && top[0]!.id) {
+        // Extract model name from id (strip provider prefix)
+        const id = top[0]!.id;
+        const slash = id.indexOf('/');
+        return slash > 0 ? id.slice(slash + 1) : id;
+      }
+    }
+    return PROVIDER_DEFAULT_MODELS[provider] ?? 'llama-3.3-70b-versatile';
+  }
+
+  // 1. "Quick review" — single fastest provider, 1 reviewer, no discussion
+  if (detected.length > 0) {
+    const fastest = detected[0]!;
+    presets.push({
+      id: 'quick',
+      label: `Quick review (${fastest})`,
+      labelKo: `\uBE60\uB978 \uB9AC\uBDF0 (${fastest})`,
+      providers: [fastest],
+      models: { [fastest]: bestModel(fastest) },
+      reviewerCount: 1,
+      discussion: false,
+      backend: 'api',
+    });
+  }
+
+  // 2. "Free review" — only if free-tier providers detected
+  const freeDetected = detected.filter((p: string) => FREE_PROVIDERS.has(p));
+  if (freeDetected.length > 0) {
+    const freeModels: Record<string, string> = {};
+    for (const prov of freeDetected) {
+      freeModels[prov] = bestModel(prov);
+    }
+    presets.push({
+      id: 'free',
+      label: `Free review (${freeDetected.join(' + ')})`,
+      labelKo: `\uBB34\uB8CC \uB9AC\uBDF0 (${freeDetected.join(' + ')})`,
+      providers: freeDetected,
+      models: freeModels,
+      reviewerCount: Math.min(freeDetected.length * 2, 5),
+      discussion: false,
+      backend: 'api',
+    });
+  }
+
+  // 3. "Thorough review" — multi-provider if 2+ detected, 3-5 reviewers, discussion on
+  if (detected.length >= 2) {
+    const thorough = detected.slice(0, 4); // cap at 4 providers
+    const thoroughModels: Record<string, string> = {};
+    for (const prov of thorough) {
+      thoroughModels[prov] = bestModel(prov);
+    }
+    presets.push({
+      id: 'thorough',
+      label: `Thorough review (${thorough.join(', ')})`,
+      labelKo: `\uC2EC\uCE35 \uB9AC\uBDF0 (${thorough.join(', ')})`,
+      providers: thorough,
+      models: thoroughModels,
+      reviewerCount: Math.min(thorough.length + 2, 5),
+      discussion: true,
+      backend: 'api',
+    });
+  } else if (detected.length === 1) {
+    const prov = detected[0]!;
+    presets.push({
+      id: 'thorough',
+      label: `Thorough review (${prov})`,
+      labelKo: `\uC2EC\uCE35 \uB9AC\uBDF0 (${prov})`,
+      providers: [prov],
+      models: { [prov]: bestModel(prov) },
+      reviewerCount: 3,
+      discussion: true,
+      backend: 'api',
+    });
+  }
+
+  // 4. "CLI review" — if CLI backends detected
+  const availableCli = cliBackends?.filter((c) => c.available) ?? [];
+  if (availableCli.length > 0) {
+    const cliProvider = availableCli[0]!;
+    const cliModel = cliProvider.backend === 'claude' ? 'claude'
+      : cliProvider.backend === 'codex' ? 'codex'
+      : cliProvider.backend === 'gemini' ? 'gemini'
+      : cliProvider.backend;
+    presets.push({
+      id: 'cli',
+      label: `CLI review (${availableCli.map((c) => c.backend).join(', ')})`,
+      labelKo: `CLI \uB9AC\uBDF0 (${availableCli.map((c) => c.backend).join(', ')})`,
+      providers: availableCli.map((c) => c.backend),
+      models: { [cliProvider.backend]: cliModel },
+      reviewerCount: Math.min(availableCli.length, 3),
+      discussion: false,
+      backend: 'cli',
+    });
+  }
+
+  // If we somehow have no presets (edge case), return fallback
+  return presets.length > 0 ? presets : FALLBACK_PRESETS;
+}
+
+// ============================================================================
+// Provider option formatting for multiselect (#173 Phase 3-1)
+// ============================================================================
+
+function formatProviderOption(
+  name: string,
+  envVar: string,
+  catalog: ModelsCatalog | null,
+): { value: string; label: string; hint?: string } {
+  const detected = !!process.env[envVar];
+  let label = name;
+  if (detected) {
+    label += '  \u2713 key detected';
+  }
+
+  let hint: string | undefined;
+  if (catalog) {
+    const stats = getProviderStats(catalog, name);
+    if (stats.total > 0) {
+      const parts: string[] = [`${stats.total} models`];
+      if (stats.free > 0) parts.push(`${stats.free} free`);
+      hint = parts.join(', ');
+    }
+  }
+
+  return { value: name, label, hint };
+}
+
+// ============================================================================
+// Model recommendation formatting (#173 Phase 3-2)
+// ============================================================================
+
+function formatModelOption(model: ModelEntry): { value: string; label: string } {
+  // Extract display model name from id
+  const id = model.id;
+  const slash = id.indexOf('/');
+  const displayName = slash > 0 ? id.slice(slash + 1) : id;
+
+  const tags: string[] = [];
+  const isFree = model.cost ? (model.cost.input === 0 && model.cost.output === 0) : false;
+  if (isFree) tags.push('FREE');
+  else tags.push('PAID');
+  if (model.limit?.context) tags.push(`ctx=${Math.round(model.limit.context / 1000)}k`);
+  if (model.reasoning) tags.push('reasoning');
+
+  const tagStr = tags.length > 0 ? ` [${tags.join(', ')}]` : '';
+  return { value: displayName, label: `${model.name || displayName}${tagStr}` };
+}
 
 /**
  * Detect if any provider API keys are set in the environment.
@@ -374,164 +667,255 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
 
   p.intro(t('cli.init.welcome'));
 
+  // Detect environment, catalog, and CLI backends in parallel
+  const [env, catalog, cliBackends] = await Promise.all([
+    Promise.resolve(detectEnvironment()),
+    loadModelsCatalog(),
+    detectCliBackends().catch(() => [] as DetectedCli[]),
+  ]);
+
   // Free provider recommendation: show if no API keys are detected
-  const detectedKeys = detectApiKeys();
-  if (detectedKeys.length === 0) {
+  if (env.apiProviders.filter((p) => p.available).length === 0) {
     p.note(t('cli.init.noKeys'));
   }
 
+  // Generate dynamic presets based on detected environment
+  const dynamicPresets = generatePresets(env, catalog, cliBackends);
+
   // Step 1: Preset or custom
   const setupMode = await p.select({
-    message: ko ? '설정 방법을 선택하세요' : 'How would you like to set up?',
+    message: ko ? '\uC124\uC815 \uBC29\uBC95\uC744 \uC120\uD0DD\uD558\uC138\uC694' : 'How would you like to set up?',
     options: [
-      ...INIT_PRESETS.map((preset) => ({
+      ...dynamicPresets.map((preset) => ({
         value: preset.id,
         label: ko ? preset.labelKo : preset.label,
       })),
-      { value: 'custom', label: ko ? '직접 설정' : 'Custom setup' },
+      { value: 'custom', label: ko ? '\uC9C1\uC811 \uC124\uC815' : 'Custom setup' },
     ],
   });
   if (p.isCancel(setupMode)) {
-    p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+    p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
     throw new UserCancelledError();
   }
 
-  let provider: string;
-  let model: string;
-  let reviewerCount: number;
-  let discussion: boolean;
+  let configData: GeneratedConfig;
   let format: 'json' | 'yaml';
-  let mode: ReviewMode = 'pragmatic';
-  let language: Language;
+  let primaryProvider: string;
+  let primaryModel: string;
 
-  const selectedPreset = INIT_PRESETS.find((pr) => pr.id === setupMode);
+  const selectedPreset = dynamicPresets.find((pr) => pr.id === setupMode);
   if (selectedPreset) {
-    // Use preset defaults
-    provider = selectedPreset.provider;
-    model = selectedPreset.model;
-    reviewerCount = selectedPreset.reviewerCount;
-    discussion = selectedPreset.discussion;
+    // Use preset defaults — build selections from preset
+    const selections: ProviderModelSelection[] = selectedPreset.providers.map((prov) => ({
+      provider: prov,
+      model: selectedPreset.models[prov] ?? PROVIDER_DEFAULT_MODELS[prov] ?? 'llama-3.3-70b-versatile',
+      backend: selectedPreset.backend,
+    }));
+
     format = options.format === 'yaml' ? 'yaml' : 'json';
+    primaryProvider = selections[0]!.provider;
+    primaryModel = selections[0]!.model;
 
     // Language selection
     const languageSelection = await p.select({
-      message: ko ? '리뷰 언어?' : 'Review language?',
+      message: ko ? '\uB9AC\uBDF0 \uC5B8\uC5B4?' : 'Review language?',
       options: [
         { value: 'en', label: 'English' },
-        { value: 'ko', label: '한국어' },
+        { value: 'ko', label: '\uD55C\uAD6D\uC5B4' },
       ],
       initialValue: ko ? 'ko' : 'en',
     });
     if (p.isCancel(languageSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
-    language = languageSelection as Language;
+    const language = languageSelection as Language;
+
+    if (selections.length === 1) {
+      configData = buildCustomConfig({
+        provider: primaryProvider,
+        model: primaryModel,
+        reviewerCount: selectedPreset.reviewerCount,
+        discussion: selectedPreset.discussion,
+        language,
+      });
+    } else {
+      configData = buildMultiProviderConfig({
+        selections,
+        reviewerCount: selectedPreset.reviewerCount,
+        discussion: selectedPreset.discussion,
+        language,
+      });
+    }
   } else {
     // Custom setup: full wizard
 
     // Config format
     const formatSelection = await p.select({
-      message: ko ? '설정 파일 형식?' : 'Config format?',
+      message: ko ? '\uC124\uC815 \uD30C\uC77C \uD615\uC2DD?' : 'Config format?',
       options: [
         { value: 'json', label: 'JSON' },
         { value: 'yaml', label: 'YAML' },
       ],
     });
     if (p.isCancel(formatSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
     format = formatSelection as 'json' | 'yaml';
 
-    // Provider selection — detect available API keys
-    const providerOptions = Object.entries(PROVIDER_ENV_VARS).map(([name, envVar]) => ({
-      value: name,
-      label: `${name}${process.env[envVar] ? ' \u2713 (key detected)' : ''}`,
-    }));
-    const providerSelection = await p.select({
-      message: ko ? '어떤 프로바이더를 사용할까요?' : 'Which provider?',
+    // Provider multiselect — detect available API keys, include catalog stats
+    const providerOptions = Object.entries(PROVIDER_ENV_VARS).map(([name, envVar]) =>
+      formatProviderOption(name, envVar, catalog),
+    );
+
+    // Default selections: providers with detected API keys
+    const defaultProviders = env.apiProviders.filter((p) => p.available).map((p) => p.provider);
+
+    const providerSelection = await p.multiselect({
+      message: ko ? '\uC0AC\uC6A9\uD560 \uD504\uB85C\uBC14\uC774\uB354\uB97C \uC120\uD0DD\uD558\uC138\uC694' : 'Select providers (space to toggle, enter to confirm)',
       options: providerOptions,
+      initialValues: defaultProviders,
+      required: true,
     });
     if (p.isCancel(providerSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
-    provider = providerSelection as string;
+    const selectedProviders = providerSelection as string[];
+
+    // Per-provider model selection
+    const selections: ProviderModelSelection[] = [];
+    for (const prov of selectedProviders) {
+      let selectedModel: string;
+
+      if (catalog) {
+        const topModels = getTopModels(catalog, prov, 5);
+        if (topModels.length > 0) {
+          // Show model recommendation
+          const modelOptions = topModels.map((m) => formatModelOption(m));
+          const modelSelection = await p.select({
+            message: ko ? `${prov} \uBAA8\uB378 \uC120\uD0DD` : `Model for ${prov}`,
+            options: modelOptions,
+          });
+          if (p.isCancel(modelSelection)) {
+            p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
+            throw new UserCancelledError();
+          }
+          selectedModel = modelSelection as string;
+
+          // Find the ModelEntry for context window info
+          const entry = topModels.find((m) => {
+            const id = m.id;
+            const slash = id.indexOf('/');
+            return (slash > 0 ? id.slice(slash + 1) : id) === selectedModel;
+          });
+          selections.push({
+            provider: prov,
+            model: selectedModel,
+            backend: 'api',
+            contextWindow: entry?.limit?.context,
+            isFree: entry?.cost ? (entry.cost.input === 0 && entry.cost.output === 0) : undefined,
+          });
+          continue;
+        }
+      }
+
+      // Fallback: text input with default model
+      const defaultModel = PROVIDER_DEFAULT_MODELS[prov] ?? 'llama-3.3-70b-versatile';
+      const modelInput = await p.text({
+        message: ko ? `${prov} \uBAA8\uB378 \uC774\uB984?` : `Model for ${prov}?`,
+        placeholder: defaultModel,
+        defaultValue: defaultModel,
+      });
+      if (p.isCancel(modelInput)) {
+        p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
+        throw new UserCancelledError();
+      }
+      selectedModel = (modelInput as string) || defaultModel;
+      selections.push({ provider: prov, model: selectedModel, backend: 'api' });
+    }
+
+    primaryProvider = selections[0]!.provider;
+    primaryModel = selections[0]!.model;
 
     // Reviewer count
     const countSelection = await p.select({
-      message: ko ? '리뷰어 수?' : 'How many reviewers?',
+      message: ko ? '\uB9AC\uBDF0\uC5B4 \uC218?' : 'How many reviewers?',
       options: [
-        { value: '1', label: ko ? '1 (최소)' : '1 (minimal)' },
-        { value: '3', label: ko ? '3 (권장)' : '3 (recommended)' },
-        { value: '5', label: ko ? '5 (심층)' : '5 (thorough)' },
+        { value: '1', label: ko ? '1 (\uCD5C\uC18C)' : '1 (minimal)' },
+        { value: '3', label: ko ? '3 (\uAD8C\uC7A5)' : '3 (recommended)' },
+        { value: '5', label: ko ? '5 (\uC2EC\uCE35)' : '5 (thorough)' },
       ],
       initialValue: '3',
     });
     if (p.isCancel(countSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
-    reviewerCount = parseInt(countSelection as string, 10);
-
-    // Model name
-    const defaultModel = PROVIDER_DEFAULT_MODELS[provider] ?? 'llama-3.3-70b-versatile';
-    const modelSelection = await p.text({
-      message: ko ? '모델 이름?' : 'Model name?',
-      placeholder: defaultModel,
-      defaultValue: defaultModel,
-    });
-    if (p.isCancel(modelSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
-      throw new UserCancelledError();
-    }
-    model = (modelSelection as string) || defaultModel;
+    const reviewerCount = parseInt(countSelection as string, 10);
 
     // Enable discussion
     const discussionSelection = await p.confirm({
-      message: ko ? 'L2 토론 (멀티 에이전트 디베이트) 활성화?' : 'Enable L2 discussion (multi-agent debate)?',
+      message: ko ? 'L2 \uD1A0\uB860 (\uBA40\uD2F0 \uC5D0\uC774\uC804\uD2B8 \uB514\uBCA0\uC774\uD2B8) \uD65C\uC131\uD654?' : 'Enable L2 discussion (multi-agent debate)?',
       initialValue: true,
     });
     if (p.isCancel(discussionSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
-    discussion = discussionSelection as boolean;
+    const discussion = discussionSelection as boolean;
 
     // Review mode
     const modeSelection = await p.select({
-      message: ko ? '리뷰 모드?' : 'Review mode?',
+      message: ko ? '\uB9AC\uBDF0 \uBAA8\uB4DC?' : 'Review mode?',
       options: [
-        { value: 'pragmatic', label: ko ? 'Pragmatic (균형적, 오탐 감소)' : 'Pragmatic (balanced, fewer false positives)' },
-        { value: 'strict', label: ko ? 'Strict (보안 중심, 낮은 임계값)' : 'Strict (security-focused, lower thresholds)' },
+        { value: 'pragmatic', label: ko ? 'Pragmatic (\uADE0\uD615\uC801, \uC624\uD0D0 \uAC10\uC18C)' : 'Pragmatic (balanced, fewer false positives)' },
+        { value: 'strict', label: ko ? 'Strict (\uBCF4\uC548 \uC911\uC2EC, \uB0AE\uC740 \uC784\uACC4\uAC12)' : 'Strict (security-focused, lower thresholds)' },
       ],
       initialValue: 'pragmatic',
     });
     if (p.isCancel(modeSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
-    mode = modeSelection as ReviewMode;
+    const mode = modeSelection as ReviewMode;
 
     // Language
     const languageSelection = await p.select({
-      message: ko ? '리뷰 언어?' : 'Review language?',
+      message: ko ? '\uB9AC\uBDF0 \uC5B8\uC5B4?' : 'Review language?',
       options: [
         { value: 'en', label: 'English' },
-        { value: 'ko', label: '한국어' },
+        { value: 'ko', label: '\uD55C\uAD6D\uC5B4' },
       ],
       initialValue: ko ? 'ko' : 'en',
     });
     if (p.isCancel(languageSelection)) {
-      p.cancel(ko ? '설정이 취소되었습니다.' : 'Setup cancelled.');
+      p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
       throw new UserCancelledError();
     }
-    language = languageSelection as Language;
-  }
+    const language = languageSelection as Language;
 
-  // Build config from selections
-  const configData = buildCustomConfig({ provider, model, reviewerCount, discussion, mode, language });
+    // Build config from selections
+    if (selections.length === 1) {
+      configData = buildCustomConfig({
+        provider: primaryProvider,
+        model: primaryModel,
+        reviewerCount,
+        discussion,
+        mode,
+        language,
+      });
+    } else {
+      configData = buildMultiProviderConfig({
+        selections,
+        reviewerCount,
+        discussion,
+        mode,
+        language,
+      });
+    }
+  }
 
   // Ensure .ca/ directory exists
   const caDir = path.join(baseDir, '.ca');
@@ -554,19 +938,19 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
   await writeFile(reviewIgnorePath, reviewIgnoreContent, force, created, skipped);
 
   // Provider health check: ping one model from each configured provider
-  const envVar = PROVIDER_ENV_VARS[provider];
+  const envVar = PROVIDER_ENV_VARS[primaryProvider];
   if (envVar && process.env[envVar]) {
     const spinner = p.spinner();
     spinner.start(t('cli.init.healthCheck'));
     try {
       const { getModel } = await import('@codeagora/core/l1/provider-registry.js');
       const { generateText } = await import('ai');
-      const languageModel = getModel(provider, model);
+      const languageModel = getModel(primaryProvider, primaryModel);
       await generateText({ model: languageModel, prompt: 'Say OK', abortSignal: AbortSignal.timeout(10_000) });
-      spinner.stop(`${provider}/${model} \u2713`);
+      spinner.stop(`${primaryProvider}/${primaryModel} \u2713`);
     } catch {
-      spinner.stop(`${provider}/${model} \u2717 (could not connect)`);
-      warnings.push(`Provider ${provider} health check failed. Verify your API key.`);
+      spinner.stop(`${primaryProvider}/${primaryModel} \u2717 (could not connect)`);
+      warnings.push(`Provider ${primaryProvider} health check failed. Verify your API key.`);
     }
   }
 
