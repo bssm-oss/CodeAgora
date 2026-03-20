@@ -818,17 +818,48 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     }
     const selectedProviders = providerSelection as string[];
 
+    // CLI backend → models.dev provider mapping
+    const CLI_TO_PROVIDER: Record<string, string> = {
+      claude: 'anthropic',
+      codex: 'openai',
+      copilot: 'openai',
+      gemini: 'google',
+      aider: 'openai',
+      cline: 'anthropic',
+      cursor: 'openai',
+      kiro: 'anthropic',
+    };
+
     // Per-provider model selection (multiple models per provider for diversity)
     const selections: ProviderModelSelection[] = [];
     for (const prov of selectedProviders) {
       // Handle CLI backend selections (e.g. "cli:claude")
       if (prov.startsWith('cli:')) {
         const backend = prov.slice(4);
-        // CLI backends also need a model — ask which model to use
+        const mappedProvider = CLI_TO_PROVIDER[backend];
+
+        // Try to show model list from the mapped provider
+        if (catalog && mappedProvider) {
+          const topModels = getTopModels(catalog, mappedProvider, 20);
+          if (topModels.length > 0) {
+            const modelOptions = topModels.map((m) => formatModelOption(m));
+            const modelSelection = await p.select({
+              message: ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`,
+              options: modelOptions,
+            });
+            if (p.isCancel(modelSelection)) {
+              p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
+              throw new UserCancelledError();
+            }
+            selections.push({ provider: backend, model: modelSelection as string, backend: 'cli' });
+            continue;
+          }
+        }
+
+        // Fallback: text input
         const cliModelInput = await p.text({
           message: ko ? `${backend} CLI \uBAA8\uB378 \uC774\uB984?` : `Model for ${backend} CLI?`,
-          placeholder: backend,
-          defaultValue: backend,
+          placeholder: 'model-name',
         });
         if (p.isCancel(cliModelInput)) {
           p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
