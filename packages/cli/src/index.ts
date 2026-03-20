@@ -1000,10 +1000,30 @@ Examples:
 // In ESM the canonical check is comparing import.meta.url to the process entry module.
 // A simpler cross-env guard: skip parse when NODE_ENV is 'test' and argv hasn't been
 // explicitly set beyond the two node/script entries.
-// Easter egg
+// Default action: show quick guide when no command is given
+program.action(() => {
+  const r = '\x1b[0m', b = '\x1b[1m', c = '\x1b[36m', g = '\x1b[32m', d = '\x1b[2m', y = '\x1b[33m';
+  console.log('');
+  console.log(`  ${c}${b}CodeAgora${r} ${d}v${process.env.CODEAGORA_VERSION ?? 'dev'}${r}`);
+  console.log(`  ${d}Multi-LLM collaborative code review${r}`);
+  console.log('');
+  console.log(`  ${g}Commands:${r}`);
+  console.log(`    ${b}agora init${r}              ${d}Setup (auto-detects API keys + CLI tools)${r}`);
+  console.log(`    ${b}agora review${r}            ${d}Run code review${r}`);
+  console.log(`    ${b}agora review --quick${r}    ${d}Fast review (L1 only)${r}`);
+  console.log(`    ${b}agora review --verbose${r}  ${d}Show full issue details${r}`);
+  console.log(`    ${b}agora providers${r}         ${d}Show available providers${r}`);
+  console.log(`    ${b}agora doctor${r}            ${d}Check setup health${r}`);
+  console.log(`    ${b}agora language${r}          ${d}Switch language (en/ko)${r}`);
+  console.log('');
+  console.log(`  ${y}Free tier:${r} ${d}Groq + GitHub Models = unlimited free reviews${r}`);
+  console.log(`  ${d}Run ${b}agora --help${r}${d} for all commands${r}`);
+  console.log('');
+});
+
+// Easter egg (hidden from --help)
 program
-  .command('justn')
-  .description('???')
+  .command('justn', { hidden: true })
   .action(async () => {
     const msg = 'I MADE IT GRAHHHHHHHHH ';
     const colors = ['\x1b[31m', '\x1b[33m', '\x1b[32m', '\x1b[36m', '\x1b[35m'];
@@ -1014,15 +1034,15 @@ program
     while (Date.now() < end) {
       process.stdout.write(`${bold}${colors[i % colors.length]}${msg}${reset}`);
       i++;
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 15));
     }
     console.log('\n');
-    console.log(`${bold}\x1b[33m  ██╗███╗   ███╗ █████╗ ██████╗ ███████╗    ██████╗ ██╗   ██╗     ██╗██╗   ██╗███████╗████████╗███╗   ██╗${reset}`);
-    console.log(`${bold}\x1b[33m  ██║████╗ ████║██╔══██╗██╔══██╗██╔════╝    ██╔══██╗╚██╗ ██╔╝     ██║██║   ██║██╔════╝╚══██╔══╝████╗  ██║${reset}`);
-    console.log(`${bold}\x1b[33m  ██║██╔████╔██║███████║██║  ██║█████╗      ██████╔╝ ╚████╔╝      ██║██║   ██║███████╗   ██║   ██╔██╗ ██║${reset}`);
-    console.log(`${bold}\x1b[33m  ██║██║╚██╔╝██║██╔══██║██║  ██║██╔══╝      ██╔══██╗  ╚██╔╝  ██   ██║██║   ██║╚════██║   ██║   ██║╚██╗██║${reset}`);
-    console.log(`${bold}\x1b[33m  ██║██║ ╚═╝ ██║██║  ██║██████╔╝███████╗    ██████╔╝   ██║   ╚█████╔╝╚██████╔╝███████║   ██║   ██║ ╚████║${reset}`);
-    console.log(`${bold}\x1b[33m  ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝    ╚═════╝    ╚═╝    ╚════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝${reset}`);
+    console.log(`${bold}\x1b[33m  ███╗   ███╗ █████╗ ██████╗ ███████╗    ██████╗ ██╗   ██╗     ██╗██╗   ██╗███████╗████████╗███╗   ██╗${reset}`);
+    console.log(`${bold}\x1b[33m  ████╗ ████║██╔══██╗██╔══██╗██╔════╝    ██╔══██╗╚██╗ ██╔╝     ██║██║   ██║██╔════╝╚══██╔══╝████╗  ██║${reset}`);
+    console.log(`${bold}\x1b[33m  ██╔████╔██║███████║██║  ██║█████╗      ██████╔╝ ╚████╔╝      ██║██║   ██║███████╗   ██║   ██╔██╗ ██║${reset}`);
+    console.log(`${bold}\x1b[33m  ██║╚██╔╝██║██╔══██║██║  ██║██╔══╝      ██╔══██╗  ╚██╔╝  ██   ██║██║   ██║╚════██║   ██║   ██║╚██╗██║${reset}`);
+    console.log(`${bold}\x1b[33m  ██║ ╚═╝ ██║██║  ██║██████╔╝███████╗    ██████╔╝   ██║   ╚█████╔╝╚██████╔╝███████║   ██║   ██║ ╚████║${reset}`);
+    console.log(`${bold}\x1b[33m  ╚═╝     ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝    ╚═════╝    ╚═╝    ╚════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝${reset}`);
     console.log('');
   });
 
