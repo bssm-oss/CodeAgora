@@ -113,8 +113,11 @@ export async function readSurroundingContext(
   let fileContent: string;
   try {
     fileContent = await fsPromises.readFile(filePath, 'utf-8');
-  } catch {
-    // File doesn't exist (deleted) or permission error — skip silently
+  } catch (err) {
+    // File doesn't exist (deleted) — skip silently; log other errors
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.warn(`[Context] Failed to read ${filePath}: ${err.message}`);
+    }
     return '';
   }
 

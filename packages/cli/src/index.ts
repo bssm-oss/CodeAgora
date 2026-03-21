@@ -43,7 +43,7 @@ import { loadModelsCatalog } from '@codeagora/shared/data/models-dev.js';
 import { detectCliBackends } from '@codeagora/shared/utils/cli-detect.js';
 
 // Load API keys from ~/.config/codeagora/credentials
-loadCredentials();
+await loadCredentials();
 
 /**
  * Derive the display name from the invoked binary path.

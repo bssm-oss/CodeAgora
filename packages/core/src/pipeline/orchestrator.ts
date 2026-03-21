@@ -40,6 +40,8 @@ import { computeHash } from '@codeagora/shared/utils/hash.js';
 import { lookupCache, addToCache } from '@codeagora/shared/utils/cache.js';
 import { CA_ROOT } from '@codeagora/shared/utils/fs.js';
 import fs from 'fs/promises';
+import type { Config, ReviewerEntry } from '../types/config.js';
+import type { ModeratorReport } from '../types/core.js';
 
 // ============================================================================
 // Main Pipeline
@@ -104,6 +106,254 @@ export interface PipelineResult {
   cached?: boolean;
 }
 
+// ============================================================================
+// Private helpers
+// ============================================================================
+
+/**
+ * Check cache for an identical diff+config combo. Returns cached result or null.
+ */
+async function checkAndLoadCache(
+  cacheKey: string,
+  session: SessionManager,
+): Promise<PipelineResult | null> {
+  try {
+    const cachedSessionPath = await lookupCache(CA_ROOT, cacheKey);
+    if (cachedSessionPath) {
+      const [cachedDate, cachedId] = cachedSessionPath.split('/');
+      if (cachedDate && cachedId) {
+        const cachedResultPath = `${CA_ROOT}/sessions/${cachedDate}/${cachedId}/result.json`;
+        const cachedRaw = await fs.readFile(cachedResultPath, 'utf-8');
+        const cachedResult = JSON.parse(cachedRaw) as PipelineResult;
+        await session.setStatus('completed');
+        return { ...cachedResult, cached: true };
+      }
+    }
+  } catch {
+    // Cache miss or corrupt data — continue with fresh review
+  }
+  return null;
+}
+
+/**
+ * Execute L1 reviewers across all diff chunks and return aggregated results.
+ */
+async function executeL1Reviews(
+  config: Config,
+  chunks: Awaited<ReturnType<typeof chunkDiff>>,
+  surroundingContext: string | undefined,
+): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[] }> {
+  const allReviewResults: ReviewOutput[] = [];
+  const allReviewerInputs: ReviewerInput[] = [];
+
+  const processChunk = async (chunk: typeof chunks[number]) => {
+    const fileGroups = groupDiff(chunk.diffContent);
+    if (fileGroups.length === 0) return null;
+
+    const { reviewerInputs } = await resolveReviewers(
+      config.reviewers as ReviewerEntry[],
+      fileGroups,
+      config.modelRouter
+    );
+
+    // Inject surrounding context into each reviewer input (context-aware review)
+    if (surroundingContext) {
+      for (const ri of reviewerInputs) {
+        ri.surroundingContext = surroundingContext;
+      }
+    }
+
+    const reviewResults = await executeReviewers(
+      reviewerInputs,
+      config.errorHandling.maxRetries
+    );
+
+    const forfeitCheck = checkForfeitThreshold(
+      reviewResults,
+      config.errorHandling.forfeitThreshold
+    );
+    if (!forfeitCheck.passed) return null;
+
+    if (chunks.length > 1) {
+      for (const result of reviewResults) {
+        result.chunkIndex = chunk.index;
+      }
+    }
+
+    return { reviewResults, reviewerInputs };
+  };
+
+  // Adaptive strategy: ≤2 chunks serial (overhead not worth it), >2 parallel
+  const CHUNK_PARALLEL_THRESHOLD = 2;
+  const CHUNK_CONCURRENCY = 3;
+
+  if (chunks.length <= CHUNK_PARALLEL_THRESHOLD) {
+    // Serial — low overhead for small diffs
+    for (const chunk of chunks) {
+      const out = await processChunk(chunk);
+      if (out) {
+        allReviewResults.push(...out.reviewResults);
+        allReviewerInputs.push(...out.reviewerInputs);
+      }
+    }
+  } else {
+    // Parallel with concurrency limit — prevents API rate-limit storms
+    const limit = pLimit(CHUNK_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      chunks.map((chunk) => limit(() => processChunk(chunk)))
+    );
+    for (const result of settled) {
+      if (result.status === 'fulfilled' && result.value) {
+        allReviewResults.push(...result.value.reviewResults);
+        allReviewerInputs.push(...result.value.reviewerInputs);
+      }
+      // rejected chunks are silently skipped (same as forfeit skip)
+    }
+  }
+
+  return { allReviewResults, allReviewerInputs };
+}
+
+/**
+ * Execute L2 moderator discussions and return the moderator report.
+ */
+async function executeL2Discussions(
+  config: Config,
+  diffContent: string,
+  thresholdResult: ReturnType<typeof applyThreshold>,
+  date: string,
+  sessionId: string,
+  discussionEmitter: DiscussionEmitter,
+  allEvidenceDocs: EvidenceDocument[],
+  qualityTracker: QualityTracker,
+  logger: ReturnType<typeof createLogger>,
+): Promise<ModeratorReport> {
+  const { deduplicated, mergedCount } = deduplicateDiscussions(thresholdResult.discussions);
+  logger.info(`Deduplicated discussions: ${mergedCount} merged`);
+
+  // Extract code snippets for discussions
+  const snippets = extractMultipleSnippets(
+    diffContent,
+    deduplicated.map((d) => ({
+      filePath: d.filePath,
+      lineRange: d.lineRange,
+    })),
+    config.discussion.codeSnippetRange
+  );
+
+  // Attach snippets to discussions
+  for (const discussion of deduplicated) {
+    const key = `${discussion.filePath}:${discussion.lineRange[0]}-${discussion.lineRange[1]}`;
+    const snippet = snippets.get(key);
+    if (snippet) {
+      discussion.codeSnippet = snippet.code;
+    } else {
+      logger.warn(`Failed to extract code snippet for ${key}`);
+      discussion.codeSnippet = `[Code snippet not available - file ${discussion.filePath} may not be in diff]`;
+    }
+  }
+
+  const moderatorReport = await runModerator({
+    config: config.moderator,
+    supporterPoolConfig: config.supporters,
+    discussions: deduplicated,
+    settings: config.discussion,
+    date,
+    sessionId,
+    emitter: discussionEmitter,
+  });
+
+  // === QUALITY TRACKING: Record L2 discussion results ===
+  qualityTracker.recordDiscussionResults(deduplicated, moderatorReport.discussions);
+
+  // Add unconfirmed and suggestions to report
+  moderatorReport.unconfirmedIssues = thresholdResult.unconfirmed;
+  moderatorReport.suggestions = thresholdResult.suggestions;
+
+  // === CONFIDENCE: Adjust confidence based on L2 discussion verdicts ===
+  for (const verdict of moderatorReport.discussions) {
+    const matchingDocs = allEvidenceDocs.filter(d =>
+      d.filePath === verdict.filePath && Math.abs(d.lineRange[0] - verdict.lineRange[0]) <= 5
+    );
+    for (const doc of matchingDocs) {
+      doc.confidence = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
+    }
+  }
+
+  return moderatorReport;
+}
+
+/**
+ * Execute L3 head verdict (scan unconfirmed queue + make verdict).
+ */
+async function executeL3Verdict(
+  config: Config,
+  moderatorReport: ModeratorReport,
+): Promise<ReturnType<typeof makeHeadVerdict>> {
+  // === L3 HEAD: Scan Unconfirmed Queue ===
+  const { promoted, dismissed: _dismissed } = scanUnconfirmedQueue(
+    moderatorReport.unconfirmedIssues
+  );
+
+  // Promoted unconfirmed issues count as escalated for Head verdict
+  if (promoted.length > 0) {
+    for (const doc of promoted) {
+      moderatorReport.discussions.push({
+        discussionId: `promoted-${doc.filePath}:${doc.lineRange[0]}`,
+        filePath: doc.filePath,
+        lineRange: doc.lineRange,
+        finalSeverity: doc.severity,
+        reasoning: `Promoted from unconfirmed queue: ${doc.issueTitle}`,
+        consensusReached: false,
+        rounds: 0,
+      });
+    }
+    moderatorReport.summary.escalated += promoted.length;
+    moderatorReport.summary.totalDiscussions += promoted.length;
+  }
+
+  return makeHeadVerdict(moderatorReport, config.head, config.mode, config.language);
+}
+
+/**
+ * Record telemetry (quality tracking + bandit rewards) after pipeline completes.
+ */
+async function recordTelemetry(
+  qualityTracker: QualityTracker,
+  sessionId: string,
+  logger: ReturnType<typeof createLogger>,
+): Promise<void> {
+  const rewards = qualityTracker.finalizeRewards();
+  if (rewards.size === 0) return;
+
+  // Use shared BanditStore from L0 (avoids dual-instance data corruption)
+  let banditStoreInstance = getBanditStore();
+  if (!banditStoreInstance) {
+    // L0 not initialized (no auto reviewers) — create standalone instance
+    const { BanditStore } = await import('../l0/bandit-store.js');
+    banditStoreInstance = new BanditStore();
+    await banditStoreInstance.load();
+  }
+
+  for (const [, { modelId, provider, reward }] of rewards) {
+    banditStoreInstance.updateArm(`${provider}/${modelId}`, reward);
+  }
+
+  for (const record of qualityTracker.getRecords()) {
+    banditStoreInstance.addHistory(record);
+  }
+
+  await banditStoreInstance.save();
+  logger.info(
+    `Quality feedback: ${rewards.size} reviewers scored, ` +
+    `${[...rewards.values()].filter((r) => r.reward === 1).length} rewarded`
+  );
+}
+
+// ============================================================================
+// Run Pipeline
+// ============================================================================
+
 /**
  * Run complete V3 pipeline
  */
@@ -111,12 +361,11 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
   let session: SessionManager | undefined;
   // D-3: basic pipeline timing telemetry
   const telemetry = new PipelineTelemetry();
-  const pipelineStartMs = Date.now();
 
   try {
     // Load credentials from ~/.config/codeagora/credentials
     const { loadCredentials } = await import('../config/credentials.js');
-    loadCredentials();
+    await loadCredentials();
 
     // Load config and normalize (expand declarative reviewers if needed)
     progress?.stageStart('init', 'Loading config...');
@@ -185,22 +434,8 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // === CACHE: Check for identical diff + config (#109) ===
     const cacheKey = computeHash(diffContent + JSON.stringify(config.reviewers));
     if (!input.noCache) {
-      try {
-        const cachedSessionPath = await lookupCache(CA_ROOT, cacheKey);
-        if (cachedSessionPath) {
-          const [cachedDate, cachedId] = cachedSessionPath.split('/');
-          if (cachedDate && cachedId) {
-            const cachedResultPath = `${CA_ROOT}/sessions/${cachedDate}/${cachedId}/result.json`;
-            const cachedRaw = await fs.readFile(cachedResultPath, 'utf-8');
-            const cachedResult = JSON.parse(cachedRaw) as PipelineResult;
-            // Clean up the empty session we just created
-            await session.setStatus('completed');
-            return { ...cachedResult, cached: true };
-          }
-        }
-      } catch {
-        // Cache miss or corrupt data — continue with fresh review
-      }
+      const cached = await checkAndLoadCache(cacheKey, session);
+      if (cached) return cached;
     }
 
     // === AUTO-APPROVE: Skip LLM pipeline for trivial diffs ===
@@ -242,77 +477,8 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     }
 
     // === L1 REVIEWERS: Chunk Processing ===
-    const allReviewResults: ReviewOutput[] = [];
-    const allReviewerInputs: ReviewerInput[] = [];
-
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
-
-    // Process a single chunk: resolve reviewers → execute → forfeit check → tag
-    const processChunk = async (chunk: typeof chunks[number]) => {
-      const fileGroups = groupDiff(chunk.diffContent);
-      if (fileGroups.length === 0) return null;
-
-      const { reviewerInputs } = await resolveReviewers(
-        config.reviewers,
-        fileGroups,
-        config.modelRouter
-      );
-
-      // Inject surrounding context into each reviewer input (context-aware review)
-      if (surroundingContext) {
-        for (const ri of reviewerInputs) {
-          ri.surroundingContext = surroundingContext;
-        }
-      }
-
-      const reviewResults = await executeReviewers(
-        reviewerInputs,
-        config.errorHandling.maxRetries
-      );
-
-      const forfeitCheck = checkForfeitThreshold(
-        reviewResults,
-        config.errorHandling.forfeitThreshold
-      );
-      if (!forfeitCheck.passed) return null;
-
-      if (chunks.length > 1) {
-        for (const result of reviewResults) {
-          result.chunkIndex = chunk.index;
-        }
-      }
-
-      return { reviewResults, reviewerInputs };
-    };
-
-    // Adaptive strategy: ≤2 chunks serial (overhead not worth it), >2 parallel
-    const CHUNK_PARALLEL_THRESHOLD = 2;
-    const CHUNK_CONCURRENCY = 3;
-
-    if (chunks.length <= CHUNK_PARALLEL_THRESHOLD) {
-      // Serial — low overhead for small diffs
-      for (const chunk of chunks) {
-        const out = await processChunk(chunk);
-        if (out) {
-          allReviewResults.push(...out.reviewResults);
-          allReviewerInputs.push(...out.reviewerInputs);
-        }
-      }
-    } else {
-      // Parallel with concurrency limit — prevents API rate-limit storms
-      const limit = pLimit(CHUNK_CONCURRENCY);
-      const settled = await Promise.allSettled(
-        chunks.map((chunk) => limit(() => processChunk(chunk)))
-      );
-      for (const result of settled) {
-        if (result.status === 'fulfilled' && result.value) {
-          allReviewResults.push(...result.value.reviewResults);
-          allReviewerInputs.push(...result.value.reviewerInputs);
-        }
-        // rejected chunks are silently skipped (same as forfeit skip)
-      }
-    }
-
+    const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext);
     progress?.stageComplete('review', `${allReviewResults.length} reviewer results collected`);
 
     // Empty pipeline guard — all chunks failed
@@ -381,7 +547,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     const thresholdResult = applyThreshold(allEvidenceDocs, config.discussion);
     const logger = createLogger(date, sessionId, 'pipeline');
 
-    let moderatorReport: import('../types/core.js').ModeratorReport;
+    let moderatorReport: ModeratorReport;
 
     if (input.skipDiscussion) {
       // Skip L2 — treat all issues as unconfirmed
@@ -394,66 +560,21 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         summary: { totalDiscussions: 0, resolved: 0, escalated: 0 },
       };
     } else {
-      // Deduplicate discussions
-      const { deduplicated, mergedCount } = deduplicateDiscussions(thresholdResult.discussions);
-      logger.info(`Deduplicated discussions: ${mergedCount} merged`);
-
-      // Extract code snippets for discussions
-      const snippets = extractMultipleSnippets(
-        diffContent,
-        deduplicated.map((d) => ({
-          filePath: d.filePath,
-          lineRange: d.lineRange,
-        })),
-        config.discussion.codeSnippetRange
-      );
-
-      // Attach snippets to discussions
-      for (const discussion of deduplicated) {
-        const key = `${discussion.filePath}:${discussion.lineRange[0]}-${discussion.lineRange[1]}`;
-        const snippet = snippets.get(key);
-        if (snippet) {
-          discussion.codeSnippet = snippet.code;
-        } else {
-          logger.warn(`Failed to extract code snippet for ${key}`);
-          discussion.codeSnippet = `[Code snippet not available - file ${discussion.filePath} may not be in diff]`;
-        }
-      }
-
       // === L2 MODERATOR: Run Discussions ===
       progress?.stageStart('discuss', 'Moderating discussions...');
       const discussionEmitter = input.discussionEmitter ?? new DiscussionEmitter();
-      moderatorReport = await runModerator({
-        config: config.moderator,
-        supporterPoolConfig: config.supporters,
-        discussions: deduplicated,
-        settings: config.discussion,
+      moderatorReport = await executeL2Discussions(
+        config,
+        diffContent,
+        thresholdResult,
         date,
         sessionId,
-        emitter: discussionEmitter,
-      });
-
-      progress?.stageComplete('discuss', 'Discussions complete');
-
-      // === QUALITY TRACKING: Record L2 discussion results ===
-      qualityTracker.recordDiscussionResults(
-        deduplicated,
-        moderatorReport.discussions
+        discussionEmitter,
+        allEvidenceDocs,
+        qualityTracker,
+        logger,
       );
-
-      // Add unconfirmed and suggestions to report
-      moderatorReport.unconfirmedIssues = thresholdResult.unconfirmed;
-      moderatorReport.suggestions = thresholdResult.suggestions;
-
-      // === CONFIDENCE: Adjust confidence based on L2 discussion verdicts ===
-      for (const verdict of moderatorReport.discussions) {
-        const matchingDocs = allEvidenceDocs.filter(d =>
-          d.filePath === verdict.filePath && Math.abs(d.lineRange[0] - verdict.lineRange[0]) <= 5
-        );
-        for (const doc of matchingDocs) {
-          doc.confidence = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
-        }
-      }
+      progress?.stageComplete('discuss', 'Discussions complete');
     }
 
     // Write moderator report
@@ -489,60 +610,14 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       };
     }
 
-    // === L3 HEAD: Scan Unconfirmed Queue ===
-    const { promoted, dismissed: _dismissed } = scanUnconfirmedQueue(
-      moderatorReport.unconfirmedIssues
-    );
-
-    // Promoted unconfirmed issues count as escalated for Head verdict
-    if (promoted.length > 0) {
-      for (const doc of promoted) {
-        moderatorReport.discussions.push({
-          discussionId: `promoted-${doc.filePath}:${doc.lineRange[0]}`,
-          filePath: doc.filePath,
-          lineRange: doc.lineRange,
-          finalSeverity: doc.severity,
-          reasoning: `Promoted from unconfirmed queue: ${doc.issueTitle}`,
-          consensusReached: false,
-          rounds: 0,
-        });
-      }
-      moderatorReport.summary.escalated += promoted.length;
-      moderatorReport.summary.totalDiscussions += promoted.length;
-    }
-
     // === L3 HEAD: Final Verdict ===
     progress?.stageStart('verdict', 'Generating verdict...');
-    const headVerdict = await makeHeadVerdict(moderatorReport, config.head, config.mode, config.language);
+    const headVerdict = await executeL3Verdict(config, moderatorReport);
     await writeHeadVerdict(date, sessionId, headVerdict);
     progress?.stageComplete('verdict', 'Verdict complete');
 
     // === QUALITY TRACKING: Finalize rewards and persist bandit state ===
-    const rewards = qualityTracker.finalizeRewards();
-    if (rewards.size > 0) {
-      // Use shared BanditStore from L0 (avoids dual-instance data corruption)
-      let banditStoreInstance = getBanditStore();
-      if (!banditStoreInstance) {
-        // L0 not initialized (no auto reviewers) — create standalone instance
-        const { BanditStore } = await import('../l0/bandit-store.js');
-        banditStoreInstance = new BanditStore();
-        await banditStoreInstance.load();
-      }
-
-      for (const [, { modelId, provider, reward }] of rewards) {
-        banditStoreInstance.updateArm(`${provider}/${modelId}`, reward);
-      }
-
-      for (const record of qualityTracker.getRecords()) {
-        banditStoreInstance.addHistory(record);
-      }
-
-      await banditStoreInstance.save();
-      logger.info(
-        `Quality feedback: ${rewards.size} reviewers scored, ` +
-        `${[...rewards.values()].filter((r) => r.reward === 1).length} rewarded`
-      );
-    }
+    await recordTelemetry(qualityTracker, sessionId, logger);
 
     // Flush logs
     await logger.flush();
@@ -662,13 +737,9 @@ export function mergeReviewOutputsByReviewer(results: ReviewOutput[]): ReviewOut
 }
 
 /**
- * Generate performance report text from telemetry data.
- * Returns empty string if no telemetry records.
- */
-/**
  * Track devil's advocate effectiveness if enabled.
  */
-function trackDA(config: import('../types/config.js').Config, report: import('../types/core.js').ModeratorReport) {
+function trackDA(config: Config, report: ModeratorReport) {
   const da = config.supporters?.devilsAdvocate;
   if (!da?.enabled) return undefined;
   return trackDevilsAdvocate(da.id, report.roundsPerDiscussion, report.discussions);

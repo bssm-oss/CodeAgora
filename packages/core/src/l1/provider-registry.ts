@@ -25,6 +25,11 @@ import type { LanguageModel } from 'ai';
 /** A callable that returns a LanguageModel for a given model ID. */
 type ProviderInstance = (modelId: string) => LanguageModel;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toProviderInstance(provider: any): ProviderInstance {
+  return (modelId: string): LanguageModel => provider(modelId);
+}
+
 // ============================================================================
 // Provider Config
 // ============================================================================
@@ -36,170 +41,170 @@ type ProviderInstance = (modelId: string) => LanguageModel;
 const PROVIDER_FACTORIES = {
   'nvidia-nim': {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'nvidia-nim',
         baseURL: 'https://integrate.api.nvidia.com/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'NVIDIA_API_KEY',
   },
   groq: {
     create: (apiKey: string) =>
-      createGroq({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createGroq({ apiKey })),
     apiKeyEnvVar: 'GROQ_API_KEY',
   },
   openrouter: {
     create: (apiKey: string) =>
-      createOpenRouter({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createOpenRouter({ apiKey })),
     apiKeyEnvVar: 'OPENROUTER_API_KEY',
   },
   google: {
     create: (apiKey: string) =>
-      createGoogleGenerativeAI({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createGoogleGenerativeAI({ apiKey })),
     apiKeyEnvVar: 'GOOGLE_API_KEY',
   },
   mistral: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'mistral',
         baseURL: 'https://api.mistral.ai/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'MISTRAL_API_KEY',
   },
   cerebras: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'cerebras',
         baseURL: 'https://api.cerebras.ai/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'CEREBRAS_API_KEY',
   },
   together: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'together',
         baseURL: 'https://api.together.xyz/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'TOGETHER_API_KEY',
   },
   xai: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'xai',
         baseURL: 'https://api.x.ai/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'XAI_API_KEY',
   },
   openai: {
     create: (apiKey: string) =>
-      createOpenAI({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createOpenAI({ apiKey })),
     apiKeyEnvVar: 'OPENAI_API_KEY',
   },
   anthropic: {
     create: (apiKey: string) =>
-      createAnthropic({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createAnthropic({ apiKey })),
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
   },
   deepseek: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'deepseek',
         baseURL: 'https://api.deepseek.com/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'DEEPSEEK_API_KEY',
   },
   qwen: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'qwen',
         baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'QWEN_API_KEY',
   },
   zai: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'zai',
         baseURL: 'https://api.zai.chat/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'ZAI_API_KEY',
   },
   'github-models': {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'github-models',
         baseURL: 'https://models.inference.ai.azure.com',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'GITHUB_TOKEN',
   },
   'github-copilot': {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'github-copilot',
         baseURL: 'https://api.githubcopilot.com',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'GITHUB_COPILOT_TOKEN',
   },
   fireworks: {
     create: (apiKey: string) =>
-      createFireworks({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createFireworks({ apiKey })),
     apiKeyEnvVar: 'FIREWORKS_API_KEY',
   },
   cohere: {
     create: (apiKey: string) =>
-      createCohere({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createCohere({ apiKey })),
     apiKeyEnvVar: 'COHERE_API_KEY',
   },
   deepinfra: {
     create: (apiKey: string) =>
-      createDeepInfra({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createDeepInfra({ apiKey })),
     apiKeyEnvVar: 'DEEPINFRA_API_KEY',
   },
   moonshot: {
     create: (apiKey: string) =>
-      createMoonshotAI({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createMoonshotAI({ apiKey })),
     apiKeyEnvVar: 'MOONSHOT_API_KEY',
   },
   perplexity: {
     create: (apiKey: string) =>
-      createPerplexity({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createPerplexity({ apiKey })),
     apiKeyEnvVar: 'PERPLEXITY_API_KEY',
   },
   huggingface: {
     create: (apiKey: string) =>
-      createHuggingFace({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createHuggingFace({ apiKey })),
     apiKeyEnvVar: 'HUGGINGFACE_API_KEY',
   },
   baseten: {
     create: (apiKey: string) =>
-      createBaseten({ apiKey }) as unknown as ProviderInstance,
+      toProviderInstance(createBaseten({ apiKey })),
     apiKeyEnvVar: 'BASETEN_API_KEY',
   },
   siliconflow: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'siliconflow',
         baseURL: 'https://api.siliconflow.cn/v1',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'SILICONFLOW_API_KEY',
   },
   novita: {
     create: (apiKey: string) =>
-      createOpenAICompatible({
+      toProviderInstance(createOpenAICompatible({
         name: 'novita',
         baseURL: 'https://api.novita.ai/v3/openai',
         apiKey,
-      }) as unknown as ProviderInstance,
+      })),
     apiKeyEnvVar: 'NOVITA_API_KEY',
   },
 } as const;

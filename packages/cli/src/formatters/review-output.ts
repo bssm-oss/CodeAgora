@@ -457,6 +457,31 @@ export function formatJunit(result: PipelineResult): string {
 }
 
 // ============================================================================
+// Internal helpers
+// ============================================================================
+
+/**
+ * Map a topIssues entry to an EvidenceDocument for the annotated formatter.
+ * topIssues uses `title`; EvidenceDocument uses `issueTitle`.
+ */
+function toEvidenceDoc(issue: {
+  severity: string;
+  filePath: string;
+  lineRange: [number, number];
+  title: string;
+}): EvidenceDocument {
+  return {
+    issueTitle: issue.title,
+    problem: '',
+    evidence: [],
+    severity: issue.severity as EvidenceDocument['severity'],
+    suggestion: '',
+    filePath: issue.filePath,
+    lineRange: issue.lineRange,
+  };
+}
+
+// ============================================================================
 // Unified dispatcher
 // ============================================================================
 
@@ -483,9 +508,9 @@ export function formatOutput(
       return formatGithub(result);
     case 'annotated': {
       const diff = options?.diffContent ?? '';
-      // Use provided evidenceDocs; fall back to topIssues cast as EvidenceDocument[]
+      // Use provided evidenceDocs; fall back to topIssues mapped explicitly to EvidenceDocument[]
       const docs: EvidenceDocument[] = options?.evidenceDocs ??
-        (result.summary?.topIssues as unknown as EvidenceDocument[] ?? []);
+        (result.summary?.topIssues.map(toEvidenceDoc) ?? []);
       return formatAnnotated(diff, docs);
     }
     case 'html':

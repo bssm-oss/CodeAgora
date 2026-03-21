@@ -4,7 +4,7 @@
  * Similar to gh CLI (~/.config/gh/) and aws CLI (~/.aws/credentials).
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'fs';
+import { readFile, writeFile, mkdir, stat } from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
@@ -15,15 +15,18 @@ const CREDENTIALS_PATH = path.join(CONFIG_DIR, 'credentials');
  * Load all credentials from ~/.config/codeagora/credentials
  * and set them as environment variables (if not already set).
  */
-export function loadCredentials(): void {
-  if (!existsSync(CREDENTIALS_PATH)) return;
-
-  // Verify file permissions are 0o600 (owner read/write only)
-  if (!checkFilePermissions(CREDENTIALS_PATH, 0o600)) {
+export async function loadCredentials(): Promise<void> {
+  let content: string;
+  try {
+    // Verify file permissions are 0o600 (owner read/write only)
+    if (!(await checkFilePermissions(CREDENTIALS_PATH, 0o600))) {
+      return;
+    }
+    content = await readFile(CREDENTIALS_PATH, 'utf-8');
+  } catch {
     return;
   }
 
-  const content = readFileSync(CREDENTIALS_PATH, 'utf-8');
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -45,14 +48,17 @@ export function loadCredentials(): void {
  * Save a credential to ~/.config/codeagora/credentials.
  * Updates existing key or appends new one.
  */
-export function saveCredential(key: string, value: string): void {
-  mkdirSync(CONFIG_DIR, { recursive: true });
+export async function saveCredential(key: string, value: string): Promise<void> {
+  await mkdir(CONFIG_DIR, { recursive: true });
 
   const sanitized = value.replace(/[\r\n]/g, '');
   let lines: string[] = [];
 
-  if (existsSync(CREDENTIALS_PATH)) {
-    lines = readFileSync(CREDENTIALS_PATH, 'utf-8').split('\n');
+  try {
+    const existing = await readFile(CREDENTIALS_PATH, 'utf-8');
+    lines = existing.split('\n');
+  } catch {
+    // File doesn't exist yet — start with empty lines
   }
 
   const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
@@ -67,7 +73,7 @@ export function saveCredential(key: string, value: string): void {
     lines.pop();
   }
 
-  writeFileSync(CREDENTIALS_PATH, lines.join('\n') + '\n', { mode: 0o600 });
+  await writeFile(CREDENTIALS_PATH, lines.join('\n') + '\n', { mode: 0o600 });
 }
 
 /**
@@ -82,13 +88,13 @@ export function getCredentialsPath(): string {
  * On Windows this check is skipped (always returns true).
  * Warns and returns false if permissions are too loose.
  */
-export function checkFilePermissions(filePath: string, expectedMode: number): boolean {
+export async function checkFilePermissions(filePath: string, expectedMode: number): Promise<boolean> {
   // Skip permission checks on Windows (no Unix permission model)
   if (process.platform === 'win32') return true;
 
   try {
-    const stat = statSync(filePath);
-    const actualMode = stat.mode & 0o777;
+    const s = await stat(filePath);
+    const actualMode = s.mode & 0o777;
     if (actualMode !== expectedMode) {
       const actual = `0o${actualMode.toString(8)}`;
       const expected = `0o${expectedMode.toString(8)}`;

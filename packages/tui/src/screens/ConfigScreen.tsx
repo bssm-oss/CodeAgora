@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
-import fs from 'fs';
+import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { loadConfigFrom } from '@codeagora/core/config/loader.js';
@@ -106,13 +106,12 @@ export function ConfigScreen(): React.JSX.Element {
     setState(s => ({ ...s, config: newConfig }));
 
     const configPath = path.join(process.cwd(), '.ca', 'config.json');
-    try {
-      fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2), 'utf-8');
-      showToast(t('config.saved'), 'success');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      showToast(msg, 'error');
-    }
+    writeFile(configPath, JSON.stringify(newConfig, null, 2), 'utf-8')
+      .then(() => { showToast(t('config.saved'), 'success'); })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(msg, 'error');
+      });
   }, [showToast]);
 
   function openInEditor(): void {
@@ -192,14 +191,18 @@ export function ConfigScreen(): React.JSX.Element {
               onConfigChange={(newConfig) => {
                 // Preset applied — save to disk and reload
                 const configDir = path.join(process.cwd(), '.ca');
-                if (!fs.existsSync(configDir)) {
-                  fs.mkdirSync(configDir, { recursive: true });
-                }
                 const configPath = path.join(configDir, 'config.json');
-                fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2), 'utf-8');
-                setState({ config: newConfig, error: null, loading: false });
-                setActiveTab('reviewers');
-                showToast(t('config.saved'), 'success');
+                mkdir(configDir, { recursive: true })
+                  .then(() => writeFile(configPath, JSON.stringify(newConfig, null, 2), 'utf-8'))
+                  .then(() => {
+                    setState({ config: newConfig, error: null, loading: false });
+                    setActiveTab('reviewers');
+                    showToast(t('config.saved'), 'success');
+                  })
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    showToast(msg, 'error');
+                  });
               }}
             />
           </Box>

@@ -3,19 +3,19 @@
  * Issue #83: validate credentials file permissions (0o600)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { checkFilePermissions } from '@codeagora/core/config/credentials.js';
-import { statSync } from 'fs';
+import { stat } from 'fs/promises';
 
-vi.mock('fs', async () => {
-  const actual = await vi.importActual<typeof import('fs')>('fs');
+vi.mock('fs/promises', async () => {
+  const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
   return {
     ...actual,
-    statSync: vi.fn(),
+    stat: vi.fn(),
   };
 });
 
-const mockStatSync = vi.mocked(statSync);
+const mockStat = vi.mocked(stat);
 
 describe('checkFilePermissions', () => {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
@@ -27,37 +27,37 @@ describe('checkFilePermissions', () => {
     }
   });
 
-  it('returns true when permissions match expected mode', () => {
-    mockStatSync.mockReturnValue({ mode: 0o100600 } as ReturnType<typeof statSync>);
-    expect(checkFilePermissions('/path/to/creds', 0o600)).toBe(true);
+  it('returns true when permissions match expected mode', async () => {
+    mockStat.mockResolvedValue({ mode: 0o100600 } as ReturnType<typeof stat> extends Promise<infer T> ? T : never);
+    expect(await checkFilePermissions('/path/to/creds', 0o600)).toBe(true);
   });
 
-  it('returns false and warns when permissions are too loose', () => {
-    mockStatSync.mockReturnValue({ mode: 0o100644 } as ReturnType<typeof statSync>);
+  it('returns false and warns when permissions are too loose', async () => {
+    mockStat.mockResolvedValue({ mode: 0o100644 } as ReturnType<typeof stat> extends Promise<infer T> ? T : never);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    expect(checkFilePermissions('/path/to/creds', 0o600)).toBe(false);
+    expect(await checkFilePermissions('/path/to/creds', 0o600)).toBe(false);
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('permissions 0o644, expected 0o600')
     );
   });
 
-  it('returns false when file is world-readable', () => {
-    mockStatSync.mockReturnValue({ mode: 0o100666 } as ReturnType<typeof statSync>);
+  it('returns false when file is world-readable', async () => {
+    mockStat.mockResolvedValue({ mode: 0o100666 } as ReturnType<typeof stat> extends Promise<infer T> ? T : never);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    expect(checkFilePermissions('/path/to/creds', 0o600)).toBe(false);
+    expect(await checkFilePermissions('/path/to/creds', 0o600)).toBe(false);
   });
 
-  it('returns true on Windows (skip check)', () => {
+  it('returns true on Windows (skip check)', async () => {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    // statSync should NOT be called on Windows
-    expect(checkFilePermissions('/path/to/creds', 0o600)).toBe(true);
-    expect(mockStatSync).not.toHaveBeenCalled();
+    // stat should NOT be called on Windows
+    expect(await checkFilePermissions('/path/to/creds', 0o600)).toBe(true);
+    expect(mockStat).not.toHaveBeenCalled();
   });
 
-  it('returns true when stat throws (let caller handle)', () => {
-    mockStatSync.mockImplementation(() => { throw new Error('ENOENT'); });
-    expect(checkFilePermissions('/nonexistent', 0o600)).toBe(true);
+  it('returns true when stat throws (let caller handle)', async () => {
+    mockStat.mockRejectedValue(new Error('ENOENT'));
+    expect(await checkFilePermissions('/nonexistent', 0o600)).toBe(true);
   });
 });

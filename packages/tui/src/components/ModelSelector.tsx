@@ -6,9 +6,9 @@
  * - "provider/" prefix: filters to that provider (e.g. "groq/" shows only groq models)
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { colors, icons, getTerminalSize } from '../theme.js';
@@ -43,28 +43,10 @@ interface Props {
 }
 
 // ============================================================================
-// Data loading (cached)
+// Constants
 // ============================================================================
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-let _cachedModels: ModelEntry[] | null = null;
-
-function loadModelRankings(): ModelEntry[] {
-  if (_cachedModels) return _cachedModels;
-  try {
-    const raw = readFileSync(path.join(__dirname, '../../../shared/src/data/model-rankings.json'), 'utf-8');
-    const data = JSON.parse(raw) as { models?: ModelEntry[] };
-    _cachedModels = data.models ?? [];
-    return _cachedModels;
-  } catch {
-    return [];
-  }
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 const TIER_ORDER: Record<string, number> = {
   'S+': 0, S: 1, 'A+': 2, A: 3, 'A-': 4,
@@ -83,21 +65,32 @@ const TIER_COLORS: Record<string, string> = {
 export function ModelSelector({ source, provider: initialProvider, onSelect, onCancel }: Props): React.JSX.Element {
   const [search, setSearch] = useState(initialProvider ? `${initialProvider}/` : '');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [loadedModels, setLoadedModels] = useState<ModelEntry[]>([]);
 
   const { rows } = getTerminalSize();
   const visibleCount = Math.max(rows - 8, 8);
 
+  useEffect(() => {
+    readFile(path.join(__dirname, '../../../shared/src/data/model-rankings.json'), 'utf-8')
+      .then(raw => {
+        const data = JSON.parse(raw) as { models?: ModelEntry[] };
+        setLoadedModels(data.models ?? []);
+      })
+      .catch(() => {
+        setLoadedModels([]);
+      });
+  }, []);
+
   const allModels: ModelEntry[] = useMemo(() => {
-    const raw = loadModelRankings();
     const filtered = source && source !== 'all'
-      ? raw.filter(m => m.source === source)
-      : raw;
+      ? loadedModels.filter(m => m.source === source)
+      : loadedModels;
     return filtered.slice().sort((a, b) => {
       const ta = TIER_ORDER[a.tier] ?? 99;
       const tb = TIER_ORDER[b.tier] ?? 99;
       return ta - tb;
     });
-  }, [source]);
+  }, [source, loadedModels]);
 
   const filtered = useMemo(() => {
     if (!search) return allModels;
