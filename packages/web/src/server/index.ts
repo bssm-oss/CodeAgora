@@ -11,7 +11,14 @@ import { modelRoutes } from './routes/models.js';
 import { configRoutes } from './routes/config.js';
 import { costRoutes } from './routes/costs.js';
 import { healthRoutes } from './routes/health.js';
-import { corsMiddleware, errorHandler } from './middleware.js';
+import {
+  corsMiddleware,
+  errorHandler,
+  authMiddleware,
+  getAuthToken,
+  securityHeaders,
+  rateLimiter,
+} from './middleware.js';
 import { setupWebSocket } from './ws.js';
 
 // ============================================================================
@@ -34,8 +41,11 @@ export function createApp(): Hono {
   const app = new Hono();
 
   // Middleware
+  app.use('*', securityHeaders);
   app.use('*', corsMiddleware);
   app.use('*', errorHandler);
+  app.use('/api/*', rateLimiter);
+  app.use('/api/*', authMiddleware);
 
   // API routes
   app.route('/api/health', healthRoutes);
@@ -73,6 +83,7 @@ export function startServer(options: ServerOptions = {}): {
     { fetch: app.fetch, port, hostname },
     (info) => {
       console.log(`CodeAgora dashboard running at http://${hostname}:${info.port}`);
+      console.log(`Dashboard token: ${getAuthToken()}`);
     },
   );
 
