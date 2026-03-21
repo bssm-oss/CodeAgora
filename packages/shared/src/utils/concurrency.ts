@@ -26,7 +26,17 @@ export function pLimit(concurrency: number) {
   return <T>(fn: () => Promise<T>): Promise<T> => {
     return new Promise<T>((resolve, reject) => {
       const run = () => {
-        fn().then(
+        let p: Promise<T>;
+        try {
+          p = fn();
+        } catch (err) {
+          // fn threw synchronously — decrement active and drain the queue
+          active--;
+          reject(err);
+          next();
+          return;
+        }
+        p.then(
           (val) => {
             active--;
             resolve(val);
