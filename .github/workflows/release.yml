@@ -30,12 +30,28 @@ jobs:
       - name: Web package tests
         run: pnpm test:web
 
-      - name: Publish packages
+      # Smoke test: pack and verify CLI works
+      - name: Smoke test
         run: |
-          for pkg in shared core github notifications cli tui mcp web; do
+          npm pack
+          mkdir /tmp/smoke && cd /tmp/smoke
+          npm init -y
+          npm i $GITHUB_WORKSPACE/codeagora-*.tgz
+          npx agora --version
+          npx agora doctor || true
+
+      # Publish core package
+      - name: Publish codeagora
+        run: npm publish --access public || true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Publish optional packages
+      - name: Publish optional packages
+        run: |
+          for pkg in web tui mcp notifications; do
             cd packages/$pkg && npm publish --access public || true && cd ../..
           done
-          npm publish --access public || true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
