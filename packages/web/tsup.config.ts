@@ -34,6 +34,7 @@ export default defineConfig({
   external: [
     /^@ai-sdk\//,
     /^@openrouter\//,
+    /^@octokit\//,
     /^@hono\//,
     'ai',
     'zod',

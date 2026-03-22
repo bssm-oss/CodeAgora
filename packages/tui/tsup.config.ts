@@ -30,6 +30,7 @@ export default defineConfig({
   dts: false,
   clean: true,
   bundle: true,
+  splitting: false,
   noExternal: [/^@codeagora\/(core|shared)/],
   external: [
     /^@ai-sdk\//,

@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/notifications",
-  "version": "2.0.0",
+  "version": "2.0.0-rc.13",
   "description": "CodeAgora notification webhooks — Discord and Slack integration",
   "type": "module",
   "license": "MIT",
@@ -11,8 +11,18 @@
   },
   "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
   "keywords": ["codeagora", "notifications", "discord", "slack", "webhooks"],
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./webhook.js": {
+      "import": "./dist/webhook.js"
+    }
+  },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts"
@@ -23,7 +33,7 @@
     "test": "vitest run",
     "lint": "eslint src/"
   },
-  "dependencies": {
+  "devDependencies": {
     "@codeagora/core": "workspace:*",
     "@codeagora/shared": "workspace:*"
   }

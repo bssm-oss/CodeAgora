@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/web",
-  "version": "2.0.0",
+  "version": "2.0.0-rc.13",
   "description": "CodeAgora web dashboard — review history, analytics, and real-time monitoring",
   "type": "module",
   "license": "MIT",
@@ -11,14 +11,24 @@
   },
   "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
   "keywords": ["codeagora", "dashboard", "code-review", "web"],
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "files": [
     "dist/**/*.js",
-    "dist/**/*.d.ts"
+    "dist/**/*.d.ts",
+    "dist/frontend/**"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && vite build",
     "build:frontend": "vite build",
     "dev": "tsx src/server/index.ts",
     "dev:frontend": "vite",
@@ -26,8 +36,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@codeagora/core": "workspace:*",
-    "@codeagora/shared": "workspace:*",
     "@hono/node-server": "^1.14.0",
     "@hono/node-ws": "^1.1.0",
     "hono": "^4.7.0"
@@ -38,6 +46,8 @@
     "react-router-dom": ">=6.0.0"
   },
   "devDependencies": {
+    "@codeagora/core": "workspace:*",
+    "@codeagora/shared": "workspace:*",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

@@ -21,15 +21,11 @@
     "ai",
     "static-analysis"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "files": [
-    "packages/shared/dist/**/*.js",
-    "packages/shared/dist/**/*.d.ts",
-    "packages/core/dist/**/*.js",
-    "packages/core/dist/**/*.d.ts",
     "packages/cli/dist/**/*.js",
-    "packages/cli/dist/**/*.d.ts",
-    "packages/github/dist/**/*.js",
-    "packages/github/dist/**/*.d.ts",
     "packages/shared/src/data/**",
     "scripts/postinstall.cjs",
     "README.md",

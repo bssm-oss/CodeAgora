@@ -27,9 +27,10 @@ function workspaceResolver(): Plugin {
 export default defineConfig({
   entry: ['src/index.ts', 'src/webhook.ts'],
   format: ['esm'],
-  dts: true,
+  dts: false,
   clean: true,
   bundle: true,
+  splitting: false,
   noExternal: [/^@codeagora\/(core|shared)/],
   external: [
     'zod',
