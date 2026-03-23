@@ -49,10 +49,6 @@ runs:
       shell: bash
       run: pnpm install --frozen-lockfile
 
-    - name: Build
-      shell: bash
-      run: pnpm build
-
     - name: Fetch PR diff
       shell: bash
       run: |
@@ -68,7 +64,7 @@ runs:
       id: review
       shell: bash
       run: |
-        node packages/github/dist/action.js \
+        npx tsx packages/github/src/action.ts \
           --diff /tmp/codeagora-pr.diff \
           --pr "$PR_NUMBER" \
           --sha "$HEAD_SHA" \

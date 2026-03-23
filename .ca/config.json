@@ -1,0 +1,117 @@
+{
+  "mode": "pragmatic",
+  "language": "en",
+  "reviewers": [
+    {
+      "id": "r-scout",
+      "label": "Llama 4 Scout",
+      "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "backend": "api",
+      "provider": "groq",
+      "enabled": true,
+      "timeout": 120
+    },
+    {
+      "id": "r-gpt-oss",
+      "label": "GPT-OSS 20B",
+      "model": "openai/gpt-oss-20b",
+      "backend": "api",
+      "provider": "groq",
+      "enabled": true,
+      "timeout": 120
+    },
+    {
+      "id": "r-qwen3",
+      "label": "Qwen3 32B",
+      "model": "qwen/qwen3-32b",
+      "backend": "api",
+      "provider": "groq",
+      "enabled": true,
+      "timeout": 120
+    },
+    {
+      "id": "r-deepseek",
+      "label": "DeepSeek R1 Distill 70B",
+      "model": "deepseek-r1-distill-llama-70b",
+      "backend": "api",
+      "provider": "groq",
+      "enabled": true,
+      "timeout": 180
+    },
+    {
+      "id": "r-llama31",
+      "label": "Llama 3.1 8B",
+      "model": "llama-3.1-8b-instant",
+      "backend": "api",
+      "provider": "groq",
+      "enabled": true,
+      "timeout": 120
+    }
+  ],
+  "supporters": {
+    "pool": [
+      {
+        "id": "s-gpt-oss-120b",
+        "label": "GPT-OSS 120B",
+        "model": "openai/gpt-oss-120b",
+        "backend": "api",
+        "provider": "groq",
+        "enabled": true,
+        "timeout": 180
+      },
+      {
+        "id": "s-qwen3",
+        "label": "Qwen3 32B",
+        "model": "qwen/qwen3-32b",
+        "backend": "api",
+        "provider": "groq",
+        "enabled": true,
+        "timeout": 120
+      }
+    ],
+    "pickCount": 2,
+    "pickStrategy": "random",
+    "devilsAdvocate": {
+      "id": "da-kimi",
+      "label": "Kimi K2 (Devil's Advocate)",
+      "model": "moonshotai/kimi-k2-instruct",
+      "backend": "api",
+      "provider": "groq",
+      "enabled": true,
+      "timeout": 180,
+      "persona": "Extremely skeptical senior engineer who challenges every assumption and actively looks for false positives"
+    },
+    "personaPool": [".ca/personas/strict.md", ".ca/personas/pragmatic.md"],
+    "personaAssignment": "random"
+  },
+  "moderator": {
+    "model": "openai/gpt-oss-120b",
+    "backend": "api",
+    "provider": "groq"
+  },
+  "head": {
+    "model": "moonshotai/kimi-k2-instruct",
+    "backend": "api",
+    "provider": "groq",
+    "enabled": true
+  },
+  "discussion": {
+    "maxRounds": 4,
+    "registrationThreshold": {
+      "HARSHLY_CRITICAL": 1,
+      "CRITICAL": 1,
+      "WARNING": 2,
+      "SUGGESTION": null
+    },
+    "codeSnippetRange": 10
+  },
+  "errorHandling": {
+    "maxRetries": 2,
+    "forfeitThreshold": 0.7
+  },
+  "autoApprove": {
+    "enabled": false,
+    "maxLines": 5,
+    "allowedFilePatterns": ["*.md", "*.txt", "docs/**"]
+  }
+}
