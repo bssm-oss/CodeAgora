@@ -45,6 +45,7 @@ async function runReviewWithDiff(
       evidenceDocs: result.evidenceDocs ?? [],
       discussions: result.discussions,
       reviewerMap: result.reviewerMap,
+      reviewerOpinions: result.reviewerOpinions,
       sessionId: `${result.date}/${result.sessionId}`,
     });
   } finally {

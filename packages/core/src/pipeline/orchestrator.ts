@@ -102,6 +102,12 @@ export interface PipelineResult {
   devilsAdvocateStats?: import('../l2/devils-advocate-tracker.js').DevilsAdvocateStats;
   /** Maps "filePath:startLine" → reviewer IDs that flagged the issue */
   reviewerMap?: Record<string, string[]>;
+  /** Maps "filePath:startLine" → per-reviewer opinions preserving individual L1 findings */
+  reviewerOpinions?: Record<string, import('../types/core.js').ReviewerOpinion[]>;
+  /** Devil's Advocate supporter ID (for display annotation) */
+  devilsAdvocateId?: string;
+  /** Maps supporterId → model name (for display in discussion tables) */
+  supporterModelMap?: Record<string, string>;
   /** True when the result was served from cache (#109) */
   cached?: boolean;
 }
@@ -607,6 +613,9 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         performanceText: await generatePerformanceText(telemetry),
         diffComplexity,
         reviewerMap: buildReviewerMap(allReviewResults),
+        reviewerOpinions: buildReviewerOpinions(allReviewResults),
+        devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
+        supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
       };
     }
 
@@ -665,6 +674,9 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       diffComplexity,
       devilsAdvocateStats: trackDA(config, moderatorReport),
       reviewerMap: buildReviewerMap(allReviewResults),
+      reviewerOpinions: buildReviewerOpinions(allReviewResults),
+      devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
+      supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
     };
 
     // === CACHE: Persist result and update cache index (#109) ===
@@ -711,6 +723,44 @@ function buildReviewerMap(results: ReviewOutput[]): Record<string, string[]> {
         map[key].push(r.reviewerId);
       }
     }
+  }
+  return map;
+}
+
+/**
+ * Build a map of "filePath:startLine" → per-reviewer opinions.
+ * Preserves each reviewer's individual problem/evidence/suggestion/severity.
+ */
+function buildReviewerOpinions(results: ReviewOutput[]): Record<string, import('../types/core.js').ReviewerOpinion[]> {
+  const map: Record<string, import('../types/core.js').ReviewerOpinion[]> = {};
+  for (const r of results) {
+    if (r.status !== 'success') continue;
+    for (const doc of r.evidenceDocs) {
+      const key = `${doc.filePath}:${doc.lineRange[0]}`;
+      if (!map[key]) map[key] = [];
+      map[key].push({
+        reviewerId: r.reviewerId,
+        model: r.model,
+        severity: doc.severity,
+        problem: doc.problem,
+        evidence: doc.evidence,
+        suggestion: doc.suggestion,
+      });
+    }
+  }
+  return map;
+}
+
+/**
+ * Build supporterId → model map from supporter pool config.
+ */
+function buildSupporterModelMap(supporters: import('../types/config.js').SupporterPoolConfig): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const s of supporters.pool) {
+    map[s.id] = s.model;
+  }
+  if (supporters.devilsAdvocate?.enabled) {
+    map[supporters.devilsAdvocate.id] = supporters.devilsAdvocate.model;
   }
   return map;
 }

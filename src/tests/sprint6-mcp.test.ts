@@ -137,6 +137,34 @@ describe('formatCompact', () => {
 
     expect(result.issues[0].confidence).toBe(50);
   });
+
+  it('includes reviewerOpinions per issue when provided', () => {
+    const result = formatCompact({
+      decision: 'REJECT',
+      reasoning: 'Issues found',
+      evidenceDocs: [makeDoc()],
+      reviewerOpinions: {
+        'src/test.ts:42': [
+          { reviewerId: 'gpt-4o', model: 'gpt-4o', severity: 'CRITICAL', problem: 'Null crash', evidence: ['line 42'], suggestion: 'Add check' },
+          { reviewerId: 'claude', model: 'claude-sonnet', severity: 'WARNING', problem: 'Maybe null', evidence: [], suggestion: 'Consider guard' },
+        ],
+      },
+    });
+
+    expect(result.issues[0].opinions).toHaveLength(2);
+    expect(result.issues[0].opinions![0].reviewerId).toBe('gpt-4o');
+    expect(result.issues[0].opinions![1].reviewerId).toBe('claude');
+  });
+
+  it('omits opinions field when reviewerOpinions not provided', () => {
+    const result = formatCompact({
+      decision: 'REJECT',
+      reasoning: 'Issues found',
+      evidenceDocs: [makeDoc()],
+    });
+
+    expect(result.issues[0].opinions).toBeUndefined();
+  });
 });
 
 // ============================================================================

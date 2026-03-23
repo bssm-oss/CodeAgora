@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Multi-LLM code review pipeline — parallel reviewers, structured debate, consensus verdict",
   "license": "MIT",
+  "packageManager": "pnpm@10.30.3",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bssm-oss/CodeAgora.git"

@@ -9,7 +9,7 @@ import {
   buildSummaryBody,
   buildReviewBadgeUrl,
 } from '../mapper.js';
-import type { EvidenceDocument, DiscussionVerdict } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, ReviewerOpinion, DiscussionRound } from '@codeagora/core/types/core.js';
 import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
 
 // ============================================================================
@@ -156,6 +156,140 @@ describe('mapToInlineCommentBody', () => {
     const body = mapToInlineCommentBody(doc);
     // getConfidenceBadge returns non-empty string for high confidence
     expect(body).toContain('Confidence');
+  });
+
+  // === Reviewer Opinions (L1 individual findings) ===
+
+  it('renders collapsed reviewer opinions section when multiple opinions provided', () => {
+    const opinions: ReviewerOpinion[] = [
+      {
+        reviewerId: 'gpt-4o',
+        model: 'gpt-4o',
+        severity: 'CRITICAL',
+        problem: 'Null pointer crash on empty input',
+        evidence: ['Line 42 has no guard'],
+        suggestion: 'Add null check',
+      },
+      {
+        reviewerId: 'claude-sonnet',
+        model: 'claude-sonnet-4-20250514',
+        severity: 'WARNING',
+        problem: 'Possible null issue, low risk',
+        evidence: ['Line 42 might be null'],
+        suggestion: 'Consider adding guard clause',
+      },
+    ];
+    const body = mapToInlineCommentBody(makeDoc(), undefined, undefined, undefined, undefined, opinions);
+    expect(body).toContain('Individual Reviews (2 reviewers)');
+    expect(body).toContain('gpt-4o');
+    expect(body).toContain('claude-sonnet');
+    expect(body).toContain('Null pointer crash on empty input');
+    expect(body).toContain('Possible null issue, low risk');
+    expect(body).toContain('<details>');
+  });
+
+  it('omits reviewer opinions section when only one opinion', () => {
+    const opinions: ReviewerOpinion[] = [
+      {
+        reviewerId: 'gpt-4o',
+        model: 'gpt-4o',
+        severity: 'CRITICAL',
+        problem: 'Null pointer crash',
+        evidence: [],
+        suggestion: '',
+      },
+    ];
+    const body = mapToInlineCommentBody(makeDoc(), undefined, undefined, undefined, undefined, opinions);
+    expect(body).not.toContain('Individual Reviews');
+  });
+
+  it('includes evidence and suggestion in each opinion', () => {
+    const opinions: ReviewerOpinion[] = [
+      {
+        reviewerId: 'reviewer-a',
+        model: 'model-a',
+        severity: 'CRITICAL',
+        problem: 'Problem A',
+        evidence: ['Evidence line 1', 'Evidence line 2'],
+        suggestion: 'Fix it this way',
+      },
+      {
+        reviewerId: 'reviewer-b',
+        model: 'model-b',
+        severity: 'WARNING',
+        problem: 'Problem B',
+        evidence: ['Evidence B'],
+        suggestion: 'Alternative fix',
+      },
+    ];
+    const body = mapToInlineCommentBody(makeDoc(), undefined, undefined, undefined, undefined, opinions);
+    expect(body).toContain('Evidence line 1');
+    expect(body).toContain('Evidence line 2');
+    expect(body).toContain('Fix it this way');
+    expect(body).toContain('Alternative fix');
+  });
+
+  it('shows model name and DA icon in discussion round table', () => {
+    const discussion = makeVerdict();
+    const rounds: DiscussionRound[] = [{
+      round: 1,
+      moderatorPrompt: 'Discuss this issue.',
+      supporterResponses: [
+        { supporterId: 'supporter-1', response: 'Looks correct, agree.', stance: 'agree' },
+        { supporterId: 'devil-adv', response: 'False positive, disagree.', stance: 'disagree' },
+      ],
+    }];
+    const supporterModelMap = new Map([
+      ['supporter-1', 'gpt-4o'],
+      ['devil-adv', 'claude-sonnet-4-20250514'],
+    ]);
+    const body = mapToInlineCommentBody(
+      makeDoc(), discussion, undefined, undefined, rounds, undefined, 'devil-adv', supporterModelMap,
+    );
+    // DA gets 😈 icon
+    expect(body).toContain('\u{1F608} claude-sonnet-4-20250514');
+    // Regular supporter shows model name without icon
+    expect(body).toContain('gpt-4o');
+    expect(body).not.toContain('supporter-1');
+    expect(body).not.toContain('devil-adv');
+  });
+
+  it('falls back to supporterId when no model map provided', () => {
+    const discussion = makeVerdict();
+    const rounds: DiscussionRound[] = [{
+      round: 1,
+      moderatorPrompt: 'Discuss.',
+      supporterResponses: [
+        { supporterId: 'supporter-1', response: 'Agree.', stance: 'agree' },
+      ],
+    }];
+    const body = mapToInlineCommentBody(makeDoc(), discussion, undefined, undefined, rounds);
+    expect(body).toContain('supporter-1');
+  });
+
+  it('shows severity badge per reviewer opinion', () => {
+    const opinions: ReviewerOpinion[] = [
+      {
+        reviewerId: 'r1',
+        model: 'm1',
+        severity: 'CRITICAL',
+        problem: 'P1',
+        evidence: [],
+        suggestion: '',
+      },
+      {
+        reviewerId: 'r2',
+        model: 'm2',
+        severity: 'WARNING',
+        problem: 'P2',
+        evidence: [],
+        suggestion: '',
+      },
+    ];
+    const body = mapToInlineCommentBody(makeDoc(), undefined, undefined, undefined, undefined, opinions);
+    // CRITICAL badge (🔴) and WARNING badge (🟡)
+    expect(body).toContain('\u{1F534}');
+    expect(body).toContain('\u{1F7E1}');
   });
 });
 

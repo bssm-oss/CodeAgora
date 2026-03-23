@@ -67,6 +67,19 @@ export interface ReviewOutput {
   chunkIndex?: number; // Set when diff is split into multiple chunks
 }
 
+/**
+ * Per-reviewer opinion for a specific code location.
+ * Preserves individual L1 reviewer findings before they are merged into EvidenceDocuments.
+ */
+export interface ReviewerOpinion {
+  reviewerId: string;
+  model: string;
+  severity: string;
+  problem: string;
+  evidence: string[];
+  suggestion: string;
+}
+
 // ============================================================================
 // Discussion (L2)
 // ============================================================================

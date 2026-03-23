@@ -3,7 +3,7 @@
  * Maps CodeAgora domain types → GitHub API review shapes.
  */
 
-import type { EvidenceDocument, DiscussionVerdict, DiscussionRound } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion } from '@codeagora/core/types/core.js';
 import { SEVERITY_ORDER } from '@codeagora/core/types/core.js';
 import type { GitHubReview, GitHubReviewComment, DiffPositionIndex } from './types.js';
 import { resolveLineRange } from './diff-parser.js';
@@ -59,6 +59,12 @@ export function mapToInlineCommentBody(
   options?: MapperOptions,
   /** Per-round debate data for this discussion (1.2) */
   rounds?: DiscussionRound[],
+  /** Per-reviewer individual opinions for this location */
+  opinions?: ReviewerOpinion[],
+  /** Devil's Advocate supporter ID for annotation */
+  devilsAdvocateId?: string,
+  /** Maps supporterId → model name */
+  supporterModelMap?: Map<string, string>,
 ): string {
   const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\u26AA', label: doc.severity };
   const lines: string[] = [];
@@ -93,6 +99,33 @@ export function mapToInlineCommentBody(
     }
   }
 
+  // Individual reviewer opinions (L1)
+  if (opinions && opinions.length > 1) {
+    const severityBadge = (sev: string) => SEVERITY_BADGE[sev]?.emoji ?? '\u26AA';
+    lines.push('');
+    lines.push('<details>');
+    lines.push(`<summary>\u{1F50D} Individual Reviews (${opinions.length} reviewers)</summary>`);
+    lines.push('');
+    for (const op of opinions) {
+      lines.push(`**${op.reviewerId}** \u{1F4AC} \`${op.model}\` (${severityBadge(op.severity)} ${op.severity})`);
+      lines.push('');
+      lines.push(`> **Problem:** ${truncateResponse(op.problem, 200)}`);
+      if (op.evidence.length > 0) {
+        lines.push('>');
+        lines.push(`> **Evidence:**`);
+        for (const e of op.evidence) {
+          lines.push(`> - ${truncateResponse(e, 150)}`);
+        }
+      }
+      if (op.suggestion) {
+        lines.push('>');
+        lines.push(`> **Suggestion:** ${truncateResponse(op.suggestion, 200)}`);
+      }
+      lines.push('');
+    }
+    lines.push('</details>');
+  }
+
   if (discussion) {
     const consensusIcon = discussion.consensusReached ? '\u2705' : '\u26A0\uFE0F';
     const consensusText = discussion.consensusReached ? 'consensus' : 'forced decision';
@@ -114,7 +147,10 @@ export function mapToInlineCommentBody(
           for (const resp of round.supporterResponses) {
             const stanceIcon = resp.stance === 'agree' ? '\u2705' : resp.stance === 'disagree' ? '\u274C' : '\u2796';
             const summary = truncateResponse(resp.response, 100);
-            lines.push(`| ${resp.supporterId} | ${stanceIcon} ${resp.stance.toUpperCase()} | ${summary} |`);
+            const isDA = devilsAdvocateId && resp.supporterId === devilsAdvocateId;
+            const displayName = supporterModelMap?.get(resp.supporterId) ?? resp.supporterId;
+            const nameLabel = isDA ? `\u{1F608} ${displayName}` : displayName;
+            lines.push(`| ${nameLabel} | ${stanceIcon} ${resp.stance.toUpperCase()} | ${summary} |`);
           }
           lines.push('');
         }
@@ -160,6 +196,12 @@ export function buildReviewComments(
   roundsPerDiscussion?: Record<string, DiscussionRound[]>,
   /** Minimum confidence threshold for inline comments (1.6) */
   minConfidence?: number,
+  /** Per-location reviewer opinions for individual L1 findings */
+  reviewerOpinions?: Map<string, ReviewerOpinion[]>,
+  /** Devil's Advocate supporter ID for annotation */
+  devilsAdvocateId?: string,
+  /** Maps supporterId → model name */
+  supporterModelMap?: Map<string, string>,
 ): GitHubReviewComment[] {
   // Build discussion lookup by filePath:startLine for exact matching
   const discussionByLocation = new Map<string, DiscussionVerdict>();
@@ -187,7 +229,8 @@ export function buildReviewComments(
     const discussionRounds = matchingDiscussion
       ? roundsPerDiscussion?.[matchingDiscussion.discussionId]
       : undefined;
-    let body = mapToInlineCommentBody(doc, matchingDiscussion, reviewerIds, options, discussionRounds);
+    const opinions = reviewerOpinions?.get(locationKey);
+    let body = mapToInlineCommentBody(doc, matchingDiscussion, reviewerIds, options, discussionRounds, opinions, devilsAdvocateId, supporterModelMap);
 
     if (position !== null) {
       comments.push({
@@ -231,6 +274,10 @@ export function buildSummaryBody(params: {
   roundsPerDiscussion?: Record<string, DiscussionRound[]>;
   /** Suppressed issues for transparency (1.5) */
   suppressedIssues?: Array<{ filePath: string; lineRange: [number, number]; issueTitle: string; dismissCount?: number }>;
+  /** Devil's Advocate supporter ID for annotation */
+  devilsAdvocateId?: string;
+  /** Maps supporterId → model name */
+  supporterModelMap?: Map<string, string>;
 }): string {
   const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = params;
   const lines: string[] = [];
@@ -364,7 +411,10 @@ export function buildSummaryBody(params: {
           for (const resp of round.supporterResponses) {
             const stanceIcon = resp.stance === 'agree' ? '\u2705' : resp.stance === 'disagree' ? '\u274C' : '\u2796';
             const summary = truncateResponse(resp.response, 80);
-            lines.push(`| ${resp.supporterId} | ${stanceIcon} ${resp.stance.toUpperCase()} | ${summary} |`);
+            const isDA = params.devilsAdvocateId && resp.supporterId === params.devilsAdvocateId;
+            const displayName = params.supporterModelMap?.get(resp.supporterId) ?? resp.supporterId;
+            const nameLabel = isDA ? `\u{1F608} ${displayName}` : displayName;
+            lines.push(`| ${nameLabel} | ${stanceIcon} ${resp.stance.toUpperCase()} | ${summary} |`);
           }
           lines.push('');
         }
@@ -460,8 +510,14 @@ export function mapToGitHubReview(params: {
   suppressedIssues?: Array<{ filePath: string; lineRange: [number, number]; issueTitle: string; dismissCount?: number }>;
   /** Minimum confidence for inline comments (1.6) */
   minConfidence?: number;
+  /** Per-location reviewer opinions for individual L1 findings */
+  reviewerOpinions?: Map<string, ReviewerOpinion[]>;
+  /** Devil's Advocate supporter ID for annotation */
+  devilsAdvocateId?: string;
+  /** Maps supporterId → model name */
+  supporterModelMap?: Map<string, string>;
 }): GitHubReview {
-  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence } =
+  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap } =
     params;
 
   // Filter out dismissed docs — exact match by file + line
@@ -474,8 +530,8 @@ export function mapToGitHubReview(params: {
     (doc) => !dismissedLocations.has(`${doc.filePath}:${doc.lineRange[0]}`),
   );
 
-  const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence);
-  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues });
+  const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap);
+  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap });
 
   // Determine event: REQUEST_CHANGES if any CRITICAL/HARSHLY_CRITICAL remains
   const hasBlocking = activeDocs.some(

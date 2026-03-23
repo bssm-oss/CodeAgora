@@ -20,11 +20,44 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run CodeAgora review
-        uses: ./
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Fetch PR diff
+        run: |
+          gh pr diff "$PR_NUMBER" \
+            --repo "$REPO" \
+            > /tmp/codeagora-pr.diff
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+
+      - name: Run CodeAgora review
+        run: |
+          node packages/github/dist/action.js \
+            --diff /tmp/codeagora-pr.diff \
+            --pr "$PR_NUMBER" \
+            --sha "$HEAD_SHA" \
+            --repo "$REPO" \
+            --fail-on-reject true \
+            --max-diff-lines 5000
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}

@@ -42,9 +42,16 @@ runs:
       with:
         node-version: '20'
 
-    - name: Install CodeAgora
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Install dependencies
       shell: bash
-      run: npm install -g codeagora
+      run: pnpm install --frozen-lockfile
+
+    - name: Build
+      shell: bash
+      run: pnpm build
 
     - name: Fetch PR diff
       shell: bash
@@ -61,7 +68,7 @@ runs:
       id: review
       shell: bash
       run: |
-        node "$(dirname $(which codeagora))/../packages/github/dist/action.js" \
+        node packages/github/dist/action.js \
           --diff /tmp/codeagora-pr.diff \
           --pr "$PR_NUMBER" \
           --sha "$HEAD_SHA" \

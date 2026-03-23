@@ -4,7 +4,16 @@
  * Strips verbose text, keeps only structured data.
  */
 
-import type { EvidenceDocument, DiscussionVerdict } from '../types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, ReviewerOpinion } from '../types/core.js';
+
+export interface CompactReviewerOpinion {
+  reviewerId: string;
+  model: string;
+  severity: string;
+  problem: string;
+  evidence: string[];
+  suggestion: string;
+}
 
 export interface CompactIssue {
   severity: string;
@@ -13,6 +22,7 @@ export interface CompactIssue {
   title: string;
   confidence: number;
   flaggedBy?: string[];
+  opinions?: CompactReviewerOpinion[];
 }
 
 export interface CompactReviewResult {
@@ -33,10 +43,11 @@ export function formatCompact(params: {
   evidenceDocs: EvidenceDocument[];
   discussions?: DiscussionVerdict[];
   reviewerMap?: Record<string, string[]>;
+  reviewerOpinions?: Record<string, ReviewerOpinion[]>;
   cost?: string;
   sessionId?: string;
 }): CompactReviewResult {
-  const { decision, reasoning, evidenceDocs, discussions, reviewerMap, cost, sessionId } = params;
+  const { decision, reasoning, evidenceDocs, discussions, reviewerMap, reviewerOpinions, cost, sessionId } = params;
 
   // Filter out dismissed issues
   const dismissedLocations = new Set(
@@ -61,6 +72,10 @@ export function formatCompact(params: {
     const flaggers = reviewerMap?.[key];
     if (flaggers && flaggers.length > 0) {
       issue.flaggedBy = flaggers;
+    }
+    const ops = reviewerOpinions?.[key];
+    if (ops && ops.length > 0) {
+      issue.opinions = ops;
     }
     return issue;
   });

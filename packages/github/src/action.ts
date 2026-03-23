@@ -107,6 +107,9 @@ async function main(): Promise<void> {
   const evidenceDocs = result.evidenceDocs ?? [];
   const discussions = result.discussions ?? [];
   const reviewerMap = result.reviewerMap ? new Map(Object.entries(result.reviewerMap)) : undefined;
+  const reviewerOpinions = result.reviewerOpinions
+    ? new Map(Object.entries(result.reviewerOpinions))
+    : undefined;
 
   // Build and post review
   const ghConfig = { token: inputs.token, owner, repo };
@@ -121,6 +124,11 @@ async function main(): Promise<void> {
     sessionId: result.sessionId,
     sessionDate: result.date,
     reviewerMap,
+    reviewerOpinions,
+    devilsAdvocateId: result.devilsAdvocateId,
+    supporterModelMap: result.supporterModelMap
+      ? new Map(Object.entries(result.supporterModelMap))
+      : undefined,
   });
 
   const postResult = await postReview(ghConfig, inputs.pr, review);

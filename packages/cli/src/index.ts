@@ -343,6 +343,9 @@ program
         const ghConfig = { token: process.env['GITHUB_TOKEN'] ?? '', owner: prContext.owner, repo: prContext.repo };
         const positionIndex = buildDiffPositionIndex(prContext.diff);
         const cliReviewerMap = result.reviewerMap ? new Map(Object.entries(result.reviewerMap)) : undefined;
+        const cliReviewerOpinions = result.reviewerOpinions
+          ? new Map(Object.entries(result.reviewerOpinions))
+          : undefined;
         const review = mapToGitHubReview({
           summary: result.summary,
           evidenceDocs: result.evidenceDocs ?? [],
@@ -352,6 +355,11 @@ program
           sessionId: result.sessionId,
           sessionDate: result.date,
           reviewerMap: cliReviewerMap,
+          reviewerOpinions: cliReviewerOpinions,
+          devilsAdvocateId: result.devilsAdvocateId,
+          supporterModelMap: result.supporterModelMap
+            ? new Map(Object.entries(result.supporterModelMap))
+            : undefined,
         });
         const postResult = await postReview(ghConfig, prContext.prNumber, review);
         await setCommitStatus(ghConfig, prContext.headSha, postResult.verdict, postResult.reviewUrl);
