@@ -1,110 +1,13 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import type { Config } from '@codeagora/core/types/config.js';
+import { STATIC_PRESETS, buildPresetConfig } from '@codeagora/core/config/presets.js';
+import type { PresetConfig } from '@codeagora/core/config/presets.js';
 import { Panel } from '../../components/Panel.js';
 import { ScrollableList } from '../../components/ScrollableList.js';
 import { colors, icons, getTerminalSize } from '../../theme.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { getMissingProviders, isProviderAvailable } from '../../utils/provider-status.js';
-
-// ============================================================================
-// Preset Definitions
-// ============================================================================
-
-interface PresetDef {
-  name: string;
-  description: string;
-  reviewerCount: number;
-  providers: string[];
-  build: () => Partial<Config>;
-}
-
-// Shared defaults every preset must include
-const PRESET_DEFAULTS = {
-  moderator: { model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', timeout: 120 },
-  discussion: {
-    maxRounds: 3,
-    registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },
-    codeSnippetRange: 10,
-    objectionTimeout: 60,
-    maxObjectionRounds: 1,
-  },
-  errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
-  head: { backend: 'api' as const, model: 'llama-3.3-70b-versatile', provider: 'groq', timeout: 120, enabled: true },
-};
-
-const PRESETS: PresetDef[] = [
-  {
-    name: 'Quick Setup',
-    description: '3 Groq reviewers + 1 supporter',
-    reviewerCount: 3,
-    providers: ['groq'],
-    build: () => ({
-      reviewers: [
-        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        { id: 'r2', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        { id: 'r3', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-      ],
-      supporters: {
-        pool: [
-          { id: 's1', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        ],
-        pickCount: 1,
-        pickStrategy: 'random' as const,
-        devilsAdvocate: { id: 'da', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        personaPool: ['.ca/personas/strict.md'],
-        personaAssignment: 'random' as const,
-      },
-      ...PRESET_DEFAULTS,
-    }),
-  },
-  {
-    name: 'Diversity',
-    description: 'Groq + Google + Mistral mix',
-    reviewerCount: 3,
-    providers: ['groq', 'google', 'mistral'],
-    build: () => ({
-      reviewers: [
-        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        { id: 'r2', model: 'gemini-2.0-flash', backend: 'api' as const, provider: 'google', enabled: true, timeout: 120 },
-        { id: 'r3', model: 'mistral-large-latest', backend: 'api' as const, provider: 'mistral', enabled: true, timeout: 120 },
-      ],
-      supporters: {
-        pool: [
-          { id: 's1', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        ],
-        pickCount: 1,
-        pickStrategy: 'random' as const,
-        devilsAdvocate: { id: 'da', model: 'mistral-large-latest', backend: 'api' as const, provider: 'mistral', enabled: true, timeout: 120 },
-        personaPool: ['.ca/personas/strict.md'],
-        personaAssignment: 'random' as const,
-      },
-      ...PRESET_DEFAULTS,
-    }),
-  },
-  {
-    name: 'Minimal',
-    description: '1 reviewer + 1 supporter',
-    reviewerCount: 1,
-    providers: ['groq'],
-    build: () => ({
-      reviewers: [
-        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-      ],
-      supporters: {
-        pool: [
-          { id: 's1', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        ],
-        pickCount: 1,
-        pickStrategy: 'random' as const,
-        devilsAdvocate: { id: 'da', model: 'llama-3.3-70b-versatile', backend: 'api' as const, provider: 'groq', enabled: true, timeout: 120 },
-        personaPool: ['.ca/personas/strict.md'],
-        personaAssignment: 'random' as const,
-      },
-      ...PRESET_DEFAULTS,
-    }),
-  },
-];
 
 // ============================================================================
 // Component
@@ -121,10 +24,19 @@ export function PresetsTab({ config, isActive, onConfigChange }: Props): React.J
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
 
   function applyPreset(index: number): void {
-    const preset = PRESETS[index];
+    const preset = STATIC_PRESETS[index];
     if (!preset) return;
-    const partial = preset.build();
-    const newConfig = config !== null ? ({ ...config, ...partial } as Config) : (partial as Config);
+
+    // Preserve existing mode/language if config exists
+    const mode = config?.mode ?? 'pragmatic';
+    const language = config?.language ?? 'en';
+
+    const newConfig = buildPresetConfig({
+      preset,
+      mode: mode as 'strict' | 'pragmatic',
+      language: language as 'en' | 'ko',
+    });
+
     onConfigChange(newConfig);
     setConfirmIndex(null);
   }
@@ -144,7 +56,7 @@ export function PresetsTab({ config, isActive, onConfigChange }: Props): React.J
     if (key.upArrow || input === 'k') {
       setSelectedIndex(i => Math.max(0, i - 1));
     } else if (key.downArrow || input === 'j') {
-      setSelectedIndex(i => Math.min(PRESETS.length - 1, i + 1));
+      setSelectedIndex(i => Math.min(STATIC_PRESETS.length - 1, i + 1));
     } else if (key.return || input === ' ') {
       setConfirmIndex(selectedIndex);
     }
@@ -154,7 +66,7 @@ export function PresetsTab({ config, isActive, onConfigChange }: Props): React.J
   const listWidth = Math.max(Math.floor((cols - 4) * 0.4), 20);
   const detailWidth = Math.max((cols - 4) - listWidth - 2, 20);
 
-  const selectedPreset = PRESETS[selectedIndex];
+  const selectedPreset = STATIC_PRESETS[selectedIndex];
 
   return (
     <Box flexDirection="row">
@@ -163,16 +75,16 @@ export function PresetsTab({ config, isActive, onConfigChange }: Props): React.J
         {confirmIndex !== null ? (
           <Box flexDirection="column">
             <Text color={colors.warning} bold>
-              {t('config.confirm.preset').replace('{name}', PRESETS[confirmIndex]?.name ?? '')}
+              {t('config.confirm.preset').replace('{name}', STATIC_PRESETS[confirmIndex]?.name ?? '')}
             </Text>
             <Text dimColor>{t('config.presets.replaceWarning')}</Text>
           </Box>
         ) : (
           <ScrollableList
-            items={PRESETS}
+            items={STATIC_PRESETS}
             selectedIndex={selectedIndex}
             height={10}
-            renderItem={(preset, _i, isSelected) => (
+            renderItem={(preset: PresetConfig, _i: number, isSelected: boolean) => (
               <Box flexDirection="column">
                 <Text color={isSelected ? colors.selection.bg : undefined} bold={isSelected}>
                   {preset.name}
@@ -211,8 +123,8 @@ export function PresetsTab({ config, isActive, onConfigChange }: Props): React.J
                 })}
               </Box>
               <Box>
-                <Text dimColor>{t('presets.supporters').padEnd(14)}</Text>
-                <Text>{t('presets.supportersValue')}</Text>
+                <Text dimColor>{'Discussion'.padEnd(14)}</Text>
+                <Text>{selectedPreset.discussion ? 'Enabled' : 'Disabled'}</Text>
               </Box>
             </Box>
             {(() => {

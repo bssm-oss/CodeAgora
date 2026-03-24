@@ -133,7 +133,7 @@ describe('ConfigScreen', () => {
     );
     const frame = presetsFrame() ?? '';
     expect(frame).toContain('Quick Setup');
-    expect(frame).toContain('Diversity');
+    expect(frame).toContain('Thorough');
     expect(frame).toContain('Minimal');
     unmount2();
 
