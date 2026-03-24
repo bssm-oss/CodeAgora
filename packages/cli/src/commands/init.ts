@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import * as p from '@clack/prompts';
 import { generateMinimalTemplate } from '@codeagora/core/config/templates.js';
 import { getModePreset } from '@codeagora/core/config/mode-presets.js';
-import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { PROVIDER_ENV_VARS, getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 import { getProviderTier, getCliBackendTier, TIER_LABELS } from '@codeagora/shared/providers/tiers.js';
 import { loadModelsCatalog, getTopModels, getProviderStats } from '@codeagora/shared/data/models-dev.js';
 import type { ModelsCatalog, ModelEntry } from '@codeagora/shared/data/models-dev.js';
@@ -1098,6 +1098,82 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
       spinner.stop(`${primaryProvider}/${primaryModel} \u2717 (could not connect)`);
       warnings.push(`Provider ${primaryProvider} health check failed. Verify your API key.`);
     }
+  }
+
+  // GitHub Actions setup
+  const setupCI = await p.confirm({
+    message: ko
+      ? 'GitHub Actions 워크플로우를 생성하시겠습니까? (PR 자동 리뷰)'
+      : 'Set up GitHub Actions workflow? (auto-review on PRs)',
+    initialValue: true,
+  });
+
+  if (!p.isCancel(setupCI) && setupCI) {
+    const workflowDir = path.join(baseDir, '.github', 'workflows');
+    await fs.mkdir(workflowDir, { recursive: true });
+
+    // Collect unique env vars from configured providers
+    const configProviders = new Set<string>();
+    if ('reviewers' in configData && Array.isArray(configData.reviewers)) {
+      for (const r of configData.reviewers) {
+        if ('provider' in r && r.provider) configProviders.add(r.provider);
+      }
+    }
+    if (configData.supporters?.pool) {
+      for (const s of configData.supporters.pool) {
+        if ('provider' in s && s.provider) configProviders.add(s.provider);
+      }
+    }
+    if (configData.moderator?.provider) configProviders.add(configData.moderator.provider);
+
+    const envLines = [...configProviders]
+      .map((prov) => {
+        const envVar = getProviderEnvVar(prov);
+        return `          ${envVar}: \${{ secrets.${envVar} }}`;
+      })
+      .join('\n');
+
+    const workflowContent = `name: CodeAgora Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  review:
+    if: "!contains(github.event.pull_request.labels.*.name, 'review:skip')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CodeAgora Review
+        uses: bssm-oss/CodeAgora@v2
+        with:
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+          fail-on-reject: 'true'
+          max-diff-lines: '5000'
+        env:
+${envLines}
+`;
+
+    const workflowPath = path.join(workflowDir, 'codeagora-review.yml');
+    await writeFile(workflowPath, workflowContent, force, created, skipped);
+
+    // Show secrets setup instructions
+    const secretNames = [...configProviders].map((prov) => getProviderEnvVar(prov));
+    const secretsList = secretNames.map((s) => `  • ${s}`).join('\n');
+    p.note(
+      ko
+        ? `워크플로우가 생성되었습니다.\n\n레포 Settings → Secrets → Actions에 다음 시크릿을 추가하세요:\n${secretsList}`
+        : `Workflow created.\n\nAdd these secrets in your repo Settings → Secrets → Actions:\n${secretsList}`,
+      ko ? '🔑 시크릿 설정 필요' : '🔑 Secrets required',
+    );
   }
 
   p.outro(t('cli.init.created', { path: configPath }));
