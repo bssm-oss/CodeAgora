@@ -15,46 +15,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: CodeAgora Review
+        uses: ./
         with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Fetch PR diff
-        run: |
-          gh pr diff "$PR_NUMBER" \
-            --repo "$REPO" \
-            > /tmp/codeagora-pr.diff
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fail-on-reject: 'true'
+          max-diff-lines: '5000'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-
-      - name: Run CodeAgora review
-        run: |
-          npx tsx packages/github/src/action.ts \
-            --diff /tmp/codeagora-pr.diff \
-            --pr "$PR_NUMBER" \
-            --sha "$HEAD_SHA" \
-            --repo "$REPO" \
-            --fail-on-reject true \
-            --max-diff-lines 5000
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           CODEAGORA_APP_ID: ${{ secrets.CODEAGORA_APP_ID }}
           CODEAGORA_APP_PRIVATE_KEY: ${{ secrets.CODEAGORA_APP_PRIVATE_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          REPO: ${{ github.repository }}
