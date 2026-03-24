@@ -1,0 +1,44 @@
+name: Build Action Bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/core/src/**'
+      - 'packages/shared/src/**'
+      - 'packages/github/src/**'
+      - 'scripts/build-action.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: pnpm/action-setup@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build action bundle
+        run: node scripts/build-action.mjs
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --quiet dist/action.js && echo "changed=false" >> "$GITHUB_OUTPUT" || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated bundle
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/action.js
+          git commit -m "chore: rebuild dist/action.js [skip ci]"
+          git push
