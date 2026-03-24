@@ -17,18 +17,22 @@ import { ReviewersTab } from './config/ReviewersTab.js';
 import { SupportersTab } from './config/SupportersTab.js';
 import { ModeratorTab } from './config/ModeratorTab.js';
 import { PresetsTab } from './config/PresetsTab.js';
+import { HeadTab } from './config/HeadTab.js';
+import { SettingsTab } from './config/SettingsTab.js';
 import { EnvSetup } from './config/EnvSetup.js';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type TabName = 'reviewers' | 'supporters' | 'moderator' | 'presets' | 'env';
+type TabName = 'reviewers' | 'supporters' | 'moderator' | 'head' | 'settings' | 'presets' | 'env';
 
 const TABS: Array<{ id: TabName; label: string }> = [
   { id: 'reviewers', label: t('config.tabs.reviewers') },
   { id: 'supporters', label: t('config.tabs.supporters') },
   { id: 'moderator', label: t('config.tabs.moderator') },
+  { id: 'head', label: 'Head' },
+  { id: 'settings', label: 'Settings' },
   { id: 'presets', label: t('config.tabs.presets') },
   { id: 'env', label: t('config.tabs.apiKeys') },
 ];
@@ -40,7 +44,7 @@ const HELP_BINDINGS: KeyBinding[] = [
   { key: 'a', description: t('config.help.add') },
   { key: 'd', description: t('config.help.delete') },
   { key: 'Tab', description: t('config.help.tabs') },
-  { key: '1-5', description: t('config.help.tabNum') },
+  { key: '1-7', description: t('config.help.tabNum') },
   { key: 'Ctrl+e', description: t('config.help.editor') },
   { key: '?', description: t('config.help.help') },
   { key: 'q', description: t('config.help.quit') },
@@ -239,6 +243,20 @@ export function ConfigScreen(): React.JSX.Element {
           <ModeratorTab
             config={config}
             isActive={activeTab === 'moderator'}
+            onConfigChange={handleConfigChange}
+          />
+        )}
+        {activeTab === 'head' && (
+          <HeadTab
+            config={config}
+            isActive={activeTab === 'head'}
+            onConfigChange={handleConfigChange}
+          />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsTab
+            config={config}
+            isActive={activeTab === 'settings'}
             onConfigChange={handleConfigChange}
           />
         )}
