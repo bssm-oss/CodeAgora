@@ -2,8 +2,9 @@
 node_modules/
 .pnpm-store/
 
-# Build outputs
-dist/
+# Build outputs (allow dist/action.js for GitHub Action)
+dist/*
+!dist/action.js
 *.tsbuildinfo
 
 # Environment & Secrets

@@ -43,7 +43,8 @@
     "test": "vitest run",
     "test:web": "cd packages/web && vitest run",
     "test:all": "vitest run && cd packages/web && vitest run",
-    "dev": "pnpm --filter @codeagora/cli dev"
+    "dev": "pnpm --filter @codeagora/cli dev",
+    "build:action": "node scripts/build-action.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
@@ -73,6 +74,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.11.5",
     "@types/react": "^19.2.14",
+    "esbuild": "^0.27.4",
     "eslint": "^10.0.3",
     "eslint-plugin-react-hooks": "^7.0.1",
     "ink": "^6.8.0",

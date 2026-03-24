@@ -42,19 +42,6 @@ runs:
       with:
         node-version: '20'
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 9
-
-    - name: Install dependencies
-      shell: bash
-      run: cd "${{ github.action_path }}" && pnpm install --no-frozen-lockfile
-
-    - name: Build packages
-      shell: bash
-      run: cd "${{ github.action_path }}" && pnpm build
-
     - name: Fetch PR diff
       shell: bash
       run: |
@@ -70,7 +57,7 @@ runs:
       id: review
       shell: bash
       run: |
-        npx tsx "${{ github.action_path }}/packages/github/src/action.ts" \
+        node "$ACTION_PATH/dist/action.js" \
           --diff /tmp/codeagora-pr.diff \
           --pr "$PR_NUMBER" \
           --sha "$HEAD_SHA" \
@@ -78,6 +65,7 @@ runs:
           --fail-on-reject "$FAIL_ON_REJECT" \
           --max-diff-lines "$MAX_DIFF_LINES"
       env:
+        ACTION_PATH: ${{ github.action_path }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
