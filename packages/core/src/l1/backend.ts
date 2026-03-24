@@ -18,6 +18,7 @@ export interface BackendInput {
   prompt: string;
   timeout: number;
   signal?: AbortSignal;
+  temperature?: number;
 }
 
 /** Command definition: binary + args, no shell. */

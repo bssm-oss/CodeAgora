@@ -40,6 +40,7 @@ export const AgentConfigSchema = z
     backend: BackendSchema,
     provider: z.string().optional(),
     persona: z.string().optional(),
+    temperature: z.number().min(0).max(2).optional(),
     timeout: z.number().default(120),
     enabled: z.boolean().default(true),
     fallback: z.union([FallbackSchema, z.array(FallbackSchema)]).optional(),

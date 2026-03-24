@@ -11,7 +11,7 @@ import type { BackendInput } from './backend.js';
  * Execute a review via direct API call using Vercel AI SDK.
  */
 export async function executeViaAISDK(input: BackendInput): Promise<string> {
-  const { model, provider, prompt, timeout, signal } = input;
+  const { model, provider, prompt, timeout, signal, temperature } = input;
 
   if (!provider) {
     throw new Error('API backend requires provider parameter');
@@ -27,6 +27,7 @@ export async function executeViaAISDK(input: BackendInput): Promise<string> {
     model: languageModel,
     prompt,
     abortSignal,
+    ...(temperature !== undefined && { temperature }),
   });
 
   return text;

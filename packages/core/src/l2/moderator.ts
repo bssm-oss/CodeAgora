@@ -449,6 +449,7 @@ async function executeSupporterResponse(
     provider: supporter.provider,
     prompt,
     timeout: supporter.timeout,
+    temperature: supporter.temperature,
   });
 
   const stance = parseStance(response);
@@ -559,6 +560,7 @@ ${rounds.map((r, i) => `Round ${i + 1}:\n${r.supporterResponses.map(s => `- ${s.
     provider: config.provider,
     prompt,
     timeout: 120,
+    temperature: 0.2,
   });
 
   return parseForcedDecision(response);

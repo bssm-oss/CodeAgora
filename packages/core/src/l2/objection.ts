@@ -62,6 +62,7 @@ async function executeSupporterObjectionCheck(
     model: config.model,
     prompt,
     timeout: 60,
+    temperature: config.temperature,
   });
 
   const hasObjection = parseObjectionResponse(response);

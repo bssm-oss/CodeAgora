@@ -80,6 +80,7 @@ export async function executeReviewer(
         prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
         signal: controller.signal,
+        temperature: config.temperature,
       });
 
       // Parse response into evidence documents with diff file paths for fallback
@@ -115,6 +116,7 @@ export async function executeReviewer(
         provider: fb.provider,
         prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
+        temperature: config.temperature,
       });
 
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
@@ -259,6 +261,7 @@ async function executeReviewerWithGuards(
         prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
         signal: controller.signal,
+        temperature: config.temperature,
       });
 
       if (useGuards) cb.recordSuccess(provider!, config.model);
@@ -309,6 +312,7 @@ async function executeReviewerWithGuards(
         provider: fb.provider,
         prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
+        temperature: config.temperature,
       });
 
       if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);

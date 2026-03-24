@@ -45,6 +45,7 @@ async function llmVerdict(report: ModeratorReport, config: HeadConfig, language?
     provider: config.provider,
     prompt,
     timeout: 120,
+    temperature: 0.2,
   });
 
   return parseHeadResponse(response, report);
