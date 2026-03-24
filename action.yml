@@ -51,6 +51,10 @@ runs:
       shell: bash
       run: cd "${{ github.action_path }}" && pnpm install --no-frozen-lockfile
 
+    - name: Build packages
+      shell: bash
+      run: cd "${{ github.action_path }}" && pnpm build
+
     - name: Fetch PR diff
       shell: bash
       run: |
