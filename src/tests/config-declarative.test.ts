@@ -37,7 +37,6 @@ describe('DeclarativeReviewersSchema', () => {
         minFamilies: 3,
         reasoning: { min: 1, max: 2 },
         contextMin: '32k',
-        tierMin: 'A-',
       },
     });
 

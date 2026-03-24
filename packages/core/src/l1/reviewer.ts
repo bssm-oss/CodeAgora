@@ -58,6 +58,16 @@ export async function executeReviewer(
   // Extract file list from diff for fallback parsing
   const diffFilePaths = extractFileListFromDiff(diffContent);
 
+  // Load persona if configured (prepended to review prompt)
+  let personaPrefix = '';
+  if (config.persona) {
+    const { loadPersona } = await import('../l2/moderator.js');
+    const content = await loadPersona(config.persona);
+    if (content) {
+      personaPrefix = `${content}\n\n---\n\n`;
+    }
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout * 1000);
@@ -67,7 +77,7 @@ export async function executeReviewer(
         backend: config.backend,
         model: config.model,
         provider: config.provider,
-        prompt: buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
         signal: controller.signal,
       });
@@ -103,7 +113,7 @@ export async function executeReviewer(
         backend: fb.backend,
         model: fb.model,
         provider: fb.provider,
-        prompt: buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
       });
 
@@ -222,6 +232,16 @@ async function executeReviewerWithGuards(
     };
   }
 
+  // Load persona if configured (prepended to review prompt)
+  let personaPrefix = '';
+  if (config.persona) {
+    const { loadPersona } = await import('../l2/moderator.js');
+    const content = await loadPersona(config.persona);
+    if (content) {
+      personaPrefix = `${content}\n\n---\n\n`;
+    }
+  }
+
   let lastError: Error | undefined;
   const diffFilePaths = extractFileListFromDiff(diffContent);
 
@@ -236,7 +256,7 @@ async function executeReviewerWithGuards(
         backend: config.backend,
         model: config.model,
         provider: config.provider,
-        prompt: buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
         signal: controller.signal,
       });
@@ -287,7 +307,7 @@ async function executeReviewerWithGuards(
         backend: fb.backend,
         model: fb.model,
         provider: fb.provider,
-        prompt: buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
         timeout: config.timeout,
       });
 

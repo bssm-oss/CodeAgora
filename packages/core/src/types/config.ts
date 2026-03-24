@@ -107,10 +107,10 @@ export type ModeratorConfig = z.infer<typeof ModeratorConfigSchema>;
 export const SupporterPoolConfigSchema = z.object({
   pool: z.array(AgentConfigSchema).min(1),
   pickCount: z.number().int().positive().default(2),
-  pickStrategy: z.enum(['random', 'round-robin']).default('random'),
+  pickStrategy: z.literal('random').default('random'),
   devilsAdvocate: AgentConfigSchema,
   personaPool: z.array(z.string()).min(1),
-  personaAssignment: z.enum(['random', 'fixed']).default('random'),
+  personaAssignment: z.literal('random').default('random'),
 });
 export type SupporterPoolConfig = z.infer<typeof SupporterPoolConfigSchema>;
 
@@ -156,7 +156,6 @@ export const DeclarativeReviewersSchema = z.object({
         })
         .optional(),
       contextMin: z.string().default('32k'),
-      tierMin: z.string().default('B'),
       preferProviders: z.array(z.string()).optional(),
     })
     .optional(),

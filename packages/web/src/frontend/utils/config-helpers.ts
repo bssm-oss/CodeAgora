@@ -149,15 +149,15 @@ function validateConfigField(field: string, value: unknown): string | null {
 
   // Pick strategy
   if (field === 'pickStrategy') {
-    if (typeof value === 'string' && !['random', 'round-robin'].includes(value)) {
-      return `${field} must be "random" or "round-robin"`;
+    if (typeof value === 'string' && value !== 'random') {
+      return `${field} must be "random"`;
     }
   }
 
   // Persona assignment
   if (field === 'personaAssignment') {
-    if (typeof value === 'string' && !['random', 'fixed'].includes(value)) {
-      return `${field} must be "random" or "fixed"`;
+    if (typeof value === 'string' && value !== 'random') {
+      return `${field} must be "random"`;
     }
   }
 

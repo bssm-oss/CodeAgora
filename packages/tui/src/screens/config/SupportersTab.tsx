@@ -69,11 +69,10 @@ export function SupportersTab({ config, isActive, onConfigChange }: Props): Reac
   }
 
   function cyclePickStrategy(): void {
-    const current = config.supporters.pickStrategy;
-    const next = current === 'random' ? 'round-robin' : 'random';
+    // Only 'random' is supported — round-robin was never implemented
     onConfigChange({
       ...config,
-      supporters: { ...config.supporters, pickStrategy: next },
+      supporters: { ...config.supporters, pickStrategy: 'random' },
     });
   }
 
