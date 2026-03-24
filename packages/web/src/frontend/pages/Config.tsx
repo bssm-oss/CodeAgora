@@ -274,7 +274,7 @@ export function ConfigPage(): React.JSX.Element {
             type="select"
             value={getNestedValue(config, 'supporters.pickStrategy') ?? 'random'}
             onChange={(v) => updateField('supporters.pickStrategy', v)}
-            options={['random', 'round-robin']}
+            options={['random']}
             error={errors['supporters.pickStrategy']}
           />
           <ConfigField
@@ -283,7 +283,7 @@ export function ConfigPage(): React.JSX.Element {
             type="select"
             value={getNestedValue(config, 'supporters.personaAssignment') ?? 'random'}
             onChange={(v) => updateField('supporters.personaAssignment', v)}
-            options={['random', 'fixed']}
+            options={['random']}
             error={errors['supporters.personaAssignment']}
           />
           <ConfigField

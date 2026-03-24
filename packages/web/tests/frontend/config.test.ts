@@ -108,7 +108,7 @@ describe('validateConfigField', () => {
 
   it('should validate pickStrategy field', () => {
     expect(validateConfigField('pickStrategy', 'random')).toBeNull();
-    expect(validateConfigField('pickStrategy', 'round-robin')).toBeNull();
+    expect(validateConfigField('pickStrategy', 'round-robin')).not.toBeNull();
     expect(validateConfigField('pickStrategy', 'invalid')).not.toBeNull();
   });
 

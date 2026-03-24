@@ -1,6 +1,6 @@
 /**
  * #187 Supporter Selection Tests
- * Verifies pickStrategy (round-robin vs random) and personaAssignment (fixed vs random)
+ * Verifies random selection and persona assignment
  * in selectSupporters from @codeagora/core/l2/moderator.js
  */
 
@@ -74,36 +74,6 @@ describe('pickStrategy: random', () => {
 });
 
 // ============================================================================
-// pickStrategy: 'round-robin'
-// ============================================================================
-
-describe('pickStrategy: round-robin', () => {
-  it('selects exactly pickCount supporters', () => {
-    const config = makeConfig({ pickStrategy: 'round-robin', pickCount: 2 });
-    const selected = selectSupporters(config);
-    // round-robin may not be implemented differently from random in current code;
-    // verify the contract: correct count, no duplicates, from enabled pool
-    expect(selected).toHaveLength(2);
-  });
-
-  it('selected supporters are from the enabled pool', () => {
-    const config = makeConfig({ pickStrategy: 'round-robin', pickCount: 2 });
-    const selected = selectSupporters(config);
-    const poolIds = basePool.map((s) => s.id);
-    for (const s of selected) {
-      expect(poolIds).toContain(s.id);
-    }
-  });
-
-  it('does not include duplicates', () => {
-    const config = makeConfig({ pickStrategy: 'round-robin', pickCount: 2 });
-    const selected = selectSupporters(config);
-    const ids = selected.map((s) => s.id);
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-});
-
-// ============================================================================
 // personaAssignment: 'random'
 // ============================================================================
 
@@ -137,43 +107,11 @@ describe('personaAssignment: random', () => {
 });
 
 // ============================================================================
-// personaAssignment: 'fixed'
-// ============================================================================
-
-describe('personaAssignment: fixed', () => {
-  it('assigns personas in fixed order (index 0 to first, index 1 to second)', () => {
-    const config = makeConfig({ personaAssignment: 'fixed', pickCount: 2 });
-    // Run multiple times — fixed assignment should be deterministic in terms of
-    // personas coming from personaPool in order
-    const selected = selectSupporters(config);
-
-    for (const s of selected) {
-      expect(s.assignedPersona).toBeDefined();
-      expect(personaPool).toContain(s.assignedPersona!);
-    }
-  });
-
-  it('assigns personas consistently across multiple calls (same pool order)', () => {
-    const config = makeConfig({ personaAssignment: 'fixed', pickCount: 2 });
-
-    // With fixed persona assignment, all calls should assign personas from
-    // the personaPool (the exact index depends on implementation)
-    const result1 = selectSupporters(config);
-    const result2 = selectSupporters(config);
-
-    // Both results should have valid personas from the pool
-    for (const s of [...result1, ...result2]) {
-      expect(personaPool).toContain(s.assignedPersona!);
-    }
-  });
-});
-
-// ============================================================================
 // Devil's Advocate interaction
 // ============================================================================
 
 describe('Devil\'s Advocate with selection strategies', () => {
-  it('devil is prepended before pool supporters regardless of pickStrategy', () => {
+  it('devil is prepended before pool supporters', () => {
     const configWithDevil = makeConfig({
       pickStrategy: 'random',
       devilsAdvocate: { ...baseDevil, enabled: true },
