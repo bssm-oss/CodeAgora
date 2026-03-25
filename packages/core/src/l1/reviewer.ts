@@ -42,6 +42,8 @@ export interface ReviewerInput {
   };
   /** Surrounding code context from source files (context-aware review) */
   surroundingContext?: string;
+  /** Custom reviewer prompt file path (overrides built-in prompt) */
+  customPromptPath?: string;
 }
 
 /**
@@ -68,6 +70,23 @@ export async function executeReviewer(
     }
   }
 
+  // Build prompt: custom file (with {{DIFF}} placeholder) or built-in
+  let reviewPrompt: string;
+  if (input.customPromptPath) {
+    try {
+      const { loadPersona } = await import('../l2/moderator.js');
+      const template = await loadPersona(input.customPromptPath);
+      reviewPrompt = template
+        ? template.replace('{{DIFF}}', diffContent).replace('{{SUMMARY}}', prSummary)
+        : buildReviewerPrompt(diffContent, prSummary, surroundingContext);
+    } catch {
+      reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext);
+    }
+  } else {
+    reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext);
+  }
+  const fullPrompt = personaPrefix + reviewPrompt;
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.timeout * 1000);
@@ -77,7 +96,7 @@ export async function executeReviewer(
         backend: config.backend,
         model: config.model,
         provider: config.provider,
-        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: fullPrompt,
         timeout: config.timeout,
         signal: controller.signal,
         temperature: config.temperature,
@@ -114,7 +133,7 @@ export async function executeReviewer(
         backend: fb.backend,
         model: fb.model,
         provider: fb.provider,
-        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: fullPrompt,
         timeout: config.timeout,
         temperature: config.temperature,
       });
@@ -244,6 +263,23 @@ async function executeReviewerWithGuards(
     }
   }
 
+  // Build prompt: custom file (with {{DIFF}} placeholder) or built-in
+  let reviewPrompt: string;
+  if (input.customPromptPath) {
+    try {
+      const { loadPersona } = await import('../l2/moderator.js');
+      const template = await loadPersona(input.customPromptPath);
+      reviewPrompt = template
+        ? template.replace('{{DIFF}}', diffContent).replace('{{SUMMARY}}', prSummary)
+        : buildReviewerPrompt(diffContent, prSummary, surroundingContext);
+    } catch {
+      reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext);
+    }
+  } else {
+    reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext);
+  }
+  const fullPrompt = personaPrefix + reviewPrompt;
+
   let lastError: Error | undefined;
   const diffFilePaths = extractFileListFromDiff(diffContent);
 
@@ -258,7 +294,7 @@ async function executeReviewerWithGuards(
         backend: config.backend,
         model: config.model,
         provider: config.provider,
-        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: fullPrompt,
         timeout: config.timeout,
         signal: controller.signal,
         temperature: config.temperature,
@@ -310,7 +346,7 @@ async function executeReviewerWithGuards(
         backend: fb.backend,
         model: fb.model,
         provider: fb.provider,
-        prompt: personaPrefix + buildReviewerPrompt(diffContent, prSummary, surroundingContext),
+        prompt: fullPrompt,
         timeout: config.timeout,
         temperature: config.temperature,
       });
