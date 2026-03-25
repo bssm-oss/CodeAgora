@@ -26,8 +26,12 @@ vi.mock('fs/promises', () => ({
 // Helper: render and wait for async useEffect to populate models
 async function renderAndWait(props: React.ComponentProps<typeof ModelSelector>) {
   const result = render(<ModelSelector {...props} />);
-  // Wait for useEffect + setState cycle
-  await new Promise(r => setTimeout(r, 50));
+  // Poll until models are loaded (frame shows model count > 0)
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 50));
+    const frame = result.lastFrame() ?? '';
+    if (frame.includes('models)') && !frame.includes('0 models)')) break;
+  }
   return result;
 }
 
