@@ -221,6 +221,13 @@ export const AutoApproveConfigSchema = z.object({
 }).optional();
 export type AutoApproveConfig = z.infer<typeof AutoApproveConfigSchema>;
 
+export const PromptsConfigSchema = z.object({
+  reviewer: z.string().optional(),
+  supporter: z.string().optional(),
+  head: z.string().optional(),
+}).optional();
+export type PromptsConfig = z.infer<typeof PromptsConfigSchema>;
+
 export const ConfigSchema = z.object({
   mode: ReviewModeSchema.optional(),
   language: LanguageSchema.optional(),
@@ -235,6 +242,7 @@ export const ConfigSchema = z.object({
   notifications: NotificationsConfigSchema.optional(),
   github: GitHubIntegrationSchema.optional(),
   autoApprove: AutoApproveConfigSchema,
+  prompts: PromptsConfigSchema,
   plugins: z.array(z.string()).optional(),
 });
 export type Config = z.infer<typeof ConfigSchema>;

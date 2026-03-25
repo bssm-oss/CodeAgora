@@ -169,6 +169,13 @@ async function executeL1Reviews(
       }
     }
 
+    // Inject custom reviewer prompt path from config
+    if (config.prompts?.reviewer) {
+      for (const ri of reviewerInputs) {
+        ri.customPromptPath = config.prompts.reviewer;
+      }
+    }
+
     const reviewResults = await executeReviewers(
       reviewerInputs,
       config.errorHandling.maxRetries
