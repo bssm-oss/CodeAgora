@@ -126,8 +126,9 @@ export class QualityTracker {
       data.peerValidationRate =
         totalInDiscussion > 0 ? peerValidated / totalInDiscussion : 1.0;
 
-      // Head acceptance: fraction of all raised issues accepted as actionable
-      data.headAcceptanceRate = headAccepted / data.issuesRaised;
+      // Head acceptance: fraction of discussed issues accepted as actionable
+      data.headAcceptanceRate =
+        totalInDiscussion > 0 ? headAccepted / totalInDiscussion : 1.0;
     }
   }
 

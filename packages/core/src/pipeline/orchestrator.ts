@@ -527,7 +527,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     );
 
     // === RULES: Apply custom review rules ===
-    const compiledRules = await loadReviewRules(process.cwd());
+    const compiledRules = await loadReviewRules(input.repoPath ?? process.cwd());
     if (compiledRules && compiledRules.length > 0) {
       const ruleEvidence = matchRules(diffContent, compiledRules);
       if (ruleEvidence.length > 0) {
@@ -537,7 +537,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     }
 
     // === LEARNING: Apply dismissed patterns ===
-    const learnedPatterns = await loadLearnedPatterns(process.cwd());
+    const learnedPatterns = await loadLearnedPatterns(input.repoPath ?? process.cwd());
     if (learnedPatterns && learnedPatterns.dismissedPatterns.length > 0) {
       const { filtered, suppressed } = applyLearnedPatterns(
         allEvidenceDocs,
