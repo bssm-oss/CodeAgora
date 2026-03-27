@@ -64,6 +64,7 @@ export function DebateScreen({ discussions }: Props): React.JSX.Element {
   const escalated = discussions.filter(d => d.status === 'escalated').length;
 
   useInput((_input, key) => {
+    if (total === 0) return; // Guard against empty list
     if (key.downArrow || _input === 'j') {
       setSelectedIndex(i => Math.min(i + 1, total - 1));
     } else if (key.upArrow || _input === 'k') {
