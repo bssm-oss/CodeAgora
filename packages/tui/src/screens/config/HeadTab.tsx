@@ -45,12 +45,21 @@ export function HeadTab({ config, isActive, onConfigChange }: Props): React.JSX.
 
   function saveEdit(): void {
     const timeout = parseInt(editTimeout, 10);
+    const trimmedModel = (editModel || head.model || '').trim();
+    
+    // Validate model name is not empty before saving
+    if (!trimmedModel) {
+      // Don't save if model is empty - keep current config
+      setEditMode(false);
+      return;
+    }
+    
     onConfigChange({
       ...config,
       head: {
         ...head,
         provider: editProvider || head.provider,
-        model: editModel || head.model,
+        model: trimmedModel,
         backend: editBackend as typeof head.backend || head.backend,
         timeout: isNaN(timeout) ? 120 : timeout,
       },
