@@ -55,20 +55,20 @@ export function registerLearnCommand(program: Command): void {
         try {
           const prNumber = parseInt(options.pr, 10);
           if (isNaN(prNumber) || prNumber <= 0) {
-            console.error('Error: --pr must be a positive integer');
+            console.error(t('cli.learn.error.prPositiveInteger'));
             process.exit(1);
           }
 
           const token = process.env['GITHUB_TOKEN'];
           if (!token) {
-            console.error('Error: GITHUB_TOKEN environment variable required');
+            console.error(t('cli.learn.error.githubTokenRequired'));
             process.exit(1);
           }
 
           const ownerRepo = options.repo ?? (await getRepoFromGit());
           const slashIdx = ownerRepo.indexOf('/');
           if (slashIdx === -1) {
-            console.error('Error: --repo must be in <owner/repo> format');
+            console.error(t('cli.learn.error.repoFormat'));
             process.exit(1);
           }
           const owner = ownerRepo.slice(0, slashIdx);
@@ -89,8 +89,8 @@ export function registerLearnCommand(program: Command): void {
             dismissedPatterns: merged,
           });
 
-          console.log(`Learned ${newPatterns.length} pattern(s) from PR #${prNumber}`);
-          console.log(`Total patterns: ${merged.length}`);
+          console.log(t('cli.info.patternLearned', { prNumber: String(prNumber), count: String(newPatterns.length) }));
+          console.log(t('cli.info.totalPatterns', { count: String(merged.length) }));
         } catch (err) {
           console.error('Error:', err instanceof Error ? err.message : String(err));
           process.exit(1);
@@ -143,11 +143,11 @@ export function registerLearnCommand(program: Command): void {
           const readline = await import('readline');
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
           const answer = await new Promise<string>((resolve) => {
-            rl.question(`Clear ${data.dismissedPatterns.length} pattern(s)? [y/N] `, resolve);
+            rl.question(t('cli.confirm.clearPatterns', { count: String(data.dismissedPatterns.length) }) + ' ', resolve);
           });
           rl.close();
           if (answer.toLowerCase() !== 'y') {
-            console.log('Cancelled.');
+            console.log(t('cli.confirm.cancelled'));
             return;
           }
         }
@@ -216,15 +216,15 @@ export function registerLearnCommand(program: Command): void {
           return;
         }
         if (isNaN(index) || index < 0 || index >= data.dismissedPatterns.length) {
-          console.error(`Error: index must be between 0 and ${data.dismissedPatterns.length - 1}`);
+          console.error(t('cli.learn.error.invalidIndex', { max: String(data.dismissedPatterns.length - 1) }));
           process.exit(1);
         }
 
         const removed = data.dismissedPatterns[index]!;
         data.dismissedPatterns.splice(index, 1);
         await saveLearnedPatterns(process.cwd(), data);
-        console.log(`Removed pattern: "${removed.pattern}"`);
-        console.log(`Remaining: ${data.dismissedPatterns.length} pattern(s)`);
+        console.log(t('cli.info.removedPattern', { pattern: removed.pattern }));
+        console.log(t('cli.info.patternsRemaining', { count: String(data.dismissedPatterns.length) }));
       } catch (err) {
         console.error('Error:', err instanceof Error ? err.message : String(err));
         process.exit(1);
@@ -260,7 +260,7 @@ export function registerLearnCommand(program: Command): void {
         const imported = JSON.parse(raw) as LearnedPatterns;
 
         if (!imported.dismissedPatterns || !Array.isArray(imported.dismissedPatterns)) {
-          console.error('Error: invalid patterns file (expected { version, dismissedPatterns[] })');
+          console.error(t('cli.learn.error.invalidPatternsFile'));
           process.exit(1);
         }
 
@@ -275,8 +275,8 @@ export function registerLearnCommand(program: Command): void {
           dismissedPatterns: merged,
         });
 
-        console.log(`Imported ${imported.dismissedPatterns.length} pattern(s)`);
-        console.log(`Total patterns: ${merged.length}`);
+        console.log(t('cli.info.importedPatterns', { count: String(imported.dismissedPatterns.length) }));
+        console.log(t('cli.info.totalPatterns', { count: String(merged.length) }));
       } catch (err) {
         console.error('Error:', err instanceof Error ? err.message : String(err));
         process.exit(1);

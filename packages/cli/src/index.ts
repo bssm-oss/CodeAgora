@@ -128,7 +128,7 @@ program
         try {
           stagedDiff = execFileSync('git', ['diff', '--staged'], { encoding: 'utf-8' });
         } catch {
-          console.error('Failed to run "git diff --staged". Are you in a git repository?');
+          console.error(t('cli.error.gitStagedFailed'));
           process.exit(1);
         }
         if (!stagedDiff.trim()) {
@@ -155,7 +155,7 @@ program
         } else {
           const prNum = parseInt(options.pr, 10);
           if (isNaN(prNum)) {
-            console.error('Error: --pr must be a GitHub PR URL or a number');
+            console.error(t('cli.error.prFormat'));
             process.exit(1);
           }
           const { execFile } = await import('child_process');
@@ -165,7 +165,7 @@ program
           ghConfig = createGitHubConfig({ remoteUrl: remoteUrl.trim(), prNumber: prNum });
         }
 
-        if (!options.quiet) console.error(`Fetching PR #${ghConfig.prNumber} diff from GitHub...`);
+        if (!options.quiet) console.error(t('cli.info.fetchingPR', { prNumber: String(ghConfig.prNumber) }));
         const prInfo = await fetchPrDiff(ghConfig, ghConfig.prNumber);
 
         const tmpDir = path.join(process.cwd(), '.ca');
@@ -199,7 +199,7 @@ program
       } else if (diffPath) {
         resolvedPath = path.resolve(diffPath);
       } else {
-        console.error('Error: diff-path required (or pipe via stdin, or use --pr)');
+        console.error(t('cli.error.diffPathRequired'));
         process.exit(1);
       }
 
@@ -207,7 +207,7 @@ program
       try {
         await fs.access(resolvedPath);
       } catch {
-        console.error(`Error: Diff file not found: ${resolvedPath}`);
+        console.error(t('cli.error.diffFileNotFound', { path: resolvedPath }));
         process.exit(1);
       }
 
@@ -317,7 +317,7 @@ program
       spinner?.stop();
 
       if (result.cached && !options.quiet) {
-        console.error('Cache hit — returning previous review result. Use --no-cache to force a fresh review.');
+        console.error(t('cli.error.cacheHit'));
       }
 
       // Build format options: verbose flag + annotated-specific options
@@ -340,7 +340,7 @@ program
 
       // Post review to GitHub if --post-review and --pr were used
       if (options.postReview && prContext && result.status === 'success' && result.summary) {
-        if (!options.quiet) console.error('Posting review to GitHub...');
+        if (!options.quiet) console.error(t('cli.info.postingReview'));
         const ghConfig = { token: process.env['GITHUB_TOKEN'] ?? '', owner: prContext.owner, repo: prContext.repo };
         const positionIndex = buildDiffPositionIndex(prContext.diff);
         const cliReviewerMap = result.reviewerMap ? new Map(Object.entries(result.reviewerMap)) : undefined;
@@ -363,10 +363,10 @@ program
             : undefined,
         });
         const appKit = await createAppOctokit(prContext.owner, prContext.repo);
-        if (appKit && !options.quiet) console.error('Using GitHub App authentication (CodeAgora Bot)');
+        if (appKit && !options.quiet) console.error(t('cli.info.usingAppAuth'));
         const postResult = await postReview(ghConfig, prContext.prNumber, review, appKit ?? undefined);
         await setCommitStatus(ghConfig, prContext.headSha, postResult.verdict, postResult.reviewUrl);
-        if (!options.quiet) console.error(`Review posted: ${postResult.reviewUrl}`);
+        if (!options.quiet) console.error(t('cli.info.reviewPosted', { url: postResult.reviewUrl }));
       }
 
       // Send notifications if requested and pipeline succeeded with a summary
@@ -393,8 +393,8 @@ program
               escalated: s.escalated,
             });
           } catch {
-            console.error('@codeagora/notifications is not installed.');
-            console.error('Install: npm i -g @codeagora/notifications');
+            console.error(t('cli.error.notificationsNotInstalled'));
+            console.error(t('cli.error.notificationsInstall'));
           }
         }
       }
@@ -620,19 +620,19 @@ program
     try {
       const config = await loadConfig();
       if (!config.notifications) {
-        console.error('No notifications configured in .ca/config.json');
+        console.error(t('cli.error.notificationsNotConfigured'));
         process.exit(1);
       }
 
       // Parse "YYYY-MM-DD/NNN" format
       const parts = sessionId.split('/');
       if (parts.length !== 2) {
-        console.error('Session ID must be in format YYYY-MM-DD/NNN');
+        console.error(t('cli.error.sessionIdFormat'));
         process.exit(1);
       }
       const [date, id] = parts;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date!) || !/^\d+$/.test(id!)) {
-        console.error('Invalid session ID format. Expected: YYYY-MM-DD/NNN');
+        console.error(t('cli.error.invalidSessionIdFormat'));
         process.exit(1);
       }
       const sessionDir = path.join(process.cwd(), '.ca', 'sessions', date!, id!);
@@ -643,7 +643,7 @@ program
         const raw = await fs.readFile(path.join(sessionDir, 'head-verdict.json'), 'utf-8');
         verdictRaw = JSON.parse(raw) as Record<string, unknown>;
       } catch {
-        console.error(`Session not found: ${sessionId}`);
+        console.error(t('cli.error.sessionNotFound', { sessionId }));
         process.exit(1);
       }
 
@@ -656,8 +656,8 @@ program
       try {
         ({ sendNotifications } = await import('@codeagora/notifications/webhook.js'));
       } catch {
-        console.error('@codeagora/notifications is not installed.');
-        console.error('Install: npm i -g @codeagora/notifications');
+        console.error(t('cli.error.notificationsNotInstalled'));
+        console.error(t('cli.error.notificationsInstall'));
         process.exit(1);
       }
 
@@ -687,8 +687,8 @@ program
       const { startTui } = await import('@codeagora/tui/index.js');
       startTui();
     } catch {
-      console.error('@codeagora/tui is not installed.');
-      console.error('Install: npm i -g @codeagora/tui');
+      console.error(t('cli.error.tuiNotInstalled'));
+      console.error(t('cli.error.tuiInstall'));
       process.exit(1);
     }
   });
@@ -729,11 +729,11 @@ program
   .action(async (session: string) => {
     try {
       const [date, id] = session.split('/');
-      if (!date || !id) { console.error('Session must be YYYY-MM-DD/NNN'); process.exit(1); }
+      if (!date || !id) { console.error(t('cli.error.sessionFormat')); process.exit(1); }
       const sessionDir = path.join(process.cwd(), '.ca', 'sessions', date, id);
       const raw = await fs.readFile(path.join(sessionDir, 'result.json'), 'utf-8');
       const result = JSON.parse(raw) as { reviewerMap?: Record<string, string[]> };
-      if (!result.reviewerMap) { console.error('No reviewer map in session'); process.exit(1); }
+      if (!result.reviewerMap) { console.error(t('cli.error.noReviewerMap')); process.exit(1); }
       const allIds = [...new Set(Object.values(result.reviewerMap).flat())];
       const matrix = computeAgreementMatrix(result.reviewerMap, allIds);
       console.log(formatAgreementMatrix(matrix));
@@ -786,7 +786,7 @@ program
     }
 
     if (locale !== 'en' && locale !== 'ko') {
-      console.error(`Unsupported language: "${locale}". Supported: en, ko`);
+      console.error(t('cli.error.unsupportedLanguage', { locale }));
       process.exit(1);
     }
 
@@ -801,12 +801,12 @@ program
     }
 
     if (!configPath) {
-      console.error(`No config file found. Run "${displayName} init" first.`);
+      console.error(t('cli.error.runInitFirst', { cmd: displayName }));
       process.exit(1);
     }
 
     if (configPath.endsWith('.yaml') || configPath.endsWith('.yml')) {
-      console.error('YAML config editing is not yet supported. Use .ca/config.json.');
+      console.error(t('cli.error.yamlNotSupported'));
       process.exit(1);
     }
 
