@@ -133,7 +133,8 @@ function resolveImportPath(fromFile: string, importSpecifier: string): string | 
     }
   }
 
-  return dirParts.join('/');
+  const resolved = dirParts.join('/');
+  return resolved || null;
 }
 
 // ============================================================================
