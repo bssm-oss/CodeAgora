@@ -11,7 +11,7 @@ Directly tested, issue response guaranteed.
 | API | Groq | `GROQ_API_KEY` | Free tier available |
 | API | Anthropic | `ANTHROPIC_API_KEY` | |
 | CLI | Claude Code | `claude` | [claude.ai](https://claude.ai/download) |
-| CLI | Gemini CLI | `gemini` | `npm i -g @anthropic-ai/gemini-cli` |
+| CLI | Gemini CLI | `gemini` | `npm i -g @google/gemini-cli` |
 | CLI | Codex CLI | `codex` | `npm i -g @openai/codex` |
 
 ## Tier 2 — Verified

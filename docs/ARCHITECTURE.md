@@ -1,6 +1,6 @@
 # Architecture
 
-## 3-Layer Pipeline
+## 4-Layer Pipeline
 
 ```
 ┌─────────────────────────────────────────────────┐
