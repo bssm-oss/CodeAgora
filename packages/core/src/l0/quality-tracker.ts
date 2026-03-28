@@ -38,6 +38,7 @@ interface ReviewerTrack {
   specificityScore: number;
   peerValidationRate: number | null;
   headAcceptanceRate: number | null;
+  noIssuesRaised?: boolean;
 }
 
 // ============================================================================
@@ -100,8 +101,9 @@ export class QualityTracker {
 
     for (const [, data] of this.reviewers) {
       if (data.issueLocations.size === 0) {
-        data.peerValidationRate = 1.0;
-        data.headAcceptanceRate = 1.0;
+        data.peerValidationRate = 0.5;   // neutral, not perfect
+        data.headAcceptanceRate = 0.5;   // neutral, not perfect
+        data.noIssuesRaised = true;      // flag for reward skip
         continue;
       }
 
@@ -156,6 +158,11 @@ export class QualityTracker {
         WEIGHTS.headAcceptance * data.headAcceptanceRate +
         WEIGHTS.peerValidation * data.peerValidationRate +
         WEIGHTS.specificity * data.specificityScore;
+
+      if (data.noIssuesRaised) {
+        // Don't update bandit arm — no signal from zero-issue reviewer
+        continue;
+      }
 
       const reward: 0 | 1 = compositeQ >= REWARD_THRESHOLD ? 1 : 0;
 
