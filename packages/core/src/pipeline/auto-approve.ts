@@ -168,11 +168,6 @@ export function analyzeTrivialDiff(
     return { isTrivial: true, reason: 'comments-only', stats };
   }
 
-  // maxLines shortcut: if total changed lines across all files is small and no code
-  if (statsTotal <= config.maxLines && statsCode === 0) {
-    return { isTrivial: true, reason: 'blank-lines-only', stats };
-  }
-
-  // Not trivial
+  // Not trivial (has non-trivial lines: actual code changes)
   return { isTrivial: false, stats };
 }

@@ -92,7 +92,7 @@ export function formatCompact(params: {
 
   return {
     decision,
-    reasoning: reasoning.slice(0, 200),
+    reasoning: reasoning.length > 200 ? reasoning.slice(0, 197) + '...' : reasoning,
     issues,
     summary,
     ...(cost && { cost }),
