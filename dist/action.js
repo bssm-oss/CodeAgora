@@ -59742,7 +59742,8 @@ function resolveImportPath(fromFile, importSpecifier) {
       dirParts.push(part);
     }
   }
-  return dirParts.join("/");
+  const resolved = dirParts.join("/");
+  return resolved || null;
 }
 function clusterByImports(files, graph) {
   const visited = /* @__PURE__ */ new Set();
@@ -61567,7 +61568,7 @@ var QualityTracker = class {
         }
       }
       data.peerValidationRate = totalInDiscussion > 0 ? peerValidated / totalInDiscussion : 1;
-      data.headAcceptanceRate = headAccepted / data.issuesRaised;
+      data.headAcceptanceRate = totalInDiscussion > 0 ? headAccepted / totalInDiscussion : 1;
     }
   }
   /**
@@ -62206,9 +62207,6 @@ function analyzeTrivialDiff(diffContent, config2) {
       return { isTrivial: true, reason: "import-reorder", stats };
     }
     return { isTrivial: true, reason: "comments-only", stats };
-  }
-  if (statsTotal <= config2.maxLines && statsCode === 0) {
-    return { isTrivial: true, reason: "blank-lines-only", stats };
   }
   return { isTrivial: false, stats };
 }
@@ -63085,7 +63083,7 @@ async function runPipeline(input, progress) {
     let allEvidenceDocs = allReviewResults.flatMap(
       (r) => r.evidenceDocs
     );
-    const compiledRules = await loadReviewRules(process.cwd());
+    const compiledRules = await loadReviewRules(input.repoPath ?? process.cwd());
     if (compiledRules && compiledRules.length > 0) {
       const ruleEvidence = matchRules(diffContent, compiledRules);
       if (ruleEvidence.length > 0) {
@@ -63093,7 +63091,7 @@ async function runPipeline(input, progress) {
         allEvidenceDocs.push(...ruleEvidence);
       }
     }
-    const learnedPatterns = await loadLearnedPatterns(process.cwd());
+    const learnedPatterns = await loadLearnedPatterns(input.repoPath ?? process.cwd());
     if (learnedPatterns && learnedPatterns.dismissedPatterns.length > 0) {
       const { filtered, suppressed } = applyLearnedPatterns(
         allEvidenceDocs,
