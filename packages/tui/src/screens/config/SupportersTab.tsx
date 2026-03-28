@@ -127,7 +127,7 @@ export function SupportersTab({ config, isActive, onConfigChange }: Props): Reac
         setMode('confirm-delete');
       }
     } else if (input === 'p') {
-      setPickCountInput(String(config.supporters.pickCount));
+      setPickCountInput(String(config.supporters?.pickCount ?? 2));
       setMode('edit-pick-count');
     } else if (input === 's') {
       cyclePickStrategy();
@@ -190,8 +190,8 @@ export function SupportersTab({ config, isActive, onConfigChange }: Props): Reac
 
             <Box marginTop={1} flexDirection="column">
               <Text dimColor bold>{icons.separator} {t('config.supporter.poolSettings')}</Text>
-              <DetailRow label={t('config.pool.pickCount')} value={String(config.supporters.pickCount)} labelWidth={14} />
-              <DetailRow label={t('config.pool.pickStrategy')} value={config.supporters.pickStrategy} labelWidth={14} />
+              <DetailRow label={t('config.pool.pickCount')} value={String(config.supporters?.pickCount ?? 2)} labelWidth={14} />
+              <DetailRow label={t('config.pool.pickStrategy')} value={config.supporters?.pickStrategy ?? 'random'} labelWidth={14} />
             </Box>
 
             <Box marginTop={1}>
