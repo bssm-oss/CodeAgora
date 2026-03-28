@@ -24,6 +24,7 @@ export function HeadTab({ config, isActive, onConfigChange }: Props): React.JSX.
   const [editBackend, setEditBackend] = useState('');
   const [editTimeout, setEditTimeout] = useState('');
   const [activeField, setActiveField] = useState(0);
+  const [validationError, setValidationError] = useState('');
 
   const head = config.head ?? { model: '', backend: 'api' as const, provider: '', timeout: 120, enabled: true };
 
@@ -33,6 +34,7 @@ export function HeadTab({ config, isActive, onConfigChange }: Props): React.JSX.
     setEditBackend(head.backend ?? 'api');
     setEditTimeout(String(head.timeout ?? 120));
     setActiveField(0);
+    setValidationError('');
     setEditMode(true);
   }
 
@@ -45,12 +47,21 @@ export function HeadTab({ config, isActive, onConfigChange }: Props): React.JSX.
 
   function saveEdit(): void {
     const timeout = parseInt(editTimeout, 10);
+    const trimmedModel = (editModel || head.model || '').trim();
+    
+    // Validate model name is not empty before saving
+    if (!trimmedModel) {
+      setValidationError('Model name cannot be empty');
+      return;
+    }
+    setValidationError('');
+    
     onConfigChange({
       ...config,
       head: {
         ...head,
         provider: editProvider || head.provider,
-        model: editModel || head.model,
+        model: trimmedModel,
         backend: editBackend as typeof head.backend || head.backend,
         timeout: isNaN(timeout) ? 120 : timeout,
       },
@@ -131,6 +142,11 @@ export function HeadTab({ config, isActive, onConfigChange }: Props): React.JSX.
             </Box>
           );
         })}
+        {validationError ? (
+          <Box marginTop={1}>
+            <Text color={colors.error}>{icons.cross} {validationError}</Text>
+          </Box>
+        ) : null}
         <Box marginTop={1}>
           <Text dimColor>Enter save  Esc cancel  Tab next field</Text>
         </Box>
