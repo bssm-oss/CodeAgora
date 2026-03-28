@@ -4,6 +4,13 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
+│  L0: Model Intelligence                          │
+│  Thompson Sampling (bandit) model selection,     │
+│  health monitoring, quality tracking,            │
+│  specificity scoring, leaderboard                │
+└───────┬─────────────────────────────────────────┘
+        │ Selected reviewers
+┌───────▼─────────────────────────────────────────┐
 │  L1: Parallel Reviewers                          │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐        │
 │  │ Reviewer │ │ Reviewer │ │ Reviewer │  ...    │
@@ -27,6 +34,8 @@
 │  ACCEPT / REJECT / NEEDS_HUMAN                   │
 └─────────────────────────────────────────────────┘
 ```
+
+**L0 — Model Intelligence**: Thompson Sampling (bandit) selects reviewer models based on quality history. Tracks health, specificity scores, and maintains a performance leaderboard.
 
 **L1 — Parallel Reviewers**: Multiple LLMs review the diff independently. Severity-based thresholds determine which issues proceed to debate.
 
