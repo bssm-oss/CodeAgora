@@ -251,6 +251,34 @@ export function chunkDiffFiles(
 }
 
 // ============================================================================
+// Built-in Artifact Filter (#228)
+// ============================================================================
+
+/**
+ * Default patterns for files that should never be reviewed.
+ * These are build outputs, lock files, and minified bundles — not source code.
+ * Users can add additional patterns via .reviewignore.
+ */
+export const BUILT_IN_ARTIFACT_PATTERNS = [
+  'dist/**',
+  'build/**',
+  'out/**',
+  '.next/**',
+  '.nuxt/**',
+  'coverage/**',
+  'node_modules/**',
+  '**/*.min.js',
+  '**/*.min.css',
+  '**/*.bundle.js',
+  'pnpm-lock.yaml',
+  'package-lock.json',
+  'yarn.lock',
+  'bun.lockb',
+  '**/*.d.ts.map',
+  '**/*.js.map',
+];
+
+// ============================================================================
 // .reviewignore Filter
 // ============================================================================
 
@@ -348,18 +376,22 @@ export async function chunkDiff(diffContent: string, options?: ChunkOptions): Pr
   const parsedFiles = parseDiffFiles(diffContent);
   if (parsedFiles.length === 0) return [];
 
-  // 2. Apply .reviewignore filter
+  // 2. Filter built-in artifact patterns (dist/, lock files, minified bundles)
+  const artifactFiltered = filterIgnoredFiles(parsedFiles, BUILT_IN_ARTIFACT_PATTERNS);
+  if (artifactFiltered.length === 0) return [];
+
+  // 3. Apply .reviewignore filter (user-defined patterns)
   const ignorePatterns = await loadReviewIgnorePatterns(options?.cwd);
-  const filteredFiles = filterIgnoredFiles(parsedFiles, ignorePatterns);
+  const filteredFiles = filterIgnoredFiles(artifactFiltered, ignorePatterns);
   if (filteredFiles.length === 0) return [];
 
-  // 3. Split large files by hunk boundaries
+  // 4. Split large files by hunk boundaries
   const splitFiles: Array<{ filePath: string; content: string }> = [];
   for (const file of filteredFiles) {
     splitFiles.push(...splitLargeFile(file, maxTokens));
   }
 
-  // 4. Check if everything fits in a single chunk
+  // 5. Check if everything fits in a single chunk
   const totalTokens = splitFiles.reduce((sum, f) => sum + estimateTokens(f.content), 0);
   if (totalTokens <= maxTokens) {
     const joined = splitFiles.map((f) => f.content).join('\n');
@@ -373,6 +405,6 @@ export async function chunkDiff(diffContent: string, options?: ChunkOptions): Pr
     ];
   }
 
-  // 5. Group into chunks
+  // 6. Group into chunks
   return chunkDiffFiles(splitFiles, maxTokens);
 }
