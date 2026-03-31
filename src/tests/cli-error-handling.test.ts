@@ -1,89 +1,78 @@
 /**
- * CLI Error Handling Tests — classifyError + formatError
+ * CLI Error Handling Tests — formatError hint matching
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyError, formatError } from '@codeagora/cli/utils/errors.js';
+import { formatError } from '@codeagora/cli/utils/errors.js';
 
 // ============================================================================
-// classifyError
+// formatError — hint matching (replaces classifyError tests)
 // ============================================================================
 
-describe('classifyError()', () => {
-  it('returns exitCode 2 for Config file not found error', () => {
-    const result = classifyError(new Error('Config file not found at .ca/config.json'));
-    expect(result.exitCode).toBe(2);
-    expect(result.hint).toContain('agora init');
+describe('formatError() hint matching', () => {
+  it('shows config hint for Config file not found', () => {
+    const output = formatError(new Error('Config file not found at .ca/config.json'), false);
+    expect(output).toContain('Hint:');
+    expect(output).toContain('agora init');
   });
 
-  it('returns exitCode 2 for config.json reference', () => {
-    const result = classifyError(new Error('Failed to read config.json'));
-    expect(result.exitCode).toBe(2);
+  it('shows config hint for config.json reference', () => {
+    const output = formatError(new Error('Failed to read config.json'), false);
+    expect(output).toContain('Hint:');
   });
 
-  it('returns exitCode 2 for API key issues', () => {
-    const result = classifyError(new Error('Invalid API key provided'));
-    expect(result.exitCode).toBe(2);
-    expect(result.hint).toContain('agora providers');
+  it('shows API key hint for API key issues', () => {
+    const output = formatError(new Error('Invalid API key provided'), false);
+    expect(output).toContain('Hint:');
+    expect(output).toContain('agora providers');
   });
 
-  it('returns exitCode 2 for API_KEY env var issues', () => {
-    const result = classifyError(new Error('OPENAI_API_KEY is not set'));
-    expect(result.exitCode).toBe(2);
+  it('shows API key hint for API_KEY env var issues', () => {
+    const output = formatError(new Error('OPENAI_API_KEY is not set'), false);
+    expect(output).toContain('Hint:');
   });
 
-  it('returns exitCode 3 for reviewer forfeited error', () => {
-    const result = classifyError(new Error('Reviewer forfeited after timeout'));
-    expect(result.exitCode).toBe(3);
-    expect(result.hint).toContain('agora doctor');
+  it('shows doctor hint for reviewer forfeited error', () => {
+    const output = formatError(new Error('Reviewer forfeited after timeout'), false);
+    expect(output).toContain('Hint:');
+    expect(output).toContain('agora doctor');
   });
 
-  it('returns exitCode 3 for Too many reviewers error', () => {
-    const result = classifyError(new Error('Too many reviewers failed'));
-    expect(result.exitCode).toBe(3);
+  it('shows doctor hint for Too many reviewers error', () => {
+    const output = formatError(new Error('Too many reviewers failed'), false);
+    expect(output).toContain('Hint:');
   });
 
-  it('returns exitCode 3 for ENOENT file not found', () => {
-    const result = classifyError(new Error('ENOENT: no such file or directory'));
-    expect(result.exitCode).toBe(3);
-    expect(result.hint).toContain('file path');
+  it('shows path hint for ENOENT file not found', () => {
+    const output = formatError(new Error('ENOENT: no such file or directory'), false);
+    expect(output).toContain('Hint:');
+    expect(output).toContain('file path');
   });
 
-  it('returns exitCode 3 for "not found" message', () => {
-    const result = classifyError(new Error('Diff file not found: /tmp/test.patch'));
-    expect(result.exitCode).toBe(3);
+  it('shows path hint for "not found" message', () => {
+    const output = formatError(new Error('Diff file not found: /tmp/test.patch'), false);
+    expect(output).toContain('Hint:');
   });
 
-  it('returns exitCode 2 for JSON parse error', () => {
-    const result = classifyError(new Error('Unexpected token in JSON'));
-    expect(result.exitCode).toBe(2);
-    expect(result.hint).toContain('config file syntax');
+  it('shows syntax hint for JSON parse error', () => {
+    const output = formatError(new Error('Unexpected token in JSON'), false);
+    expect(output).toContain('Hint:');
+    expect(output).toContain('config file syntax');
   });
 
-  it('returns exitCode 2 for YAML parse error', () => {
-    const result = classifyError(new Error('YAML parse error at line 5'));
-    expect(result.exitCode).toBe(2);
+  it('shows syntax hint for YAML parse error', () => {
+    const output = formatError(new Error('YAML parse error at line 5'), false);
+    expect(output).toContain('Hint:');
   });
 
-  it('returns exitCode 3 for unknown errors (default)', () => {
-    const result = classifyError(new Error('Something unexpected happened'));
-    expect(result.exitCode).toBe(3);
-  });
-
-  it('preserves the error message', () => {
-    const msg = 'Some specific error message';
-    const result = classifyError(new Error(msg));
-    expect(result.message).toBe(msg);
-  });
-
-  it('returns no hint for unknown errors', () => {
-    const result = classifyError(new Error('Unknown problem'));
-    expect(result.hint).toBeUndefined();
+  it('shows no hint for unknown errors', () => {
+    const output = formatError(new Error('Something unexpected happened'), false);
+    expect(output).not.toContain('Hint:');
   });
 });
 
 // ============================================================================
-// formatError
+// formatError — output formatting
 // ============================================================================
 
 describe('formatError()', () => {
@@ -92,7 +81,7 @@ describe('formatError()', () => {
     expect(output).toContain('Error: Something went wrong');
   });
 
-  it('includes hint when classified error has one', () => {
+  it('includes hint when error matches a known pattern', () => {
     const output = formatError(new Error('Config file not found'), false);
     expect(output).toContain('Hint:');
     expect(output).toContain('agora init');
@@ -107,7 +96,6 @@ describe('formatError()', () => {
   it('includes stack trace when verbose is true', () => {
     const err = new Error('test error');
     const output = formatError(err, true);
-    // stack trace will contain "at " from call frames
     expect(output).toContain(err.stack ?? '');
   });
 

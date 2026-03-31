@@ -5,45 +5,34 @@
 import { statusColor, dim } from './colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 
-export interface CliError {
-  message: string;
-  hint?: string;
-  exitCode: number; // 2=config/setup, 3=runtime
-}
-
-export function classifyError(error: Error): CliError {
-  const msg = error.message;
-
-  // Config not found
+/**
+ * Match an error message to a user-friendly hint.
+ */
+function getErrorHint(msg: string): string | undefined {
   if (msg.includes('Config file not found') || msg.includes('config.json')) {
-    return { message: msg, hint: t('error.configHint'), exitCode: 2 };
+    return t('error.configHint');
   }
-  // API key issues
   if ((msg.includes('API') || msg.includes('api')) && (msg.includes('key') || msg.includes('KEY'))) {
-    return { message: msg, hint: t('error.apiKeyHint'), exitCode: 2 };
+    return t('error.apiKeyHint');
   }
-  // Reviewer failures
   if (msg.includes('forfeited') || msg.includes('Too many reviewers')) {
-    return { message: msg, hint: t('error.doctorHint'), exitCode: 3 };
+    return t('error.doctorHint');
   }
-  // File not found
   if (msg.includes('ENOENT') || msg.includes('no such file') || msg.includes('not found')) {
-    return { message: msg, hint: t('error.pathHint'), exitCode: 3 };
+    return t('error.pathHint');
   }
-  // YAML/JSON parse errors
   if (msg.includes('parse error') || msg.includes('JSON') || msg.includes('YAML')) {
-    return { message: msg, hint: t('error.syntaxHint'), exitCode: 2 };
+    return t('error.syntaxHint');
   }
-  // Default
-  return { message: msg, exitCode: 3 };
+  return undefined;
 }
 
 export function formatError(error: Error, verbose: boolean): string {
-  const classified = classifyError(error);
+  const hint = getErrorHint(error.message);
   const lines: string[] = [];
-  lines.push(statusColor.fail(`Error: ${classified.message}`));
-  if (classified.hint) {
-    lines.push(dim(`Hint: ${classified.hint}`));
+  lines.push(statusColor.fail(`Error: ${error.message}`));
+  if (hint) {
+    lines.push(dim(`Hint: ${hint}`));
   }
   if (verbose) {
     lines.push('');
