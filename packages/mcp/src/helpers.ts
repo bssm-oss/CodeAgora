@@ -27,6 +27,9 @@ async function runReviewWithDiff(
       diffPath: tmpFile,
       skipDiscussion: options.skipDiscussion,
       skipHead: options.skipHead,
+      ...(options.reviewerCount != null && {
+        reviewerSelection: { count: options.reviewerCount },
+      }),
     });
 
     if (result.status !== 'success' || !result.summary) {

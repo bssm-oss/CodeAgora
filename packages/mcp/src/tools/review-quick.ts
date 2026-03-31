@@ -15,8 +15,13 @@ export function registerReviewQuick(server: McpServer): void {
       reviewer_count: z.number().optional().default(3).describe('Number of reviewers (default: 3)'),
     },
     async ({ diff, reviewer_count }) => {
-      const result = await runQuickReview(diff, reviewer_count);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await runQuickReview(diff, reviewer_count);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
     },
   );
 }

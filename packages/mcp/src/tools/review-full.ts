@@ -14,8 +14,13 @@ export function registerReviewFull(server: McpServer): void {
       diff: z.string().describe('Unified diff content'),
     },
     async ({ diff }) => {
-      const result = await runFullReview(diff);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      try {
+        const result = await runFullReview(diff);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: msg }) }], isError: true };
+      }
     },
   );
 }
