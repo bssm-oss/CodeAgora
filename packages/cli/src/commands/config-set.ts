@@ -52,8 +52,10 @@ async function resolveConfigPath(baseDir: string): Promise<string | null> {
 function parseValue(raw: string): string | number | boolean {
   if (raw === 'true') return true;
   if (raw === 'false') return false;
-  const num = Number(raw);
-  if (!isNaN(num) && raw.trim() !== '') return num;
+  // Only accept strict decimal numbers (optional negative, integer or float)
+  if (/^-?\d+(\.\d+)?$/.test(raw.trim())) {
+    return Number(raw);
+  }
   return raw;
 }
 
