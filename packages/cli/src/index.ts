@@ -111,6 +111,7 @@ program
     contextLines?: number;
     jsonStream?: boolean;
     cache: boolean;
+    failOnReject?: boolean;
   }) => {
     // Hoist stdinTmpPath so finally block can clean it up (#77)
     let stdinTmpPath: string | undefined;
