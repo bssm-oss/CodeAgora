@@ -92,6 +92,7 @@ export interface Discussion {
   lineRange: [number, number];
   codeSnippet: string; // ±10 lines
   evidenceDocs: string[]; // Paths to reviewer evidence .md files
+  evidenceContent?: EvidenceDocument[]; // Actual L1 evidence for supporter prompts
   status: 'pending' | 'in_progress' | 'resolved' | 'escalated';
 }
 

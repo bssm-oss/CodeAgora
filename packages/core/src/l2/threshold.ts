@@ -169,6 +169,7 @@ function createDiscussion(group: LocationGroup, severity: Severity, counter: { v
     lineRange: group.lineRange,
     codeSnippet: '', // Populated by moderator
     evidenceDocs: group.docs.map((d) => `evidence-${d.issueTitle.replace(/\s+/g, '-')}.md`),
+    evidenceContent: group.docs, // Actual L1 content for supporter prompts (#246)
     status: 'pending',
   };
 }

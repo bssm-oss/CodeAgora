@@ -570,8 +570,38 @@ ${rounds.map((r, i) => `Round ${i + 1}:\n${r.supporterResponses.map(s => `- ${s.
 // Helpers
 // ============================================================================
 
+function buildEvidenceSection(discussion: Discussion, isKo: boolean): string {
+  const content = discussion.evidenceContent;
+  if (!content || content.length === 0) {
+    return isKo
+      ? `근거 문서: ${discussion.evidenceDocs.length}명의 리뷰어`
+      : `Evidence documents: ${discussion.evidenceDocs.length} reviewer(s)`;
+  }
+
+  const sections = content.map((doc, i) => {
+    if (isKo) {
+      return [
+        `**리뷰어 ${i + 1}** (${doc.severity}):`,
+        `문제: ${doc.problem}`,
+        doc.evidence.length > 0 ? `근거: ${doc.evidence.join('; ')}` : '',
+        doc.suggestion ? `제안: ${doc.suggestion}` : '',
+      ].filter(Boolean).join('\n');
+    }
+    return [
+      `**Reviewer ${i + 1}** (${doc.severity}):`,
+      `Problem: ${doc.problem}`,
+      doc.evidence.length > 0 ? `Evidence: ${doc.evidence.join('; ')}` : '',
+      doc.suggestion ? `Suggestion: ${doc.suggestion}` : '',
+    ].filter(Boolean).join('\n');
+  });
+
+  const label = isKo ? '리뷰어 근거' : 'Reviewer Evidence';
+  return `${label}:\n\n${sections.join('\n\n')}`;
+}
+
 function buildModeratorPrompt(discussion: Discussion, roundNum: number, language?: 'en' | 'ko'): string {
   const isKo = language === 'ko';
+  const evidenceSection = buildEvidenceSection(discussion, isKo);
 
   if (isKo) {
     const snippetSection = discussion.codeSnippet && discussion.codeSnippet.trim()
@@ -587,7 +617,7 @@ ${discussion.codeSnippet}
 파일: ${discussion.filePath}:${discussion.lineRange[0]}-${discussion.lineRange[1]}
 주장된 심각도: ${discussion.severity}
 
-근거 문서: ${discussion.evidenceDocs.length}명의 리뷰어
+${evidenceSection}
 
 ${snippetSection}
 
@@ -612,11 +642,11 @@ Issue: ${discussion.issueTitle}
 File: ${discussion.filePath}:${discussion.lineRange[0]}-${discussion.lineRange[1]}
 Claimed Severity: ${discussion.severity}
 
-Evidence documents: ${discussion.evidenceDocs.length} reviewer(s)
+${evidenceSection}
 
 ${snippetSection}
 
-Evaluate the evidence and provide your verdict.`;
+Evaluate the evidence above and provide your verdict.`;
 }
 
 type Stance = 'agree' | 'disagree' | 'neutral';
