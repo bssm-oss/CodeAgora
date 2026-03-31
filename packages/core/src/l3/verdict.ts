@@ -58,7 +58,10 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
     const consensus = d.consensusReached
       ? (isKo ? '합의 도달' : 'consensus reached')
       : (isKo ? '합의 미달' : 'no consensus');
-    return `- [${d.finalSeverity}] ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${consensus}, ${d.rounds} ${isKo ? '라운드' : 'round(s)'}: ${d.reasoning}`;
+    const confStr = d.avgConfidence != null
+      ? (isKo ? `, 신뢰도: ${d.avgConfidence}%` : `, confidence: ${d.avgConfidence}%`)
+      : '';
+    return `- [${d.finalSeverity}] ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${consensus}, ${d.rounds} ${isKo ? '라운드' : 'round(s)'}${confStr}: ${d.reasoning}`;
   }).join('\n');
 
   // Build condensed evidence for CRITICAL+ findings (#310)
@@ -106,9 +109,13 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 - SUGGESTION: ${suggestionCount}건
 - 미해결 토론: ${unresolvedCount}건
 
-## 판단 지침
-- CRITICAL 이상 이슈가 존재하면: REJECT 강력 권고
-- 미해결 토론이 남아있으면: NEEDS_HUMAN 고려`
+## 판단 지침 (신뢰도 기반 분류 필수)
+- CRITICAL+ 이슈를 신뢰도 구간별로 분류할 것
+- 신뢰도 >50% CRITICAL+: 실제 문제 가능성 높음 — REJECT 고려
+- 신뢰도 ≤15% CRITICAL+: 미검증 — NEEDS_HUMAN으로 라우팅, REJECT 금지
+- 미해결 토론이 남아있으면: NEEDS_HUMAN 고려
+- 0% 신뢰도 이슈를 "차단 이슈"로 표시할 경우 반드시 "미검증" 표기 필요
+- 모든 CRITICAL+ 이슈가 저신뢰도라면: REJECT 대신 NEEDS_HUMAN + 트리아지 가이드 반환`
     : `## Quantitative Summary
 - HARSHLY_CRITICAL: ${harshlyCount} issues
 - CRITICAL: ${criticalCount} issues
@@ -116,9 +123,12 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 - SUGGESTION: ${suggestionCount} issues
 - Unresolved discussions: ${unresolvedCount}
 
-## Guidance
-- If CRITICAL+ issues exist: strongly consider REJECT
-- If unresolved discussions remain: consider NEEDS_HUMAN`;
+## Triage Guidance (#236)
+- Group findings by confidence tier before deciding
+- CRITICAL+ with confidence >50%: likely real — consider REJECT
+- CRITICAL+ with confidence ≤15%: unverified — route to NEEDS_HUMAN, NOT REJECT
+- Do NOT mark zero-confidence findings as "Blocking Issues" without flagging them as unverified
+- If all critical findings are low-confidence, return NEEDS_HUMAN with triage guidance`;
 
   if (isKo) {
     return `당신은 멀티 에이전트 코드 리뷰 시스템의 최종 판관입니다. 여러 AI 리뷰어가 독립적으로 코드 변경을 검토한 후 토론을 진행했습니다. 최종 판결을 내려주세요.
@@ -220,9 +230,22 @@ function parseHeadResponse(response: string, report: ModeratorReport): HeadVerdi
 // Rule-Based Verdict (Fallback)
 // ============================================================================
 
+/**
+ * Issues at or below this confidence (%) are treated as unverified — routed to
+ * NEEDS_HUMAN instead of REJECT. (#229: 0% confidence should not be HARSHLY_CRITICAL)
+ */
+const ZERO_CONFIDENCE_THRESHOLD = 15;
+
 function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'): HeadVerdict {
-  const criticalIssues = report.discussions.filter(
+  // Separate high-confidence critical issues from unverified (zero/very-low confidence) ones (#229)
+  const allCritical = report.discussions.filter(
     (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
+  );
+  const criticalIssues = allCritical.filter(
+    (d) => d.avgConfidence == null || d.avgConfidence > ZERO_CONFIDENCE_THRESHOLD
+  );
+  const unverifiedCritical = allCritical.filter(
+    (d) => d.avgConfidence != null && d.avgConfidence <= ZERO_CONFIDENCE_THRESHOLD
   );
 
   const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
@@ -242,12 +265,30 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
   }
 
   if (criticalIssues.length > 0) {
+    const unverifiedNote = unverifiedCritical.length > 0
+      ? ` Additionally, ${unverifiedCritical.length} low-confidence critical finding(s) need verification.`
+      : '';
+    const questions = [
+      ...(escalatedIssues.length > 0 ? [`${escalatedIssues.length} issue(s) need human judgment`] : []),
+      ...(unverifiedCritical.length > 0
+        ? [`${unverifiedCritical.length} low-confidence finding(s) need verification: ${unverifiedCritical.map((d) => d.discussionId).join(', ')}`]
+        : []),
+    ];
     return {
       decision: 'REJECT',
-      reasoning: `Found ${criticalIssues.length} critical issue(s) that must be fixed before merging.`,
-      questionsForHuman: escalatedIssues.length > 0
-        ? [`${escalatedIssues.length} issue(s) need human judgment`]
-        : undefined,
+      reasoning: `Found ${criticalIssues.length} critical issue(s) that must be fixed before merging.${unverifiedNote}`,
+      questionsForHuman: questions.length > 0 ? questions : undefined,
+    };
+  }
+
+  // Only unverified critical (zero confidence) — escalate to human instead of hard reject
+  if (unverifiedCritical.length > 0) {
+    return {
+      decision: 'NEEDS_HUMAN',
+      reasoning: `Found ${unverifiedCritical.length} critical finding(s) with very low confidence (≤${ZERO_CONFIDENCE_THRESHOLD}%). These may be false positives — human verification required before rejecting.`,
+      questionsForHuman: unverifiedCritical.map(
+        (d) => `Verify: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${d.finalSeverity}, ${d.avgConfidence}% confidence`
+      ),
     };
   }
 
