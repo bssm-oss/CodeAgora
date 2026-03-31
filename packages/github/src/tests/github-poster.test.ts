@@ -147,14 +147,17 @@ describe('postReview()', () => {
     expect(callArgs.comments.length).toBeLessThanOrEqual(50);
   });
 
-  it('falls back to review without inline comments on 422 position error', async () => {
+  it('falls back via bisection on 422 position error, preserving valid comments', async () => {
     const positionError = Object.assign(new Error('Unprocessable Entity'), { status: 422 });
-    const octokit = makeOctokit({ createReviewError: positionError });
+    const octokit = makeOctokit();
 
-    // Second call (fallback) should succeed
+    // First call (all comments) → 422
+    // Bisection probe (single comment) → 422 (comment is bad)
+    // Final review (no surviving comments) → success
     octokit.pulls.createReview
-      .mockRejectedValueOnce(positionError)
-      .mockResolvedValueOnce({
+      .mockRejectedValueOnce(positionError)  // initial attempt
+      .mockRejectedValueOnce(positionError)  // bisection probe of single comment
+      .mockResolvedValue({                   // final review with empty survivors
         data: {
           id: 777,
           html_url: 'https://github.com/test-owner/test-repo/pull/1#pullrequestreview-777',
@@ -167,9 +170,9 @@ describe('postReview()', () => {
 
     const result = await postReview(makeConfig(), 1, review, octokit as never);
     expect(result.reviewId).toBe(777);
-    // Second call should have empty comments array
-    const secondCall = octokit.pulls.createReview.mock.calls[1][0];
-    expect(secondCall.comments).toEqual([]);
+    // Final call should have empty comments (the single bad comment was dropped)
+    const lastCall = octokit.pulls.createReview.mock.calls[octokit.pulls.createReview.mock.calls.length - 1][0];
+    expect(lastCall.comments).toEqual([]);
   });
 
   it('throws for non-position API errors', async () => {

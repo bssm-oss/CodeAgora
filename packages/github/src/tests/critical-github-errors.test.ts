@@ -180,20 +180,55 @@ describe('POST-001: 422 fallback createReview also fails', () => {
 // POST-002: rate limit (429) → thrown as-is (not position error, no fallback)
 // ============================================================================
 
-describe('POST-002: 429 rate limit error propagates without fallback', () => {
-  it('throws immediately on 429 without attempting fallback', async () => {
+describe('POST-002: 429 rate limit error — retries with backoff then throws', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries up to 3 times on 429, then throws after exhausting retries', async () => {
     const rateLimitError = Object.assign(new Error('API rate limit exceeded'), { status: 429 });
-    const octokit = makeOctokit({ createReviewFirstError: rateLimitError });
-    // Override second call to fail differently to confirm it's NOT called
+    const octokit = makeOctokit();
+    // All 4 attempts (1 initial + 3 retries) return 429
     octokit.pulls.createReview
-      .mockRejectedValueOnce(rateLimitError);
+      .mockRejectedValue(rateLimitError);
 
-    await expect(
-      postReview(makeConfig(), 1, makeReview(), octokit as never),
-    ).rejects.toThrow('API rate limit exceeded');
+    const promise = postReview(makeConfig(), 1, makeReview(), octokit as never);
+    // Attach a catch handler immediately to prevent unhandled rejection
+    promise.catch(() => {});
 
-    // Only one call — no fallback for non-422 errors
-    expect(octokit.pulls.createReview).toHaveBeenCalledTimes(1);
+    // Advance timers to flush all backoff sleeps
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+
+    await expect(promise).rejects.toThrow('API rate limit exceeded');
+    // 1 initial + 3 retries = 4 total attempts
+    expect(octokit.pulls.createReview).toHaveBeenCalledTimes(4);
+  });
+
+  it('succeeds on retry when 429 is transient', async () => {
+    const rateLimitError = Object.assign(new Error('API rate limit exceeded'), { status: 429 });
+    const octokit = makeOctokit();
+    octokit.pulls.createReview
+      .mockRejectedValueOnce(rateLimitError)
+      .mockResolvedValue({
+        data: {
+          id: 999,
+          html_url: 'https://github.com/test-owner/test-repo/pull/1#pullrequestreview-999',
+        },
+      });
+
+    const promise = postReview(makeConfig(), 1, makeReview(), octokit as never);
+
+    // Advance past the backoff delay
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    const result = await promise;
+    expect(result.reviewId).toBe(999);
+    expect(octokit.pulls.createReview).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -201,8 +236,8 @@ describe('POST-002: 429 rate limit error propagates without fallback', () => {
 // POST-005: CRITICAL comment after index 50 is dropped by slice
 // ============================================================================
 
-describe('POST-005: CRITICAL issue beyond position 50 is truncated by slice', () => {
-  it('CRITICAL comment at index 55 is dropped when 60 comments are present (no severity sort)', async () => {
+describe('POST-005: CRITICAL issue beyond original position 50 is preserved by severity sort', () => {
+  it('CRITICAL comment originally at index 55 is retained after severity-based sorting', async () => {
     const octokit = makeOctokit();
 
     // Build 60 comments: first 54 are WARNING, then 1 CRITICAL at index 55, rest WARNING
@@ -210,7 +245,7 @@ describe('POST-005: CRITICAL issue beyond position 50 is truncated by slice', ()
       path: `file${i}.ts`,
       position: i + 1,
       side: 'RIGHT' as const,
-      body: i === 55 ? '🔴 CRITICAL — buffer overflow' : '🟡 WARNING — minor issue',
+      body: i === 55 ? '\u{1F534} **CRITICAL** \u2014 buffer overflow' : '\u{1F7E1} **WARNING** \u2014 minor issue',
     }));
 
     const review = makeReview({ comments, event: 'REQUEST_CHANGES' });
@@ -219,9 +254,11 @@ describe('POST-005: CRITICAL issue beyond position 50 is truncated by slice', ()
     const callArgs = octokit.pulls.createReview.mock.calls[0][0] as { comments: Array<{ body: string }> };
     // Only 50 comments passed
     expect(callArgs.comments.length).toBe(50);
-    // The CRITICAL at index 55 is absent (slice(0, 50) excludes it)
+    // The CRITICAL is now present (severity sort puts it first)
     const hasCritical = callArgs.comments.some((c) => c.body.includes('CRITICAL'));
-    expect(hasCritical).toBe(false);
+    expect(hasCritical).toBe(true);
+    // First comment should be the CRITICAL one
+    expect(callArgs.comments[0].body).toContain('CRITICAL');
   });
 });
 
