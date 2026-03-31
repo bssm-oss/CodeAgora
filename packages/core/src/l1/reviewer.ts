@@ -328,8 +328,24 @@ async function executeReviewerWithGuards(
           error: error.message,
         };
       }
-      if (useGuards) cb.recordFailure(provider!, config.model);
       lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Auth errors (401/403) are permanent — forfeit immediately without
+      // recording to circuit breaker to avoid blocking the model (#270)
+      const errMsg = lastError.message;
+      if (/\b(401|403)\b/.test(errMsg) || /\b(Unauthorized|Forbidden)\b/i.test(errMsg)) {
+        return {
+          reviewerId: config.id,
+          model: config.model,
+          group: groupName,
+          evidenceDocs: [],
+          rawResponse: '',
+          status: 'forfeit',
+          error: `Auth error (permanent): ${errMsg}`,
+        };
+      }
+
+      if (useGuards) cb.recordFailure(provider!, config.model);
 
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));

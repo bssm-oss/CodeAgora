@@ -531,9 +531,11 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     );
 
     // === RULES: Apply custom review rules ===
+    // Use filtered diff from chunks (respects .reviewignore) instead of raw diffContent (#300)
+    const filteredDiffContent = chunks.map(c => c.diffContent).join('\n');
     const compiledRules = await loadReviewRules(input.repoPath ?? process.cwd());
     if (compiledRules && compiledRules.length > 0) {
-      const ruleEvidence = matchRules(diffContent, compiledRules);
+      const ruleEvidence = matchRules(filteredDiffContent, compiledRules);
       if (ruleEvidence.length > 0) {
         console.log(`[Rules] Matched ${ruleEvidence.length} rule-based issue(s)`);
         allEvidenceDocs.push(...ruleEvidence);

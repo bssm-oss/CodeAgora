@@ -125,9 +125,10 @@ export function initFromData(
 export async function loadRegistry(): Promise<void> {
   const fs = await import('fs/promises');
   const path = await import('path');
+  const { fileURLToPath } = await import('url');
 
   const dataDir = path.resolve(
-    new URL('.', import.meta.url).pathname,
+    path.dirname(fileURLToPath(import.meta.url)),
     '../../../shared/src/data'
   );
 
