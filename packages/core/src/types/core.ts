@@ -114,6 +114,8 @@ export interface DiscussionVerdict {
   reasoning: string;
   consensusReached: boolean;
   rounds: number;
+  /** Average confidence (0-100) of the underlying evidence docs, computed after L2 */
+  avgConfidence?: number;
 }
 
 // ============================================================================

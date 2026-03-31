@@ -295,6 +295,16 @@ async function executeL2Discussions(
     for (const doc of matchingDocs) {
       doc.confidence = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
     }
+
+    // Propagate average confidence to verdict for use in L3 head prompt (#229).
+    // Only count docs that have an explicit confidence value — docs without
+    // confidence were not scored by L1 and should not inflate the average.
+    const scoredDocs = matchingDocs.filter(d => d.confidence != null);
+    if (scoredDocs.length > 0) {
+      verdict.avgConfidence = Math.round(
+        scoredDocs.reduce((sum, d) => sum + d.confidence!, 0) / scoredDocs.length
+      );
+    }
   }
 
   return moderatorReport;
