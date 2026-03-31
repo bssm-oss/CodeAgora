@@ -60,6 +60,9 @@ export function createApp(): Hono {
     serveStatic({ root: './dist/frontend' }),
   );
 
+  // SPA fallback — serve index.html for all unmatched non-API routes
+  app.get('*', serveStatic({ path: './dist/frontend/index.html' }));
+
   return app;
 }
 

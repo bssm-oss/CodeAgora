@@ -2,7 +2,7 @@
  * Map EvidenceDocuments to specific diff lines.
  */
 
-import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument } from '../types/evidence.js';
 
 export interface MappedIssue {
   line: number;

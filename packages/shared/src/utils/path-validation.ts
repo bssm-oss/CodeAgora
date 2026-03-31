@@ -3,8 +3,8 @@
  */
 
 import path from 'path';
-import type { Result } from '@codeagora/core/types/core.js';
-import { ok, err } from '@codeagora/core/types/core.js';
+import type { Result } from '../types/result.js';
+import { ok, err } from '../types/result.js';
 
 export function validateDiffPath(
   diffPath: string,

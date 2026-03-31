@@ -5,7 +5,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { z } from 'zod';
-import { SessionMetadata } from '@codeagora/core/types/core.js';
+import type { SessionMetadata } from '../types/session.js';
 
 // ============================================================================
 // Directory Structure
