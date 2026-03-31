@@ -132,8 +132,8 @@ export function buildSarifReport(
               uriBaseId: '%SRCROOT%',
             },
             region: {
-              startLine: doc.lineRange[0],
-              endLine: doc.lineRange[1],
+              startLine: Math.max(1, doc.lineRange[0]),
+              endLine: Math.max(1, doc.lineRange[1]),
             },
           },
         },

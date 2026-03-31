@@ -16,6 +16,11 @@ import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 
 const MARKER = '<!-- codeagora-v3 -->';
 
+/** GitHub enforces 65,535 char limit on review body; use 60K ceiling for safety. */
+const MAX_REVIEW_BODY_CHARS = 60_000;
+/** GitHub enforces 65,535 char limit on individual comment body. */
+const MAX_COMMENT_BODY_CHARS = 60_000;
+
 /** Truncate a response to N chars, ending at sentence boundary if possible. */
 function truncateResponse(text: string, maxLen: number): string {
   const clean = text.replace(/\n/g, ' ').trim();
@@ -23,6 +28,23 @@ function truncateResponse(text: string, maxLen: number): string {
   const cut = clean.slice(0, maxLen);
   const lastDot = cut.lastIndexOf('.');
   return (lastDot > maxLen * 0.5 ? cut.slice(0, lastDot + 1) : cut) + '...';
+}
+
+/**
+ * Truncate review body to fit GitHub's limit.
+ * Strips low-severity sections (suggestions, then warnings) first to preserve blocking issues.
+ */
+function truncateReviewBody(body: string, maxLen: number): string {
+  // Try removing suggestions section first
+  let trimmed = body.replace(/<details>\s*<summary>\d+ suggestion\(s\)<\/summary>[\s\S]*?<\/details>\s*/g, '');
+  if (trimmed.length <= maxLen) return trimmed;
+
+  // Try removing warnings section
+  trimmed = trimmed.replace(/<details>\s*<summary>\d+ warning\(s\)<\/summary>[\s\S]*?<\/details>\s*/g, '');
+  if (trimmed.length <= maxLen) return trimmed;
+
+  // Last resort: hard truncate
+  return trimmed.slice(0, maxLen - 40) + '\n\n---\n*[Truncated — review body too long]*';
 }
 
 const SEVERITY_BADGE: Record<string, { emoji: string; label: string }> = {
@@ -88,7 +110,7 @@ export function mapToInlineCommentBody(
 
   if (doc.suggestion && options?.postSuggestions !== false) {
     lines.push('');
-    const codeBlockMatch = /```[\w]*\n([\s\S]*?)```/.exec(doc.suggestion);
+    const codeBlockMatch = /```[\w]*\n?([\s\S]*?)```/.exec(doc.suggestion);
     if (codeBlockMatch) {
       const extractedCode = codeBlockMatch[1];
       lines.push('```suggestion');
@@ -531,13 +553,23 @@ export function mapToGitHubReview(params: {
   );
 
   const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap);
-  const body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap });
+  let body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap });
 
-  // Determine event: REQUEST_CHANGES if any CRITICAL/HARSHLY_CRITICAL remains
-  const hasBlocking = activeDocs.some(
-    (d) => d.severity === 'HARSHLY_CRITICAL' || d.severity === 'CRITICAL',
-  );
-  const event: GitHubReview['event'] = hasBlocking ? 'REQUEST_CHANGES' : 'COMMENT';
+  // Enforce GitHub char limits (#268)
+  if (body.length > MAX_REVIEW_BODY_CHARS) {
+    body = truncateReviewBody(body, MAX_REVIEW_BODY_CHARS);
+  }
+  for (const c of comments) {
+    if (c.body.length > MAX_COMMENT_BODY_CHARS) {
+      c.body = c.body.slice(0, MAX_COMMENT_BODY_CHARS - 30) + '\n\n---\n*[Truncated — comment too long]*';
+    }
+  }
+
+  // Determine event from head verdict decision (#258)
+  const event: GitHubReview['event'] =
+    summary.decision === 'REJECT' ? 'REQUEST_CHANGES' :
+    summary.decision === 'ACCEPT' ? 'APPROVE' :
+    'COMMENT';
 
   return {
     commit_id: headSha,

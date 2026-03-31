@@ -211,7 +211,7 @@ describe('mapToGitHubReview', () => {
       sessionId: '002',
       sessionDate: '2026-03-16',
     });
-    expect(review.event).toBe('COMMENT');
+    expect(review.event).toBe('APPROVE');
   });
 
   it('filters out dismissed documents', () => {

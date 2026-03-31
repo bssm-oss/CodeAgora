@@ -45,7 +45,11 @@ export function buildDiffPositionIndex(unifiedDiff: string): DiffPositionIndex {
     // Hunk header: "@@ -42,8 +42,10 @@"
     if (line.startsWith('@@')) {
       const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)/);
-      newLineNumber = match ? parseInt(match[1], 10) - 1 : 0;
+      const MAX_LINE = 10_000_000;
+      const parsed = match ? parseInt(match[1], 10) : NaN;
+      newLineNumber = (Number.isFinite(parsed) && parsed >= 0 && parsed <= MAX_LINE)
+        ? parsed - 1
+        : 0;
       filePosition++;
       continue;
     }

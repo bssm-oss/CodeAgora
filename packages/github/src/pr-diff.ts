@@ -41,9 +41,10 @@ export async function fetchPrDiff(
 
   const diffContent = typeof diff === 'string' ? diff : '';
 
-  const MAX_DIFF_SIZE = 500000; // 500KB
-  if (diffContent.length >= MAX_DIFF_SIZE) {
-    console.warn('[GitHub] Diff may be truncated (>500KB). Some files may be missing from review.');
+  const MAX_DIFF_SIZE = 300_000; // ~300KB — GitHub truncates around this threshold (#288)
+  const truncated = diffContent.length >= MAX_DIFF_SIZE;
+  if (truncated) {
+    console.warn('[GitHub] Diff may be truncated (>=300KB). Some files may be missing from review.');
   }
 
   return {
@@ -52,5 +53,6 @@ export async function fetchPrDiff(
     baseBranch: pr.base.ref,
     headBranch: pr.head.ref,
     diff: diffContent,
+    truncated,
   };
 }

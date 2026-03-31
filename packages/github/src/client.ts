@@ -79,6 +79,8 @@ export interface PullRequestInfo {
   baseBranch: string;
   headBranch: string;
   diff: string;
+  /** True when diff size exceeds GitHub's ~300KB truncation threshold (#288) */
+  truncated?: boolean;
 }
 
 // ============================================================================

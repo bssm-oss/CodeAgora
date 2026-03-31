@@ -9,6 +9,7 @@
 
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import path from 'path';
 import { appendFileSync } from 'fs';
 import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
 import { buildDiffPositionIndex } from './diff-parser.js';
@@ -16,8 +17,9 @@ import { mapToGitHubReview } from './mapper.js';
 import { postReview, setCommitStatus, handleNeedsHuman } from './poster.js';
 import { createAppOctokit } from './client.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
-import { loadConfig } from '@codeagora/core/config/loader.js';
+import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
+import { sendNotifications } from '@codeagora/notifications/webhook.js';
 
 // ============================================================================
 // Input Parsing
@@ -84,9 +86,14 @@ async function main(): Promise<void> {
     }
   }
 
-  // Run pipeline
+  // Load config early — used for pipeline, mapper options, and notifications (#256)
+  const configPath = process.env['CONFIG_PATH'] || '.ca/config.json';
+  const configBaseDir = path.resolve(process.cwd(), path.dirname(path.dirname(configPath)));
+  const config = await loadConfigFrom(configBaseDir).catch(() => null);
+
+  // Run pipeline (#259: pass repoPath for surrounding code context)
   console.log('::group::Running CodeAgora review pipeline');
-  const result = await runPipeline({ diffPath: inputs.diff });
+  const result = await runPipeline({ diffPath: inputs.diff, repoPath: process.cwd() });
   console.log('::endgroup::');
 
   if (result.status === 'error') {
@@ -117,6 +124,8 @@ async function main(): Promise<void> {
   const ghConfig = { token: inputs.token, owner, repo };
   console.log('::group::Posting review to GitHub');
 
+  // Wire config.github settings to mapper (#257)
+  const ghIntegration = config?.github;
   const review = mapToGitHubReview({
     summary: result.summary,
     evidenceDocs,
@@ -131,6 +140,11 @@ async function main(): Promise<void> {
     supporterModelMap: result.supporterModelMap
       ? new Map(Object.entries(result.supporterModelMap))
       : undefined,
+    options: {
+      postSuggestions: ghIntegration?.postSuggestions,
+      collapseDiscussions: ghIntegration?.collapseDiscussions,
+    },
+    minConfidence: ghIntegration?.minConfidence,
   });
 
   const appKit = await createAppOctokit(owner, repo);
@@ -138,12 +152,8 @@ async function main(): Promise<void> {
   const postResult = await postReview(ghConfig, inputs.pr, review, appKit ?? undefined);
   await setCommitStatus(ghConfig, inputs.sha, postResult.verdict, postResult.reviewUrl);
 
-  // Load config for GitHub integration features
-  const config = await loadConfig().catch(() => null);
-
   // Handle NEEDS_HUMAN: request reviewers and add label
   if (postResult.verdict === 'NEEDS_HUMAN') {
-    const ghIntegration = config?.github;
     await handleNeedsHuman(ghConfig, inputs.pr, {
       humanReviewers: ghIntegration?.humanReviewers,
       humanTeams: ghIntegration?.humanTeams,
@@ -165,6 +175,28 @@ async function main(): Promise<void> {
   }
 
   console.log('::endgroup::');
+
+  // Send Discord/Slack notifications if configured (#261)
+  if (config?.notifications) {
+    const s = result.summary;
+    await sendNotifications(config.notifications, {
+      decision: s.decision,
+      reasoning: s.reasoning,
+      severityCounts: s.severityCounts,
+      topIssues: s.topIssues.map((i) => ({
+        severity: i.severity,
+        filePath: i.filePath,
+        title: i.title,
+      })),
+      sessionId: result.sessionId,
+      date: result.date,
+      totalDiscussions: discussions.length,
+      resolved: discussions.filter((d) => d.consensusReached).length,
+      escalated: discussions.filter((d) => !d.consensusReached).length,
+    }).catch((err) => {
+      console.error(`::warning::Failed to send notifications: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
 
   // Set outputs
   setActionOutput('verdict', result.summary.decision);

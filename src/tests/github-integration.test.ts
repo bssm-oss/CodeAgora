@@ -191,6 +191,7 @@ describe('fetchPrDiff', () => {
       baseBranch: 'main',
       headBranch: 'feature/x',
       diff: fakeDiff,
+      truncated: false,
     });
   });
 });

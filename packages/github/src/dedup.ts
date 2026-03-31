@@ -12,11 +12,16 @@ const MARKER = '<!-- codeagora-v3 -->';
 /**
  * Find all prior CodeAgora reviews on a PR (identified by the HTML marker).
  * Returns the review IDs that should be dismissed.
+ *
+ * Filters by bot login (when provided) to avoid attempting to dismiss
+ * reviews authored by other users (which would result in 403 errors).
+ * Also skips already-dismissed reviews to avoid redundant API calls.
  */
 export async function findPriorReviews(
   config: GitHubConfig,
   prNumber: number,
   octokit?: Octokit,
+  botLogin?: string,
 ): Promise<number[]> {
   const kit = octokit ?? createOctokit(config);
 
@@ -28,7 +33,14 @@ export async function findPriorReviews(
   });
 
   return reviews
-    .filter((r) => r.body?.includes(MARKER))
+    .filter((r) => {
+      if (!r.body?.includes(MARKER)) return false;
+      // Skip already-dismissed reviews — no point re-dismissing
+      if (r.state === 'DISMISSED') return false;
+      // If botLogin is provided, only match reviews authored by this bot
+      if (botLogin && r.user?.login !== botLogin) return false;
+      return true;
+    })
     .map((r) => r.id);
 }
 
