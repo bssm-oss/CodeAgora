@@ -50,7 +50,7 @@ function parseArgs(argv: string[]): ActionInputs {
   const sha = args['sha'] ?? '';
   const repo = args['repo'] ?? '';
   const token = process.env['GITHUB_TOKEN'] ?? '';
-  const failOnReject = args['fail-on-reject'] !== 'false';
+  const failOnReject = args['fail-on-reject'] === 'true';
   const maxDiffLines = parseInt(args['max-diff-lines'] ?? '5000', 10);
 
   if (!diff) throw new Error('--diff is required');

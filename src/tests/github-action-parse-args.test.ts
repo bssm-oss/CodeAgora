@@ -33,7 +33,7 @@ function parseArgs(argv: string[], token: string): {
   const pr = parseInt(args['pr'] ?? '', 10);
   const sha = args['sha'] ?? '';
   const repo = args['repo'] ?? '';
-  const failOnReject = args['fail-on-reject'] !== 'false';
+  const failOnReject = args['fail-on-reject'] === 'true';
   const maxDiffLines = parseInt(args['max-diff-lines'] ?? '5000', 10);
 
   if (!diff) throw new Error('--diff is required');
@@ -61,14 +61,14 @@ describe('github-action parseArgs', () => {
     expect(result.sha).toBe('abc123');
     expect(result.repo).toBe('owner/repo');
     expect(result.token).toBe(TOKEN);
-    expect(result.failOnReject).toBe(true);
+    expect(result.failOnReject).toBe(false);
     expect(result.maxDiffLines).toBe(5000);
   });
 
-  it('parses --fail-on-reject false correctly', () => {
-    const argv = [...validArgv, '--fail-on-reject', 'false'];
+  it('parses --fail-on-reject true correctly', () => {
+    const argv = [...validArgv, '--fail-on-reject', 'true'];
     const result = parseArgs(argv, TOKEN);
-    expect(result.failOnReject).toBe(false);
+    expect(result.failOnReject).toBe(true);
   });
 
   it('parses custom --max-diff-lines', () => {
