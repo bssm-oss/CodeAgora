@@ -8,7 +8,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { t } from '@codeagora/shared/i18n/index.js';
 
-// Known safe editor binaries
+// Allowlist prevents arbitrary command execution via $VISUAL/$EDITOR env injection
 const SAFE_EDITORS = new Set([
   'vi', 'vim', 'nvim', 'nano', 'emacs', 'pico', 'joe', 'jed',
   'code', 'code-insiders', 'subl', 'atom', 'gedit', 'kate', 'kwrite',

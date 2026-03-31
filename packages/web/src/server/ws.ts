@@ -3,12 +3,11 @@
  * Real-time event forwarding from ProgressEmitter and DiscussionEmitter.
  */
 
-import crypto from 'crypto';
 import type { Hono } from 'hono';
 import type { ProgressEmitter, ProgressEvent } from '@codeagora/core/pipeline/progress.js';
 import type { DiscussionEmitter, DiscussionEvent } from '@codeagora/core/l2/event-emitter.js';
 import { createNodeWebSocket } from '@hono/node-ws';
-import { getAuthToken } from './middleware.js';
+import { getAuthToken, compareTokens } from './middleware.js';
 
 // ============================================================================
 // Connection Limits
@@ -62,11 +61,7 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
     const authHeader = c.req.header('Authorization');
     const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     const token = queryToken ?? headerToken;
-    const authToken = getAuthToken();
-    const tokenMatches = token !== null && token !== undefined &&
-      token.length === authToken.length &&
-      crypto.timingSafeEqual(Buffer.from(token), Buffer.from(authToken));
-    if (!tokenMatches) {
+    if (!compareTokens(token, getAuthToken())) {
       return c.json({ error: 'Authentication required' }, 401);
     }
 
