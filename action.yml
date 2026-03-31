@@ -72,3 +72,4 @@ runs:
         REPO: ${{ github.repository }}
         FAIL_ON_REJECT: ${{ inputs.fail-on-reject }}
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
+        CONFIG_PATH: ${{ inputs.config-path }}

@@ -191,6 +191,7 @@ export const GitHubIntegrationSchema = z.object({
   needsHumanLabel: z.string().default('needs-human-review'),
   postSuggestions: z.boolean().default(false),
   collapseDiscussions: z.boolean().default(true),
+  minConfidence: z.number().min(0).max(1).optional(),
   sarifOutputPath: z.string().optional(),
 });
 export type GitHubIntegrationConfig = z.infer<typeof GitHubIntegrationSchema>;
