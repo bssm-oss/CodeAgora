@@ -87,32 +87,46 @@ interface LocationGroup {
   primarySeverity: Severity;
 }
 
+/**
+ * Fuzzy line-range tolerance for grouping — two reviewers flagging nearby
+ * lines on the same file are treated as the same location.
+ */
+const LINE_PROXIMITY = 5;
+
 function groupByLocation(docs: EvidenceDocument[]): LocationGroup[] {
-  const groups = new Map<string, LocationGroup>();
+  const groups: LocationGroup[] = [];
 
   for (const doc of docs) {
-    const key = `${doc.filePath}:${doc.lineRange[0]}-${doc.lineRange[1]}`;
+    // Find existing group for the same file with overlapping/nearby line range
+    const existing = groups.find(
+      (g) =>
+        g.filePath === doc.filePath &&
+        doc.lineRange[0] <= g.lineRange[1] + LINE_PROXIMITY &&
+        doc.lineRange[1] >= g.lineRange[0] - LINE_PROXIMITY,
+    );
 
-    if (!groups.has(key)) {
-      groups.set(key, {
+    if (existing) {
+      existing.docs.push(doc);
+      // Expand range to cover both
+      existing.lineRange = [
+        Math.min(existing.lineRange[0], doc.lineRange[0]),
+        Math.max(existing.lineRange[1], doc.lineRange[1]),
+      ];
+      if (severityRank(doc.severity) > severityRank(existing.primarySeverity)) {
+        existing.primarySeverity = doc.severity;
+      }
+    } else {
+      groups.push({
         filePath: doc.filePath,
-        lineRange: doc.lineRange,
+        lineRange: [...doc.lineRange],
         issueTitle: doc.issueTitle,
-        docs: [],
+        docs: [doc],
         primarySeverity: doc.severity,
       });
     }
-
-    const group = groups.get(key)!;
-    group.docs.push(doc);
-
-    // Update primary severity (highest wins)
-    if (severityRank(doc.severity) > severityRank(group.primarySeverity)) {
-      group.primarySeverity = doc.severity;
-    }
   }
 
-  return Array.from(groups.values());
+  return groups;
 }
 
 function countBySeverity(docs: EvidenceDocument[]): Record<Severity, number> {

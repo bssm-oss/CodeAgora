@@ -244,6 +244,10 @@ async function executeL2Discussions(
   const { deduplicated, mergedCount } = deduplicateDiscussions(thresholdResult.discussions);
   logger.info(`Deduplicated discussions: ${mergedCount} merged`);
 
+  if (deduplicated.length === 0) {
+    logger.warn('No discussions registered — all issues below threshold or in unconfirmed queue');
+  }
+
   // Extract code snippets for discussions
   const snippets = extractMultipleSnippets(
     diffContent,
