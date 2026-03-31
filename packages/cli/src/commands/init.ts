@@ -1158,7 +1158,7 @@ jobs:
         uses: bssm-oss/CodeAgora@v2
         with:
           github-token: \${{ secrets.GITHUB_TOKEN }}
-          fail-on-reject: 'true'
+          fail-on-reject: 'false'
           max-diff-lines: '5000'
         env:
 ${envLines}

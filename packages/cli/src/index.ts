@@ -18,7 +18,7 @@ import {
 } from './commands/sessions.js';
 import { formatOutput, type OutputFormat } from './formatters/review-output.js';
 import { parseReviewerOption, readStdin } from './options/review-options.js';
-import { formatError, classifyError } from './utils/errors.js';
+import { formatError } from './utils/errors.js';
 // @codeagora/notifications is optional — dynamically imported when needed
 import ora from 'ora';
 import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
@@ -91,6 +91,7 @@ program
   .option('--context-lines <n>', 'Surrounding code context lines (default 20, 0 = disabled)', parseInt)
   .option('--json-stream', 'Stream NDJSON events during review (for CI/pipelines)')
   .option('--no-cache', 'Skip result caching — always run a fresh review')
+  .option('--fail-on-reject', 'Exit 1 on REJECT verdict (default: false)', false)
   .action(async (diffPath: string | undefined, options: {
     dryRun?: boolean;
     output: string;
@@ -399,7 +400,7 @@ program
         }
       }
 
-      if (result.summary?.decision === 'REJECT') {
+      if (result.summary?.decision === 'REJECT' && options.failOnReject) {
         process.exit(1);
       }
 
@@ -409,8 +410,7 @@ program
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       console.error(formatError(error, options.verbose));
-      const { exitCode } = classifyError(error);
-      process.exit(exitCode);
+      process.exit(1);
     } finally {
       // Clean up stdin/PR temp file — guaranteed even on error (#77)
       if (stdinTmpPath) {
