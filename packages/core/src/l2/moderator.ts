@@ -143,16 +143,18 @@ export interface ModeratorInput {
   language?: 'en' | 'ko';
   /** Optional event emitter for real-time discussion events (2.1) */
   emitter?: DiscussionEmitter;
+  /** Pre-analysis enriched context for evidence-based debate (#431) */
+  enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext;
 }
 
 /**
  * Run all discussions and generate final report
  */
 export async function runModerator(input: ModeratorInput): Promise<ModeratorReport> {
-  const { config, supporterPoolConfig, discussions, settings, date, sessionId, language, emitter } = input;
+  const { config, supporterPoolConfig, discussions, settings, date, sessionId, language, emitter, enrichedContext } = input;
 
   const results = await Promise.allSettled(
-    discussions.map((d) => runDiscussion(d, config, supporterPoolConfig, settings, date, sessionId, language, emitter))
+    discussions.map((d) => runDiscussion(d, config, supporterPoolConfig, settings, date, sessionId, language, emitter, enrichedContext))
   );
 
   const verdicts: DiscussionVerdict[] = [];
@@ -210,6 +212,7 @@ async function runDiscussion(
   sessionId: string,
   language?: 'en' | 'ko',
   emitter?: DiscussionEmitter,
+  enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
 ): Promise<DiscussionResult> {
   const rounds: DiscussionRound[] = [];
 
@@ -257,7 +260,8 @@ async function runDiscussion(
       roundNum,
       moderatorConfig,
       selectedSupporters,
-      language
+      language,
+      enrichedContext,
     );
 
     // Emit supporter responses (2.1)
@@ -393,10 +397,11 @@ async function runRound(
   roundNum: number,
   moderatorConfig: ModeratorConfig,
   selectedSupporters: SelectedSupporter[],
-  language?: 'en' | 'ko'
+  language?: 'en' | 'ko',
+  enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
 ): Promise<DiscussionRound> {
   // Moderator prompts the discussion
-  const moderatorPrompt = buildModeratorPrompt(discussion, roundNum, language);
+  const moderatorPrompt = buildModeratorPrompt(discussion, roundNum, language, enrichedContext);
 
   // Supporters respond in parallel with graceful degradation
   const supporterResults = await Promise.allSettled(
@@ -607,9 +612,72 @@ function buildEvidenceSection(discussion: Discussion, isKo: boolean): string {
   return `${label}:\n\n${sections.join('\n\n')}`;
 }
 
-function buildModeratorPrompt(discussion: Discussion, roundNum: number, language?: 'en' | 'ko'): string {
+function buildStaticAnalysisSection(
+  discussion: Discussion,
+  enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
+  isKo?: boolean,
+): string {
+  if (!enrichedContext) return '';
+
+  const lines: string[] = [];
+  const label = isKo ? '정적 분석 증거' : 'Static Analysis Evidence';
+
+  // File classification
+  const cls = enrichedContext.fileClassifications.get(discussion.filePath);
+  if (cls) {
+    lines.push(isKo
+      ? `파일 분류: [${cls.toUpperCase()}] — ${getClassificationNote(cls, isKo)}`
+      : `File classification: [${cls.toUpperCase()}] — ${getClassificationNote(cls, isKo)}`
+    );
+  }
+
+  // tsc diagnostics for this file
+  const fileDiags = enrichedContext.tscDiagnostics.filter(d => d.file === discussion.filePath);
+  if (fileDiags.length > 0) {
+    lines.push(isKo ? `tsc 에러 (이 파일):` : `tsc errors (this file):`);
+    for (const d of fileDiags.slice(0, 5)) {
+      lines.push(`  - line ${d.line}: TS${d.code} ${d.message}`);
+    }
+  } else {
+    lines.push(isKo ? 'tsc --noEmit: 이 파일에 에러 없음' : 'tsc --noEmit: 0 errors on this file');
+  }
+
+  // Impact for symbols in this file
+  for (const [, entry] of enrichedContext.impactAnalysis) {
+    lines.push(isKo
+      ? `${entry.symbol}() — ${entry.callerCount}개 파일에서 import`
+      : `${entry.symbol}() — imported by ${entry.callerCount} file(s)`
+    );
+  }
+
+  if (lines.length === 0) return '';
+
+  return `\n${label}:\n${lines.map(l => `- ${l}`).join('\n')}\n`;
+}
+
+function getClassificationNote(cls: string, isKo?: boolean): string {
+  const notes: Record<string, [string, string]> = {
+    rename: ['식별자 이름 변경이며 로직 변경 아님', 'identifier rename, not a logic change'],
+    refactor: ['코드 구조 변경이며 동작 변경 아님', 'code movement/restructuring, not a behavior change'],
+    config: ['설정 파일 변경', 'configuration file change'],
+    test: ['테스트 파일 변경', 'test file change'],
+    docs: ['문서 변경', 'documentation change'],
+    dependency: ['의존성 파일 변경', 'dependency file change'],
+    logic: ['로직 변경 — 주의 깊게 리뷰 필요', 'logic change — review carefully'],
+  };
+  const [ko, en] = notes[cls] ?? ['', ''];
+  return isKo ? ko : en;
+}
+
+function buildModeratorPrompt(
+  discussion: Discussion,
+  roundNum: number,
+  language?: 'en' | 'ko',
+  enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
+): string {
   const isKo = language === 'ko';
   const evidenceSection = buildEvidenceSection(discussion, isKo);
+  const staticSection = buildStaticAnalysisSection(discussion, enrichedContext, isKo);
 
   if (isKo) {
     const snippetSection = discussion.codeSnippet && discussion.codeSnippet.trim()
@@ -628,7 +696,7 @@ ${discussion.codeSnippet}
 ${evidenceSection}
 
 ${snippetSection}
-
+${staticSection}
 이 이슈에 대한 판단을 내려주세요:
 - 동의: 근거가 타당합니다
 - 반대: 근거가 부족합니다
@@ -653,7 +721,7 @@ Claimed Severity: ${discussion.severity}
 ${evidenceSection}
 
 ${snippetSection}
-
+${staticSection}
 Evaluate the evidence above and provide your verdict.`;
 }
 

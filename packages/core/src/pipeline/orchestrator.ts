@@ -381,6 +381,7 @@ async function executeL2Discussions(
   allEvidenceDocs: EvidenceDocument[],
   qualityTracker: QualityTracker,
   logger: ReturnType<typeof createLogger>,
+  enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
 ): Promise<ModeratorReport> {
   const { deduplicated, mergedCount } = deduplicateDiscussions(thresholdResult.discussions);
   logger.info(`Deduplicated discussions: ${mergedCount} merged`);
@@ -419,6 +420,7 @@ async function executeL2Discussions(
     date,
     sessionId,
     emitter: discussionEmitter,
+    enrichedContext,
   });
 
   // === QUALITY TRACKING: Record L2 discussion results ===
@@ -796,6 +798,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         allEvidenceDocs,
         qualityTracker,
         logger,
+        enrichedContext,
       );
       telemetry.record({
         reviewerId: 'l2-moderator',
