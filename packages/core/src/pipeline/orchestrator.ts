@@ -592,7 +592,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     progress?.stageComplete('init', 'Config loaded');
 
     // === CACHE: Check for identical diff + config (#109) ===
-    const cacheKey = computeHash(diffContent + JSON.stringify(config.reviewers));
+    const cacheKey = computeHash(diffContent + JSON.stringify(config));
     if (!input.noCache) {
       const cached = await checkAndLoadCache(cacheKey, session);
       if (cached) return cached;
@@ -643,7 +643,19 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     // === L1 REVIEWERS: Chunk Processing ===
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
+    const l1Start = Date.now();
     const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext, projectContext);
+    const l1Elapsed = Date.now() - l1Start;
+    for (const r of allReviewResults) {
+      telemetry.record({
+        reviewerId: r.reviewerId,
+        provider: allReviewerInputs.find((i) => i.config.id === r.reviewerId)?.config.provider ?? 'unknown',
+        model: r.model,
+        latencyMs: Math.round(l1Elapsed / allReviewResults.length),
+        success: r.status === 'success',
+        error: r.error,
+      });
+    }
     progress?.stageComplete('review', `${allReviewResults.length} reviewer results collected`);
 
     // Empty pipeline guard — all chunks failed
@@ -729,6 +741,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     } else {
       // === L2 MODERATOR: Run Discussions ===
       progress?.stageStart('discuss', 'Moderating discussions...');
+      const l2Start = Date.now();
       const discussionEmitter = input.discussionEmitter ?? new DiscussionEmitter();
       moderatorReport = await executeL2Discussions(
         config,
@@ -741,6 +754,13 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         qualityTracker,
         logger,
       );
+      telemetry.record({
+        reviewerId: 'l2-moderator',
+        provider: config.moderator?.provider ?? 'unknown',
+        model: config.moderator?.model ?? 'unknown',
+        latencyMs: Date.now() - l2Start,
+        success: true,
+      });
       progress?.stageComplete('discuss', 'Discussions complete');
     }
 
@@ -782,7 +802,15 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     // === L3 HEAD: Final Verdict ===
     progress?.stageStart('verdict', 'Generating verdict...');
+    const l3Start = Date.now();
     const headVerdict = await executeL3Verdict(config, moderatorReport);
+    telemetry.record({
+      reviewerId: 'l3-head',
+      provider: config.head?.provider ?? 'unknown',
+      model: config.head?.model ?? 'unknown',
+      latencyMs: Date.now() - l3Start,
+      success: true,
+    });
     await writeHeadVerdict(date, sessionId, headVerdict);
     progress?.stageComplete('verdict', 'Verdict complete');
 

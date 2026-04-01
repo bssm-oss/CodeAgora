@@ -6,6 +6,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { formatCompact, type CompactReviewResult } from '@codeagora/core/pipeline/compact-formatter.js';
 
 /**
@@ -17,7 +18,7 @@ async function runReviewWithDiff(
 ): Promise<CompactReviewResult> {
   const tmpDir = path.join(os.tmpdir(), 'codeagora-mcp');
   await fs.mkdir(tmpDir, { recursive: true });
-  const tmpFile = path.join(tmpDir, `review-${Date.now()}.patch`);
+  const tmpFile = path.join(tmpDir, `review-${crypto.randomBytes(8).toString('hex')}.patch`);
 
   try {
     await fs.writeFile(tmpFile, diff);

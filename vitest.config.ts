@@ -34,9 +34,7 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['src/tests/**/*.test.ts', 'src/tests/**/*.test.tsx', 'packages/*/src/tests/**/*.test.ts'],
-    poolMatchGlobs: [
-      ['**/e2e-*.test.ts', 'forks'],
-    ],
+    pool: 'forks',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

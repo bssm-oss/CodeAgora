@@ -1,7 +1,7 @@
 /**
  * L1 Reviewer Fallback Tests
  *
- * Verifies that executeReviewer falls back to the configured fallback
+ * Verifies that executeReviewers falls back to the configured fallback
  * backend+model when the primary backend fails all retries.
  * Supports both single-object and array fallback chains (#89).
  */
@@ -12,8 +12,10 @@ vi.mock('../../packages/core/src/l1/backend.js', () => ({
   executeBackend: vi.fn(),
 }));
 
-import { executeReviewer, normalizeFallbacks } from '@codeagora/core/l1/reviewer.js';
+import { executeReviewers, normalizeFallbacks } from '@codeagora/core/l1/reviewer.js';
 import { executeBackend } from '@codeagora/core/l1/backend.js';
+import { CircuitBreaker } from '@codeagora/core/l1/circuit-breaker.js';
+import { HealthMonitor } from '@codeagora/core/l0/health-monitor.js';
 import type { ReviewerInput } from '@codeagora/core/l1/reviewer.js';
 import type { BackendInput } from '@codeagora/core/l1/backend.js';
 import { AgentConfigSchema } from '@codeagora/core/types/config.js';
@@ -64,7 +66,9 @@ function makeInput(
 // Tests
 // ============================================================================
 
-describe('executeReviewer — fallback mechanism', () => {
+const freshOptions = () => ({ circuitBreaker: new CircuitBreaker(), healthMonitor: new HealthMonitor() });
+
+describe('executeReviewers — fallback mechanism', () => {
   beforeEach(() => {
     mockExecuteBackend.mockReset();
   });
@@ -72,7 +76,8 @@ describe('executeReviewer — fallback mechanism', () => {
   it('1. primary succeeds — fallback is never called', async () => {
     mockExecuteBackend.mockResolvedValueOnce(MOCK_RESPONSE);
 
-    const result = await executeReviewer(makeInput(), 0);
+    const results = await executeReviewers([makeInput()], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('success');
     expect(mockExecuteBackend).toHaveBeenCalledTimes(1);
@@ -88,7 +93,8 @@ describe('executeReviewer — fallback mechanism', () => {
       fallback: { model: 'claude-3-haiku', backend: 'claude' },
     });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('success');
     expect(mockExecuteBackend).toHaveBeenCalledTimes(2);
@@ -104,7 +110,8 @@ describe('executeReviewer — fallback mechanism', () => {
       fallback: { model: 'gemini-pro', backend: 'gemini' },
     });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('success');
     expect(result.model).toBe('gemini-pro');
@@ -117,7 +124,8 @@ describe('executeReviewer — fallback mechanism', () => {
       fallback: { model: 'claude-3-haiku', backend: 'claude' },
     });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('forfeit');
     expect(result.error).toBeDefined();
@@ -131,7 +139,8 @@ describe('executeReviewer — fallback mechanism', () => {
     // No fallback field
     const input = makeInput();
 
-    const result = await executeReviewer(input, 1); // retries=1 → 2 attempts
+    const results = await executeReviewers([input], 1, 5, freshOptions()); // retries=1 → 2 attempts
+    const result = results[0];
 
     expect(result.status).toBe('forfeit');
     // only primary retries, no fallback
@@ -182,7 +191,7 @@ describe('executeReviewer — fallback mechanism', () => {
       },
     });
 
-    await executeReviewer(input, 0);
+    await executeReviewers([input], 0, 5, freshOptions());
 
     expect(mockExecuteBackend).toHaveBeenCalledTimes(2);
     const fallbackCall = mockExecuteBackend.mock.calls[1][0] as BackendInput;
@@ -220,7 +229,7 @@ describe('normalizeFallbacks helper', () => {
   });
 });
 
-describe('executeReviewer — fallback chain (array)', () => {
+describe('executeReviewers — fallback chain (array)', () => {
   beforeEach(() => {
     mockExecuteBackend.mockReset();
   });
@@ -238,7 +247,8 @@ describe('executeReviewer — fallback chain (array)', () => {
       ],
     });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('success');
     expect(result.model).toBe('gemini-pro');
@@ -256,7 +266,8 @@ describe('executeReviewer — fallback chain (array)', () => {
       ],
     });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('forfeit');
     expect(result.error).toBeDefined();
@@ -276,7 +287,8 @@ describe('executeReviewer — fallback chain (array)', () => {
       ],
     });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('success');
     expect(result.model).toBe('claude-3-haiku');
@@ -289,7 +301,8 @@ describe('executeReviewer — fallback chain (array)', () => {
 
     const input = makeInput({ fallback: [] });
 
-    const result = await executeReviewer(input, 0);
+    const results = await executeReviewers([input], 0, 5, freshOptions());
+    const result = results[0];
 
     expect(result.status).toBe('forfeit');
     // only primary attempt
@@ -309,7 +322,7 @@ describe('executeReviewer — fallback chain (array)', () => {
       ],
     });
 
-    await executeReviewer(input, 0);
+    await executeReviewers([input], 0, 5, freshOptions());
 
     // Verify fallback[0] call args
     const fb0Call = mockExecuteBackend.mock.calls[1][0] as BackendInput;
@@ -337,7 +350,6 @@ describe('AgentConfigSchema — fallback array validation (#89)', () => {
 
     expect(() => AgentConfigSchema.parse(raw)).not.toThrow();
     const parsed = AgentConfigSchema.parse(raw);
-    // Single object should still parse correctly
     expect(parsed.fallback).toBeDefined();
   });
 

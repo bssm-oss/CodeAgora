@@ -333,7 +333,7 @@ describe('buildReviewerPrompt context integration', () => {
   it('includes surrounding context section when provided', async () => {
     // Import the module to access the prompt building logic
     // Since buildReviewerPrompt is private, we test through the executeBackend mock
-    const { executeReviewer } = await import('@codeagora/core/l1/reviewer.js');
+    const { executeReviewers } = await import('@codeagora/core/l1/reviewer.js');
 
     // Mock executeBackend to capture the prompt
     let capturedPrompt = '';
@@ -345,7 +345,7 @@ describe('buildReviewerPrompt context integration', () => {
     });
 
     try {
-      await executeReviewer({
+      await executeReviewers([{
         config: {
           id: 'test-reviewer',
           model: 'test-model',
@@ -356,7 +356,7 @@ describe('buildReviewerPrompt context integration', () => {
         diffContent: '--- a/file.ts\n+++ b/file.ts\n@@ -1,1 +1,2 @@\n line1\n+line2',
         prSummary: 'Test PR',
         surroundingContext: '### file.ts\n```\n   1 | const x = 1;\n   2 | const y = 2;\n```',
-      }, 0);
+      }], 0);
 
       expect(capturedPrompt).toContain('## Surrounding Code Context');
       expect(capturedPrompt).toContain('### file.ts');
@@ -371,7 +371,7 @@ describe('buildReviewerPrompt context integration', () => {
   });
 
   it('omits context section when not provided (backward compat)', async () => {
-    const { executeReviewer } = await import('@codeagora/core/l1/reviewer.js');
+    const { executeReviewers } = await import('@codeagora/core/l1/reviewer.js');
 
     let capturedPrompt = '';
     const mockBackend = await import('@codeagora/core/l1/backend.js');
@@ -381,7 +381,7 @@ describe('buildReviewerPrompt context integration', () => {
     });
 
     try {
-      await executeReviewer({
+      await executeReviewers([{
         config: {
           id: 'test-reviewer',
           model: 'test-model',
@@ -391,7 +391,7 @@ describe('buildReviewerPrompt context integration', () => {
         groupName: 'test',
         diffContent: '--- a/file.ts\n+++ b/file.ts\n@@ -1,1 +1,2 @@\n line1\n+line2',
         prSummary: 'Test PR',
-      }, 0);
+      }], 0);
 
       expect(capturedPrompt).not.toContain('## Surrounding Code Context');
       expect(capturedPrompt).toContain('## Code Changes');

@@ -50,14 +50,12 @@ const BanditStoreDataSchema = z.object({
 // Store
 // ============================================================================
 
-const DEFAULT_STORE_PATH = path.join(process.cwd(), '.ca', 'model-quality.json');
-
 export class BanditStore {
   private data: BanditStoreData;
   private filePath: string;
 
   constructor(filePath?: string) {
-    this.filePath = filePath ?? DEFAULT_STORE_PATH;
+    this.filePath = filePath ?? path.join(process.cwd(), '.ca', 'model-quality.json');
     this.data = {
       version: 1,
       lastUpdated: new Date().toISOString(),

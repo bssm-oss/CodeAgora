@@ -140,7 +140,12 @@ vi.mock('../../packages/core/src/pipeline/report.js', () => ({
 }));
 
 vi.mock('../../packages/core/src/pipeline/telemetry.js', () => ({
-  PipelineTelemetry: vi.fn().mockImplementation(() => ({})),
+  PipelineTelemetry: vi.fn().mockImplementation(() => ({
+    record: vi.fn(),
+    getSummary: vi.fn().mockReturnValue({ totalCalls: 0, totalLatencyMs: 0, totalTokens: 0, perReviewer: [] }),
+    toJSON: vi.fn().mockReturnValue({}),
+    reset: vi.fn(),
+  })),
 }));
 
 vi.mock('../../packages/core/src/l2/event-emitter.js', () => ({

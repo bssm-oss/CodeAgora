@@ -57,130 +57,6 @@ export interface ReviewerInput {
   projectContext?: string;
 }
 
-/**
- * Execute a single reviewer
- */
-export async function executeReviewer(
-  input: ReviewerInput,
-  retries: number = 2
-): Promise<ReviewOutput> {
-  const { config, groupName, diffContent, prSummary, surroundingContext } = input;
-
-  let lastError: Error | undefined;
-
-  // Extract file list from diff for fallback parsing
-  const diffFilePaths = extractFileListFromDiff(diffContent);
-
-  // Load persona if configured (prepended to review prompt)
-  let personaPrefix = '';
-  if (config.persona) {
-    const { loadPersona } = await import('../l2/moderator.js');
-    const content = await loadPersona(config.persona);
-    if (content) {
-      personaPrefix = `${content}\n\n---\n\n`;
-    }
-  }
-
-  // Build prompt: custom file (with {{DIFF}} placeholder) or built-in
-  let reviewPrompt: string;
-  if (input.customPromptPath) {
-    try {
-      const { loadPersona } = await import('../l2/moderator.js');
-      const template = await loadPersona(input.customPromptPath);
-      reviewPrompt = template
-        ? template.replace('{{DIFF}}', diffContent).replace('{{SUMMARY}}', prSummary)
-        : buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
-    } catch {
-      reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
-    }
-  } else {
-    reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
-  }
-  const fullPrompt = personaPrefix + reviewPrompt;
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout * 1000);
-
-    try {
-      const response = await executeBackend({
-        backend: config.backend,
-        model: config.model,
-        provider: config.provider,
-        prompt: fullPrompt,
-        timeout: config.timeout,
-        signal: controller.signal,
-        temperature: config.temperature,
-      });
-
-      // Parse response into evidence documents with diff file paths for fallback
-      const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
-      if (evidenceDocs.length === 0 && response.length > 0) {
-        logParseFailure(config.model, config.id, response.length, false);
-      }
-
-      return {
-        reviewerId: config.id,
-        model: config.model,
-        group: groupName,
-        evidenceDocs,
-        rawResponse: response,
-        status: 'success',
-      };
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (attempt < retries) {
-        // Wait before retry (exponential backoff)
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  // All retries failed — try fallback chain if configured
-  const fallbacks = normalizeFallbacks(config.fallback);
-  for (const fb of fallbacks) {
-    try {
-      const response = await executeBackend({
-        backend: fb.backend,
-        model: fb.model,
-        provider: fb.provider,
-        prompt: fullPrompt,
-        timeout: config.timeout,
-        temperature: config.temperature,
-      });
-
-      const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
-      if (evidenceDocs.length === 0 && response.length > 0) {
-        logParseFailure(fb.model, config.id, response.length, true);
-      }
-
-      return {
-        reviewerId: config.id,
-        model: fb.model,
-        group: groupName,
-        evidenceDocs,
-        rawResponse: response,
-        status: 'success',
-      };
-    } catch {
-      // this fallback failed — continue to next in chain
-    }
-  }
-
-  return {
-    reviewerId: config.id,
-    model: config.model,
-    group: groupName,
-    evidenceDocs: [],
-    rawResponse: '',
-    status: 'forfeit',
-    error: lastError?.message || 'Unknown error',
-  };
-}
-
 // ============================================================================
 // Module-level circuit breaker + health monitor (D-2, D-4)
 // Circuit breaker and RPD tracking only apply to API backends with an explicit
@@ -288,7 +164,11 @@ async function executeReviewerWithGuards(
       const { loadPersona } = await import('../l2/moderator.js');
       const template = await loadPersona(input.customPromptPath);
       reviewPrompt = template
-        ? template.replace('{{DIFF}}', diffContent).replace('{{SUMMARY}}', prSummary)
+        ? template
+            .replace('{{DIFF}}', diffContent)
+            .replace('{{SUMMARY}}', prSummary)
+            .replace('{{CONTEXT}}', surroundingContext || '')
+            .replace('{{PROJECT_CONTEXT}}', input.projectContext || '')
         : buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
     } catch {
       reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);

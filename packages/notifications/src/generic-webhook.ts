@@ -69,7 +69,13 @@ export async function sendGenericWebhook(
     return;
   }
 
-  const body = JSON.stringify({ event, timestamp: Date.now(), data: payload });
+  let body: string;
+  try {
+    body = JSON.stringify({ event, timestamp: Date.now(), data: payload });
+  } catch {
+    process.stderr.write(`[codeagora] Generic webhook: failed to serialize payload\n`);
+    return;
+  }
 
   // HMAC-SHA256 signature
   const signature = createHmac('sha256', config.secret)

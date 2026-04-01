@@ -19,6 +19,7 @@ let healthMonitor: HealthMonitor | null = null;
 let banditStore: BanditStore | null = null;
 let banditState: Map<string, BanditArm> = createBanditState();
 let initialized = false;
+let initPromise: Promise<void> | null = null;
 
 // ============================================================================
 // Initialization
@@ -26,20 +27,31 @@ let initialized = false;
 
 export async function initL0(routerConfig?: ModelRouterConfig): Promise<void> {
   if (initialized) return;
+  if (initPromise) return initPromise;
 
-  await loadRegistry();
+  initPromise = (async () => {
+    if (initialized) return; // double-check after await
 
-  healthMonitor = new HealthMonitor({
-    circuitBreaker: routerConfig?.circuitBreaker,
-    dailyBudget: routerConfig?.dailyBudget,
-  });
+    await loadRegistry();
 
-  // Load persisted bandit state
-  banditStore = new BanditStore();
-  await banditStore.load();
-  banditState = banditStore.getAllArms();
+    healthMonitor = new HealthMonitor({
+      circuitBreaker: routerConfig?.circuitBreaker,
+      dailyBudget: routerConfig?.dailyBudget,
+    });
 
-  initialized = true;
+    // Load persisted bandit state
+    banditStore = new BanditStore();
+    await banditStore.load();
+    banditState = banditStore.getAllArms();
+
+    initialized = true;
+  })();
+
+  try {
+    await initPromise;
+  } finally {
+    initPromise = null;
+  }
 }
 
 /**
@@ -50,6 +62,7 @@ export function resetL0(): void {
   banditStore = null;
   banditState = createBanditState();
   initialized = false;
+  initPromise = null;
 }
 
 /**

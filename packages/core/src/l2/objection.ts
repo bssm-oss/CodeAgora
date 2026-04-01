@@ -86,7 +86,7 @@ Previous discussion rounds:
 ${previousRounds
   .map(
     (r, i) =>
-      `Round ${i + 1}:\n${r.supporterResponses.map((s) => `- ${s.supporterId}: ${s.stance}`).join('\n')}`
+      `Round ${i + 1}:\n${r.supporterResponses.map((s) => `- ${s.supporterId}: ${s.stance}\n  ${s.response.substring(0, 200)}`).join('\n')}`
   )
   .join('\n\n')}
 

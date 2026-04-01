@@ -127,7 +127,7 @@ export const DiscussionSettingsSchema = z.object({
     HARSHLY_CRITICAL: z.number().default(1), // 1명 → 즉시 등록
     CRITICAL: z.number().default(1), // 1명 + 서포터 1명
     WARNING: z.number().default(2), // 2명+
-    SUGGESTION: z.null(), // Discussion 미등록
+    SUGGESTION: z.null().default(null), // Discussion 미등록
   }),
   codeSnippetRange: z.number().default(10), // ±N lines
   objectionTimeout: z.number().default(60),

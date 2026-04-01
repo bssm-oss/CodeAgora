@@ -10,6 +10,7 @@ export const RuleSchema = z.object({
   pattern: z.string(),
   severity: SeveritySchema,
   message: z.string(),
+  suggestion: z.string().optional(),
   filePatterns: z.array(z.string()).optional(),
 });
 export type Rule = z.infer<typeof RuleSchema>;

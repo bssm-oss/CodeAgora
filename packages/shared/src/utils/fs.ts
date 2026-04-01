@@ -4,6 +4,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
 import { z } from 'zod';
 import type { SessionMetadata } from '../types/session.js';
 
@@ -210,7 +211,7 @@ export async function getNextSessionId(date: string): Promise<string> {
   const entries = await fs.readdir(sessionsDir).catch(() => [] as string[]);
   if (entries.includes(fallbackId)) {
     // Last resort: retry with different random in same safe range
-    const lastResortId = String(Date.now() % 99 + 900).padStart(3, '0');
+    const lastResortId = String(900 + crypto.randomInt(99)).padStart(3, '0');
     await ensureDir(path.join(sessionsDir, lastResortId));
     return lastResortId;
   }
