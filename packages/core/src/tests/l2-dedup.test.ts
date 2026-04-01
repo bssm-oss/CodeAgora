@@ -53,7 +53,7 @@ describe('findDuplicates', () => {
 
   it('does NOT group discussions with non-overlapping line ranges', () => {
     const d1 = makeDiscussion({ id: 'd001', filePath: 'src/a.ts', lineRange: [1, 5] });
-    const d2 = makeDiscussion({ id: 'd002', filePath: 'src/a.ts', lineRange: [10, 20] });
+    const d2 = makeDiscussion({ id: 'd002', filePath: 'src/a.ts', lineRange: [30, 40] });
     expect(findDuplicates([d1, d2]).size).toBe(0);
   });
 

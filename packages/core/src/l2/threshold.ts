@@ -92,8 +92,9 @@ interface LocationGroup {
 /**
  * Fuzzy line-range tolerance for grouping — two reviewers flagging nearby
  * lines on the same file are treated as the same location.
+ * 15 lines covers most single-function bodies (#234).
  */
-const LINE_PROXIMITY = 5;
+const LINE_PROXIMITY = 15;
 
 function groupByLocation(docs: EvidenceDocument[]): LocationGroup[] {
   const groups: LocationGroup[] = [];

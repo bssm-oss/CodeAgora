@@ -83,9 +83,10 @@ function areDuplicates(d1: Discussion, d2: Discussion): boolean {
   const [start1, end1] = d1.lineRange;
   const [start2, end2] = d2.lineRange;
 
-  // Check for overlap
-  const overlaps = start1 <= end2 && start2 <= end1;
-  if (!overlaps) {
+  // Check for overlap or proximity (within 15 lines, matching threshold.ts)
+  const DEDUP_PROXIMITY = 15;
+  const overlapsOrNearby = start1 <= end2 + DEDUP_PROXIMITY && start2 <= end1 + DEDUP_PROXIMITY;
+  if (!overlapsOrNearby) {
     return false;
   }
 
