@@ -56,8 +56,8 @@ describe('checkFilePermissions', () => {
     expect(mockStat).not.toHaveBeenCalled();
   });
 
-  it('returns true when stat throws (let caller handle)', async () => {
+  it('returns false when stat throws (fail closed)', async () => {
     mockStat.mockRejectedValue(new Error('ENOENT'));
-    expect(await checkFilePermissions('/nonexistent', 0o600)).toBe(true);
+    expect(await checkFilePermissions('/nonexistent', 0o600)).toBe(false);
   });
 });

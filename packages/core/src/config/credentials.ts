@@ -49,7 +49,7 @@ export async function loadCredentials(): Promise<void> {
  * Updates existing key or appends new one.
  */
 export async function saveCredential(key: string, value: string): Promise<void> {
-  await mkdir(CONFIG_DIR, { recursive: true });
+  await mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
 
   const sanitized = value.replace(/[\r\n]/g, '');
   let lines: string[] = [];
@@ -109,6 +109,6 @@ export async function checkFilePermissions(filePath: string, expectedMode: numbe
     }
     return true;
   } catch {
-    return true; // If stat fails, let the caller handle the read error
+    return false; // Fail closed: if stat fails, deny access (#393)
   }
 }
