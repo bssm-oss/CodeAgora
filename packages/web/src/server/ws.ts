@@ -56,11 +56,21 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
-    // Token validation via query param or Authorization header
+    // Prefer token from Sec-WebSocket-Protocol header (secure) over query param (deprecated)
+    const protocolHeader = c.req.header('sec-websocket-protocol');
+    const protocolToken = protocolHeader?.split(',')
+      .map(p => p.trim())
+      .find(p => p.startsWith('token.'))
+      ?.slice(6); // Remove 'token.' prefix
+
     const queryToken = c.req.query('token');
+    if (queryToken && !protocolToken) {
+      console.warn('[WebSocket] Token via query param is deprecated — use Sec-WebSocket-Protocol header');
+    }
+
     const authHeader = c.req.header('Authorization');
     const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const token = queryToken ?? headerToken;
+    const token = protocolToken ?? queryToken ?? headerToken;
     if (!compareTokens(token, getAuthToken())) {
       return c.json({ error: 'Authentication required' }, 401);
     }
