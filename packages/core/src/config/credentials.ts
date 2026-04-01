@@ -109,6 +109,6 @@ export async function checkFilePermissions(filePath: string, expectedMode: numbe
     }
     return true;
   } catch {
-    return true; // If stat fails, let the caller handle the read error
+    return false; // Fail closed: if stat fails, deny access (#393)
   }
 }
