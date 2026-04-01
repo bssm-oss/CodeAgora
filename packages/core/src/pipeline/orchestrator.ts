@@ -592,7 +592,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     progress?.stageComplete('init', 'Config loaded');
 
     // === CACHE: Check for identical diff + config (#109) ===
-    const cacheKey = computeHash(diffContent + JSON.stringify(config.reviewers));
+    const cacheKey = computeHash(diffContent + JSON.stringify(config));
     if (!input.noCache) {
       const cached = await checkAndLoadCache(cacheKey, session);
       if (cached) return cached;
