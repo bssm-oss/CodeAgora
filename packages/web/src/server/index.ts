@@ -86,7 +86,7 @@ export function startServer(options: ServerOptions = {}): {
     { fetch: app.fetch, port, hostname },
     (info) => {
       console.log(`CodeAgora dashboard running at http://${hostname}:${info.port}`);
-      console.log(`Dashboard token: ${getAuthToken()}`);
+      console.log(`Dashboard token: ${getAuthToken().substring(0, 8)}...`);
     },
   );
 
