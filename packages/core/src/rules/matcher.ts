@@ -118,7 +118,7 @@ export function matchRules(diffContent: string, rules: CompiledRule[]): Evidence
               `Line: ${content.trim()}`,
             ],
             severity: rule.severity,
-            suggestion: `Fix the ${rule.id} violation`,
+            suggestion: rule.suggestion ?? `Fix the ${rule.id} violation`,
             filePath,
             lineRange: [lineNum, lineNum],
             source: 'rule',
