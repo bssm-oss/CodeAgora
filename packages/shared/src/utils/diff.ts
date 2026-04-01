@@ -114,6 +114,14 @@ export async function readSurroundingContext(
 
   const filePath = path.join(repoPath, file);
 
+  // Validate path stays within repo boundary (#392)
+  const resolvedRepo = path.resolve(repoPath);
+  const resolvedFile = path.resolve(filePath);
+  if (!resolvedFile.startsWith(resolvedRepo + path.sep) && resolvedFile !== resolvedRepo) {
+    console.warn(`[Context] Path traversal blocked: ${file} escapes ${repoPath}`);
+    return '';
+  }
+
   let fileContent: string;
   try {
     fileContent = await fsPromises.readFile(filePath, 'utf-8');
