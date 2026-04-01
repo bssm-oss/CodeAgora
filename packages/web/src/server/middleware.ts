@@ -70,6 +70,10 @@ export async function rateLimiter(c: Context, next: Next): Promise<Response | vo
   const ip =
     c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'local';
   const now = Date.now();
+  // Prune expired entries to prevent unbounded memory growth (#388)
+  for (const [key, entry] of requestCounts) {
+    if (now > entry.resetAt) requestCounts.delete(key);
+  }
   const entry = requestCounts.get(ip);
   const isWrite =
     c.req.method === 'PUT' || c.req.method === 'POST' || c.req.method === 'DELETE';
