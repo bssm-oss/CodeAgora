@@ -60862,7 +60862,7 @@ function applyThreshold(evidenceDocs, settings) {
   }
   return { discussions, unconfirmed, suggestions };
 }
-var LINE_PROXIMITY = 5;
+var LINE_PROXIMITY = 15;
 function groupByLocation(docs) {
   const groups = [];
   for (const doc of docs) {
@@ -60986,8 +60986,9 @@ function areDuplicates(d1, d2) {
   }
   const [start1, end1] = d1.lineRange;
   const [start2, end2] = d2.lineRange;
-  const overlaps = start1 <= end2 && start2 <= end1;
-  if (!overlaps) {
+  const DEDUP_PROXIMITY = 15;
+  const overlapsOrNearby = start1 <= end2 + DEDUP_PROXIMITY && start2 <= end1 + DEDUP_PROXIMITY;
+  if (!overlapsOrNearby) {
     return false;
   }
   const similarity = calculateTitleSimilarity(d1.issueTitle, d2.issueTitle);
@@ -61982,7 +61983,7 @@ function selectModels(request2) {
     reasoningMax = 2
   } = constraints;
   const actualCount = Math.min(count, availableModels.length);
-  const explorationSlots = Math.max(0, Math.floor(actualCount * explorationRate));
+  const explorationSlots = actualCount >= 2 ? Math.max(1, Math.floor(actualCount * explorationRate)) : 0;
   const _samplingSlots = actualCount - explorationSlots;
   const selected = [];
   const usedKeys = /* @__PURE__ */ new Set();
@@ -62003,8 +62004,9 @@ function selectModels(request2) {
   }
   const candidates = availableModels.filter((m) => !usedKeys.has(armKey(m))).map((model) => {
     const arm = banditState2.get(armKey(model));
-    const alpha = arm ? arm.alpha + 1 : 3;
-    const beta = arm ? arm.beta + 1 : 2;
+    const MAX_PRIOR = 20;
+    const alpha = arm ? Math.min(arm.alpha + 1, MAX_PRIOR) : 3;
+    const beta = arm ? Math.min(arm.beta + 1, MAX_PRIOR) : 2;
     const theta = sampleBeta(alpha, beta, rng);
     return { model, theta };
   }).sort((a, b) => b.theta - a.theta);
