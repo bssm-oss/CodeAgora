@@ -219,4 +219,27 @@ describe('deduplicateEvidence', () => {
 
     expect(result).toHaveLength(2);
   });
+
+  it('should preserve self-contradiction penalty after merge', () => {
+    const docs = [
+      makeDoc({
+        issueTitle: 'Division by zero risk in helper',
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+        confidence: 24,
+        evidence: ['Division by zero is avoided due to prior check on line 5'],
+      }),
+      makeDoc({
+        issueTitle: 'Division by zero possible in helper',
+        filePath: 'src/utils.ts',
+        lineRange: [11, 13],
+        confidence: 80,
+        evidence: ['Potential divide by zero in compute path'],
+      }),
+    ];
+    const result = deduplicateEvidence(docs);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].confidence).toBe(24); // max(24,80)=80 then contradiction penalty => 24
+  });
 });

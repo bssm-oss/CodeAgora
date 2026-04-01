@@ -151,6 +151,7 @@ export function deduplicateEvidence(docs: EvidenceDocument[]): EvidenceDocument[
       if (mergedIndices.has(i)) continue;
 
       let primary = { ...group[i], evidence: [...(group[i].evidence || [])] };
+      let hasSelfContradiction = detectSelfContradiction(primary);
 
       for (let j = i + 1; j < group.length; j++) {
         if (mergedIndices.has(j)) continue;
@@ -170,8 +171,12 @@ export function deduplicateEvidence(docs: EvidenceDocument[]): EvidenceDocument[
               primary.evidence.push(e);
             }
           }
+          hasSelfContradiction = hasSelfContradiction || detectSelfContradiction(group[j]);
           mergedIndices.add(j);
         }
+      }
+      if (hasSelfContradiction) {
+        primary.confidence = Math.round((primary.confidence ?? 50) * 0.3);
       }
       result.push(primary);
     }
