@@ -130,7 +130,10 @@ export function selectModels(request: SelectionRequest): ModelSelection {
   const actualCount = Math.min(count, availableModels.length);
 
   // 1. Determine exploration slots
-  const explorationSlots = Math.max(0, Math.floor(actualCount * explorationRate));
+  // Guarantee at least 1 exploration slot when 2+ models selected (#232)
+  const explorationSlots = actualCount >= 2
+    ? Math.max(1, Math.floor(actualCount * explorationRate))
+    : 0;
   const _samplingSlots = actualCount - explorationSlots;
 
   const selected: Array<{
@@ -162,9 +165,12 @@ export function selectModels(request: SelectionRequest): ModelSelection {
     .filter((m) => !usedKeys.has(armKey(m)))
     .map((model) => {
       const arm = banditState.get(armKey(model));
-      // Cold start: optimistic initialization α=2, β=1
-      const alpha = arm ? arm.alpha + 1 : 3;
-      const beta = arm ? arm.beta + 1 : 2;
+      // Cap prior strength to prevent posterior collapse (#232).
+      // Without a cap, a model with early luck accumulates alpha >> beta
+      // and permanently dominates selection.
+      const MAX_PRIOR = 20;
+      const alpha = arm ? Math.min(arm.alpha + 1, MAX_PRIOR) : 3;
+      const beta = arm ? Math.min(arm.beta + 1, MAX_PRIOR) : 2;
       const theta = sampleBeta(alpha, beta, rng);
       return { model, theta };
     })
