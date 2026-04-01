@@ -158,13 +158,16 @@ export async function resolveReviewers(
     explorationRate: routerConfig.explorationRate,
   });
 
+  // Built-in specialist personas for diverse review perspectives
+  const BUILTIN_PERSONAS = ['builtin:security', 'builtin:logic', 'builtin:api-contract', 'builtin:general'];
+
   // Build AgentConfigs for auto slots
   const autoConfigs: AgentConfig[] = selection.selections.map((sel, i) => ({
     id: autoSlots[i].id,
     model: sel.modelId,
     backend: 'api' as const,
     provider: sel.provider,
-    persona: autoSlots[i].persona,
+    persona: autoSlots[i].persona ?? BUILTIN_PERSONAS[i % BUILTIN_PERSONAS.length],
     timeout: 120,
     enabled: true,
   }));

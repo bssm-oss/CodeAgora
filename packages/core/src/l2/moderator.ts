@@ -93,6 +93,15 @@ function randomElement<T>(array: T[]): T | undefined {
  */
 export async function loadPersona(personaPath: string): Promise<string> {
   try {
+    // Built-in persona: "builtin:security", "builtin:logic", etc.
+    if (personaPath.startsWith('builtin:')) {
+      const { getBuiltinPersona } = await import('../l1/builtin-personas.js');
+      const content = getBuiltinPersona(personaPath.slice(8));
+      if (content) return content;
+      console.warn(`[Persona] Unknown built-in persona: ${personaPath.slice(8)}`);
+      return '';
+    }
+
     // Inline text: if it doesn't look like a file path, use it directly
     if (!personaPath.includes('/') && !personaPath.includes('\\') && !personaPath.endsWith('.md') && !personaPath.endsWith('.txt')) {
       return personaPath.trim();
