@@ -230,6 +230,23 @@ export const PromptsConfigSchema = z.object({
 }).optional();
 export type PromptsConfig = z.infer<typeof PromptsConfigSchema>;
 
+// ============================================================================
+// Review Context (user-defined project context for reviewers)
+// ============================================================================
+
+export const ReviewContextSchema = z.object({
+  /** Deployment type — tells reviewers how the project is built and deployed */
+  deploymentType: z.enum([
+    'github-action', 'cli', 'library', 'web-app', 'api-server',
+    'lambda', 'docker', 'edge-function', 'monorepo',
+  ]).optional(),
+  /** Free-form context lines injected into reviewer prompt */
+  notes: z.array(z.string()).optional(),
+  /** Files/patterns that are bundled outputs (all deps inlined, do NOT flag external issues) */
+  bundledOutputs: z.array(z.string()).optional(),
+}).optional();
+export type ReviewContext = z.infer<typeof ReviewContextSchema>;
+
 export const ConfigSchema = z.object({
   mode: ReviewModeSchema.optional(),
   language: LanguageSchema.optional(),
@@ -245,6 +262,7 @@ export const ConfigSchema = z.object({
   github: GitHubIntegrationSchema.optional(),
   autoApprove: AutoApproveConfigSchema,
   prompts: PromptsConfigSchema,
+  reviewContext: ReviewContextSchema,
   plugins: z.array(z.string()).optional(),
 });
 export type Config = z.infer<typeof ConfigSchema>;
