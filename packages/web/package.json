@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/web",
-  "version": "2.0.0-rc.13",
+  "version": "2.1.0-rc.1",
   "description": "CodeAgora web dashboard — review history, analytics, and real-time monitoring",
   "type": "module",
   "license": "MIT",
