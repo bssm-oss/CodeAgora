@@ -213,24 +213,6 @@ async function runDiscussion(
 ): Promise<DiscussionResult> {
   const rounds: DiscussionRound[] = [];
 
-  // HARSHLY_CRITICAL: Skip discussion, escalate immediately
-  if (discussion.severity === 'HARSHLY_CRITICAL') {
-    const verdict: DiscussionVerdict = {
-      discussionId: discussion.id,
-      filePath: discussion.filePath,
-      lineRange: discussion.lineRange,
-      finalSeverity: 'HARSHLY_CRITICAL',
-      reasoning: 'HARSHLY_CRITICAL issues are escalated to Head without discussion',
-      consensusReached: false, // Escalated
-      rounds: 0,
-    };
-
-    // Write verdict file
-    await writeDiscussionVerdict(date, sessionId, verdict);
-
-    return { verdict, rounds };
-  }
-
   // L-15: If no supporters are enabled and devil's advocate is off, skip discussion
   const enabledPoolL15 = supporterPoolConfig.pool.filter((s) => s.enabled);
   if (enabledPoolL15.length === 0 && !supporterPoolConfig.devilsAdvocate.enabled) {
@@ -480,7 +462,7 @@ interface ConsensusResult {
   reasoning?: string;
 }
 
-function checkConsensus(round: DiscussionRound, discussion: Discussion, isLastRound = false): ConsensusResult {
+export function checkConsensus(round: DiscussionRound, discussion: Discussion, isLastRound = false): ConsensusResult {
   const supporters = round.supporterResponses;
 
   // No consensus possible with zero participants
@@ -501,6 +483,15 @@ function checkConsensus(round: DiscussionRound, discussion: Discussion, isLastRo
   // All disagree
   const allDisagree = supporters.every((s) => s.stance === 'disagree');
   if (allDisagree) {
+    // HC downgrade: unanimous disagree downgrades to CRITICAL, not DISMISSED
+    // Real HC issues should have at least some corroboration
+    if (discussion.severity === 'HARSHLY_CRITICAL') {
+      return {
+        reached: true,
+        severity: 'CRITICAL',
+        reasoning: 'All supporters rejected HARSHLY_CRITICAL claim — downgraded to CRITICAL for human review',
+      };
+    }
     return {
       reached: true,
       severity: 'DISMISSED',
@@ -522,6 +513,14 @@ function checkConsensus(round: DiscussionRound, discussion: Discussion, isLastRo
   }
 
   if (decidingVotes > 0 && disagreeCount > decidingVotes / 2) {
+    // HC downgrade: majority disagree downgrades to CRITICAL, not DISMISSED
+    if (discussion.severity === 'HARSHLY_CRITICAL') {
+      return {
+        reached: true,
+        severity: 'CRITICAL',
+        reasoning: `Majority rejected HARSHLY_CRITICAL claim (${disagreeCount}/${supporters.length} disagree) — downgraded to CRITICAL`,
+      };
+    }
     return {
       reached: true,
       severity: 'DISMISSED',
