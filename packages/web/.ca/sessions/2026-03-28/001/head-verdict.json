@@ -1,0 +1,11 @@
+{
+  "summary": "인증 미들웨어에서 토큰 검증 로직 누락 및 SQL 인젝션 취약점 발견",
+  "score": 62,
+  "issues": [
+    { "title": "authMiddleware에서 만료된 토큰 검증 누락", "severity": "CRITICAL", "file": "src/server/middleware.ts" },
+    { "title": "사용자 입력값 SQL 쿼리에 직접 삽입", "severity": "CRITICAL", "file": "src/db/queries.ts" },
+    { "title": "에러 응답에 스택 트레이스 노출", "severity": "WARNING", "file": "src/server/middleware.ts" },
+    { "title": "API 응답에 불필요한 내부 필드 포함", "severity": "WARNING", "file": "src/server/routes/users.ts" },
+    { "title": "테스트 커버리지 부족 (38%)", "severity": "INFO", "file": "src/services/auth.ts" }
+  ]
+}

@@ -1,0 +1,4 @@
+/**
+ * Session Metadata type
+ */
+export {};

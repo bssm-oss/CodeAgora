@@ -1,0 +1,10 @@
+{
+  "summary": "메모리 누수 및 비동기 처리 오류 발견. 전반적으로 코드 품질 양호",
+  "score": 78,
+  "issues": [
+    { "title": "이벤트 리스너 해제 누락으로 인한 메모리 누수", "severity": "WARNING", "file": "src/pipeline/orchestrator.ts" },
+    { "title": "Promise.all 내 에러 전파 누락", "severity": "WARNING", "file": "src/l2/moderator.ts" },
+    { "title": "불필요한 await 중첩으로 성능 저하", "severity": "INFO", "file": "src/l1/reviewer.ts" },
+    { "title": "타입 단언(as any) 남용", "severity": "INFO", "file": "src/l3/verdict.ts" }
+  ]
+}

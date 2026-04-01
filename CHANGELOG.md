@@ -1,5 +1,52 @@
 # Changelog
 
+## 2.2.0-rc.1 (2026-04-01)
+
+### New: Pre-Analysis Layer
+- **Semantic Diff Tagging** — Classifies diff files as rename/logic/refactor/config/test/docs before sending to reviewers, reducing false positives on non-logic changes (#411)
+- **TypeScript Diagnostics Injection** — Runs `tsc --noEmit` and injects real type errors into reviewer prompts, replacing guesswork with evidence (#414)
+- **Change Impact Analysis** — Tracks callers/importers of changed exports, showing blast radius to reviewers (#415)
+- **External AI Rule Files** — Auto-detects `.cursorrules`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.clinerules/`, `.windsurfrules` and injects into prompts (#407)
+- **Path-based Review Rules** — Config-driven glob patterns apply different review notes per directory (#408)
+
+### New: Specialist Reviewer Personas
+- 4 built-in personas: `builtin:security` (OWASP), `builtin:logic` (correctness), `builtin:api-contract` (backward compat), `builtin:general` (quality) (#412)
+- Auto reviewers cycle through personas for diverse perspectives
+- `persona: "builtin:security"` syntax in config
+
+### New: Suggestion Verification
+- CRITICAL+ code suggestions verified via TypeScript `transpileModule` before posting (#413)
+- Failed suggestions get 50% confidence penalty and ❌ badge
+- Verified suggestions get ✅ badge
+- Opt-out via `reviewContext.verifySuggestions: false`
+
+### New: Triage Digest
+- One-liner at top of review: `📋 Triage: N must-fix · N verify · N ignore` (#410)
+- Instant developer orientation — know what to focus on before reading details
+
+### Other
+- All packages unified at version 2.2.0 (TUI exits RC, still marked experimental)
+- Tests: 177 files, 2816 passing (+67 tests from v2.1.1)
+
+---
+
+## 2.1.1 (2026-04-01)
+
+### Bug Fixes (12 issues)
+- SUGGESTION threshold default null (#287)
+- Session ID / MCP temp file race conditions (#290, #282)
+- Webhook JSON.stringify crash on circular payload (#285)
+- BanditStore path frozen at module load (#278)
+- Cache key includes full config (#276)
+- Dead executeReviewer export removed (#279)
+- PipelineTelemetry wired with stage timing (#274)
+- Objection prompt includes supporter reasoning (#311)
+- Custom rule suggestion field (#301)
+- initL0 mutex for concurrent initialization (#395)
+- Custom prompt {{CONTEXT}} and {{PROJECT_CONTEXT}} placeholders (#312)
+
+---
+
 ## 2.1.0 (2026-04-01)
 
 ### Security (7 fixes)

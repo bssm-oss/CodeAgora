@@ -1,0 +1,11 @@
+{
+  "summary": "초기 구현 단계로 핵심 로직 구현 완료. 에러 처리 보강 필요",
+  "score": 70,
+  "issues": [
+    { "title": "catch 블록에서 에러 무시 (빈 catch)", "severity": "WARNING", "file": "src/l1/reviewer.ts" },
+    { "title": "하드코딩된 타임아웃 값", "severity": "WARNING", "file": "src/l1/backend.ts" },
+    { "title": "입력값 검증 없이 외부 데이터 사용", "severity": "WARNING", "file": "src/config/loader.ts" },
+    { "title": "console.log 디버그 출력 미제거", "severity": "INFO", "file": "src/pipeline/orchestrator.ts" },
+    { "title": "함수 복잡도 초과 (cyclomatic complexity > 10)", "severity": "INFO", "file": "src/l2/moderator.ts" }
+  ]
+}

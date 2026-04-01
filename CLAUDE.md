@@ -63,7 +63,7 @@ packages/
 - Config: validation tests for valid/invalid configs
 - Integration: sample diff → full pipeline execution
 - Parallelization: concurrency limits and partial failure scenarios
-- Total: 174 test files, 2749 tests
+- Total: 177 test files, 2816 tests
 
 ### Key Commands
 - `pnpm dev` — dev mode (CLI package)

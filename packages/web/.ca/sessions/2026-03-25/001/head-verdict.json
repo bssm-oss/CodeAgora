@@ -1,0 +1,8 @@
+{
+  "summary": "리팩토링 결과 전반적으로 개선됨. 경미한 타입 안전성 이슈만 남음",
+  "score": 91,
+  "issues": [
+    { "title": "옵셔널 체이닝 미적용으로 런타임 에러 가능성", "severity": "WARNING", "file": "src/config/loader.ts" },
+    { "title": "주석 미작성 함수 3개", "severity": "INFO", "file": "src/l0/model-registry.ts" }
+  ]
+}

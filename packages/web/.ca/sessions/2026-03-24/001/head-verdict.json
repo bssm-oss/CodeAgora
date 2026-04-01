@@ -1,0 +1,10 @@
+{
+  "summary": "GitHub Actions 연동 코드에서 시크릿 노출 위험 및 경쟁 조건 발견",
+  "score": 55,
+  "issues": [
+    { "title": "환경변수로 전달된 API 키가 로그에 출력됨", "severity": "CRITICAL", "file": ".github/workflows/review.yml" },
+    { "title": "병렬 워크플로우 실행 시 경쟁 조건 발생 가능", "severity": "WARNING", "file": ".github/workflows/ci.yml" },
+    { "title": "타임아웃 미설정으로 무한 대기 가능", "severity": "WARNING", "file": "src/l1/backend.ts" },
+    { "title": "불필요한 node_modules 캐시 키 설정", "severity": "INFO", "file": ".github/workflows/ci.yml" }
+  ]
+}
