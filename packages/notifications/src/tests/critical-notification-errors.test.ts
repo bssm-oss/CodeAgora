@@ -62,18 +62,14 @@ describe('GW-002: circular reference payload does not cause unhandled rejection'
     const circular: Record<string, unknown> = { key: 'value' };
     circular['self'] = circular; // circular reference
 
-    // sendGenericWebhook calls JSON.stringify(body) internally — should not propagate
-    // Note: the current implementation does NOT guard against circular refs.
-    // This test documents the actual behavior: it throws a TypeError.
-    await expect(
-      sendGenericWebhook(
-        { url: 'https://example.com/hook', secret: 'supersecretvalue123' },
-        'pipeline-complete',
-        circular,
-      ),
-    ).rejects.toThrow(TypeError);
+    // sendGenericWebhook catches JSON.stringify errors gracefully — should not throw
+    await sendGenericWebhook(
+      { url: 'https://example.com/hook', secret: 'supersecretvalue123' },
+      'pipeline-complete',
+      circular,
+    );
 
-    // fetch was never called (JSON.stringify threw before the fetch call)
+    // fetch was never called (JSON.stringify failed before the fetch call)
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
