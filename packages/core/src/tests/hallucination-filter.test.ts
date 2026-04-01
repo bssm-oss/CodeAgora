@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterHallucinations, detectSelfContradiction } from '../pipeline/hallucination-filter.js';
+import { filterHallucinations, detectSelfContradiction, deduplicateEvidence } from '../pipeline/hallucination-filter.js';
 import type { EvidenceDocument } from '../types/core.js';
 
 // Minimal diff for testing
@@ -155,5 +155,68 @@ describe('filterHallucinations', () => {
       'src/nonexistent.ts',
       'src/utils.ts',
     ]);
+  });
+});
+
+describe('deduplicateEvidence', () => {
+  it('should merge findings on same file, same line, similar title', () => {
+    const docs = [
+      makeDoc({
+        issueTitle: 'Null pointer dereference risk',
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+        confidence: 70,
+        evidence: ['evidence A'],
+      }),
+      makeDoc({
+        issueTitle: 'Null pointer dereference possible',
+        filePath: 'src/utils.ts',
+        lineRange: [11, 13],
+        confidence: 85,
+        evidence: ['evidence B'],
+      }),
+    ];
+    const result = deduplicateEvidence(docs);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].confidence).toBe(85); // higher confidence kept
+    expect(result[0].evidence).toContain('evidence A');
+    expect(result[0].evidence).toContain('evidence B');
+  });
+
+  it('should not merge findings on different files', () => {
+    const docs = [
+      makeDoc({
+        issueTitle: 'Null pointer dereference',
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+      }),
+      makeDoc({
+        issueTitle: 'Null pointer dereference',
+        filePath: 'src/index.ts',
+        lineRange: [10, 12],
+      }),
+    ];
+    const result = deduplicateEvidence(docs);
+
+    expect(result).toHaveLength(2);
+  });
+
+  it('should not merge findings with very different titles', () => {
+    const docs = [
+      makeDoc({
+        issueTitle: 'SQL injection vulnerability',
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+      }),
+      makeDoc({
+        issueTitle: 'Memory leak in event handler',
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+      }),
+    ];
+    const result = deduplicateEvidence(docs);
+
+    expect(result).toHaveLength(2);
   });
 });

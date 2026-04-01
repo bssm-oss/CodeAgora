@@ -750,6 +750,10 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     }
     allEvidenceDocs = hallucinationResult.filtered;
 
+    // === EVIDENCE DEDUP: Merge duplicate findings (#439) ===
+    const { deduplicateEvidence } = await import('./hallucination-filter.js');
+    allEvidenceDocs = deduplicateEvidence(allEvidenceDocs);
+
     // === CONFIDENCE: Compute L1 confidence for non-rule docs ===
     const totalReviewers = allReviewerInputs.length;
     const totalDiffLines = filteredDiffContent.split('\n').length;
