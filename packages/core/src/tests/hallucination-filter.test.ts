@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterHallucinations } from '../pipeline/hallucination-filter.js';
+import { filterHallucinations, detectSelfContradiction } from '../pipeline/hallucination-filter.js';
 import type { EvidenceDocument } from '../types/core.js';
 
 // Minimal diff for testing
@@ -113,6 +113,30 @@ describe('filterHallucinations', () => {
 
     expect(result.filtered).toHaveLength(0);
     expect(result.removed).toHaveLength(0);
+  });
+
+  it('should penalize confidence for self-contradicting findings', () => {
+    const docs = [makeDoc({
+      evidence: ['Division by zero is avoided due to prior check on line 5'],
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered[0].confidence).toBe(24); // 80 * 0.3
+  });
+
+  it('should not penalize confidence for findings without self-contradiction', () => {
+    const docs = [makeDoc({
+      problem: 'Division by zero on line 12',
+      evidence: ['computeValue() may return 0'],
+      suggestion: 'Validate the divisor is non-zero',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered[0].confidence).toBe(80);
   });
 
   it('should correctly split mixed valid/invalid docs', () => {

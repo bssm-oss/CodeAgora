@@ -83,8 +83,32 @@ export function filterHallucinations(
       }
     }
 
+    // Check 4: Self-contradiction — finding admits the issue is already handled
+    if (detectSelfContradiction(doc)) {
+      doc.confidence = Math.round((doc.confidence ?? 50) * 0.3);
+    }
+
     filtered.push(doc);
   }
 
   return { filtered, removed };
+}
+
+const SELF_CONTRADICTION_PATTERNS = [
+  /already\s+(?:handled|checked|validated|prevented|avoided|guarded|addressed)/i,
+  /prior\s+check/i,
+  /(?:is|are)\s+avoided\s+due\s+to/i,
+  /not\s+a\s+concern/i,
+  /already\s+returns?\s+(?:early|before|50|default)/i,
+  /(?:guard|check)\s+(?:above|before|prevents?|ensures?)/i,
+  /however.*(?:is|are)\s+(?:already|properly)\s+(?:handled|checked)/i,
+];
+
+/**
+ * Detect findings that contradict themselves by admitting the issue is handled.
+ * Example: "Division by zero possible" + evidence "avoided due to prior check"
+ */
+export function detectSelfContradiction(doc: EvidenceDocument): boolean {
+  const text = [doc.problem, ...doc.evidence, doc.suggestion].join(' ');
+  return SELF_CONTRADICTION_PATTERNS.some(p => p.test(text));
 }
