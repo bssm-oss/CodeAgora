@@ -109,7 +109,14 @@ const SELF_CONTRADICTION_PATTERNS = [
  * Example: "Division by zero possible" + evidence "avoided due to prior check"
  */
 export function detectSelfContradiction(doc: EvidenceDocument): boolean {
-  const text = [doc.problem, ...doc.evidence, doc.suggestion].join(' ');
+  if (!doc) return false;
+  const text = [
+    doc.problem || '',
+    ...(doc.evidence || []),
+    doc.suggestion || ''
+  ].join(' ').trim();
+
+  if (!text) return false;
   return SELF_CONTRADICTION_PATTERNS.some(p => p.test(text));
 }
 
@@ -117,63 +124,92 @@ export function detectSelfContradiction(doc: EvidenceDocument): boolean {
  * Deduplicate evidence documents at the individual finding level.
  * Merges findings on the same file + overlapping line range + similar title.
  * Keeps highest confidence, combines evidence lists.
+ *
+ * Optimized: Groups by filePath first to avoid O(N^2) comparison across different files.
  */
 export function deduplicateEvidence(docs: EvidenceDocument[]): EvidenceDocument[] {
-  if (docs.length <= 1) return docs;
+  if (!docs || docs.length <= 1) return docs || [];
+
+  // Group by filePath to reduce comparison space
+  const fileGroups = new Map<string, EvidenceDocument[]>();
+  for (const doc of docs) {
+    const list = fileGroups.get(doc.filePath || 'unknown') || [];
+    list.push(doc);
+    fileGroups.set(doc.filePath || 'unknown', list);
+  }
 
   const result: EvidenceDocument[] = [];
-  const merged = new Set<number>();
 
-  for (let i = 0; i < docs.length; i++) {
-    if (merged.has(i)) continue;
-
-    let primary = { ...docs[i], evidence: [...docs[i].evidence] };
-
-    for (let j = i + 1; j < docs.length; j++) {
-      if (merged.has(j)) continue;
-
-      if (shouldMergeEvidence(primary, docs[j])) {
-        // Merge: keep higher confidence, combine evidence
-        if ((docs[j].confidence ?? 0) > (primary.confidence ?? 0)) {
-          primary.confidence = docs[j].confidence;
-        }
-        // Add unique evidence items
-        for (const e of docs[j].evidence) {
-          if (!primary.evidence.includes(e)) {
-            primary.evidence.push(e);
-          }
-        }
-        merged.add(j);
-      }
+  for (const group of fileGroups.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
     }
 
-    result.push(primary);
+    const mergedIndices = new Set<number>();
+    for (let i = 0; i < group.length; i++) {
+      if (mergedIndices.has(i)) continue;
+
+      let primary = { ...group[i], evidence: [...(group[i].evidence || [])] };
+
+      for (let j = i + 1; j < group.length; j++) {
+        if (mergedIndices.has(j)) continue;
+
+        if (shouldMergeEvidence(primary, group[j])) {
+          // Merge: keep higher confidence, combine evidence
+          const primaryConf = primary.confidence ?? 0;
+          const otherConf = group[j].confidence ?? 0;
+          if (otherConf > primaryConf) {
+            primary.confidence = otherConf;
+          }
+
+          // Add unique evidence items
+          const otherEvidence = group[j].evidence || [];
+          for (const e of otherEvidence) {
+            if (!primary.evidence.includes(e)) {
+              primary.evidence.push(e);
+            }
+          }
+          mergedIndices.add(j);
+        }
+      }
+      result.push(primary);
+    }
   }
 
   return result;
 }
 
 function shouldMergeEvidence(a: EvidenceDocument, b: EvidenceDocument): boolean {
-  // Same file
-  if (a.filePath !== b.filePath) return false;
+  // Same file is guaranteed by caller (deduplicateEvidence groups by filePath)
 
-  // Overlapping line ranges (within 10 lines)
-  const LINE_TOLERANCE = 10;
-  if (a.lineRange[0] > b.lineRange[1] + LINE_TOLERANCE ||
-      b.lineRange[0] > a.lineRange[1] + LINE_TOLERANCE) return false;
+  // Overlapping line ranges (within 15 lines)
+  const LINE_TOLERANCE = 15;
+  const overlap =
+    a.lineRange[0] <= b.lineRange[1] + LINE_TOLERANCE &&
+    b.lineRange[0] <= a.lineRange[1] + LINE_TOLERANCE;
+
+  if (!overlap) return false;
 
   // Similar titles (Jaccard > 0.5)
-  const titleSim = jaccardSimilarity(a.issueTitle, b.issueTitle);
+  const titleSim = jaccardSimilarity(a.issueTitle || '', b.issueTitle || '');
   return titleSim > 0.5;
 }
 
 function jaccardSimilarity(a: string, b: string): number {
+  if (!a && !b) return 1;
+  if (!a || !b) return 0;
+
   const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(Boolean));
   const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(Boolean));
+
+  if (wordsA.size === 0 && wordsB.size === 0) return 1;
+
   let intersection = 0;
   for (const w of wordsA) {
     if (wordsB.has(w)) intersection++;
   }
+
   const union = wordsA.size + wordsB.size - intersection;
-  return union === 0 ? 1 : intersection / union;
+  return union <= 0 ? 0 : intersection / union;
 }
