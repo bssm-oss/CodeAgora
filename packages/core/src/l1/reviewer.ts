@@ -462,6 +462,9 @@ Format: \`CRITICAL (85%)\` or \`WARNING (60%)\`
 - **"What if" speculation** — cite concrete code, not hypotheticals
 - **Config values** — JSON/YAML values are intentional choices
 - **Test patterns** — mocks, stubs, simplified logic are intentional in tests
+- **Guarded values** — if there is an early return, null check, or ?? fallback that handles the value BEFORE the line you're looking at, it is NOT a bug
+- **Division by zero with prior guard** — if the divisor is checked (<=0, ===0, etc.) with an early return above, do NOT flag division by zero
+- **Null/undefined with ?? or ?.** — if the value uses ?? (nullish coalescing) or ?. (optional chaining) on the SAME expression, the null case is handled
 
 **Example Evidence Document:**
 
