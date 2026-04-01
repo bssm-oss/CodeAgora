@@ -125,7 +125,7 @@ export async function verifySuggestions(
 
   if (!hasTsConfig) {
     for (const doc of candidates) {
-      (doc as EvidenceDocument & { suggestionVerified?: string }).suggestionVerified = 'skipped';
+      doc.suggestionVerified = 'skipped';
     }
     return;
   }
@@ -138,12 +138,12 @@ export async function verifySuggestions(
     const code = extractCodeBlock(doc.suggestion);
 
     if (!code) {
-      (doc as EvidenceDocument & { suggestionVerified?: string }).suggestionVerified = 'skipped';
+      doc.suggestionVerified = 'skipped';
       continue;
     }
 
     const result = await verifySingle(code, hasTS);
-    (doc as EvidenceDocument & { suggestionVerified?: string }).suggestionVerified = result.status;
+    doc.suggestionVerified = result.status;
 
     // Apply confidence penalty on failure
     if (result.status === 'failed') {

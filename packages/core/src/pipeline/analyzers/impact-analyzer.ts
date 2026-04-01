@@ -52,13 +52,17 @@ function findImporters(
       [
         '-r',
         '-l',
-        `import.*${symbolName}`,
+        '--fixed-strings',
+        symbolName,
         '--include=*.ts',
         '--include=*.tsx',
         '--include=*.js',
         '--include=*.jsx',
         '--include=*.mts',
         '--include=*.mjs',
+        '--exclude-dir=node_modules',
+        '--exclude-dir=dist',
+        '--exclude-dir=.git',
         '.',
       ],
       {
