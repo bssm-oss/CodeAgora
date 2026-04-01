@@ -47,7 +47,7 @@ describe('findDuplicates()', () => {
 
     it('returns empty map when same file but non-overlapping line ranges', () => {
       const d1 = makeDiscussion({ id: 'nol-1', filePath: 'src/auth.ts', lineRange: [1, 10], issueTitle: 'Issue Alpha' });
-      const d2 = makeDiscussion({ id: 'nol-2', filePath: 'src/auth.ts', lineRange: [20, 30], issueTitle: 'Issue Alpha' });
+      const d2 = makeDiscussion({ id: 'nol-2', filePath: 'src/auth.ts', lineRange: [40, 50], issueTitle: 'Issue Alpha' });
 
       const result = findDuplicates([d1, d2]);
       expect(result.size).toBe(0);
