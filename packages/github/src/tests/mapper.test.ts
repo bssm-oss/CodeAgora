@@ -8,6 +8,7 @@ import {
   mapToInlineCommentBody,
   buildSummaryBody,
   buildReviewBadgeUrl,
+  buildTriageDigest,
 } from '../mapper.js';
 import type { EvidenceDocument, DiscussionVerdict, ReviewerOpinion, DiscussionRound } from '@codeagora/core/types/core.js';
 import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
@@ -491,5 +492,144 @@ describe('buildReviewBadgeUrl', () => {
   it('does not append critical count when counts are zero', () => {
     const url = buildReviewBadgeUrl('REJECT', { CRITICAL: 0, WARNING: 2 });
     expect(url).not.toContain('critical');
+  });
+});
+
+// ============================================================================
+// buildTriageDigest
+// ============================================================================
+
+describe('buildTriageDigest', () => {
+  it('returns null for empty docs', () => {
+    expect(buildTriageDigest([])).toBeNull();
+  });
+
+  it('classifies CRITICAL with high confidence as must-fix', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 90 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 must-fix');
+    expect(result).not.toContain('verify');
+    expect(result).not.toContain('ignore');
+  });
+
+  it('classifies HARSHLY_CRITICAL with high confidence as must-fix', () => {
+    const docs = [makeDoc({ severity: 'HARSHLY_CRITICAL', confidence: 80 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 must-fix');
+  });
+
+  it('classifies CRITICAL with low confidence as verify', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 30 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 verify');
+    expect(result).not.toContain('must-fix');
+  });
+
+  it('classifies WARNING with high confidence as verify', () => {
+    const docs = [makeDoc({ severity: 'WARNING', confidence: 80 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 verify');
+  });
+
+  it('classifies SUGGESTION as ignore', () => {
+    const docs = [makeDoc({ severity: 'SUGGESTION', confidence: 90 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 ignore');
+  });
+
+  it('classifies WARNING with low confidence as ignore', () => {
+    const docs = [makeDoc({ severity: 'WARNING', confidence: 10 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 ignore');
+  });
+
+  it('defaults confidence to 50 when not set', () => {
+    // CRITICAL with default 50 → conf ≤ 50 → verify
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: undefined })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 verify');
+  });
+
+  it('classifies a mix of docs correctly', () => {
+    const docs = [
+      makeDoc({ severity: 'CRITICAL', confidence: 90 }),     // must-fix
+      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // verify
+      makeDoc({ severity: 'WARNING', confidence: 80 }),      // verify
+      makeDoc({ severity: 'SUGGESTION', confidence: 50 }),   // ignore
+      makeDoc({ severity: 'SUGGESTION', confidence: 90 }),   // ignore
+    ];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 must-fix');
+    expect(result).toContain('2 verify');
+    expect(result).toContain('2 ignore');
+  });
+
+  it('omits zero-count categories', () => {
+    const docs = [makeDoc({ severity: 'SUGGESTION', confidence: 50 })];
+    const result = buildTriageDigest(docs);
+    expect(result).not.toContain('must-fix');
+    expect(result).not.toContain('verify');
+    expect(result).toContain('1 ignore');
+  });
+
+  it('uses middle dot separator between categories', () => {
+    const docs = [
+      makeDoc({ severity: 'CRITICAL', confidence: 90 }),
+      makeDoc({ severity: 'SUGGESTION', confidence: 50 }),
+    ];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('\u00B7');
+  });
+});
+
+// ============================================================================
+// buildSummaryBody — triage digest integration
+// ============================================================================
+
+describe('buildSummaryBody triage digest', () => {
+  it('includes triage digest line when evidenceDocs present', () => {
+    const docs = [
+      makeDoc({ severity: 'CRITICAL', confidence: 90 }),
+      makeDoc({ severity: 'WARNING', confidence: 80 }),
+      makeDoc({ severity: 'SUGGESTION', confidence: 50 }),
+    ];
+    const body = buildSummaryBody({
+      summary: makeSummary(),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: docs,
+      discussions: [],
+    });
+    expect(body).toContain('Triage:');
+    expect(body).toContain('1 must-fix');
+    expect(body).toContain('1 verify');
+    expect(body).toContain('1 ignore');
+  });
+
+  it('places triage digest between heading and verdict', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 90 })];
+    const body = buildSummaryBody({
+      summary: makeSummary(),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: docs,
+      discussions: [],
+    });
+    const headingIdx = body.indexOf('## CodeAgora Review');
+    const triageIdx = body.indexOf('Triage:');
+    const verdictIdx = body.indexOf('**Verdict:');
+    expect(headingIdx).toBeLessThan(triageIdx);
+    expect(triageIdx).toBeLessThan(verdictIdx);
+  });
+
+  it('omits triage digest when no evidenceDocs', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary(),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [],
+      discussions: [],
+    });
+    expect(body).not.toContain('Triage:');
   });
 });

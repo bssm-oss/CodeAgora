@@ -16,6 +16,43 @@ import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 
 const MARKER = '<!-- codeagora-v3 -->';
 
+/**
+ * Build a one-line triage summary for quick developer orientation (#410).
+ * Classification:
+ * - must-fix: CRITICAL+ with confidence >50%
+ * - verify: CRITICAL+ with confidence ≤50%, or WARNING with confidence >50%
+ * - ignore: SUGGESTION, or confidence <20%
+ */
+export function buildTriageDigest(docs: EvidenceDocument[]): string | null {
+  if (docs.length === 0) return null;
+
+  let mustFix = 0;
+  let verify = 0;
+  let ignore = 0;
+
+  for (const doc of docs) {
+    const conf = doc.confidence ?? 50;
+    const isCritical = doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
+    const isWarning = doc.severity === 'WARNING';
+
+    if (isCritical && conf > 50) {
+      mustFix++;
+    } else if ((isCritical && conf <= 50) || (isWarning && conf > 50)) {
+      verify++;
+    } else {
+      ignore++;
+    }
+  }
+
+  const parts: string[] = [];
+  if (mustFix > 0) parts.push(`${mustFix} must-fix`);
+  if (verify > 0) parts.push(`${verify} verify`);
+  if (ignore > 0) parts.push(`${ignore} ignore`);
+
+  if (parts.length === 0) return null;
+  return `\u{1F4CB} **Triage:** ${parts.join(' \u00B7 ')}`;
+}
+
 /** GitHub enforces 65,535 char limit on review body; use 60K ceiling for safety. */
 const MAX_REVIEW_BODY_CHARS = 60_000;
 /** GitHub enforces 65,535 char limit on individual comment body. */
@@ -316,6 +353,14 @@ export function buildSummaryBody(params: {
   lines.push(MARKER);
   lines.push('');
   lines.push('## CodeAgora Review');
+
+  // Triage digest (#410)
+  const triageDigest = buildTriageDigest(evidenceDocs);
+  if (triageDigest) {
+    lines.push('');
+    lines.push(triageDigest);
+  }
+
   lines.push('');
 
   // Verdict line
