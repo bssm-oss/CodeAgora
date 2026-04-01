@@ -274,6 +274,7 @@ async function executeL1Reviews(
   chunks: Awaited<ReturnType<typeof chunkDiff>>,
   surroundingContext: string | undefined,
   projectContext?: string,
+  enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
 ): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[] }> {
   const allReviewResults: ReviewOutput[] = [];
   const allReviewerInputs: ReviewerInput[] = [];
@@ -306,6 +307,13 @@ async function executeL1Reviews(
     if (projectContext) {
       for (const ri of reviewerInputs) {
         ri.projectContext = projectContext;
+      }
+    }
+
+    // Inject pre-analysis enriched context (#411, #414, #415, #407, #408)
+    if (enrichedContext) {
+      for (const ri of reviewerInputs) {
+        ri.enrichedContext = enrichedContext;
       }
     }
 
@@ -641,10 +649,27 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       ? await detectProjectContext(input.repoPath, config.reviewContext).catch(() => undefined)
       : undefined;
 
+    // === PRE-ANALYSIS: Enrich diff context for reviewers (#411, #414, #415, #407, #408) ===
+    let enrichedContext: import('./pre-analysis.js').EnrichedDiffContext | undefined;
+    if (input.repoPath) {
+      try {
+        const { analyzeBeforeReview } = await import('./pre-analysis.js');
+        const { extractFileListFromDiff: extractFiles } = await import('@codeagora/shared/utils/diff.js');
+        enrichedContext = await analyzeBeforeReview(
+          input.repoPath,
+          diffContent,
+          config,
+          extractFiles(diffContent),
+        );
+      } catch {
+        // Pre-analysis failed — continue without enrichment
+      }
+    }
+
     // === L1 REVIEWERS: Chunk Processing ===
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
     const l1Start = Date.now();
-    const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext, projectContext);
+    const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext);
     const l1Elapsed = Date.now() - l1Start;
     for (const r of allReviewResults) {
       telemetry.record({

@@ -244,6 +244,11 @@ export const ReviewContextSchema = z.object({
   notes: z.array(z.string()).optional(),
   /** Files/patterns that are bundled outputs (all deps inlined, do NOT flag external issues) */
   bundledOutputs: z.array(z.string()).optional(),
+  /** Path-based review rules — glob patterns trigger specific review notes (#408) */
+  pathRules: z.array(z.object({
+    pattern: z.string(),
+    notes: z.array(z.string()),
+  })).optional(),
 }).optional();
 export type ReviewContext = z.infer<typeof ReviewContextSchema>;
 

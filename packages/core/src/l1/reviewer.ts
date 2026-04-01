@@ -55,6 +55,8 @@ export interface ReviewerInput {
   customPromptPath?: string;
   /** Project context (framework, monorepo info) to prevent false positives (#237) */
   projectContext?: string;
+  /** Pre-analysis enriched context (#411, #414, #415, #407, #408) */
+  enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext;
 }
 
 // ============================================================================
@@ -156,6 +158,13 @@ async function executeReviewerWithGuards(
     }
   }
 
+  // Build enriched context section if available
+  let enrichedSection = '';
+  if (input.enrichedContext) {
+    const { buildEnrichedSection } = await import('../pipeline/pre-analysis.js');
+    enrichedSection = buildEnrichedSection(input.enrichedContext);
+  }
+
   // Build prompt: custom file (with {{DIFF}} placeholder) or built-in
   let reviewPrompt: string;
   let reviewMessages: ReviewerMessages | undefined;
@@ -174,7 +183,7 @@ async function executeReviewerWithGuards(
       reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
     }
   } else {
-    reviewMessages = buildReviewerMessages(diffContent, prSummary, surroundingContext, input.projectContext);
+    reviewMessages = buildReviewerMessages(diffContent, prSummary, surroundingContext, input.projectContext, enrichedSection);
     reviewPrompt = `${reviewMessages.system}\n\n${reviewMessages.user}`;
   }
   const fullPrompt = personaPrefix + reviewPrompt;
@@ -336,7 +345,7 @@ export interface ReviewerMessages {
   user: string;
 }
 
-export function buildReviewerMessages(diffContent: string, prSummary: string, surroundingContext?: string, projectContext?: string): ReviewerMessages {
+export function buildReviewerMessages(diffContent: string, prSummary: string, surroundingContext?: string, projectContext?: string, enrichedSection?: string): ReviewerMessages {
   // Use a cryptographically random delimiter to guard against prompt injection
   const delimiter = `DIFF_${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
   // Escape any sequence of 3+ backticks to prevent code fence breakout
@@ -491,11 +500,13 @@ ${surroundingContext}
 `
     : '';
 
+  const enrichedContextSection = enrichedSection || '';
+
   const user = `## PR Summary (Intent of the change)
 ${prSummary || 'No summary provided.'}
 
 **First, understand what this change is trying to do. Then ask: does the implementation actually achieve it? What could go wrong?**
-${projectContextSection}${contextSection}
+${projectContextSection}${enrichedContextSection}${contextSection}
 ## Code Changes
 
 <${delimiter}>
@@ -511,7 +522,7 @@ Write your evidence documents below. If you find no issues, write "No issues fou
   return { system, user };
 }
 
-function buildReviewerPrompt(diffContent: string, prSummary: string, surroundingContext?: string, projectContext?: string): string {
-  const { system, user } = buildReviewerMessages(diffContent, prSummary, surroundingContext, projectContext);
+function buildReviewerPrompt(diffContent: string, prSummary: string, surroundingContext?: string, projectContext?: string, enrichedSection?: string): string {
+  const { system, user } = buildReviewerMessages(diffContent, prSummary, surroundingContext, projectContext, enrichedSection);
   return `${system}\n\n${user}`;
 }
