@@ -428,7 +428,41 @@ async function executeSupporterResponse(
   }
 
   // Build prompt with persona
-  const basePrompt = `${moderatorPrompt}\n\nProvide your verdict:\n- AGREE: Evidence is valid and the issue is real\n- DISAGREE: Evidence is flawed, missing context, or the issue is a false positive\n- NEUTRAL: Needs more information\n\n**IMPORTANT: Do NOT conform simply because other reviewers agree. If you believe the evidence is wrong, say DISAGREE and explain why — even if you are the only one. Your independent judgment is more valuable than consensus.**\n\n**Response format — first line MUST be exactly one of:**\nStance: AGREE\nStance: DISAGREE\nStance: NEUTRAL\n\nThen provide your reasoning below.\n\nExample:\nStance: DISAGREE\nThe evidence cites line 42 but the actual vulnerability is mitigated by the input sanitizer at line 38.`;
+  const basePrompt = `${moderatorPrompt}
+
+## Your Task: Verify This Claim
+
+A reviewer has made the claim described above. Your job is to **verify** it by attempting to disprove it first.
+
+### Verification Process:
+1. Read the actual code carefully
+2. Try to find evidence that the claim is WRONG
+3. Consider: Is this a standard pattern? Does the surrounding code handle this case?
+4. Only agree if you genuinely cannot disprove the claim
+
+### Response Format
+
+**First line MUST be exactly one of:**
+Stance: AGREE
+Stance: DISAGREE
+Stance: NEUTRAL
+
+**Then provide your reasoning. BOTH agree and disagree require specific evidence:**
+
+If DISAGREE:
+- What specific evidence disproves the claim?
+- Is this a known pattern that the reviewer misidentified?
+- Does the surrounding context already handle the concern?
+
+If AGREE:
+- Why is the claim impossible to disprove?
+- What specific code proves the issue exists?
+- Why isn't this handled by surrounding context?
+
+If NEUTRAL:
+- What specific information is missing to make a judgment?
+
+**Do NOT agree just because a reviewer said it. Do NOT disagree just to be contrarian. Base your judgment on the actual code and evidence provided.**`;
 
   const prompt = personaContent
     ? `${personaContent}\n\n---\n\n${basePrompt}`
