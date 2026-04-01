@@ -15,7 +15,8 @@ export interface DiscussionVerdictLike {
 export function computeL1Confidence(
   doc: EvidenceDocument,
   allDocs: EvidenceDocument[],
-  totalReviewers: number
+  totalReviewers: number,
+  totalDiffLines?: number,
 ): number {
   if (totalReviewers <= 0) return 50;
   const agreeing = allDocs.filter(d =>
@@ -24,10 +25,26 @@ export function computeL1Confidence(
   ).length;
   const agreementRate = Math.round((agreeing / totalReviewers) * 100);
 
+  let base: number;
   if (doc.confidence !== undefined && doc.confidence >= 0 && doc.confidence <= 100) {
-    return Math.round(doc.confidence * 0.6 + agreementRate * 0.4);
+    base = Math.round(doc.confidence * 0.6 + agreementRate * 0.4);
+  } else {
+    base = agreementRate;
   }
-  return agreementRate;
+
+  // Corroboration scoring (#432)
+  // Single-reviewer findings are more likely hallucinations
+  if (agreeing === 1 && totalReviewers >= 3) {
+    // Diff-size correction: large diffs may have legitimate single-reviewer finds
+    const isLargeDiff = (totalDiffLines ?? 0) > 500;
+    const penalty = isLargeDiff ? 0.7 : 0.5;
+    base = Math.round(base * penalty);
+  } else if (agreeing >= 3) {
+    // Strong corroboration boost (capped at 100)
+    base = Math.min(100, Math.round(base * 1.2));
+  }
+
+  return Math.max(0, Math.min(100, base));
 }
 
 /**

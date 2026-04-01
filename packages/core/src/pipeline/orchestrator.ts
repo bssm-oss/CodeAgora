@@ -752,9 +752,10 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     // === CONFIDENCE: Compute L1 confidence for non-rule docs ===
     const totalReviewers = allReviewerInputs.length;
+    const totalDiffLines = filteredDiffContent.split('\n').length;
     for (const doc of allEvidenceDocs) {
       if (doc.source !== 'rule') {
-        doc.confidence = computeL1Confidence(doc, allEvidenceDocs, totalReviewers);
+        doc.confidence = computeL1Confidence(doc, allEvidenceDocs, totalReviewers, totalDiffLines);
       }
     }
 

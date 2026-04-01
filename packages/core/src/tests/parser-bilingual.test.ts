@@ -205,3 +205,114 @@ describe('computeL1Confidence — reviewer confidence blending (#238)', () => {
     expect(computeL1Confidence(doc, [], 0)).toBe(50);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Corroboration scoring in computeL1Confidence (#432)
+// ---------------------------------------------------------------------------
+
+describe('computeL1Confidence — corroboration scoring (#432)', () => {
+  function makeDoc(filePath: string, lineStart: number, confidence?: number): EvidenceDocument {
+    return {
+      issueTitle: 'Test',
+      problem: 'Test problem',
+      evidence: [],
+      severity: 'WARNING',
+      suggestion: 'Fix it',
+      filePath,
+      lineRange: [lineStart, lineStart + 10],
+      ...(confidence !== undefined && { confidence }),
+    };
+  }
+
+  it('single reviewer (1/5), small diff → confidence × 0.5', () => {
+    // Only 1 doc agrees (itself), totalReviewers >= 3, small diff
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),   // agreeing (same file+line)
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    // agreeing = 1, totalReviewers = 5, agreementRate = 20
+    // base = Math.round(80 * 0.6 + 20 * 0.4) = Math.round(48 + 8) = 56
+    // penalty (small diff): 56 * 0.5 = 28
+    const result = computeL1Confidence(doc, allDocs, 5, 100);
+    expect(result).toBe(28);
+  });
+
+  it('single reviewer (1/5), large diff (>500 lines) → confidence × 0.7', () => {
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    // agreeing = 1, totalReviewers = 5, agreementRate = 20
+    // base = 56, penalty (large diff): Math.round(56 * 0.7) = 39
+    const result = computeL1Confidence(doc, allDocs, 5, 600);
+    expect(result).toBe(39);
+  });
+
+  it('triple corroboration (3/5) → confidence × 1.2', () => {
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),
+      makeDoc('src/foo.ts', 12),
+      makeDoc('src/foo.ts', 14),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+    ];
+    // agreeing = 3, totalReviewers = 5, agreementRate = 60
+    // base = Math.round(80 * 0.6 + 60 * 0.4) = Math.round(48 + 24) = 72
+    // boost: Math.round(72 * 1.2) = 86
+    const result = computeL1Confidence(doc, allDocs, 5);
+    expect(result).toBe(86);
+  });
+
+  it('all reviewers agree (5/5) → confidence × 1.2 (capped at 100)', () => {
+    const doc = makeDoc('src/foo.ts', 10, 100);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),
+      makeDoc('src/foo.ts', 11),
+      makeDoc('src/foo.ts', 12),
+      makeDoc('src/foo.ts', 13),
+      makeDoc('src/foo.ts', 14),
+    ];
+    // agreeing = 5, totalReviewers = 5, agreementRate = 100
+    // base = Math.round(100 * 0.6 + 100 * 0.4) = 100
+    // boost: Math.min(100, Math.round(100 * 1.2)) = 100 (capped)
+    const result = computeL1Confidence(doc, allDocs, 5);
+    expect(result).toBe(100);
+  });
+
+  it('2 reviewers agree → no penalty/boost (middle ground)', () => {
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),
+      makeDoc('src/foo.ts', 12),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+    ];
+    // agreeing = 2, totalReviewers = 5, agreementRate = 40
+    // base = Math.round(80 * 0.6 + 40 * 0.4) = Math.round(48 + 16) = 64
+    // No penalty (agreeing != 1), no boost (agreeing < 3) → 64
+    const result = computeL1Confidence(doc, allDocs, 5);
+    expect(result).toBe(64);
+  });
+
+  it('totalReviewers < 3 → no penalty even for single reviewer', () => {
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),
+      makeDoc('src/bar.ts', 100),
+    ];
+    // agreeing = 1, but totalReviewers = 2 (< 3), so no penalty
+    // agreementRate = 50, base = Math.round(80 * 0.6 + 50 * 0.4) = 68
+    const result = computeL1Confidence(doc, allDocs, 2, 100);
+    expect(result).toBe(68);
+  });
+});
