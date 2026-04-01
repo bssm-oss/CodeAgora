@@ -740,6 +740,14 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       allEvidenceDocs = filtered;
     }
 
+    // === HALLUCINATION FILTER: Remove findings referencing non-existent code (#428) ===
+    const { filterHallucinations } = await import('./hallucination-filter.js');
+    const hallucinationResult = filterHallucinations(allEvidenceDocs, filteredDiffContent);
+    if (hallucinationResult.removed.length > 0) {
+      console.log(`[Hallucination Filter] Removed ${hallucinationResult.removed.length} finding(s) referencing non-existent code`);
+    }
+    allEvidenceDocs = hallucinationResult.filtered;
+
     // === CONFIDENCE: Compute L1 confidence for non-rule docs ===
     const totalReviewers = allReviewerInputs.length;
     for (const doc of allEvidenceDocs) {
