@@ -13,7 +13,7 @@
     "./*": "./dist/*"
   },
   "scripts": {
-    "build": "echo skip",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src/"
