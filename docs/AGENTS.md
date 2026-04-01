@@ -8,7 +8,7 @@
 Reference documentation for the CodeAgora multi-agent code review system. This directory contains:
 
 - **Product strategy & vision**: Why the system exists, target users, core hypothesis
-- **Architecture & design**: Layer definitions, component boundaries, data flow
+- **Architecture & design**: 6-stage pipeline (Pre-Analysis, L0-L3, Hallucination Filter), component boundaries, data flow
 - **Integration patterns**: GitHub Actions, PR comments, SARIF output, webhooks
 - **Research & roadmap**: Academic foundations (MAD), implementation phases, feature catalog
 - **Implementation guides**: Complete specifications for developers building new features
@@ -20,7 +20,7 @@ These documents guide both strategic decision-making and tactical implementation
 | File | Purpose | Audience |
 |------|---------|----------|
 | `1_PRD.md` | Product Requirements Document. Problem definition, solution hypothesis, target users, success metrics, v1 scope. Answered: "Why are we building this?" | Product owners, architects, team leads |
-| `3_V3_DESIGN.md` | Architecture Design Document. Four-layer pipeline (L0-L3), component definitions, discussion protocol, head verdict logic, role definitions. Answered: "How does the system work?" | Engineers, architects |
+| `3_V3_DESIGN.md` | Original v3 Architecture Design Document. For current architecture (v2.2.0 with Pre-Analysis, Hallucination Filter, Specialist Personas), see [ARCHITECTURE.md](ARCHITECTURE.md). | Engineers, architects |
 | `5_GITHUB_INTEGRATION.md` | GitHub Integration Specification. PR comment formatting, GitHub Actions workflow, SARIF output structure, UX mockups, API mappings. Answered: "How does the system integrate with GitHub?" | Backend/CLI engineers, DevOps |
 | `6_WEB_AND_UX_EXPANSION.md` | Web & UX Roadmap. Feature phases (GitHub enrichment → Discord → meme mode → web dashboard → MCP), difficulty matrix, execution order, TypeScript limitations. Answered: "What's next after v3 CLI?" | Product owners, frontend engineers, planners |
 | `MAD_RESEARCH_AND_IMPROVEMENTS.md` | Multi-Agent Debate Research & Roadmap. Academic foundations (NeurIPS 2025, X-MAS, Free-MAD), current state analysis, 4 priority improvements (87.5% debate cost reduction), implementation roadmap. Answered: "How do we improve debate quality?" | Architects, research engineers |
@@ -48,7 +48,7 @@ These documents guide both strategic decision-making and tactical implementation
 
 **Documents are living but versioned:**
 - `1_PRD.md` is stable (v1 scope is fixed; post-v1 changes go in roadmap documents)
-- `3_V3_DESIGN.md` reflects the current production design
+- `3_V3_DESIGN.md` describes the original v3 design; for current architecture see `ARCHITECTURE.md`
 - `5_GITHUB_INTEGRATION.md` is a complete spec; changes require team sign-off
 - `6_WEB_AND_UX_EXPANSION.md` is the source of truth for feature phases and priorities
 - `MAD_RESEARCH_AND_IMPROVEMENTS.md` is evergreen research; implementation status tracked separately in IMPLEMENT_PLAN.md (root docs/)

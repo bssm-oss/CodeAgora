@@ -1,3 +1,5 @@
+> **Note**: This document describes the original v3 design. For the current architecture (v2.2.0 with Pre-Analysis Layer, Hallucination Filter, Specialist Personas, and Suggestion Verification), see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # CodeAgora v3 — Architecture Design Document
 
 > Multi-Agent Debate Code Review System

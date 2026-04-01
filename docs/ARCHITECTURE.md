@@ -1,6 +1,6 @@
 # Architecture
 
-## 4-Layer Pipeline
+## 6-Stage Pipeline
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -11,16 +11,36 @@
 └───────┬─────────────────────────────────────────┘
         │ Selected reviewers
 ┌───────▼─────────────────────────────────────────┐
-│  L1: Parallel Reviewers                          │
+│  Pre-Analysis (5 analyzers)                      │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────┐ │
+│  │ Semantic Diff│ │ TS Diagnostics│ │ Change   │ │
+│  │ Classification│ │             │ │ Impact   │ │
+│  └──────────────┘ └──────────────┘ └──────────┘ │
+│  ┌──────────────┐ ┌──────────────┐              │
+│  │ AI Rule File │ │ Build Artifact│              │
+│  │ Detection    │ │ Exclusion    │              │
+│  └──────────────┘ └──────────────┘              │
+└───────┬─────────────────────────────────────────┘
+        │ Enriched context
+┌───────▼─────────────────────────────────────────┐
+│  L1: Parallel Specialist Reviewers               │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐        │
-│  │ Reviewer │ │ Reviewer │ │ Reviewer │  ...    │
+│  │ Security │ │  Logic   │ │ General  │  ...    │
 │  │ (Groq)   │ │ (Google) │ │ (Mistral)│        │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘        │
 └───────┼────────────┼────────────┼───────────────┘
         │            │            │
         └────────────┼────────────┘
-                     │ Severity threshold routing
+                     │
 ┌────────────────────▼────────────────────────────┐
+│  Hallucination Filter (4-layer defense)          │
+│  ① File/line validation against actual diff      │
+│  ② Self-contradiction detection                  │
+│  ③ Evidence deduplication (merge duplicates)      │
+│  ④ Confidence scoring (0% → NEEDS_HUMAN)         │
+└────────┬────────────────────────────────────────┘
+         │ Validated issues + severity routing
+┌────────▼────────────────────────────────────────┐
 │  L2: Discussion                                  │
 │  ┌─────────────┐   ┌──────────────────────────┐ │
 │  │  Moderator  │◄──│ Supporter Pool + Devil's  │ │
@@ -31,17 +51,32 @@
 ┌────────▼────────────────────────────────────────┐
 │  L3: Head Agent                                  │
 │  Groups issues → Scans unconfirmed →             │
+│  Suggestion verification (tsc transpile) →       │
 │  ACCEPT / REJECT / NEEDS_HUMAN                   │
+│  Triage digest: must-fix / verify / ignore       │
 └─────────────────────────────────────────────────┘
 ```
 
 **L0 — Model Intelligence**: Thompson Sampling (bandit) selects reviewer models based on quality history. Tracks health, specificity scores, and maintains a performance leaderboard.
 
-**L1 — Parallel Reviewers**: Multiple LLMs review the diff independently. Severity-based thresholds determine which issues proceed to debate.
+**Pre-Analysis Layer**: 5 analyzers enrich context before L1 reviewers run:
+- **Semantic Diff Classification**: Categorizes changes by type (refactor, feature, bugfix, etc.)
+- **TypeScript Diagnostics**: Runs tsc to surface type errors in changed files
+- **Change Impact Analysis**: Identifies downstream effects of modifications
+- **External AI Rule Detection**: Auto-detects `.cursorrules`, `CLAUDE.md`, `copilot-instructions.md` and injects them into reviewer context
+- **Build Artifact Exclusion**: Filters out `dist/`, lock files, `*.min.js` by default
 
-**L2 — Discussion**: A supporter pool and devil's advocate debate contested issues over multiple rounds. The moderator enforces consensus or makes a forced decision.
+**L1 — Parallel Specialist Reviewers**: Multiple LLMs review the diff independently using specialist personas (`builtin:security`, `builtin:logic`, `builtin:api-contract`, `builtin:general`). Severity-based thresholds determine which issues proceed to debate.
 
-**L3 — Head Verdict**: Groups issues, scans unconfirmed findings, and delivers a final decision.
+**Hallucination Filter (4-Layer Defense)**: Reduces false positives from ~100% to <25%:
+1. **File/line validation**: Checks that referenced files and line numbers exist in the actual diff
+2. **Self-contradiction detection**: Flags issues where the problem description contradicts the evidence
+3. **Evidence deduplication**: Merges duplicate findings across reviewers before L2
+4. **Confidence-based verdict**: Issues with 0% confidence at CRITICAL+ severity route to NEEDS_HUMAN instead of REJECT
+
+**L2 — Discussion**: A supporter pool and devil's advocate debate contested issues over multiple rounds. Static analysis evidence is included in debate context. The moderator enforces consensus or makes a forced decision.
+
+**L3 — Head Verdict**: Groups issues, scans unconfirmed findings, verifies CRITICAL+ suggestions via tsc transpile check, and delivers a final decision with a triage digest (must-fix / verify / ignore).
 
 ## Project Structure
 

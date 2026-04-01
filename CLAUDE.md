@@ -14,10 +14,31 @@ Reviewer models run parallel independent reviews → debate conflicting opinions
 - Build: tsup
 - Package Manager: pnpm
 
-## Architecture (4-Layer)
+## Architecture (6-Stage Pipeline)
 ```
-CLI Layer → L0 (Model Intelligence) → L1 (Parallel Reviewers) → L2 (Discussion) → L3 (Head Verdict)
+CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewers) → Hallucination Filter → L2 (Discussion) → L3 (Head Verdict)
 ```
+
+### Pre-Analysis Layer
+5 analyzers run before L1 reviewers to enrich context:
+- Semantic Diff Classification
+- TypeScript Diagnostics
+- Change Impact Analysis
+- External AI Rule Detection (.cursorrules, CLAUDE.md, copilot-instructions)
+- Build Artifact Exclusion (dist/, lock files, *.min.js filtered by default)
+
+### Hallucination Filter (4-Layer)
+Reduces false positives from LLM reviewers (target: <25%):
+1. File/line validation against actual diff
+2. Self-contradiction detection
+3. Evidence deduplication (merges duplicate findings)
+4. Confidence scoring (0% confidence criticals → NEEDS_HUMAN, not REJECT)
+
+### Specialist Personas
+Built-in persona types: `builtin:security`, `builtin:logic`, `builtin:api-contract`, `builtin:general`
+
+### Suggestion Verification
+CRITICAL+ suggestions are verified via tsc transpile check (configurable via `reviewContext.verifySuggestions`)
 
 ## Directory Structure
 ```
@@ -63,6 +84,7 @@ packages/
 - Config: validation tests for valid/invalid configs
 - Integration: sample diff → full pipeline execution
 - Parallelization: concurrency limits and partial failure scenarios
+- Hallucination filter: false positive rate validation
 - Total: 180 test files, 2846 tests
 
 ### Key Commands
@@ -104,9 +126,10 @@ packages/
 
 ### Security
 - Shell injection: spawn() + SAFE_ARG regex validation
-- Path traversal: absolute path blocking + containment check
-- Credentials: ~/.config/codeagora/credentials (0o600 permissions)
+- Path traversal: absolute path blocking + containment check (fail-closed)
+- Credentials: ~/.config/codeagora/credentials (0o700 directory, 0o600 file permissions)
 - SSRF: URL validation + HTTPS enforced + domain whitelist
+- Permissions: fail-closed on permission check errors
 
 ## Reference Docs
 1. [PRD](docs/1_PRD.md)

@@ -50,15 +50,24 @@ git diff | agora review
 ```
 git diff | agora review
 
-  L1  --- Reviewer A --+
-      --- Reviewer B --+-- parallel independent reviews
-      --- Reviewer C --+
-              |
-  L2  --- Discussion Moderator
-      --- Supporters + Devil's Advocate
-      --- Consensus voting per issue
-              |
-  L3  --- Head Agent --> ACCEPT / REJECT / NEEDS_HUMAN
+  Pre  --- Semantic Diff Classification
+       --- TypeScript Diagnostics
+       --- Change Impact Analysis
+            |
+  L1   --- Reviewer A (security) --+
+       --- Reviewer B (logic)    --+-- parallel specialist reviews
+       --- Reviewer C (general)  --+
+            |
+  Filter -- Hallucination Check (file/line validation)
+       --- Self-contradiction Filter
+       --- Evidence Dedup
+            |
+  L2   --- Adversarial Discussion (supporters must disprove)
+       --- Static analysis evidence in debate
+            |
+  L3   --- Head Agent --> ACCEPT / REJECT / NEEDS_HUMAN
+            |
+  Output -- Triage: N must-fix / N verify / N ignore
 ```
 
 ---
