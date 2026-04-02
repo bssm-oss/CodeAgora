@@ -61,7 +61,7 @@ export async function postToGitHub(
   };
 
   const { mapToGitHubReview } = await import('@codeagora/github/mapper.js');
-  const { buildDiffPositionIndex } = await import('@codeagora/github/diff-position.js');
+  const { buildDiffPositionIndex } = await import('@codeagora/github/diff-parser.js');
   const { postReview, setCommitStatus } = await import('@codeagora/github/poster.js');
 
   // Fetch the actual diff for position mapping
@@ -78,10 +78,11 @@ export async function postToGitHub(
     sessionDate: result.date,
   });
 
-  const reviewUrl = await postReview(ghConfig, prNumber, review);
-  await setCommitStatus(ghConfig, headSha, result.summary.decision, reviewUrl);
+  const postResult = await postReview(ghConfig, prNumber, review);
+  const reviewUrl = typeof postResult === 'string' ? postResult : postResult?.url;
+  await setCommitStatus(ghConfig, headSha, result.summary.decision, reviewUrl as string);
 
-  return { reviewUrl };
+  return { reviewUrl: reviewUrl ?? undefined };
 }
 
 // ============================================================================
