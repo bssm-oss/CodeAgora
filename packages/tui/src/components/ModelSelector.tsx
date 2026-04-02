@@ -10,6 +10,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import path from 'path';
 import { colors, icons, getTerminalSize } from '../theme.js';
 import { isProviderAvailable } from '../utils/provider-status.js';
@@ -71,7 +72,14 @@ export function ModelSelector({ source, provider: initialProvider, onSelect, onC
   const visibleCount = Math.max(rows - 8, 8);
 
   useEffect(() => {
-    readFile(path.join(__dirname, '../../../shared/src/data/model-rankings.json'), 'utf-8')
+    // Resolve via createRequire to work both in source and built output
+    const require = createRequire(import.meta.url);
+    const rankingsPath = (() => {
+      try { return require.resolve('@codeagora/shared/data/model-rankings.json'); } catch {}
+      // Fallback: try relative to __dirname (source layout)
+      return path.join(__dirname, '../../../shared/src/data/model-rankings.json');
+    })();
+    readFile(rankingsPath, 'utf-8')
       .then(raw => {
         const data = JSON.parse(raw) as { models?: ModelEntry[] };
         setLoadedModels(data.models ?? []);

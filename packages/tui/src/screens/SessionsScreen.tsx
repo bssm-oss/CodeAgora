@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { listSessions, showSession, getSessionStats } from '@codeagora/core/session/queries.js';
 import type { SessionEntry, SessionDetail, SessionStats } from '@codeagora/core/session/queries.js';
@@ -62,7 +62,10 @@ export function SessionsScreen(): React.JSX.Element {
   const [sortMode, setSortMode] = useState<SortMode>('date');
   const [stats, setStats] = useState<SessionStats | null>(null);
 
+  const fetchIdRef = useRef(0);
+
   function fetchSessions(status: StatusFilter, sort: SortMode): void {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     const opts = {
       limit: 20,
@@ -74,12 +77,15 @@ export function SessionsScreen(): React.JSX.Element {
       getSessionStats(process.cwd()),
     ])
       .then(([entries, sessionStats]) => {
+        // Ignore stale responses from superseded fetches
+        if (fetchId !== fetchIdRef.current) return;
         setSessions(entries);
         setStats(sessionStats);
         setSelectedIndex(0);
         setLoading(false);
       })
       .catch((e: unknown) => {
+        if (fetchId !== fetchIdRef.current) return;
         setError(e instanceof Error ? e.message : String(e));
         setLoading(false);
       });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, useApp, useInput } from 'ink';
 import { useRouter } from './hooks/useRouter.js';
 import { Header } from './components/Header.js';
@@ -19,6 +19,7 @@ export function App(): React.JSX.Element {
   const { exit } = useApp();
   const { screen, navigate, goBack, canGoBack } = useRouter();
   const [reviewParams, setReviewParams] = useState<ReviewSetupParams | undefined>();
+  const reviewParamsRef = useRef(reviewParams);
   const [pipelineResult, setPipelineResult] = useState<PipelineResult | undefined>();
   const [diffContent, setDiffContent] = useState<string>('');
   const [evidenceDocs, setEvidenceDocs] = useState<Array<{
@@ -31,8 +32,8 @@ export function App(): React.JSX.Element {
 
   useInput((input) => {
     if (input === 'q') {
-      // Do not handle 'q' when on a detail/modal screen — let the screen handle it
-      if (screen === 'context' || screen === 'sessions' || screen === 'debate') {
+      // Do not handle 'q' when on a detail/modal/editing screen — let the screen handle it
+      if (screen === 'context' || screen === 'sessions' || screen === 'debate' || screen === 'config') {
         return;
       }
       if (screen === 'results') {
@@ -49,6 +50,7 @@ export function App(): React.JSX.Element {
   function handleReviewSetupNavigate(to: Screen, params?: ReviewSetupParams): void {
     if (params) {
       setReviewParams(params);
+      reviewParamsRef.current = params;
     }
     navigate(to);
   }
@@ -63,10 +65,11 @@ export function App(): React.JSX.Element {
       lineRange: iss.lineRange,
       issueTitle: iss.title,
     })));
-    // Read diffContent from diffPath if available
-    if (reviewParams?.diffPath) {
+    // Read diffContent from diffPath — use ref to avoid stale closure
+    const currentParams = reviewParamsRef.current;
+    if (currentParams?.diffPath) {
       import('fs/promises').then(fs =>
-        fs.readFile(reviewParams.diffPath, 'utf-8').then(setDiffContent).catch(() => setDiffContent(''))
+        fs.readFile(currentParams.diffPath, 'utf-8').then(setDiffContent).catch(() => setDiffContent(''))
       );
     }
     navigate('results');

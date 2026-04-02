@@ -111,9 +111,17 @@ export function DiffViewer({ files }: Props): React.JSX.Element {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
 
+  // Compute lines early so useInput callback can access line count for bounds
+  const safeIdx = Math.min(activeFileIndex, Math.max(0, files.length - 1));
+  const activeFileForLines = files[safeIdx];
+  const lineCount = activeFileForLines ? buildLines(activeFileForLines, collapsed).length : 0;
+
   useInput((input, key) => {
     if (input === 'j' || key.downArrow) {
-      setScrollOffset(o => o + 1);
+      setScrollOffset(o => {
+        const maxOffset = Math.max(0, lineCount - VIEWPORT_HEIGHT);
+        return Math.min(o + 1, maxOffset);
+      });
     } else if (input === 'k' || key.upArrow) {
       setScrollOffset(o => Math.max(0, o - 1));
     } else if (key.tab && !key.shift) {
@@ -136,9 +144,9 @@ export function DiffViewer({ files }: Props): React.JSX.Element {
     );
   }
 
-  const safeIndex = Math.min(activeFileIndex, files.length - 1);
+  const safeIndex = safeIdx;
   const activeFile = files[safeIndex]!;
-  const lines = buildLines(activeFile, collapsed);
+  const lines = activeFileForLines ? buildLines(activeFile, collapsed) : [];
   const visibleLines = lines.slice(scrollOffset, scrollOffset + VIEWPORT_HEIGHT);
   const canScrollDown = scrollOffset + VIEWPORT_HEIGHT < lines.length;
 
