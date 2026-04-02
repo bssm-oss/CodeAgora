@@ -147,7 +147,7 @@ reviewRoutes.post('/', async (c) => {
   // Fire-and-forget: pipeline runs in the background
   void (async () => {
     try {
-      await runPipeline(
+      const result = await runPipeline(
         {
           diffPath,
           providerOverride: provider || undefined,
@@ -158,9 +158,55 @@ reviewRoutes.post('/', async (c) => {
         },
         activeEmitter!,
       );
+
+      // Create notification for completed review
+      try {
+        const { createNotification } = await import('./notifications.js');
+        const verdict = result.summary?.decision;
+        if (verdict === 'REJECT') {
+          await createNotification({
+            type: 'verdict_reject',
+            sessionId: `${result.date}/${result.sessionId}`,
+            verdict,
+            message: `Review completed: REJECT — ${Object.entries(result.summary?.severityCounts ?? {}).map(([k, v]) => `${v} ${k}`).join(', ')}`,
+            urgent: true,
+          });
+        } else if (verdict === 'NEEDS_HUMAN') {
+          await createNotification({
+            type: 'verdict_needs_human',
+            sessionId: `${result.date}/${result.sessionId}`,
+            verdict,
+            message: `Review completed: NEEDS_HUMAN — requires manual review`,
+            urgent: true,
+          });
+        } else if (result.status === 'success') {
+          await createNotification({
+            type: 'review_complete',
+            sessionId: `${result.date}/${result.sessionId}`,
+            verdict: verdict ?? 'ACCEPT',
+            message: `Review completed: ${verdict ?? 'ACCEPT'}`,
+            urgent: false,
+          });
+        }
+      } catch {
+        // Notification creation is non-critical
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Pipeline failed.';
       activeEmitter?.stageError('init', msg);
+
+      // Notify on failure
+      try {
+        const { createNotification } = await import('./notifications.js');
+        await createNotification({
+          type: 'review_failed',
+          sessionId: `${date}/${sessionId}`,
+          message: `Review failed: ${msg}`,
+          urgent: false,
+        });
+      } catch {
+        // Non-critical
+      }
     } finally {
       pipelineRunning = false;
       activeEmitter = null;
