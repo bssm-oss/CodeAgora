@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.2.1 (2026-04-02)
+
+### MCP: CLI Parity + Extension
+- All review tools (review_quick, review_full, review_pr) now accept 13 optional parameters: provider, model, timeout, reviewer_timeout, reviewer_count, reviewer_names, no_cache, repo_path, context_lines, output_format, notify, staged, post_review
+- **review_pr** supports PR number only — auto-detects owner/repo from git remote
+- **Staged review** — review git staged changes directly from MCP
+- New **config_get** tool — read config values by dot-notation key
+- New **config_set** tool — update config values from Claude Code
+- Post-pipeline actions: GitHub PR posting, Discord/Slack notifications, output formatting
+- Shared zod schema for consistent parameter validation across tools
+- 49 new MCP tests (94 total)
+
+### Web Dashboard
+- **Dashboard landing page** — stat cards, recent activity, weekly trend chart, quick actions (replaces "Coming soon" stub)
+- **Review trigger** — start reviews from web UI (diff text, PR URL, or staged changes) with real-time WebSocket progress
+- **YAML config editing** — full round-trip read/write support via converter.ts (comments lost on save)
+- **Notification center** — bell icon, dropdown, read/unread tracking, urgent badges for REJECT/NEEDS_HUMAN
+- **Session comparison page** — side-by-side verdict/config/issue diff with ConfigDiff component
+
+### CLI
+- New **config-get** command — `codeagora config-get discussion.maxRounds` returns specific values
+
+### Bug Fixes
+- MCP bridge no longer treats REJECT verdicts as errors (#443)
+
+### Stats
+- Tests: 181 files, 2895 passing
+
+---
+
 ## 2.2.0 (2026-04-01)
 
 ### New: 4-Layer Hallucination Filter

@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/mcp",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "CodeAgora MCP server — Claude Code integration for AI-powered code review",
   "type": "module",
   "license": "MIT",

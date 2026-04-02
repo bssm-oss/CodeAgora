@@ -7,8 +7,8 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-2846%20passing-%23191A51" alt="Tests">
-  <img src="https://img.shields.io/badge/version-2.2.0-%2305A6B9" alt="v2.2.0">
+  <img src="https://img.shields.io/badge/tests-2895%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/version-2.2.1-%2305A6B9" alt="v2.2.1">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
