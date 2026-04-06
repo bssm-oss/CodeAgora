@@ -415,6 +415,7 @@ a:hover {
 .trend-chart__svg {
   display: block;
   width: 100%;
+  max-height: 120px;
 }
 
 .trend-chart__label {
@@ -1994,6 +1995,80 @@ a:hover {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+.quality-trend__legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.quality-trend__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.quality-trend__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.quality-trend__title,
+.selection-frequency__title {
+  color: var(--color-text);
+}
+
+.quality-trend__label {
+  fill: var(--color-text-secondary);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.quality-trend__svg text {
+  fill: var(--color-text-secondary);
+}
+
+.quality-trend__tooltip-text {
+  fill: var(--color-text);
+}
+
+.selection-frequency__legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.selection-frequency__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+.selection-frequency__legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.selection-frequency__label {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.selection-frequency__count {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 13px;
 }
 
 /* Selection Frequency */

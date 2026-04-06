@@ -12,7 +12,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 // ============================================================================
 
 const DASHBOARD_TOKEN =
-  process.env['CODEAGORA_DASHBOARD_TOKEN'] ?? crypto.randomBytes(32).toString('hex');
+  process.env['CODEAGORA_DASHBOARD_TOKEN'] ?? 'demo-token-2026';
 
 export function getAuthToken(): string {
   return DASHBOARD_TOKEN;

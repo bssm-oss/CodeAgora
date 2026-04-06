@@ -34,7 +34,10 @@ export function useApi<T>(path: string): UseApiResult<T> {
       setError(null);
 
       try {
-        const response = await fetch(path);
+        const token = localStorage.getItem('codeagora-token') ?? '';
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const response = await fetch(path, { headers });
 
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);

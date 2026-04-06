@@ -183,7 +183,7 @@ export function ReviewDetail(): React.JSX.Element {
               <div key={disc.discussionId} className="discussion-card">
                 <div className="discussion-card__header">
                   <span className="discussion-card__file">
-                    {disc.filePath}:{disc.lineRange[0]}-{disc.lineRange[1]}
+                    {disc.filePath ? `${disc.filePath}:${disc.lineRange?.[0]}-${disc.lineRange?.[1]}` : disc.discussionId}
                   </span>
                   <span className="discussion-card__rounds">{disc.rounds} rounds</span>
                   <span className={`discussion-card__consensus ${disc.consensusReached ? 'discussion-card__consensus--reached' : ''}`}>

@@ -1,0 +1,15 @@
+{
+  "decision": "REJECT",
+  "reasoning": "This diff introduces 2 HARSHLY_CRITICAL/CRITICAL security vulnerabilities (SQL injection, auth bypass) and 1 CRITICAL race condition. The SQL injection alone is grounds for rejection. All 3 reviewers independently identified overlapping security concerns, and the discussion phase confirmed the severity assessments with full consensus. Code changes are required before merge.",
+  "codeChanges": [
+    {
+      "filePath": "src/routes/users.ts",
+      "changes": "```typescript\n// Replace template literal with parameterized query\nconst user = await db.query('SELECT * FROM users WHERE id = $1', [userId]);\n```"
+    },
+    {
+      "filePath": "src/middleware/auth.ts",
+      "changes": "```typescript\nif (!token || token.role !== 'admin') {\n  return res.status(403).json({ error: 'Forbidden' });\n}\n```"
+    }
+  ],
+  "questionsForHuman": []
+}

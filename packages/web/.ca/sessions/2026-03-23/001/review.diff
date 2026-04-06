@@ -1,0 +1,113 @@
+diff --git a/src/routes/users.ts b/src/routes/users.ts
+index abc1234..def5678 100644
+--- a/src/routes/users.ts
++++ b/src/routes/users.ts
+@@ -20,12 +20,15 @@ import { db } from '../db';
+
+ router.get('/users/:userId', async (req, res) => {
+   const { userId } = req.params;
+-  const user = await db.query(`SELECT * FROM users WHERE id = '${userId}'`);
++  const user = await db.query(`SELECT * FROM users WHERE id = ${userId}`);
+   if (!user.rows[0]) {
+     return res.status(404).json({ error: 'User not found' });
+   }
+   return res.json(user.rows[0]);
+ });
++
++router.get('/users', async (req, res) => {
++  const users = await db.query('SELECT id, name, email FROM users');
++  return res.json(users.rows);
++});
+
+diff --git a/src/middleware/auth.ts b/src/middleware/auth.ts
+index 111aaa..222bbb 100644
+--- a/src/middleware/auth.ts
++++ b/src/middleware/auth.ts
+@@ -42,10 +42,12 @@ export function requireAuth(req, res, next) {
+ }
+
+ export function requireAdmin(req, res, next) {
+-  const token = req.headers.authorization;
+-  if (!token) {
++  const authHeader = req.headers.authorization;
++  const token = authHeader?.startsWith('Bearer ') ? verifyToken(authHeader.slice(7)) : null;
++  if (token) {
++    req.user = token;
+     return next();
+   }
+   return res.status(401).json({ error: 'Unauthorized' });
+ }
+
+diff --git a/src/services/payment.ts b/src/services/payment.ts
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/src/services/payment.ts
+@@ -0,0 +1,95 @@
++import { db } from '../db';
++
++export async function deductBalance(accountId: string, amount: number) {
++  // Read current balance
++  const result = await db.query('SELECT balance FROM accounts WHERE id = $1', [accountId]);
++  const currentBalance = result.rows[0]?.balance ?? 0;
++
++  if (currentBalance < amount) {
++    throw new Error('Insufficient balance');
++  }
++
++  // Update balance
++  const newBalance = currentBalance - amount;
++  await db.query('UPDATE accounts SET balance = $1 WHERE id = $2', [newBalance, accountId]);
++
++  return { previousBalance: currentBalance, newBalance };
++}
++
++export async function processPayment(req, res) {
++  try {
++    const { accountId, amount } = req.body;
++    const result = await deductBalance(accountId, amount);
++    return res.json(result);
++  } catch (err) {
++    console.error('Payment error:', err);
++  }
++}
+
+diff --git a/src/utils/crypto.ts b/src/utils/crypto.ts
+new file mode 100644
+index 0000000..def5678
+--- /dev/null
++++ b/src/utils/crypto.ts
+@@ -0,0 +1,20 @@
++import crypto from 'crypto';
++
++const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key-32-chars-long!!!!!!';
++
++export function encrypt(text: string): string {
++  const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
++  let encrypted = cipher.update(text, 'utf8', 'hex');
++  encrypted += cipher.final('hex');
++  return encrypted;
++}
+
+diff --git a/src/routes/auth.ts b/src/routes/auth.ts
+index aaa111..bbb222 100644
+--- a/src/routes/auth.ts
++++ b/src/routes/auth.ts
+@@ -12,8 +12,14 @@ import { generateToken } from '../utils/jwt';
+
+ router.post('/auth/login', async (req, res) => {
+   const { email, password } = req.body;
+-  const user = await findUserByEmail(email);
++
++  if (!email || !password) {
++    return res.status(400).json({ error: 'Email and password required' });
++  }
++
++  const user = await findUserByEmail(email.toLowerCase().trim());
+   if (!user || !await comparePassword(password, user.passwordHash)) {
+     return res.status(401).json({ error: 'Invalid credentials' });
+   }
++
+   const token = generateToken({ id: user.id, email: user.email, role: user.role });
+   return res.json({ token });
+ });

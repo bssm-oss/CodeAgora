@@ -1,0 +1,42 @@
+[
+  {
+    "id": "notif-001",
+    "type": "verdict_reject",
+    "sessionId": "2026-03-23/001",
+    "verdict": "REJECT",
+    "message": "Review completed: REJECT — 1 HARSHLY_CRITICAL, 2 CRITICAL, 2 WARNING",
+    "urgent": true,
+    "read": false,
+    "createdAt": "2026-03-23T12:03:00.000Z"
+  },
+  {
+    "id": "notif-002",
+    "type": "review_complete",
+    "sessionId": "2026-03-25/001",
+    "verdict": "ACCEPT",
+    "message": "Review completed: ACCEPT — 2 SUGGESTION",
+    "urgent": false,
+    "read": true,
+    "createdAt": "2026-03-25T12:02:00.000Z"
+  },
+  {
+    "id": "notif-003",
+    "type": "verdict_reject",
+    "sessionId": "2026-03-27/001",
+    "verdict": "REJECT",
+    "message": "Review completed: REJECT — 2 CRITICAL, 1 WARNING",
+    "urgent": true,
+    "read": false,
+    "createdAt": "2026-03-27T12:03:00.000Z"
+  },
+  {
+    "id": "notif-004",
+    "type": "review_failed",
+    "sessionId": "2026-03-28/001",
+    "verdict": null,
+    "message": "Review failed: All reviewers timed out",
+    "urgent": true,
+    "read": false,
+    "createdAt": "2026-03-28T10:01:00.000Z"
+  }
+]

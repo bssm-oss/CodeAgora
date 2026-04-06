@@ -1,0 +1,46 @@
+{
+  "mode": "strict",
+  "language": "en",
+  "reviewers": [
+    { "id": "reviewer-security", "model": "claude-sonnet-4-20250514", "backend": "api", "provider": "anthropic", "persona": "builtin:security", "enabled": true },
+    { "id": "reviewer-logic", "model": "gpt-4o", "backend": "api", "provider": "openai", "persona": "builtin:logic", "enabled": true },
+    { "id": "reviewer-api", "model": "gemini-2.5-flash", "backend": "api", "provider": "google", "persona": "builtin:api-contract", "enabled": true },
+    { "id": "reviewer-general", "model": "claude-sonnet-4-20250514", "backend": "api", "provider": "anthropic", "persona": "builtin:general", "enabled": true },
+    { "id": "reviewer-perf", "model": "gemini-2.5-flash", "backend": "api", "provider": "google", "persona": "builtin:general", "enabled": true }
+  ],
+  "supporters": {
+    "pool": [
+      { "id": "supporter-security", "model": "claude-sonnet-4-20250514", "backend": "api", "provider": "anthropic" },
+      { "id": "supporter-logic", "model": "gpt-4o", "backend": "api", "provider": "openai" }
+    ],
+    "pickCount": 2,
+    "pickStrategy": "random",
+    "devilsAdvocate": { "id": "devils-advocate", "model": "claude-sonnet-4-20250514", "backend": "api", "provider": "anthropic" },
+    "personaPool": ["security", "logic", "api-contract"],
+    "personaAssignment": "random"
+  },
+  "moderator": {
+    "id": "moderator",
+    "model": "claude-sonnet-4-20250514",
+    "backend": "api",
+    "provider": "anthropic"
+  },
+  "discussion": {
+    "enabled": true,
+    "maxRounds": 3,
+    "registrationThreshold": {
+      "HARSHLY_CRITICAL": 1,
+      "CRITICAL": 1,
+      "WARNING": 2,
+      "SUGGESTION": null
+    },
+    "codeSnippetRange": 10,
+    "objectionTimeout": 30,
+    "maxObjectionRounds": 2
+  },
+  "errorHandling": {
+    "maxRetries": 2,
+    "retryDelay": 5000,
+    "fallbackOnTimeout": true
+  }
+}

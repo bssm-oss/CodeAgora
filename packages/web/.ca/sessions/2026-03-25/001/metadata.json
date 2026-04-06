@@ -1,0 +1,11 @@
+{
+  "sessionId": "001",
+  "date": "2026-03-25",
+  "timestamp": 1742860800000,
+  "diffPath": ".ca/sessions/2026-03-25/001/review.diff",
+  "status": "completed",
+  "startedAt": 1742860800000,
+  "completedAt": 1742860920000,
+  "diffHash": "e5f2a8b3",
+  "configHash": "b7d4e2f1"
+}

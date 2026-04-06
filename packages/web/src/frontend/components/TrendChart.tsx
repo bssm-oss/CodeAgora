@@ -83,7 +83,7 @@ export function TrendChart({
         width="100%"
         height={height}
         viewBox={`0 0 400 ${height}`}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
@@ -109,7 +109,7 @@ export function TrendChart({
         {data.map((point, i) => {
           const chartWidth = 400 - PADDING_LEFT - PADDING_RIGHT;
           const barWidth = chartWidth / data.length;
-          const barGap = Math.max(barWidth * 0.2, 1);
+          const barGap = Math.max(barWidth * 0.3, 2);
           const chartHeight = height - PADDING_TOP - PADDING_BOTTOM;
           const barHeight = (point.value / maxValue) * chartHeight;
           const x = PADDING_LEFT + i * barWidth + barGap / 2;

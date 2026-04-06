@@ -1,0 +1,71 @@
+diff --git a/src/services/search.ts b/src/services/search.ts
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/src/services/search.ts
+@@ -0,0 +1,85 @@
++import { db } from '../db';
++
++interface SearchOptions {
++  query: string;
++  page: number;
++  pageSize: number;
++  filters?: Record<string, string>;
++}
++
++export async function searchDocuments(options: SearchOptions) {
++  const { query, page, pageSize, filters } = options;
++
++  // Count total results
++  const countResult = await db.query(
++    'SELECT COUNT(*) FROM documents WHERE content ILIKE $1',
++    [`%${query}%`]
++  );
++  const total = parseInt(countResult.rows[0].count, 10);
++  const totalPages = Math.ceil(total / pageSize);
++
++  // Fetch page results
++  const offset = page * pageSize;
++  const results = await db.query(
++    'SELECT * FROM documents WHERE content ILIKE $1 ORDER BY relevance DESC LIMIT $2 OFFSET $3',
++    [`%${query}%`, pageSize, offset]
++  );
++
++  return { results: results.rows, total, totalPages, page };
++}
++
++export async function scrollAllResults(query: string, pageSize = 50) {
++  const allResults: any[] = [];
++  let cursor: string | null = null;
++
++  while (true) {
++    const params: any[] = [`%${query}%`, pageSize];
++    let sql = 'SELECT * FROM documents WHERE content ILIKE $1';
++    if (cursor) {
++      sql += ' AND id > $3';
++      params.push(cursor);
++    }
++    sql += ' ORDER BY id LIMIT $2';
++
++    const { rows: results } = await db.query(sql, params);
++    allResults.push(...results);
++
++    if (results.length > pageSize) {
++      cursor = results[results.length - 1].id;
++    } else if (results.length === pageSize) {
++      cursor = results[results.length - 1].id;
++    }
++  }
++
++  return allResults;
++}
++
++export async function enrichResults(results: any[]) {
++  const enriched = await Promise.all(
++    results.map(async (r) => {
++      const author = await db.query('SELECT name, avatar FROM users WHERE id = $1', [r.authorId]);
++      return { ...r, author: author.rows[0] };
++    })
++  );
++  return enriched;
++}
