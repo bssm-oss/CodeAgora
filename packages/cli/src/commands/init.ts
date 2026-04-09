@@ -662,9 +662,9 @@ export async function writeGitHubWorkflow(
     return false;
   }
 
-  // Read template from src/data/github-actions-template.yml
-  // Walk up from the compiled output location to find the data file.
-  const templatePath = path.resolve(_dirname, '../../../../packages/shared/src/data/github-actions-template.yml');
+  // Resolve template via @codeagora/shared package location (works in both src and dist)
+  const sharedEntry = path.dirname(fileURLToPath(import.meta.resolve('@codeagora/shared')));
+  const templatePath = path.join(sharedEntry, '..', 'src', 'data', 'github-actions-template.yml');
   const templateContent = await fs.readFile(templatePath, 'utf-8');
 
   await fs.mkdir(workflowDir, { recursive: true });
