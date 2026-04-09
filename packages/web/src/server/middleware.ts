@@ -4,6 +4,8 @@
  */
 
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import type { Context, Next } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
@@ -11,8 +13,24 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 // Auth
 // ============================================================================
 
-const DASHBOARD_TOKEN =
-  process.env['CODEAGORA_DASHBOARD_TOKEN'] ?? crypto.randomBytes(32).toString('hex');
+function loadOrGenerateToken(): string {
+  if (process.env['CODEAGORA_DASHBOARD_TOKEN']) {
+    return process.env['CODEAGORA_DASHBOARD_TOKEN'];
+  }
+  const tokenPath = path.join(process.cwd(), '.ca', 'dashboard-token');
+  try {
+    const saved = fs.readFileSync(tokenPath, 'utf-8').trim();
+    if (/^[0-9a-f]{64}$/.test(saved)) return saved;
+  } catch { /* no persisted token, generate new */ }
+  const token = crypto.randomBytes(32).toString('hex');
+  try {
+    fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
+    fs.writeFileSync(tokenPath, token + '\n', { mode: 0o600 });
+  } catch { /* best-effort persist */ }
+  return token;
+}
+
+const DASHBOARD_TOKEN = loadOrGenerateToken();
 
 export function getAuthToken(): string {
   return DASHBOARD_TOKEN;

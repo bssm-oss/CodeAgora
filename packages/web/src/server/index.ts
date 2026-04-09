@@ -90,7 +90,11 @@ export function startServer(options: ServerOptions = {}): {
     { fetch: app.fetch, port, hostname },
     (info) => {
       console.log(`CodeAgora dashboard running at http://${hostname}:${info.port}`);
-      console.log(`Dashboard token: ${getAuthToken().substring(0, 8)}...`);
+      const token = getAuthToken();
+      console.log(`Dashboard token: ${token}`);
+      if (!process.env['CODEAGORA_DASHBOARD_TOKEN']) {
+        console.log(`  (persisted to .ca/dashboard-token — set CODEAGORA_DASHBOARD_TOKEN to override)`);
+      }
     },
   );
 

@@ -662,11 +662,21 @@ export async function writeGitHubWorkflow(
     return false;
   }
 
-  // _dirname is packages/cli/dist/ (built) or packages/cli/src/commands/ (dev/test)
+  // built: _dirname = cli/dist/ → 3 up to repo root
+  // dev:   _dirname = cli/src/commands/ → 4 up to repo root
   const rel = 'packages/shared/src/data/github-actions-template.yml';
-  let templatePath = path.resolve(_dirname, '../../..', rel);
-  if (!await fileExists(templatePath)) {
-    templatePath = path.resolve(_dirname, '../../../..', rel);
+  const candidates = [
+    path.resolve(_dirname, '../../..', rel),
+    path.resolve(_dirname, '../../../..', rel),
+  ];
+  let templatePath = '';
+  for (const c of candidates) {
+    if (await fileExists(c)) { templatePath = c; break; }
+  }
+  if (!templatePath) {
+    throw new Error(
+      `GitHub Actions template not found. Searched:\n${candidates.map(p => `  ${p}`).join('\n')}`
+    );
   }
   const templateContent = await fs.readFile(templatePath, 'utf-8');
 

@@ -63,4 +63,5 @@ reviews/
 .ca/sessions/
 .ca/logs/
 .ca/model-quality.json
+.ca/dashboard-token
 .claude/worktrees/

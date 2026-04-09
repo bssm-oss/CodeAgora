@@ -174,6 +174,11 @@ describe('formatSessionStats()', () => {
     expect(output).toContain('2');
   });
 
+  it('includes interrupted count when non-zero', () => {
+    const output = formatSessionStats(makeStats({ interrupted: 3 }));
+    expect(output).toContain('3');
+  });
+
   it('shows "Severity Distribution" section header', () => {
     const output = formatSessionStats(makeStats());
     expect(output).toContain('Severity Distribution');
