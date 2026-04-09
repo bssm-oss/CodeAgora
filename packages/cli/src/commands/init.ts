@@ -662,9 +662,12 @@ export async function writeGitHubWorkflow(
     return false;
   }
 
-  // Resolve template via @codeagora/shared package location (works in both src and dist)
-  const sharedEntry = path.dirname(fileURLToPath(import.meta.resolve('@codeagora/shared')));
-  const templatePath = path.join(sharedEntry, '..', 'src', 'data', 'github-actions-template.yml');
+  // _dirname is packages/cli/dist/ (built) or packages/cli/src/commands/ (dev/test)
+  const rel = 'packages/shared/src/data/github-actions-template.yml';
+  let templatePath = path.resolve(_dirname, '../../..', rel);
+  if (!await fileExists(templatePath)) {
+    templatePath = path.resolve(_dirname, '../../../..', rel);
+  }
   const templateContent = await fs.readFile(templatePath, 'utf-8');
 
   await fs.mkdir(workflowDir, { recursive: true });

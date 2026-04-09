@@ -18,6 +18,7 @@ function makeStats(overrides: Partial<SessionStats> = {}): SessionStats {
     completed: 8,
     failed: 1,
     inProgress: 1,
+    interrupted: 0,
     successRate: 80.0,
     severityDistribution: {
       CRITICAL: 3,
