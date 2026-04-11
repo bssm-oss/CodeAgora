@@ -6,10 +6,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bssm-oss/CodeAgora.git",
+    "url": "git+https://github.com/justn-hyeok/CodeAgora.git",
     "directory": "packages/tui"
   },
-  "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
+  "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
   "keywords": ["codeagora", "tui", "terminal", "ink", "code-review"],
   "engines": {
     "node": ">=20"

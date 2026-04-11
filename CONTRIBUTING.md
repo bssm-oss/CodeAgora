@@ -5,7 +5,7 @@ Thanks for your interest in contributing!
 ## Getting Started
 
 ```bash
-git clone https://github.com/bssm-oss/CodeAgora.git
+git clone https://github.com/justn-hyeok/CodeAgora.git
 cd CodeAgora
 pnpm install
 pnpm build
@@ -38,7 +38,7 @@ pnpm test
 
 ## Reporting Issues
 
-Use [GitHub Issues](https://github.com/bssm-oss/CodeAgora/issues). Include:
+Use [GitHub Issues](https://github.com/justn-hyeok/CodeAgora/issues). Include:
 - Steps to reproduce
 - Expected vs actual behavior
 - Node.js version and OS

@@ -29,5 +29,5 @@ console.log(`    ${bold}$ agora review${reset}       ${dim}Run your first code r
 console.log(`    ${bold}$ agora language${reset}     ${dim}Switch language (en/ko)${reset}`);
 console.log('');
 console.log(`  ${yellow}Free tier:${reset} ${dim}Groq + GitHub Models = unlimited free reviews${reset}`);
-console.log(`  ${dim}Docs: https://github.com/bssm-oss/CodeAgora${reset}`);
+console.log(`  ${dim}Docs: https://github.com/justn-hyeok/CodeAgora${reset}`);
 console.log('');

@@ -5,7 +5,7 @@
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT open a public issue**
-2. Email the maintainers or use [GitHub Security Advisories](https://github.com/bssm-oss/CodeAgora/security/advisories/new)
+2. Email the maintainers or use [GitHub Security Advisories](https://github.com/justn-hyeok/CodeAgora/security/advisories/new)
 3. Include steps to reproduce and potential impact
 
 We will respond within 48 hours and work on a fix.
