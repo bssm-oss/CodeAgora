@@ -117,10 +117,10 @@ describe('CONC-01 — pLimit synchronous throw inside fn', () => {
 // ============================================================================
 
 describe('FS-02 — readJson corrupted/truncated/invalid-schema', () => {
-  it('empty file throws SyntaxError', async () => {
+  it('empty file throws with file path in message', async () => {
     const p = path.join(tmpDir, 'empty.json');
     await fsReal.writeFile(p, '', 'utf-8');
-    await expect(readJson(p)).rejects.toThrow(SyntaxError);
+    await expect(readJson(p)).rejects.toThrow(/JSON parse error in/);
   });
 
   it('truncated JSON throws with file path in message', async () => {
