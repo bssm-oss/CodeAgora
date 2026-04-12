@@ -120,13 +120,14 @@ describe('runTscDiagnostics', () => {
 
   it('should handle child process error event', async () => {
     mockExecFile.mockImplementation((_cmd, _args, _opts, _cb) => {
-      const child = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const child: any = {
         on: vi.fn((event: string, handler: () => void) => {
           if (event === 'error') handler();
           return child;
         }),
       };
-      return child as unknown as ReturnType<typeof execFile>;
+      return child as ReturnType<typeof execFile>;
     });
 
     const result = await runTscDiagnostics('/repo', ['src/file.ts']);
