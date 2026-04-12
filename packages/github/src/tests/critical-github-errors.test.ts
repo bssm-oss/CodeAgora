@@ -432,8 +432,6 @@ describe('MAP-001: buildSummaryBody with 100 evidence documents', () => {
       discussions: [],
     });
 
-    // The heatmap slices to top 10 — count occurrences of "src/file" in table rows
-    (body.match(/`src\/file\d+\.ts`/g) ?? []);
     // Heatmap table should have at most 10 file entries, plus blocking table entries
     // (blocking table shows all CRITICAL docs — 100 — so we check heatmap specifically)
     // The heatmap section appears inside <details><summary>Issue distribution...
