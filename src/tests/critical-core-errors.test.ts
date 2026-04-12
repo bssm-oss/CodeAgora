@@ -123,10 +123,10 @@ describe('FS-02 — readJson corrupted/truncated/invalid-schema', () => {
     await expect(readJson(p)).rejects.toThrow(SyntaxError);
   });
 
-  it('truncated JSON throws SyntaxError', async () => {
+  it('truncated JSON throws with file path in message', async () => {
     const p = path.join(tmpDir, 'trunc.json');
     await fsReal.writeFile(p, '{"key":', 'utf-8');
-    await expect(readJson(p)).rejects.toThrow(SyntaxError);
+    await expect(readJson(p)).rejects.toThrow(/JSON parse error in/);
   });
 
   it('invalid schema throws when schema provided', async () => {
