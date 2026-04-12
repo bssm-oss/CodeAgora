@@ -665,6 +665,8 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
           totalDiscussions: 0,
           resolved: 0,
           escalated: 0,
+          totalReviewers: 0,
+          forfeitedReviewers: 0,
         },
         evidenceDocs: [],
         discussions: [],
