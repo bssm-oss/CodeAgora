@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/mcp",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "description": "CodeAgora MCP server — Claude Code integration for AI-powered code review",
   "type": "module",
   "license": "MIT",
@@ -10,7 +10,13 @@
     "directory": "packages/mcp"
   },
   "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
-  "keywords": ["codeagora", "mcp", "model-context-protocol", "claude", "code-review"],
+  "keywords": [
+    "codeagora",
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "code-review"
+  ],
   "engines": {
     "node": ">=20"
   },

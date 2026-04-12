@@ -1,5 +1,75 @@
 # Changelog
 
+## 2.3.0 (2026-04-13)
+
+### Web Dashboard — Production Hardening
+- **ErrorBoundary** wrapping all routes with crash recovery UI
+- **httpOnly cookie auth** via `POST /api/auth` with HMAC-derived session tokens
+- **CORS origin pinning** — configurable via `CODEAGORA_CORS_ORIGINS` env var
+- **API response validation** — optional Zod-compatible schema in `useApi` hook
+- **Session pagination** with server-side filtering (status, search, date range)
+- **Pipeline state persistence** to `.ca/pipeline-state.json` with crash recovery
+- **Config revert UX** — snapshot at load time, Revert button on save failure
+- **WebSocket reconnect** state recovery via sync message on connect
+- **DiffViewer syntax highlighting** for keywords, strings, comments, numbers
+- **Pipeline idle state** guidance UI
+- **Structured logging** via pino
+
+### Web Dashboard — Security (17 code review findings addressed)
+- WS query param auth path removed (token log exposure)
+- Cookie stores HMAC-derived token, not raw DASHBOARD_TOKEN
+- `DELETE /api/auth` requires authentication
+- `execFileAsync` error messages gated on `NODE_ENV`
+- `provider`/`model` format validation before pipeline execution
+- WS origin check aligned with CORS pinned origins
+- Cookie regex hoisted to module-level constant
+- `activeConnections` double-decrement fixed (onError cleanup removed)
+
+### Web Dashboard — Performance
+- Session index 30s TTL in-memory cache with invalidation on pipeline completion
+- `parseDiffLines` memoized in DiffViewer
+- `findIssuesForLine` O(N²) → `Map<line, issues>` O(1) lookup
+- `processDiscussionEvent` single `find()` before switch
+- `useMemo` side effects moved to `useEffect` (React concurrent safety)
+- `writePipelineState` sync → async
+- Config.tsx split into 8 section components (415 → 279 lines)
+
+### Hallucination Filter — 4-Check System
+- **New: Check 4 — Self-contradiction detection** penalizes findings that claim "added" when only removals exist (or vice versa)
+- **New: Uncertainty routing** — findings with confidence < 20% after penalties routed to `uncertain` array for human review
+- `FilterResult` now returns `{ filtered, removed, uncertain }`
+- Tests expanded from 9 → 26 cases
+
+### Plugin System — Third-Party Support
+- **Third-party loading** via dynamic `import()` from `.ca/plugins/` directory
+- **Plugin manifest** discovery from `codeagora-plugin.json` or `package.json`
+- **Sandbox isolation** with timeout-bounded execution via `AbortController`
+- **Path traversal protection** on plugin directory scanning
+- Source TypeScript in `packages/core/src/plugins/` (types, registry, loader, sandbox)
+- 35 new tests covering registry, validation, loader, sandbox
+
+### Infrastructure
+- `@vitest/coverage-v8` — coverage: 73.7% statements / 84.2% branches / 87.1% functions
+- `test:coverage` script added
+
+### Documentation
+- CLAUDE.md: "3-Check" → "4-Check" hallucination filter with uncertainty docs
+- README: Web dashboard, TUI, MCP server, Notifications detailed sections added
+
+### Stats
+- Tests: 226 files, 3,386 passing (+53 from 3,333)
+- E2E verified: 8 web pages + TUI startup + 22 API edge cases
+
+---
+
+## 2.2.2 (2026-04-12)
+
+- Phase 1 cleanup: dead code removal, i18n key sync, version alignment
+- CLAUDE.md accuracy fixes (6 items: pipeline stages, filter layers, test counts, MCP tools, function names, SSRF method)
+- MCP test TS2322 type fixes
+
+---
+
 ## 2.2.1 (2026-04-02)
 
 ### MCP: CLI Parity + Extension

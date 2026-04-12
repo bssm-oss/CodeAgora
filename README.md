@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-2895%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-3386%20passing-%23191A51" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
@@ -72,11 +72,78 @@ git diff | agora review
 
 ---
 
-## Extensions
+## Web Dashboard
+
+Real-time web UI for monitoring reviews, browsing sessions, and managing configuration.
+
+```bash
+agora dashboard          # Start on http://localhost:6274
+agora dashboard -p 8080  # Custom port
+```
+
+Features:
+- **9 pages** — Dashboard, Sessions, Models, Costs, Discussions, Config, Pipeline, Compare, Review Detail
+- **Live pipeline** — WebSocket-powered real-time stage progression and discussion updates
+- **Model intelligence** — Leaderboard, quality trends, selection frequency charts
+- **httpOnly cookie auth** — Secure token exchange via `POST /api/auth`
+- **Server-side pagination** — Filterable by status, search, date range
+
+The dashboard token is printed on startup and persisted to `.ca/dashboard-token`.
+
+---
+
+## Interactive TUI
+
+Terminal UI for running reviews without leaving the terminal.
+
+```bash
+agora tui
+```
+
+8 screens: Review Setup, Pipeline Progress, Results, Diff Viewer, Debate, Config, Model Selector, Provider Status. Navigate with arrow keys, `Enter` to select, `q` to quit.
+
+---
+
+## MCP Server (Claude Code / Cursor)
+
+9-tool MCP server for AI IDE integration.
+
+```json
+// claude_desktop_config.json or .cursor/mcp.json
+{
+  "mcpServers": {
+    "codeagora": {
+      "command": "npx",
+      "args": ["-y", "@codeagora/mcp"]
+    }
+  }
+}
+```
+
+Tools: `review_diff`, `review_pr`, `review_staged`, `session_list`, `session_detail`, `explain_session`, `config_get`, `config_set`, `health_check`.
+
+---
+
+## Notifications
+
+```bash
+agora notify 2026-03-27/001  # Send notification for a past session
+```
+
+Supported channels:
+- **Discord** — Real-time thread updates + summary (webhook URL in config)
+- **Slack** — Summary notification (webhook URL in config)
+- **Generic webhook** — HMAC-SHA256 signed payloads over HTTPS
+
+Configure in `.ca/config.json` under `notifications`.
+
+---
+
+## All Extensions
 
 ```bash
 npm i -g @codeagora/web            # Web dashboard
-npm i -g @codeagora/tui            # Interactive TUI (experimental)
+npm i -g @codeagora/tui            # Interactive TUI
 npm i -g @codeagora/mcp            # Claude Code / Cursor integration
 npm i -g @codeagora/notifications  # Discord / Slack webhooks
 ```
@@ -149,7 +216,8 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 
 ```bash
 pnpm install && pnpm build
-pnpm test          # 2895 tests
+pnpm test          # 3386 tests
+pnpm test:coverage # with coverage report
 pnpm typecheck
 pnpm cli review path/to/diff.patch
 ```

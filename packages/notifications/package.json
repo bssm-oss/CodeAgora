@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/notifications",
-  "version": "2.2.2",
+  "version": "2.3.0",
   "description": "CodeAgora notification webhooks — Discord and Slack integration",
   "type": "module",
   "license": "MIT",
@@ -10,7 +10,13 @@
     "directory": "packages/notifications"
   },
   "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
-  "keywords": ["codeagora", "notifications", "discord", "slack", "webhooks"],
+  "keywords": [
+    "codeagora",
+    "notifications",
+    "discord",
+    "slack",
+    "webhooks"
+  ],
   "engines": {
     "node": ">=20"
   },

@@ -91,7 +91,7 @@ packages/
 - Integration: sample diff → full pipeline execution
 - Parallelization: concurrency limits and partial failure scenarios
 - Hallucination filter: false positive rate validation
-- Total: 226 test files, 3333 tests (2026-04-12 기준)
+- Total: 228 test files, 3386 tests (2026-04-13 기준)
 
 ### Key Commands
 - `pnpm dev` — dev mode (CLI package)
