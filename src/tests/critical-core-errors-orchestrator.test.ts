@@ -276,7 +276,7 @@ describe('ORCH-01 — all reviewers fail returns error', () => {
     const result = await runPipeline({ diffPath: '/tmp/test.diff', noCache: true });
 
     expect(result.status).toBe('error');
-    expect(result.error).toContain('All review chunks failed');
+    expect(result.error).toContain('All reviewers failed');
     expect(mockSession.setStatus).toHaveBeenCalledWith('failed');
   });
 
@@ -332,7 +332,7 @@ describe('ORCH-02 — partial failure with forfeitThreshold=0.5', () => {
     const result = await runPipeline({ diffPath: '/tmp/test.diff', noCache: true });
 
     expect(result.status).toBe('error');
-    expect(result.error).toMatch(/All review chunks failed/);
+    expect(result.error).toMatch(/All reviewers failed/);
   });
 
   it('pipeline does not call makeHeadVerdict when forfeit threshold exceeded', async () => {

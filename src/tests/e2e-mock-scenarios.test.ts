@@ -336,7 +336,7 @@ describe('P0: Error paths', () => {
     const result = await runPipeline({ diffPath: '/tmp/test.diff' });
 
     expect(result.status).toBe('error');
-    expect(result.error).toContain('All review chunks failed');
+    expect(result.error).toContain('All reviewers failed');
     expect(makeHeadVerdict).not.toHaveBeenCalled();
     expect(mockSession.setStatus).toHaveBeenCalledWith('failed');
   });

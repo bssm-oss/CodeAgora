@@ -241,7 +241,7 @@ describe('Orchestrator Branches', () => {
     const result = await runPipeline({ diffPath: '/tmp/test.diff' });
 
     expect(result.status).toBe('error');
-    expect(result.error).toContain('All review chunks failed');
+    expect(result.error).toContain('All reviewers failed');
     expect(mockSession.setStatus).toHaveBeenCalledWith('failed');
   });
 
