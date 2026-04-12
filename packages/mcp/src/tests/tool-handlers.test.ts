@@ -71,7 +71,7 @@ vi.mock('../post-actions.js', () => ({
 // ---------------------------------------------------------------------------
 
 describe('config_get handler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns full config when no key given', async () => {
     const { loadConfig } = await import('@codeagora/core/config/loader.js');
@@ -132,7 +132,7 @@ describe('config_get handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('config_set handler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('calls setConfigValue and returns success', async () => {
     const { setConfigValue } = await import('@codeagora/cli/commands/config-set.js');
@@ -168,7 +168,7 @@ describe('config_set handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('get_leaderboard handler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns formatted leaderboard', async () => {
     const { getModelLeaderboard, formatLeaderboard } = await import('@codeagora/core/l0/leaderboard.js');
@@ -203,7 +203,7 @@ describe('get_leaderboard handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('get_stats handler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns formatted stats', async () => {
     const { getSessionStats, formatSessionStats } = await import('@codeagora/core/session/queries.js');
@@ -237,7 +237,7 @@ describe('get_stats handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('review_quick handler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns error when no diff and not staged', async () => {
     const { registerReviewQuick } = await import('../tools/review-quick.js');
@@ -332,7 +332,7 @@ describe('review_quick handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('review_full handler', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns error when no diff and not staged', async () => {
     const { registerReviewFull } = await import('../tools/review-full.js');

@@ -50,7 +50,7 @@ function makeResult(overrides: Partial<PipelineResult> = {}): PipelineResult {
 // ---------------------------------------------------------------------------
 
 describe('formatReviewResult', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('formats with default text format', async () => {
     const { formatReviewResult } = await import('../post-actions.js');
@@ -78,7 +78,7 @@ describe('formatReviewResult', () => {
 // ---------------------------------------------------------------------------
 
 describe('postToGitHub', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('throws when pipeline did not succeed', async () => {
     const { postToGitHub } = await import('../post-actions.js');
@@ -105,7 +105,7 @@ describe('postToGitHub', () => {
 // ---------------------------------------------------------------------------
 
 describe('sendReviewNotification', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns early when pipeline did not succeed', async () => {
     const { sendReviewNotification } = await import('../post-actions.js');
