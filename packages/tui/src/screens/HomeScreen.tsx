@@ -6,6 +6,8 @@ import type { Screen } from '../hooks/useRouter.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { colors, icons } from '../theme.js';
 
+const version = process.env['CODEAGORA_VERSION'] ?? '2.2.2';
+
 interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
   onQuit: () => void;
@@ -33,7 +35,7 @@ export function HomeScreen({ onNavigate, onQuit }: HomeScreenProps): React.JSX.E
     <Panel title={t('app.title')}>
       <Box flexDirection="column" marginBottom={1}>
         <Text color={colors.success}>{icons.check} Ready</Text>
-        <Text color={colors.muted}>{'v2.2.1'}</Text>
+        <Text color={colors.muted}>v{version}</Text>
       </Box>
       <Menu items={getMenuItems()} onSelect={handleSelect} />
     </Panel>

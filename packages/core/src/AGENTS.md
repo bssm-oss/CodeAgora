@@ -4,7 +4,7 @@
 # src
 
 ## Purpose
-Source code organization for the core review pipeline. Contains 4 review layers (L0-L3), supporting modules (config, plugins, rules, session, learning), and type definitions. This directory is the source-of-truth for all review orchestration logic.
+Source code organization for the core review pipeline. Contains 4 review layers (L0-L3), supporting modules (config, rules, session, learning), and type definitions. This directory is the source-of-truth for all review orchestration logic.
 
 ## Subdirectories
 
@@ -16,7 +16,6 @@ Source code organization for the core review pipeline. Contains 4 review layers 
 | `l3/` | Head Verdict — makes final verdict, groups issues by file |
 | `pipeline/` | Orchestrator — connects all layers, chunks diffs, estimates cost, tracks progress, emits telemetry |
 | `config/` | Configuration — loads config files, validates schema, manages credentials, provides templates |
-| `plugins/` | Plugin System — loads custom providers, manages plugin registry |
 | `rules/` | Custom Rules — loads custom review rules, pattern matching |
 | `session/` | Session Management — SessionManager for state across review run |
 | `types/` | Type Definitions — TypeScript types for config, core types, L0 types |
@@ -53,7 +52,7 @@ Source code organization for the core review pipeline. Contains 4 review layers 
 **Configuration & Initialization:**
 - Config loaded once via `config/loader.ts` at pipeline start
 - SessionManager provides session context throughout execution
-- Plugins loaded via `plugins/loader.ts` before execution
+- Providers resolved via `l1/provider-registry.ts` at runtime
 
 **Error Handling:**
 - Each layer logs errors but continues processing when safe

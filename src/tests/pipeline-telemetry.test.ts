@@ -121,23 +121,6 @@ describe('PipelineTelemetry', () => {
     expect(parsed).toHaveProperty('summary');
   });
 
-  it('reset() 후 빈 summary', () => {
-    telemetry.record({
-      reviewerId: 'reviewer-a',
-      provider: 'anthropic',
-      model: 'claude-3-haiku',
-      latencyMs: 500,
-      usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
-      success: true,
-    });
-    telemetry.reset();
-    const summary = telemetry.getSummary();
-    expect(summary.totalCalls).toBe(0);
-    expect(summary.totalLatencyMs).toBe(0);
-    expect(summary.totalTokens).toBe(0);
-    expect(summary.perReviewer).toHaveLength(0);
-  });
-
   it('실패한 call도 latency에 포함', () => {
     telemetry.record({
       reviewerId: 'reviewer-a',

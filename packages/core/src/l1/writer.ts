@@ -95,17 +95,17 @@ function formatEvidenceDocument(doc: EvidenceDocument): string {
   lines.push(`**Severity:** ${doc.severity}`);
   lines.push('');
 
-  lines.push('### 문제');
+  lines.push('### Problem');
   lines.push(doc.problem);
   lines.push('');
 
-  lines.push('### 근거');
+  lines.push('### Evidence');
   doc.evidence.forEach((e, i) => {
     lines.push(`${i + 1}. ${e}`);
   });
   lines.push('');
 
-  lines.push('### 제안');
+  lines.push('### Suggestion');
   lines.push(doc.suggestion);
   lines.push('');
 

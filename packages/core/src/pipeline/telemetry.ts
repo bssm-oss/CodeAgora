@@ -86,7 +86,4 @@ export class PipelineTelemetry {
     };
   }
 
-  reset(): void {
-    this.records = [];
-  }
 }

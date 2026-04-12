@@ -368,26 +368,26 @@ For each **real, actionable issue** in the **newly added or modified code**, wri
 \`\`\`markdown
 ## Issue: [Clear, concise title]
 
-### 문제
+### Problem
 In {filePath}:{startLine}-{endLine}
 
 [What is the problem? Describe the issue in detail.]
 
-### 근거
+### Evidence
 1. [Specific evidence 1]
 2. [Specific evidence 2]
 3. [Specific evidence 3]
 
-### 심각도
+### Severity
 [HARSHLY_CRITICAL / CRITICAL / WARNING / SUGGESTION] ([confidence 0-100]%)
 
-### 제안
+### Suggestion
 [How to fix it?]
 \`\`\`
 
 **CRITICAL FORMAT REQUIREMENTS:**
 
-1. **File location (MANDATORY)**: The first line of "### 문제" section MUST follow this exact format:
+1. **File location (MANDATORY)**: The first line of "### Problem" section MUST follow this exact format:
    - \`In {filePath}:{startLine}-{endLine}\`
    - Example: \`In auth.ts:10-15\`
    - Example: \`In src/components/Login.tsx:42-42\`
@@ -436,7 +436,7 @@ Default to the lower severity — false HC escalation wastes resources.
 
 ## Fix Quality Requirements
 
-When writing a ### 제안 section:
+When writing a ### Suggestion section:
 - Only include code fixes when your confidence is ≥80%. If lower, describe the approach in plain text.
 - Fixes MUST use the same libraries/frameworks visible in the diff or surrounding context. Do NOT introduce new dependencies.
 - If the surrounding context already handles the concern (e.g., sanitizer, guard, wrapper), do NOT suggest adding it again.
@@ -444,7 +444,7 @@ When writing a ### 제안 section:
 
 ## Confidence Score
 
-For each issue, assign a **confidence score (0-100%)** in the 심각도 section:
+For each issue, assign a **confidence score (0-100%)** in the Severity section:
 - **80-100%**: You are certain this is a real bug/vulnerability. You can point to specific code that proves it.
 - **50-79%**: Likely a real issue, but you'd need more context to be sure.
 - **20-49%**: Possible issue, but could be a false positive. Downgrade severity to SUGGESTION.
@@ -468,20 +468,20 @@ Format: \`CRITICAL (85%)\` or \`WARNING (60%)\`
 \`\`\`markdown
 ## Issue: SQL Injection Vulnerability
 
-### 문제
+### Problem
 In auth.ts:10-12
 
 The user input is directly concatenated into SQL query without sanitization, creating a SQL injection vulnerability.
 
-### 근거
+### Evidence
 1. Username parameter is taken directly from user input
 2. String concatenation is used instead of parameterized queries
 3. No input validation or escaping is performed
 
-### 심각도
+### Severity
 HARSHLY_CRITICAL (90%)
 
-### 제안
+### Suggestion
 Use parameterized queries: \`db.query('SELECT * FROM users WHERE username = ?', [username])\`
 \`\`\`
 
