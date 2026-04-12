@@ -21,6 +21,13 @@ interface SessionMetadata {
   completedAt?: number;
 }
 
+interface PaginatedSessions {
+  items: SessionMetadata[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 interface CostsApiResponse {
   totalCost: number;
   sessionCount: number;
@@ -45,14 +52,14 @@ function formatUptime(ms: number): string {
 }
 
 export function Dashboard(): React.JSX.Element {
-  const { data: sessions, loading: sessionsLoading, error: sessionsError, refetch: refetchSessions } =
-    useApi<SessionMetadata[]>('/api/sessions');
+  const { data: sessionsResponse, loading: sessionsLoading, error: sessionsError, refetch: refetchSessions } =
+    useApi<PaginatedSessions>('/api/sessions?limit=200');
   const { data: costs, loading: costsLoading } =
     useApi<CostsApiResponse>('/api/costs');
   const { data: health } =
     useApi<HealthResponse>('/api/health');
 
-  const sessionList = useMemo(() => sessions ?? [], [sessions]);
+  const sessionList = useMemo(() => sessionsResponse?.items ?? [], [sessionsResponse]);
 
   const costSummary = useMemo(() => {
     if (!costs) return null;
