@@ -89,8 +89,8 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
   const caExists = await dirExists(caDir);
   checks.push({
     name: '.ca/ directory',
-    status: caExists ? 'pass' : 'warn',
-    message: caExists ? `.ca/ directory found` : `.ca/ directory missing — run 'init' first`,
+    status: caExists ? 'pass' : 'fail',
+    message: caExists ? `.ca/ directory found` : `.ca/ directory missing — run 'agora init' to set up`,
   });
 
   // 3. Config file existence

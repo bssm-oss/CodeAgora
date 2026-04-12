@@ -246,7 +246,8 @@ function getOrCreateProvider(providerName: string): ProviderInstance {
   const apiKey = process.env[config.apiKeyEnvVar];
   if (!apiKey) {
     throw new Error(
-      `API key not found. Set ${config.apiKeyEnvVar} environment variable.`
+      `API key not found for provider '${providerName}'. Set ${config.apiKeyEnvVar} environment variable.\n` +
+      `  export ${config.apiKeyEnvVar}=your_key_here`
     );
   }
 

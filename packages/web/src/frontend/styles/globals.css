@@ -1370,6 +1370,22 @@ a:hover {
   border: 1px solid rgba(210, 153, 34, 0.2);
 }
 
+.pipeline-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(88, 166, 255, 0.3);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .pipeline-idle {
   text-align: center;
   padding: 48px 24px 24px;
@@ -4165,4 +4181,76 @@ a:hover {
 .notification-verdict--needs-human {
   background-color: rgba(210, 153, 34, 0.15);
   color: var(--color-warning);
+}
+
+/* ============================================================================
+   Mobile Responsive
+   ============================================================================ */
+
+.menu-toggle {
+  display: none;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 18px;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 1001;
+  background-color: var(--color-bg-secondary);
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .menu-toggle {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: -220px;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    transition: left 0.2s ease;
+  }
+
+  .sidebar.sidebar--open {
+    left: 0;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 999;
+  }
+
+  .sidebar.sidebar--open ~ .sidebar-overlay {
+    display: block;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 16px;
+    padding-top: 52px;
+  }
+
+  .session-table,
+  .cost-table,
+  .model-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  input, select, button {
+    min-height: 44px;
+  }
 }

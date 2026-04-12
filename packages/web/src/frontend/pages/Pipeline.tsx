@@ -32,7 +32,7 @@ export function Pipeline(): React.JSX.Element {
 
       {connected && pipelineRunning && !hasActivity && (
         <div className="pipeline-notice pipeline-notice--info">
-          A review pipeline is currently running. Waiting for events...
+          <span className="pipeline-spinner" /> A review pipeline is currently running. Live updates will appear shortly...
         </div>
       )}
 

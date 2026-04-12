@@ -125,7 +125,13 @@ export async function writeJson(filePath: string, data: unknown): Promise<void> 
 
 export async function readJson<T>(filePath: string, schema?: z.ZodType<T>): Promise<T> {
   const content = await fs.readFile(filePath, 'utf-8');
-  const raw = JSON.parse(content);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`JSON parse error in ${filePath}: ${msg}`);
+  }
   if (schema) return schema.parse(raw);
   return raw as T;
 }

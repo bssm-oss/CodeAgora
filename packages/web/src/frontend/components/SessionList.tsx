@@ -78,6 +78,10 @@ export function SessionList({
     return (
       <div className="session-empty">
         <p>No sessions found</p>
+        <p style={{ color: 'var(--text-muted)', marginTop: '8px' }}>
+          Start your first review from the <a href="/pipeline">Pipeline</a> page,
+          or run <code>agora review</code> from the CLI.
+        </p>
       </div>
     );
   }

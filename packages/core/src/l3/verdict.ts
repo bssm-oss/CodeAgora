@@ -256,10 +256,14 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
     if (warningIssues.length >= 3) {
       return {
         decision: 'NEEDS_HUMAN',
-        reasoning: `Strict mode: ${warningIssues.length} warning issue(s) require human review.`,
-        questionsForHuman: escalatedIssues.length > 0
-          ? [`${escalatedIssues.length} issue(s) need human judgment`]
-          : undefined,
+        reasoning: `Strict mode: ${warningIssues.length} warning-level issue(s) found. Review each to confirm they are acceptable.`,
+        questionsForHuman: [
+          ...warningIssues.slice(0, 3).map(
+            (d) => `Check: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — WARNING`
+          ),
+          ...(warningIssues.length > 3 ? [`...and ${warningIssues.length - 3} more warnings`] : []),
+          ...(escalatedIssues.length > 0 ? [`${escalatedIssues.length} unresolved discussion(s) also need judgment`] : []),
+        ],
       };
     }
   }
@@ -293,11 +297,16 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
   }
 
   if (escalatedIssues.length > 0) {
+    const fileList = escalatedIssues
+      .map((d) => `${d.filePath}:${d.lineRange[0]}`)
+      .slice(0, 5)
+      .join(', ');
     return {
       decision: 'NEEDS_HUMAN',
-      reasoning: 'Moderator could not reach consensus on some issues.',
+      reasoning: `${escalatedIssues.length} issue(s) could not reach reviewer consensus after max discussion rounds. ` +
+        `Human review needed at: ${fileList}${escalatedIssues.length > 5 ? ` (+${escalatedIssues.length - 5} more)` : ''}.`,
       questionsForHuman: escalatedIssues.map(
-        (d) => `${d.discussionId}: ${d.finalSeverity} - Review needed`
+        (d) => `Verify ${d.discussionId} (${d.filePath}:${d.lineRange[0]}-${d.lineRange[1]}): ${d.finalSeverity} — reviewers disagreed on severity/validity`
       ),
     };
   }

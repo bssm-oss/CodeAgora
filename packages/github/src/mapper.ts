@@ -388,9 +388,15 @@ export function buildSummaryBody(params: {
     for (const doc of blocking) {
       const badge = SEVERITY_BADGE[doc.severity]!;
       const confCell = getConfidenceBadge(doc.confidence) || '—';
+      const unverified = (doc.confidence ?? 100) <= 30 ? ' ⚠️' : '';
       lines.push(
-        `| ${badge.emoji} ${badge.label} | \`${doc.filePath}\` | ${doc.lineRange[0]}\u2013${doc.lineRange[1]} | ${doc.issueTitle} | ${confCell} |`,
+        `| ${badge.emoji} ${badge.label}${unverified} | \`${doc.filePath}\` | ${doc.lineRange[0]}\u2013${doc.lineRange[1]} | ${doc.issueTitle} | ${confCell} |`,
       );
+    }
+    const lowConfCount = blocking.filter((d) => (d.confidence ?? 100) <= 30).length;
+    if (lowConfCount > 0) {
+      lines.push('');
+      lines.push(`> ⚠️ ${lowConfCount} finding(s) marked with low confidence (≤30%) — verify before acting.`);
     }
     lines.push('');
   }

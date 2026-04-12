@@ -1065,6 +1065,19 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     }
   }
 
+  // Warn if the primary provider's API key is missing
+  const primaryEnvVar = PROVIDER_ENV_VARS[primaryProvider];
+  if (primaryEnvVar && !process.env[primaryEnvVar]) {
+    p.note(
+      `${primaryEnvVar} is not set. Reviews will fail until you set it:\n\n` +
+      `  export ${primaryEnvVar}=your_key_here\n\n` +
+      (FREE_PROVIDERS.has(primaryProvider)
+        ? `${primaryProvider} offers a free tier — sign up at the provider's website to get a key.`
+        : `Get an API key from your ${primaryProvider} account dashboard.`),
+      'Missing API Key',
+    );
+  }
+
   // Ensure .ca/ directory exists
   const caDir = path.join(baseDir, '.ca');
   await fs.mkdir(caDir, { recursive: true });

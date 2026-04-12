@@ -16,9 +16,9 @@ const navItems: NavItem[] = [
   { path: '/pipeline', label: 'Pipeline' },
 ];
 
-export function Sidebar(): React.JSX.Element {
+export function Sidebar({ className = '' }: { className?: string }): React.JSX.Element {
   return (
-    <nav className="sidebar">
+    <nav className={`sidebar ${className}`.trim()}>
       <div className="sidebar-header">
         <h1 className="sidebar-title">CodeAgora</h1>
       </div>

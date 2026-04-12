@@ -275,6 +275,7 @@ async function executeL1Reviews(
   surroundingContext: string | undefined,
   projectContext?: string,
   enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
+  progress?: import('./progress.js').ProgressEmitter,
 ): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[] }> {
   const allReviewResults: ReviewOutput[] = [];
   const allReviewerInputs: ReviewerInput[] = [];
@@ -320,6 +321,15 @@ async function executeL1Reviews(
     const reviewResults = await executeReviewers(
       reviewerInputs,
       config.errorHandling.maxRetries
+    );
+
+    // Emit per-chunk progress
+    const successCount = reviewResults.filter((r) => r.status === 'success').length;
+    progress?.stageUpdate(
+      'review',
+      Math.round(((chunk.index + 1) / chunks.length) * 90),
+      `Chunk ${chunk.index + 1}/${chunks.length}: ${successCount}/${reviewResults.length} reviewers succeeded`,
+      { completed: chunk.index + 1, total: chunks.length },
     );
 
     const forfeitCheck = checkForfeitThreshold(
@@ -647,6 +657,17 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         sessionId,
         date,
         status: 'success',
+        summary: {
+          decision: 'ACCEPT' as const,
+          reasoning: 'No code changes detected in diff. Nothing to review.',
+          severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 0, WARNING: 0, SUGGESTION: 0 },
+          topIssues: [],
+          totalDiscussions: 0,
+          resolved: 0,
+          escalated: 0,
+        },
+        evidenceDocs: [],
+        discussions: [],
       };
     }
 
@@ -675,7 +696,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // === L1 REVIEWERS: Chunk Processing ===
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
     const l1Start = Date.now();
-    const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext);
+    const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress);
     const l1Elapsed = Date.now() - l1Start;
     for (const r of allReviewResults) {
       telemetry.record({
@@ -696,7 +717,8 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         sessionId,
         date,
         status: 'error',
-        error: 'All review chunks failed (forfeited or errored)',
+        error: `All reviewers failed (forfeited or errored). ` +
+          `Check API keys with 'agora doctor --live' or review session logs at .ca/sessions/${date}/${sessionId}/`,
       };
     }
 

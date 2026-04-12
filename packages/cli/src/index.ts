@@ -308,8 +308,7 @@ program
               spinner!.start(stageLabels[event.stage] ?? event.stage);
               break;
             case 'stage-update':
-              // Per-reviewer progress updates are not currently emitted by executeReviewers.
-              // Future enhancement: wrap each reviewer promise to emit incremental progress.
+              spinner!.text = event.message;
               break;
             case 'stage-complete':
               spinner!.succeed(stageLabels[event.stage] ?? event.stage);
@@ -324,8 +323,14 @@ program
         });
       }
 
+      const reviewStart = Date.now();
       const result = await runPipeline(pipelineOptions, progress);
+      const reviewDuration = ((Date.now() - reviewStart) / 1000).toFixed(1);
       spinner?.stop();
+
+      if (!options.quiet) {
+        console.error(`Review completed in ${reviewDuration}s`);
+      }
 
       if (result.cached && !options.quiet) {
         console.error(t('cli.error.cacheHit'));
