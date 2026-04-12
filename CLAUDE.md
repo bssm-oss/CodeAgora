@@ -29,12 +29,14 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - External AI Rule Detection (.cursorrules, CLAUDE.md, copilot-instructions)
 - Build Artifact Exclusion (dist/, lock files, *.min.js filtered by default)
 
-### Hallucination Filter (3-Check)
+### Hallucination Filter (4-Check)
 Reduces false positives from LLM reviewers (target: <25%):
 1. File/line validation against actual diff (file existence + hunk range ±10 lines)
 2. Code quote verification (backtick-quoted code fabrication detection, >50% fabricated → confidence halved)
-3. Rule-source bypass (static analysis findings always pass)
+3. Self-contradiction detection (claims "added" but only removals exist, or vice versa → confidence halved)
+4. Rule-source bypass (static analysis findings always pass)
 
+Low-confidence findings (< 20%) after penalties are routed to `uncertain` for human review.
 Note: Evidence deduplication is handled separately in L2 (`deduplication.ts`, Union-Find).
 Confidence scoring is split across L0 (`specificity-scorer.ts`) and L3 (`verdict.ts`, 0–15% → NEEDS_HUMAN).
 

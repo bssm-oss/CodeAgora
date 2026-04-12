@@ -752,6 +752,9 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     if (hallucinationResult.removed.length > 0) {
       console.log(`[Hallucination Filter] Removed ${hallucinationResult.removed.length} finding(s) referencing non-existent code`);
     }
+    if (hallucinationResult.uncertain.length > 0) {
+      console.log(`[Hallucination Filter] ${hallucinationResult.uncertain.length} finding(s) flagged as uncertain (low confidence after penalty)`);
+    }
     allEvidenceDocs = hallucinationResult.filtered;
 
     // === CONFIDENCE: Compute L1 confidence for non-rule docs ===

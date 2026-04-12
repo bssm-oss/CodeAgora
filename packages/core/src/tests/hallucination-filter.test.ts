@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { filterHallucinations } from '../pipeline/hallucination-filter.js';
 import type { EvidenceDocument } from '../types/core.js';
 
-// Minimal diff for testing
+// ============================================================================
+// Test Diff Fixtures
+// ============================================================================
+
 const SAMPLE_DIFF = `diff --git a/src/utils.ts b/src/utils.ts
 --- a/src/utils.ts
 +++ b/src/utils.ts
@@ -24,6 +27,34 @@ diff --git a/src/index.ts b/src/index.ts
    return helper();
 `;
 
+/** Diff with only additions (no removals) for contradiction tests. */
+const ADDITIONS_ONLY_DIFF = `diff --git a/src/new-feature.ts b/src/new-feature.ts
+--- /dev/null
++++ b/src/new-feature.ts
+@@ -0,0 +1,5 @@
++export function newFeature() {
++  const x = 1;
++  const y = 2;
++  return x + y;
++}
+`;
+
+/** Diff with only removals (no additions) for contradiction tests. */
+const REMOVALS_ONLY_DIFF = `diff --git a/src/deprecated.ts b/src/deprecated.ts
+--- a/src/deprecated.ts
++++ /dev/null
+@@ -1,5 +0,0 @@
+-export function oldFunction() {
+-  const x = 1;
+-  const y = 2;
+-  return x + y;
+-}
+`;
+
+// ============================================================================
+// Helper
+// ============================================================================
+
 function makeDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
   return {
     issueTitle: 'Test Issue',
@@ -39,7 +70,11 @@ function makeDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
   };
 }
 
-describe('filterHallucinations', () => {
+// ============================================================================
+// Check 1: File Existence
+// ============================================================================
+
+describe('Check 1: File existence', () => {
   it('should remove findings referencing files not in diff', () => {
     const docs = [makeDoc({ filePath: 'src/nonexistent.ts' })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -49,7 +84,7 @@ describe('filterHallucinations', () => {
     expect(result.removed[0].filePath).toBe('src/nonexistent.ts');
   });
 
-  it('should keep findings for files in diff with lines in hunk', () => {
+  it('should keep findings for valid files', () => {
     const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [11, 12] })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
@@ -57,8 +92,28 @@ describe('filterHallucinations', () => {
     expect(result.removed).toHaveLength(0);
   });
 
-  it('should remove findings with line ranges outside all hunks', () => {
-    // Hunk is at lines 10-17, tolerance is 10, so line 500 is well outside
+  it('should keep findings with unknown filePath', () => {
+    const docs = [makeDoc({ filePath: 'unknown' })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+  });
+
+  it('should handle files with similar prefixes correctly', () => {
+    // src/utils.ts exists but src/utils.test.ts does not
+    const docs = [makeDoc({ filePath: 'src/utils.test.ts' })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.removed).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// Check 2: Line Range Overlap
+// ============================================================================
+
+describe('Check 2: Line range overlap', () => {
+  it('should remove findings with line ranges far outside all hunks', () => {
     const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [500, 510] })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
@@ -66,6 +121,34 @@ describe('filterHallucinations', () => {
     expect(result.removed).toHaveLength(1);
   });
 
+  it('should keep findings within hunk tolerance (±10 lines)', () => {
+    // Hunk is ~10-17, tolerance is 10, so line 25 should still overlap
+    const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [20, 25] })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+  });
+
+  it('should keep findings at exact hunk boundaries', () => {
+    const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [10, 10] })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+  });
+
+  it('should handle lineRange [0, 0] gracefully (skip line check)', () => {
+    const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [0, 0] })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// Check 3: Code Quote Verification
+// ============================================================================
+
+describe('Check 3: Code quote verification', () => {
   it('should penalize confidence for fabricated code quotes', () => {
     const docs = [makeDoc({
       problem: 'The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong',
@@ -88,10 +171,150 @@ describe('filterHallucinations', () => {
     expect(result.filtered[0].confidence).toBe(80);
   });
 
+  it('should ignore short code quotes (< 10 chars)', () => {
+    const docs = [makeDoc({
+      problem: 'Variable `x` and `y` are bad',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(80); // Not penalized
+  });
+
+  it('should handle mixed real and fabricated quotes', () => {
+    const docs = [makeDoc({
+      problem: 'The `const b = computeValue()` is fine but `totallyFakeCodeThatDoesNotExist` is bad',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    // 1 real + 1 fake = 50% fabricated, not > 50%, so no penalty
+    expect(result.filtered[0].confidence).toBe(80);
+  });
+
+  it('should penalize when majority of quotes are fabricated', () => {
+    const docs = [makeDoc({
+      problem: '`fakeSnippetOne1234` and `fakeSnippetTwo5678` and `fakeSnippetThreeABC` are wrong',
+      confidence: 60,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(30); // 60 * 0.5
+  });
+
+  it('should not crash on problem text with no backticks', () => {
+    const docs = [makeDoc({ problem: 'No code quotes here at all', confidence: 80 })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(80);
+  });
+});
+
+// ============================================================================
+// Check 4: Self-Contradiction Detection
+// ============================================================================
+
+describe('Check 4: Self-contradiction detection', () => {
+  it('should penalize when finding claims "added" but only removals exist', () => {
+    const docs = [makeDoc({
+      filePath: 'src/deprecated.ts',
+      lineRange: [1, 5],
+      problem: 'A new variable was added without type annotation',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(40); // 80 * 0.5
+  });
+
+  it('should penalize when finding claims "removed" but only additions exist', () => {
+    const docs = [makeDoc({
+      filePath: 'src/new-feature.ts',
+      lineRange: [1, 5],
+      problem: 'The function was removed without deprecation notice',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(40); // 80 * 0.5
+  });
+
+  it('should not penalize when direction matches (added + additions exist)', () => {
+    const docs = [makeDoc({
+      filePath: 'src/new-feature.ts',
+      lineRange: [1, 5],
+      problem: 'A new function was added without error handling',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(80); // No penalty
+  });
+
+  it('should not penalize neutral descriptions', () => {
+    const docs = [makeDoc({
+      filePath: 'src/new-feature.ts',
+      lineRange: [1, 5],
+      problem: 'The function has a potential null reference',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(80);
+  });
+
+  it('should stack with code quote penalty', () => {
+    const docs = [makeDoc({
+      filePath: 'src/deprecated.ts',
+      lineRange: [1, 5],
+      problem: 'The new import `totallyFakeCodeSnippetHere` was added incorrectly',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
+
+    // Both check 3 (fabricated quote) and check 4 (contradiction) apply
+    // 80 * 0.5 (quote) * 0.5 (contradiction) = 20
+    expect(result.filtered[0].confidence).toBe(20);
+  });
+});
+
+// ============================================================================
+// Uncertainty Routing
+// ============================================================================
+
+describe('Uncertainty routing', () => {
+  it('should route very low confidence findings to uncertain', () => {
+    const docs = [makeDoc({
+      filePath: 'src/deprecated.ts',
+      lineRange: [1, 5],
+      problem: 'A `totallyFakeCodeSnippetHere` was introduced that is wrong',
+      confidence: 30, // After penalties: 30 * 0.5 (quote) * 0.5 (contradiction) = 8 < 20
+    })];
+    const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
+
+    expect(result.filtered).toHaveLength(0);
+    expect(result.uncertain).toHaveLength(1);
+    expect(result.uncertain[0].confidence).toBeLessThan(20);
+  });
+
+  it('should keep moderate confidence findings in filtered', () => {
+    const docs = [makeDoc({ confidence: 80 })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+    expect(result.uncertain).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Rule Source Bypass
+// ============================================================================
+
+describe('Rule-source bypass', () => {
   it('should always keep rule-source findings', () => {
     const docs = [makeDoc({
       source: 'rule',
-      filePath: 'src/nonexistent.ts', // Even if file doesn't exist in diff
+      filePath: 'src/nonexistent.ts',
       lineRange: [999, 999],
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -99,29 +322,36 @@ describe('filterHallucinations', () => {
     expect(result.filtered).toHaveLength(1);
     expect(result.removed).toHaveLength(0);
   });
+});
 
-  it('should keep findings with unknown filePath', () => {
-    const docs = [makeDoc({ filePath: 'unknown' })];
-    const result = filterHallucinations(docs, SAMPLE_DIFF);
+// ============================================================================
+// Edge Cases & Integration
+// ============================================================================
 
-    expect(result.filtered).toHaveLength(1);
-    expect(result.removed).toHaveLength(0);
-  });
-
+describe('Edge cases', () => {
   it('should return empty results for empty docs', () => {
     const result = filterHallucinations([], SAMPLE_DIFF);
 
     expect(result.filtered).toHaveLength(0);
     expect(result.removed).toHaveLength(0);
+    expect(result.uncertain).toHaveLength(0);
+  });
+
+  it('should handle empty diff content', () => {
+    const docs = [makeDoc()];
+    const result = filterHallucinations(docs, '');
+
+    // No files in diff → removed
+    expect(result.removed).toHaveLength(1);
   });
 
   it('should correctly split mixed valid/invalid docs', () => {
     const docs = [
-      makeDoc({ filePath: 'src/utils.ts', lineRange: [11, 12] }), // valid
-      makeDoc({ filePath: 'src/nonexistent.ts' }), // invalid: file not in diff
-      makeDoc({ filePath: 'src/index.ts', lineRange: [1, 3] }), // valid
-      makeDoc({ filePath: 'src/utils.ts', lineRange: [500, 510] }), // invalid: out of range
-      makeDoc({ source: 'rule', filePath: 'any-file.ts' }), // valid: rule source
+      makeDoc({ filePath: 'src/utils.ts', lineRange: [11, 12] }),       // valid
+      makeDoc({ filePath: 'src/nonexistent.ts' }),                       // invalid: file not in diff
+      makeDoc({ filePath: 'src/index.ts', lineRange: [1, 3] }),         // valid
+      makeDoc({ filePath: 'src/utils.ts', lineRange: [500, 510] }),     // invalid: out of range
+      makeDoc({ source: 'rule', filePath: 'any-file.ts' }),             // valid: rule source
     ];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
@@ -131,5 +361,17 @@ describe('filterHallucinations', () => {
       'src/nonexistent.ts',
       'src/utils.ts',
     ]);
+  });
+
+  it('should handle doc with undefined confidence', () => {
+    const docs = [makeDoc({
+      problem: 'The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong',
+      confidence: undefined,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    // Default 50 * 0.5 = 25, still above uncertainty threshold
+    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered[0].confidence).toBe(25);
   });
 });
