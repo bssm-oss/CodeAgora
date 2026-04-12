@@ -8,6 +8,10 @@ import {
   STATIC_PRESETS,
   type PresetConfig,
 } from '../config/presets.js';
+/** Cast config.reviewers to static array for test assertions */
+function reviewers(config: ReturnType<typeof buildPresetConfig>): Array<Record<string, unknown>> {
+  return config.reviewers as unknown as Array<Record<string, unknown>>;
+}
 
 // ============================================================================
 // Helpers
@@ -95,8 +99,8 @@ describe('buildPresetConfig() — required fields', () => {
   it('returns an object with head field', () => {
     const config = buildPresetConfig({ preset: makePreset() });
     expect(config.head).toBeDefined();
-    expect(config.head.model).toBeTruthy();
-    expect(config.head.enabled).toBe(true);
+    expect(config.head!.model).toBeTruthy();
+    expect(config.head!.enabled).toBe(true);
   });
 
   it('returns an object with discussion field', () => {
@@ -137,14 +141,14 @@ describe('buildPresetConfig() — quick preset', () => {
 
   it('all reviewers use groq provider', () => {
     const config = buildPresetConfig({ preset: quickPreset });
-    for (const r of config.reviewers) {
+    for (const r of reviewers(config)) {
       expect(r.provider).toBe('groq');
     }
   });
 
   it('reviewers have timeout set', () => {
     const config = buildPresetConfig({ preset: quickPreset });
-    for (const r of config.reviewers) {
+    for (const r of reviewers(config)) {
       expect(r.timeout).toBeGreaterThan(0);
     }
   });
@@ -156,21 +160,21 @@ describe('buildPresetConfig() — quick preset', () => {
 
   it('reviewers use backend: api', () => {
     const config = buildPresetConfig({ preset: quickPreset });
-    for (const r of config.reviewers) {
+    for (const r of reviewers(config)) {
       expect(r.backend).toBe('api');
     }
   });
 
   it('reviewers have enabled: true', () => {
     const config = buildPresetConfig({ preset: quickPreset });
-    for (const r of config.reviewers) {
+    for (const r of reviewers(config)) {
       expect(r.enabled).toBe(true);
     }
   });
 
   it('reviewers have unique ids', () => {
     const config = buildPresetConfig({ preset: quickPreset });
-    const ids = config.reviewers.map((r) => r.id);
+    const ids = reviewers(config).map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
@@ -289,10 +293,10 @@ describe('buildPresetConfig() — round-robin reviewer distribution', () => {
     });
     const config = buildPresetConfig({ preset });
 
-    expect(config.reviewers[0]?.provider).toBe('groq');
-    expect(config.reviewers[1]?.provider).toBe('openai');
-    expect(config.reviewers[2]?.provider).toBe('groq');
-    expect(config.reviewers[3]?.provider).toBe('openai');
+    expect(reviewers(config)[0]?.provider).toBe('groq');
+    expect(reviewers(config)[1]?.provider).toBe('openai');
+    expect(reviewers(config)[2]?.provider).toBe('groq');
+    expect(reviewers(config)[3]?.provider).toBe('openai');
   });
 
   it('uses correct models for each provider in round-robin', () => {
@@ -303,8 +307,8 @@ describe('buildPresetConfig() — round-robin reviewer distribution', () => {
     });
     const config = buildPresetConfig({ preset });
 
-    expect(config.reviewers[0]?.model).toBe('llama-3');
-    expect(config.reviewers[1]?.model).toBe('gpt-4o');
+    expect(reviewers(config)[0]?.model).toBe('llama-3');
+    expect(reviewers(config)[1]?.model).toBe('gpt-4o');
   });
 
   it('uses same provider for all reviewers when only one provider', () => {
@@ -315,7 +319,7 @@ describe('buildPresetConfig() — round-robin reviewer distribution', () => {
     });
     const config = buildPresetConfig({ preset });
 
-    for (const r of config.reviewers) {
+    for (const r of reviewers(config)) {
       expect(r.provider).toBe('groq');
     }
   });
@@ -391,8 +395,8 @@ describe('buildPresetConfig() — moderator and head', () => {
     });
     const config = buildPresetConfig({ preset });
 
-    expect(config.head.provider).toBe('groq');
-    expect(config.head.model).toBe('llama-3');
+    expect(config.head!.provider).toBe('groq');
+    expect(config.head!.model).toBe('llama-3');
   });
 
   it('moderator backend is api', () => {
@@ -402,7 +406,7 @@ describe('buildPresetConfig() — moderator and head', () => {
 
   it('head backend is api', () => {
     const config = buildPresetConfig({ preset: makePreset() });
-    expect(config.head.backend).toBe('api');
+    expect(config.head!.backend).toBe('api');
   });
 });
 
