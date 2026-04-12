@@ -39,7 +39,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary'],
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['packages/tui/**'],
+      exclude: ['packages/tui/**', 'packages/web/src/frontend/**'],
       reportOnFailure: true,
     },
   },
