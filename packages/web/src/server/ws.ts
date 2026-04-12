@@ -7,7 +7,7 @@ import type { Hono } from 'hono';
 import type { ProgressEmitter, ProgressEvent } from '@codeagora/core/pipeline/progress.js';
 import type { DiscussionEmitter, DiscussionEvent } from '@codeagora/core/l2/event-emitter.js';
 import { createNodeWebSocket } from '@hono/node-ws';
-import { getAuthToken, compareTokens, AUTH_COOKIE_NAME, isAllowedOrigin } from './middleware.js';
+import { getAuthToken, compareTokens, AUTH_COOKIE_NAME, isAllowedOrigin, verifySessionCookie } from './middleware.js';
 import { getActiveEmitter } from './routes/review.js';
 import { logger } from './logger.js';
 
@@ -57,27 +57,30 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
-    // Auth: try cookie first (httpOnly, set by POST /api/auth), then protocol header, then query param
+    // Auth: try cookie (HMAC-derived), then protocol header, then Bearer header
     const cookieHeader = c.req.header('Cookie');
-    const cookieToken = cookieHeader
-      ? cookieHeader.match(new RegExp(`(?:^|;\\s*)${AUTH_COOKIE_NAME}=([^;]*)`))?.[1] ?? null
-      : null;
+    const cookieRe = new RegExp(`(?:^|;\\s*)${AUTH_COOKIE_NAME}=([^;]*)`);
+    const cookieValue = cookieHeader ? cookieHeader.match(cookieRe)?.[1] ?? null : null;
 
     const protocolHeader = c.req.header('sec-websocket-protocol');
     const protocolToken = protocolHeader?.split(',')
       .map(p => p.trim())
       .find(p => p.startsWith('token.'))
-      ?.slice(6); // Remove 'token.' prefix
-
-    const queryToken = c.req.query('token');
-    if (queryToken && !protocolToken && !cookieToken) {
-      logger.warn('WebSocket token via query param is deprecated — use httpOnly cookie or Sec-WebSocket-Protocol header');
-    }
+      ?.slice(6);
 
     const authHeader = c.req.header('Authorization');
     const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const token = cookieToken ?? protocolToken ?? queryToken ?? headerToken;
-    if (!compareTokens(token, getAuthToken())) {
+
+    let wsAuthenticated = false;
+    if (cookieValue) {
+      wsAuthenticated = verifySessionCookie(cookieValue);
+    } else if (protocolToken) {
+      wsAuthenticated = compareTokens(protocolToken, getAuthToken());
+    } else if (headerToken) {
+      wsAuthenticated = compareTokens(headerToken, getAuthToken());
+    }
+
+    if (!wsAuthenticated) {
       return c.json({ error: 'Authentication required' }, 401);
     }
 
@@ -149,16 +152,8 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
         },
 
         onError() {
-          activeConnections = Math.max(0, activeConnections - 1);
-          // Cleanup on error
-          if (progressEmitter && progressListener) {
-            progressEmitter.removeListener('progress', progressListener);
-          }
-          if (discussionEmitter && discussionListener) {
-            discussionEmitter.removeListener('*', discussionListener);
-          }
-          progressListener = null;
-          discussionListener = null;
+          // No-op: onClose fires after onError per WebSocket spec.
+          // Decrement and listener cleanup happen in onClose to avoid double-count.
         },
       };
     }),

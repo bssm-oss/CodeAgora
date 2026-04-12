@@ -89,9 +89,22 @@ function getLineClass(type: ParsedDiffLine['type']): string {
   }
 }
 
-function findIssuesForLine(lineNumber: number | null, issues: DiffIssueMarker[]): DiffIssueMarker[] {
-  if (lineNumber === null) return [];
-  return issues.filter((issue) => lineNumber >= issue.lineStart && lineNumber <= issue.lineEnd);
+/**
+ * Build a Map<lineNumber, DiffIssueMarker[]> for O(1) lookup per line.
+ */
+function buildIssueMap(issues: DiffIssueMarker[]): Map<number, DiffIssueMarker[]> {
+  const map = new Map<number, DiffIssueMarker[]>();
+  for (const issue of issues) {
+    for (let line = issue.lineStart; line <= issue.lineEnd; line++) {
+      const existing = map.get(line);
+      if (existing) {
+        existing.push(issue);
+      } else {
+        map.set(line, [issue]);
+      }
+    }
+  }
+  return map;
 }
 
 // ============================================================================
@@ -114,7 +127,8 @@ function HighlightedCode({ text }: { text: string }): React.JSX.Element {
 }
 
 export function DiffViewer({ diffText, issues = [], onIssueClick }: DiffViewerProps): React.JSX.Element {
-  const lines = parseDiffLines(diffText);
+  const lines = useMemo(() => parseDiffLines(diffText), [diffText]);
+  const issueMap = useMemo(() => buildIssueMap(issues), [issues]);
 
   return (
     <div className="diff-viewer">
@@ -122,7 +136,7 @@ export function DiffViewer({ diffText, issues = [], onIssueClick }: DiffViewerPr
         <tbody>
           {lines.map((line, idx) => {
             const lineNumber = line.newLineNumber ?? line.oldLineNumber;
-            const matchedIssues = findIssuesForLine(lineNumber, issues);
+            const matchedIssues = lineNumber !== null ? issueMap.get(lineNumber) ?? [] : [];
             const hasIssue = matchedIssues.length > 0;
 
             return (

@@ -31,10 +31,10 @@ interface PipelineState {
   startedAt: number;
 }
 
-function writePipelineState(state: PipelineState): void {
+async function writePipelineState(state: PipelineState): Promise<void> {
   try {
-    fsSync.mkdirSync(path.dirname(PIPELINE_STATE_PATH), { recursive: true });
-    fsSync.writeFileSync(PIPELINE_STATE_PATH, JSON.stringify(state), { mode: 0o600 });
+    await fs.mkdir(path.dirname(PIPELINE_STATE_PATH), { recursive: true });
+    await fs.writeFile(PIPELINE_STATE_PATH, JSON.stringify(state), { mode: 0o600 });
   } catch {
     // Best-effort persistence
   }
@@ -129,6 +129,15 @@ reviewRoutes.post('/', async (c) => {
     model?: string;
   };
 
+  // Validate provider/model format
+  const SAFE_ID = /^[\w:./-]{1,100}$/;
+  if (provider && !SAFE_ID.test(provider)) {
+    return c.json({ error: 'Invalid provider format.' }, 400);
+  }
+  if (model && !SAFE_ID.test(model)) {
+    return c.json({ error: 'Invalid model format.' }, 400);
+  }
+
   // Exactly one input source required
   const sourceCount = [diff, pr_url, staged].filter(Boolean).length;
   if (sourceCount === 0) {
@@ -169,8 +178,9 @@ reviewRoutes.post('/', async (c) => {
       return c.json({ error: 'No diff source resolved.' }, 400);
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to resolve diff.';
-    return c.json({ error: `Diff resolution failed: ${message}` }, 500);
+    const isDev = process.env['NODE_ENV'] === 'development';
+    const message = isDev && err instanceof Error ? err.message : 'Diff resolution failed.';
+    return c.json({ error: message }, 500);
   }
 
   if (!diffText.trim()) {
@@ -189,7 +199,7 @@ reviewRoutes.post('/', async (c) => {
   // ---- Set up emitters and run pipeline in background ---------------------
   pipelineRunning = true;
   activeEmitter = new ProgressEmitter();
-  writePipelineState({ running: true, sessionId, date, startedAt: Date.now() });
+  await writePipelineState({ running: true, sessionId, date, startedAt: Date.now() });
   const discussionEmitter = new DiscussionEmitter();
 
   // Wire emitters to WebSocket so connected clients receive live events

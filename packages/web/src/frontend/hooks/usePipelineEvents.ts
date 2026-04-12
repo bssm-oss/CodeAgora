@@ -192,10 +192,12 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     objections: [...d.objections],
   }));
 
+  // Single find before switch — all event types carry discussionId
+  const disc = updated.find((d) => d.discussionId === event.discussionId);
+
   switch (event.type) {
     case 'discussion-start': {
-      const exists = updated.find((d) => d.discussionId === event.discussionId);
-      if (!exists) {
+      if (!disc) {
         updated.push({
           discussionId: event.discussionId,
           issueTitle: event.issueTitle,
@@ -210,7 +212,6 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     }
 
     case 'round-start': {
-      const disc = updated.find((d) => d.discussionId === event.discussionId);
       if (disc) {
         const existingRound = disc.rounds.find((r) => r.roundNum === event.roundNum);
         if (!existingRound) {
@@ -221,7 +222,6 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     }
 
     case 'supporter-response': {
-      const disc = updated.find((d) => d.discussionId === event.discussionId);
       if (disc) {
         let round = disc.rounds.find((r) => r.roundNum === event.roundNum);
         if (!round) {
@@ -238,7 +238,6 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     }
 
     case 'consensus-check': {
-      const disc = updated.find((d) => d.discussionId === event.discussionId);
       if (disc) {
         const round = disc.rounds.find((r) => r.roundNum === event.roundNum);
         if (round) {
@@ -252,7 +251,6 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     }
 
     case 'discussion-end': {
-      const disc = updated.find((d) => d.discussionId === event.discussionId);
       if (disc) {
         disc.finalSeverity = event.finalSeverity;
         disc.consensusReached = event.consensusReached;
@@ -262,7 +260,6 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     }
 
     case 'forced-decision': {
-      const disc = updated.find((d) => d.discussionId === event.discussionId);
       if (disc) {
         disc.forcedDecision = { severity: event.severity, reasoning: event.reasoning };
         disc.completed = true;
@@ -271,7 +268,6 @@ export function processDiscussionEvent(discussions: DiscussionState[], event: Di
     }
 
     case 'objection': {
-      const disc = updated.find((d) => d.discussionId === event.discussionId);
       if (disc) {
         disc.objections.push({ supporterId: event.supporterId, reasoning: event.reasoning });
       }

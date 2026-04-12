@@ -4,10 +4,9 @@
  * DELETE /api/auth — Clear the session cookie.
  */
 
+import crypto from 'crypto';
 import { Hono } from 'hono';
-import { getAuthToken, compareTokens } from '../middleware.js';
-
-export const AUTH_COOKIE_NAME = 'codeagora-session';
+import { getAuthToken, compareTokens, AUTH_COOKIE_NAME } from '../middleware.js';
 
 export const authRoutes = new Hono();
 
@@ -23,9 +22,10 @@ authRoutes.post('/', (c) => {
     return c.json({ error: 'Invalid token' }, 403);
   }
 
-  // Set httpOnly cookie — browser will send it on all subsequent requests
+  // Set httpOnly cookie with HMAC-derived session token (not the raw secret)
   const isSecure = c.req.url.startsWith('https://');
-  const cookieValue = headerToken;
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const cookieValue = `${nonce}.${crypto.createHmac('sha256', getAuthToken()).update(nonce).digest('hex')}`;
   const cookieParts = [
     `${AUTH_COOKIE_NAME}=${cookieValue}`,
     'HttpOnly',

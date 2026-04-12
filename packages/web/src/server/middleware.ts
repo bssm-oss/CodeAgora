@@ -49,31 +49,52 @@ export function compareTokens(received: string | null | undefined, expected: str
 export const AUTH_COOKIE_NAME = 'codeagora-session';
 
 /**
- * Parse a specific cookie from the Cookie header.
+ * Verify an HMAC-derived session cookie value.
+ * Format: "nonce.hmac" where hmac = HMAC-SHA256(DASHBOARD_TOKEN, nonce).
  */
-function getCookieValue(cookieHeader: string | undefined, name: string): string | null {
+export function verifySessionCookie(value: string): boolean {
+  const dotIdx = value.indexOf('.');
+  if (dotIdx === -1) return false;
+  const nonce = value.slice(0, dotIdx);
+  const receivedHmac = value.slice(dotIdx + 1);
+  if (!nonce || !receivedHmac) return false;
+  const expectedHmac = crypto.createHmac('sha256', DASHBOARD_TOKEN).update(nonce).digest('hex');
+  return compareTokens(receivedHmac, expectedHmac);
+}
+
+/** Pre-compiled regex for cookie parsing — avoids per-request compilation. */
+const COOKIE_RE = new RegExp(`(?:^|;\\s*)${AUTH_COOKIE_NAME}=([^;]*)`);
+
+/**
+ * Parse the session cookie from the Cookie header.
+ */
+function getCookieValue(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  const match = cookieHeader.match(COOKIE_RE);
   return match?.[1] ?? null;
 }
 
 export async function authMiddleware(c: Context, next: Next): Promise<Response | void> {
-  // Skip auth for health and auth endpoints
-  if (c.req.path === '/api/health' || c.req.path === '/api/auth') {
+  // Skip auth for health check and auth token exchange (POST only)
+  if (c.req.path === '/api/health' || (c.req.path === '/api/auth' && c.req.method === 'POST')) {
     await next();
     return;
   }
-  // Try Bearer token first, then httpOnly cookie
+  // Try Bearer token first, then httpOnly cookie (HMAC-derived)
   const authHeader = c.req.header('Authorization');
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const cookieToken = getCookieValue(c.req.header('Cookie'), AUTH_COOKIE_NAME);
-  const token = bearerToken ?? cookieToken;
+  const cookieToken = getCookieValue(c.req.header('Cookie'));
 
-  if (!token) {
-    return c.json({ error: 'Authentication required' }, 401);
+  let authenticated = false;
+  if (bearerToken) {
+    authenticated = compareTokens(bearerToken, DASHBOARD_TOKEN);
+  } else if (cookieToken) {
+    authenticated = verifySessionCookie(cookieToken);
   }
-  if (!compareTokens(token, DASHBOARD_TOKEN)) {
-    return c.json({ error: 'Invalid token' }, 403);
+
+  if (!authenticated) {
+    return c.json({ error: bearerToken || cookieToken ? 'Invalid token' : 'Authentication required' },
+      bearerToken || cookieToken ? 403 : 401);
   }
   await next();
 }
