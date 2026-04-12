@@ -130,7 +130,7 @@ describe('runDoctor()', () => {
     const result = await runDoctor(tmpDir);
     const caCheck = result.checks.find((c) => c.name === '.ca/ directory');
     expect(caCheck).toBeDefined();
-    expect(caCheck!.status).toBe('warn');
+    expect(caCheck!.status).toBe('fail');
   });
 
   it('reports .ca/ directory as pass when it exists', async () => {
