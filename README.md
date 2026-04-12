@@ -139,14 +139,18 @@ Configure in `.ca/config.json` under `notifications`.
 
 ---
 
-## All Extensions
+## Extensions
 
-```bash
-npm i -g @codeagora/web            # Web dashboard
-npm i -g @codeagora/tui            # Interactive TUI
-npm i -g @codeagora/mcp            # Claude Code / Cursor integration
-npm i -g @codeagora/notifications  # Discord / Slack webhooks
-```
+All extensions are optional — install only what you need.
+
+| Package | Install | What it does |
+|---------|---------|-------------|
+| [@codeagora/web](https://www.npmjs.com/package/@codeagora/web) | `npm i -g @codeagora/web` | Web dashboard — 9-page SPA with real-time pipeline monitoring, session history, model leaderboard, cost tracking |
+| [@codeagora/tui](https://www.npmjs.com/package/@codeagora/tui) | `npm i -g @codeagora/tui` | Interactive terminal UI — run reviews, browse sessions, edit config, watch debates in real-time |
+| [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp` | MCP server (9 tools) — integrates with Claude Code, Cursor, and any MCP-compatible IDE |
+| [@codeagora/notifications](https://www.npmjs.com/package/@codeagora/notifications) | `npm i -g @codeagora/notifications` | Webhooks — Discord (real-time threads + summary), Slack (summary), generic (HMAC-SHA256 signed) |
+
+Each extension works standalone or together. The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions.
 
 [Extension guide ->](docs/EXTENSIONS.md)
 
@@ -209,6 +213,8 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 | [Providers](docs/PROVIDERS.md) | Full provider list with tiers |
 | [Architecture](docs/ARCHITECTURE.md) | Pipeline design and project structure |
 | [Extensions](docs/EXTENSIONS.md) | Web, TUI, MCP, Notifications |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
+| [FAQ](docs/FAQ.md) | Frequently asked questions |
 
 ---
 
