@@ -334,7 +334,7 @@ describe('DP-001: malformed @@ hunk header', () => {
     ].join('\n');
 
     // Should not throw
-    const index = buildDiffPositionIndex(diff);
+    buildDiffPositionIndex(diff);
     // newLineNumber starts at 0 (parseInt on undefined → NaN → fallback 0), then decremented to -1
     // The added line gets indexed at src/foo.ts:0 — not a crash
     expect(() => buildDiffPositionIndex(diff)).not.toThrow();
@@ -433,7 +433,7 @@ describe('MAP-001: buildSummaryBody with 100 evidence documents', () => {
     });
 
     // The heatmap slices to top 10 — count occurrences of "src/file" in table rows
-    const heatmapMatches = (body.match(/`src\/file\d+\.ts`/g) ?? []);
+    (body.match(/`src\/file\d+\.ts`/g) ?? []);
     // Heatmap table should have at most 10 file entries, plus blocking table entries
     // (blocking table shows all CRITICAL docs — 100 — so we check heatmap specifically)
     // The heatmap section appears inside <details><summary>Issue distribution...

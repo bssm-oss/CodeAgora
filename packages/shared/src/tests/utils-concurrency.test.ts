@@ -43,7 +43,6 @@ describe('pLimit — basic execution', () => {
   });
 
   it('resolves zero tasks without hanging', async () => {
-    const limit = pLimit(2);
     const results = await Promise.all([] as Promise<never>[]);
     expect(results).toEqual([]);
   });

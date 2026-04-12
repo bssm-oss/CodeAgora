@@ -134,8 +134,6 @@ export function selectModels(request: SelectionRequest): ModelSelection {
   const explorationSlots = actualCount >= 2
     ? Math.max(1, Math.floor(actualCount * explorationRate))
     : 0;
-  const _samplingSlots = actualCount - explorationSlots;
-
   const selected: Array<{
     model: ModelMetadata;
     reason: ModelSelection['selections'][number]['selectionReason'];

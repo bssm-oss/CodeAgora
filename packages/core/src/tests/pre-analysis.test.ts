@@ -3,10 +3,10 @@
  * Tests for diff classifier, path rules, and the orchestrator.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { classifyDiffFiles } from '../pipeline/analyzers/diff-classifier.js';
 import { matchPathRules } from '../pipeline/analyzers/path-rules.js';
-import { buildEnrichedSection, type EnrichedDiffContext, type FileClassification, type TscDiagnostic, type ImpactEntry } from '../pipeline/pre-analysis.js';
+import { buildEnrichedSection, type EnrichedDiffContext, type FileClassification, type ImpactEntry } from '../pipeline/pre-analysis.js';
 
 // ============================================================================
 // classifyDiffFiles

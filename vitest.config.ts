@@ -37,7 +37,7 @@ export default defineConfig({
     pool: 'forks',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
+      reporter: ['text', 'lcov', 'json-summary'],
       include: ['packages/*/src/**/*.ts'],
       exclude: ['packages/tui/**'],
     },

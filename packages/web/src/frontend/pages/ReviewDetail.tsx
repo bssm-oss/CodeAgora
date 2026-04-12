@@ -13,9 +13,7 @@ import {
   formatDate,
 } from '../utils/review-helpers.js';
 import type {
-  Severity,
   ReviewEntry,
-  DiffIssueMarker,
 } from '../utils/review-helpers.js';
 
 // ============================================================================

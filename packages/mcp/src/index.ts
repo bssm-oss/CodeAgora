@@ -6,7 +6,6 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
 import { registerReviewQuick } from './tools/review-quick.js';
 import { registerReviewFull } from './tools/review-full.js';
 import { registerReviewPr } from './tools/review-pr.js';

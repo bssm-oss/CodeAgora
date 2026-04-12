@@ -5,7 +5,7 @@
  * and helpers function signatures. Does not make real LLM calls.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------

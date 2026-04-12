@@ -5,7 +5,7 @@
  * We clean up after each test using the resolved absolute paths.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { rm, readFile, access } from 'fs/promises';
 import path from 'path';
 import { SessionManager } from '../session/manager.js';

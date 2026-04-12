@@ -20,12 +20,6 @@ interface SessionCostEntry {
   provider?: string;
 }
 
-interface CostSummary {
-  totalCost: number;
-  sessionCount: number;
-  averageCost: number;
-  entries: SessionCostEntry[];
-}
 
 // ============================================================================
 // Helpers

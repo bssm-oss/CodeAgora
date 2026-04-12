@@ -621,19 +621,6 @@ async function searchAndSelect<T extends string>(
 }
 
 /**
- * Detect if any provider API keys are set in the environment.
- */
-function detectApiKeys(): string[] {
-  const found: string[] = [];
-  for (const [name, envVar] of Object.entries(PROVIDER_ENV_VARS)) {
-    if (process.env[envVar]) {
-      found.push(name);
-    }
-  }
-  return found;
-}
-
-/**
  * Get localized text for the wizard based on current locale.
  */
 function isKorean(): boolean {

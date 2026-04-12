@@ -5,7 +5,7 @@
  * and the recoverStaleSessions() startup recovery function.
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { rm, readFile, mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { SessionManager, recoverStaleSessions } from '../session/manager.js';

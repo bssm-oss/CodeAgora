@@ -14,9 +14,11 @@ Reviewer models run parallel independent reviews → debate conflicting opinions
 - Build: tsup
 - Package Manager: pnpm
 
-## Architecture (6-Stage Pipeline)
+## Architecture (10-Stage Pipeline)
 ```
-CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewers) → Hallucination Filter → L2 (Discussion) → L3 (Head Verdict)
+CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewers)
+  → Rules & Learning Filter → Hallucination Filter → Confidence Computation
+  → Suggestion Verification → L2 (Discussion) → L3 (Head Verdict)
 ```
 
 ### Pre-Analysis Layer
@@ -27,12 +29,14 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - External AI Rule Detection (.cursorrules, CLAUDE.md, copilot-instructions)
 - Build Artifact Exclusion (dist/, lock files, *.min.js filtered by default)
 
-### Hallucination Filter (4-Layer)
+### Hallucination Filter (3-Check)
 Reduces false positives from LLM reviewers (target: <25%):
-1. File/line validation against actual diff
-2. Self-contradiction detection
-3. Evidence deduplication (merges duplicate findings)
-4. Confidence scoring (0% confidence criticals → NEEDS_HUMAN, not REJECT)
+1. File/line validation against actual diff (file existence + hunk range ±10 lines)
+2. Code quote verification (backtick-quoted code fabrication detection, >50% fabricated → confidence halved)
+3. Rule-source bypass (static analysis findings always pass)
+
+Note: Evidence deduplication is handled separately in L2 (`deduplication.ts`, Union-Find).
+Confidence scoring is split across L0 (`specificity-scorer.ts`) and L3 (`verdict.ts`, 0–15% → NEEDS_HUMAN).
 
 ### Specialist Personas
 Built-in persona types: `builtin:security`, `builtin:logic`, `builtin:api-contract`, `builtin:general`
@@ -49,7 +53,7 @@ packages/
 ├── notifications/  # @codeagora/notifications — Discord/Slack webhooks, event stream
 ├── cli/            # @codeagora/cli — CLI entrypoint, commands, formatters
 ├── tui/            # @codeagora/tui — interactive terminal UI (experimental, ink + React)
-├── mcp/            # @codeagora/mcp — MCP server (7 tools, multi-platform)
+├── mcp/            # @codeagora/mcp — MCP server (9 tools, multi-platform)
 └── web/            # @codeagora/web — Hono.js REST API + React SPA dashboard
 ```
 
@@ -63,7 +67,7 @@ packages/
   - L2: Promise.allSettled (partial failure tolerance)
   - Security boundaries: Result<T> type pattern
 - All external input validated with zod
-- Shell args sanitized via `sanitizeShellArg()` + spawn() (never exec)
+- Shell args validated via `validateArg()` + spawn() (never exec)
 
 ### Parallelization Strategy
 - Chunk processing: adaptive (≤2 serial, >2 pLimit(3) parallel)
@@ -85,7 +89,7 @@ packages/
 - Integration: sample diff → full pipeline execution
 - Parallelization: concurrency limits and partial failure scenarios
 - Hallucination filter: false positive rate validation
-- Total: 181 test files, 2895 tests
+- Total: 226 test files, 3333 tests (2026-04-12 기준)
 
 ### Key Commands
 - `pnpm dev` — dev mode (CLI package)
@@ -128,7 +132,7 @@ packages/
 - Shell injection: spawn() + SAFE_ARG regex validation
 - Path traversal: absolute path blocking + containment check (fail-closed)
 - Credentials: ~/.config/codeagora/credentials (0o700 directory, 0o600 file permissions)
-- SSRF: URL validation + HTTPS enforced + domain whitelist
+- SSRF: URL validation + HTTPS enforced + private IP/DNS blocklist
 - Permissions: fail-closed on permission check errors
 
 ## Reference Docs
