@@ -43,6 +43,7 @@
     "test": "vitest run",
     "test:web": "cd packages/web && vitest run",
     "test:all": "vitest run && cd packages/web && vitest run",
+    "test:coverage": "vitest run --coverage",
     "dev": "pnpm --filter @codeagora/cli dev",
     "build:action": "node scripts/build-action.mjs"
   },

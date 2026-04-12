@@ -40,6 +40,7 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'json-summary'],
       include: ['packages/*/src/**/*.ts'],
       exclude: ['packages/tui/**'],
+      reportOnFailure: true,
     },
   },
 });
