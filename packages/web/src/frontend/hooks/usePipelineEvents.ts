@@ -3,7 +3,7 @@
  * Wraps useWebSocket and maintains pipeline state from ProgressEvents and DiscussionEvents.
  */
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWebSocket } from './useWebSocket.js';
 
 // ============================================================================
@@ -87,6 +87,7 @@ export interface UsePipelineEventsResult {
   events: PipelineEventEntry[];
   discussions: DiscussionState[];
   connected: boolean;
+  pipelineRunning: boolean;
 }
 
 // ============================================================================
@@ -109,15 +110,19 @@ function createInitialStages(): StageState[] {
   }));
 }
 
+interface SyncData {
+  pipelineRunning: boolean;
+}
+
 interface WebSocketMessage {
-  type: 'progress' | 'discussion';
-  data: ProgressEvent | DiscussionEvent;
+  type: 'progress' | 'discussion' | 'sync';
+  data: ProgressEvent | DiscussionEvent | SyncData;
 }
 
 function isWebSocketMessage(msg: unknown): msg is WebSocketMessage {
   if (typeof msg !== 'object' || msg === null) return false;
   const obj = msg as Record<string, unknown>;
-  return (obj.type === 'progress' || obj.type === 'discussion') && typeof obj.data === 'object' && obj.data !== null;
+  return (obj.type === 'progress' || obj.type === 'discussion' || obj.type === 'sync') && typeof obj.data === 'object' && obj.data !== null;
 }
 
 function isProgressEvent(data: unknown): data is ProgressEvent {
@@ -304,14 +309,19 @@ export function usePipelineEvents(): UsePipelineEventsResult {
     discussions: DiscussionState[];
     events: PipelineEventEntry[];
     eventId: number;
+    pipelineRunning: boolean;
   }>({
     stages: createInitialStages(),
     discussions: [],
     events: [],
     eventId: 0,
+    pipelineRunning: false,
   });
 
-  const result = useMemo(() => {
+  // Re-render trigger — incremented after processing new messages
+  const [, setVersion] = useState(0);
+
+  useEffect(() => {
     const state = stateRef.current;
 
     // Reset if messages were trimmed (buffer wrapped)
@@ -323,10 +333,21 @@ export function usePipelineEvents(): UsePipelineEventsResult {
       lastProcessedRef.current = 0;
     }
 
+    let processed = false;
+
     // Only process new messages since last run
     for (let i = lastProcessedRef.current; i < messages.length; i++) {
       const msg = messages[i];
       if (!isWebSocketMessage(msg)) continue;
+
+      processed = true;
+
+      // Handle sync messages (sent on reconnect)
+      if (msg.type === 'sync') {
+        const syncData = msg.data as SyncData;
+        state.pipelineRunning = syncData.pipelineRunning;
+        continue;
+      }
 
       if (msg.type === 'progress' && isProgressEvent(msg.data)) {
         const progressEvent = msg.data as ProgressEvent;
@@ -356,15 +377,21 @@ export function usePipelineEvents(): UsePipelineEventsResult {
       state.events = state.events.slice(state.events.length - MAX_EVENTS);
     }
 
-    const currentStage = getCurrentStage(state.stages);
-
-    return {
-      stages: state.stages,
-      currentStage,
-      events: state.events,
-      discussions: state.discussions,
-    };
+    // Trigger re-render only if new messages were processed
+    if (processed) {
+      setVersion((v) => v + 1);
+    }
   }, [messages]);
 
-  return { ...result, connected };
+  const state = stateRef.current;
+  const currentStage = getCurrentStage(state.stages);
+
+  return {
+    stages: state.stages,
+    currentStage,
+    events: state.events,
+    discussions: state.discussions,
+    pipelineRunning: state.pipelineRunning,
+    connected,
+  };
 }

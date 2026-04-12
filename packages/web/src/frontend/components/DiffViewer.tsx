@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SeverityBadge } from './SeverityBadge.js';
 import { parseDiffLines } from '../utils/review-helpers.js';
 import type { DiffIssueMarker, ParsedDiffLine } from '../utils/review-helpers.js';
@@ -11,6 +11,65 @@ interface DiffViewerProps {
   diffText: string;
   issues?: DiffIssueMarker[];
   onIssueClick?: (issueTitle: string) => void;
+}
+
+// ============================================================================
+// Syntax Highlight Tokens
+// ============================================================================
+
+interface HighlightToken {
+  text: string;
+  className: string;
+}
+
+const HIGHLIGHT_RULES: Array<{ pattern: RegExp; className: string }> = [
+  // Comments (single-line)
+  { pattern: /(\/\/.*$|#.*$)/m, className: 'syntax-comment' },
+  // Strings (double-quoted, single-quoted, template literals)
+  { pattern: /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/, className: 'syntax-string' },
+  // Keywords
+  { pattern: /\b(import|export|from|const|let|var|function|return|if|else|for|while|class|interface|type|async|await|try|catch|finally|throw|new|typeof|instanceof|in|of|switch|case|break|default|continue|do|extends|implements|enum|abstract|private|protected|public|static|readonly|override|declare|namespace|module)\b/, className: 'syntax-keyword' },
+  // Built-in values
+  { pattern: /\b(true|false|null|undefined|NaN|Infinity|void|this|super)\b/, className: 'syntax-builtin' },
+  // Numbers
+  { pattern: /\b(\d+\.?\d*(?:e[+-]?\d+)?|0x[0-9a-f]+|0o[0-7]+|0b[01]+)\b/i, className: 'syntax-number' },
+];
+
+function highlightLine(text: string): HighlightToken[] {
+  if (!text) return [{ text: '', className: '' }];
+
+  const tokens: HighlightToken[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    let earliestMatch: { index: number; length: number; className: string } | null = null;
+
+    for (const rule of HIGHLIGHT_RULES) {
+      const match = rule.pattern.exec(remaining);
+      if (match && match[1] !== undefined) {
+        const idx = match.index + (match[0].indexOf(match[1]));
+        if (!earliestMatch || idx < earliestMatch.index) {
+          earliestMatch = { index: idx, length: match[1].length, className: rule.className };
+        }
+      }
+    }
+
+    if (!earliestMatch) {
+      tokens.push({ text: remaining, className: '' });
+      break;
+    }
+
+    if (earliestMatch.index > 0) {
+      tokens.push({ text: remaining.slice(0, earliestMatch.index), className: '' });
+    }
+    tokens.push({
+      text: remaining.slice(earliestMatch.index, earliestMatch.index + earliestMatch.length),
+      className: earliestMatch.className,
+    });
+    remaining = remaining.slice(earliestMatch.index + earliestMatch.length);
+  }
+
+  return tokens;
 }
 
 // ============================================================================
@@ -39,6 +98,21 @@ function findIssuesForLine(lineNumber: number | null, issues: DiffIssueMarker[])
 // Component
 // ============================================================================
 
+function HighlightedCode({ text }: { text: string }): React.JSX.Element {
+  const tokens = useMemo(() => highlightLine(text), [text]);
+  return (
+    <code>
+      {tokens.map((token, i) =>
+        token.className ? (
+          <span key={i} className={token.className}>{token.text}</span>
+        ) : (
+          <React.Fragment key={i}>{token.text}</React.Fragment>
+        ),
+      )}
+    </code>
+  );
+}
+
 export function DiffViewer({ diffText, issues = [], onIssueClick }: DiffViewerProps): React.JSX.Element {
   const lines = parseDiffLines(diffText);
 
@@ -61,7 +135,11 @@ export function DiffViewer({ diffText, issues = [], onIssueClick }: DiffViewerPr
                     {line.newLineNumber ?? ''}
                   </td>
                   <td className="diff-line__content">
-                    <code>{line.content}</code>
+                    {line.type === 'header' ? (
+                      <code>{line.content}</code>
+                    ) : (
+                      <HighlightedCode text={line.content} />
+                    )}
                   </td>
                 </tr>
                 {hasIssue &&

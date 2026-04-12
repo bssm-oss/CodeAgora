@@ -10,7 +10,12 @@
     "directory": "packages/web"
   },
   "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
-  "keywords": ["codeagora", "dashboard", "code-review", "web"],
+  "keywords": [
+    "codeagora",
+    "dashboard",
+    "code-review",
+    "web"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -38,7 +43,8 @@
   "dependencies": {
     "@hono/node-server": "^1.14.0",
     "@hono/node-ws": "^1.1.0",
-    "hono": "^4.7.0"
+    "hono": "^4.7.0",
+    "pino": "^10.3.1"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

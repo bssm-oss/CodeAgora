@@ -13,6 +13,7 @@ import { costRoutes } from './routes/costs.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { healthRoutes } from './routes/health.js';
 import { reviewRoutes } from './routes/review.js';
+import { authRoutes } from './routes/auth.js';
 import {
   corsMiddleware,
   errorHandler,
@@ -20,8 +21,10 @@ import {
   getAuthToken,
   securityHeaders,
   rateLimiter,
+  setCorsOrigins,
 } from './middleware.js';
 import { setupWebSocket } from './ws.js';
+import { logger } from './logger.js';
 
 // ============================================================================
 // Types
@@ -50,6 +53,7 @@ export function createApp(): Hono {
   app.use('/api/*', authMiddleware);
 
   // API routes
+  app.route('/api/auth', authRoutes);
   app.route('/api/health', healthRoutes);
   app.route('/api/sessions', sessionRoutes);
   app.route('/api/models', modelRoutes);
@@ -83,17 +87,18 @@ export function startServer(options: ServerOptions = {}): {
   const port = options.port ?? (Number(process.env['PORT']) || 6274);
   const hostname = options.hostname ?? '127.0.0.1';
 
+  setCorsOrigins(port);
+
   const app = createApp();
   const { injectWebSocket } = setupWebSocket(app);
 
   const server = serve(
     { fetch: app.fetch, port, hostname },
     (info) => {
-      console.log(`CodeAgora dashboard running at http://${hostname}:${info.port}`);
       const token = getAuthToken();
-      console.log(`Dashboard token: ${token}`);
+      logger.info({ url: `http://${hostname}:${info.port}`, token }, 'CodeAgora dashboard started');
       if (!process.env['CODEAGORA_DASHBOARD_TOKEN']) {
-        console.log(`  (persisted to .ca/dashboard-token — set CODEAGORA_DASHBOARD_TOKEN to override)`);
+        logger.info('Token persisted to .ca/dashboard-token — set CODEAGORA_DASHBOARD_TOKEN to override');
       }
     },
   );

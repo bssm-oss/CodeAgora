@@ -7,14 +7,66 @@ import { Hono } from 'hono';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import os from 'os';
 import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
 import { DiscussionEmitter } from '@codeagora/core/l2/event-emitter.js';
 import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
+import { invalidateSessionCache } from './sessions.js';
 import { setEmitters } from '../ws.js';
 
 const execFileAsync = promisify(execFile);
+
+// ============================================================================
+// Pipeline State Persistence
+// ============================================================================
+
+const PIPELINE_STATE_PATH = path.join('.ca', 'pipeline-state.json');
+
+interface PipelineState {
+  running: boolean;
+  sessionId: string;
+  date: string;
+  startedAt: number;
+}
+
+function writePipelineState(state: PipelineState): void {
+  try {
+    fsSync.mkdirSync(path.dirname(PIPELINE_STATE_PATH), { recursive: true });
+    fsSync.writeFileSync(PIPELINE_STATE_PATH, JSON.stringify(state), { mode: 0o600 });
+  } catch {
+    // Best-effort persistence
+  }
+}
+
+function clearPipelineState(): void {
+  try {
+    fsSync.unlinkSync(PIPELINE_STATE_PATH);
+  } catch {
+    // File may not exist
+  }
+}
+
+/**
+ * Check for stale pipeline state on startup. If a state file exists from a
+ * previous crashed run, it means the pipeline was interrupted.
+ */
+function recoverStalePipelineState(): void {
+  try {
+    const raw = fsSync.readFileSync(PIPELINE_STATE_PATH, 'utf-8');
+    const state = JSON.parse(raw) as PipelineState;
+    if (state.running) {
+      // The process that wrote this state is dead — clear unconditionally
+      clearPipelineState();
+    }
+  } catch {
+    // No state file or unreadable — clean start
+  }
+}
+
+// Run recovery on module load
+recoverStalePipelineState();
 
 // ============================================================================
 // Pipeline Mutex
@@ -137,6 +189,7 @@ reviewRoutes.post('/', async (c) => {
   // ---- Set up emitters and run pipeline in background ---------------------
   pipelineRunning = true;
   activeEmitter = new ProgressEmitter();
+  writePipelineState({ running: true, sessionId, date, startedAt: Date.now() });
   const discussionEmitter = new DiscussionEmitter();
 
   // Wire emitters to WebSocket so connected clients receive live events
@@ -211,6 +264,8 @@ reviewRoutes.post('/', async (c) => {
       pipelineRunning = false;
       activeEmitter = null;
       setEmitters(null, null);
+      clearPipelineState();
+      invalidateSessionCache();
 
       // Cleanup temp file (best-effort)
       fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});

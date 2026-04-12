@@ -112,11 +112,14 @@ export function ConfigPage(): React.JSX.Element {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [preEditSnapshot, setPreEditSnapshot] = useState<Record<string, unknown> | null>(null);
 
-  // Sync server config into local state
+  // Sync server config into local state and capture last-known-good snapshot
   useEffect(() => {
     if (serverConfig && !initialized) {
-      setConfig(serverConfig as unknown as Record<string, unknown>);
+      const serverData = serverConfig as unknown as Record<string, unknown>;
+      setConfig(serverData);
+      setPreEditSnapshot(structuredClone(serverData));
       setInitialized(true);
     }
   }, [serverConfig, initialized]);
@@ -124,7 +127,9 @@ export function ConfigPage(): React.JSX.Element {
   // When there's no config (404), use defaults
   useEffect(() => {
     if (!loading && error && error.includes('404') && !initialized) {
-      setConfig(getDefaultConfig() as unknown as Record<string, unknown>);
+      const defaults = getDefaultConfig() as unknown as Record<string, unknown>;
+      setConfig(defaults);
+      setPreEditSnapshot(structuredClone(defaults));
       setInitialized(true);
     }
   }, [loading, error, initialized]);
@@ -148,9 +153,13 @@ export function ConfigPage(): React.JSX.Element {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
+      const token = localStorage.getItem('codeagora-token') ?? '';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch('/api/config', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(config),
       });
 
@@ -165,6 +174,7 @@ export function ConfigPage(): React.JSX.Element {
         setToast({ message, type: 'error' });
       } else {
         setToast({ message: 'Configuration saved successfully', type: 'success' });
+        setPreEditSnapshot(structuredClone(config));
         refetch();
       }
     } catch (err: unknown) {
@@ -176,6 +186,14 @@ export function ConfigPage(): React.JSX.Element {
       setSaving(false);
     }
   }, [config, refetch]);
+
+  const handleRevert = useCallback(() => {
+    if (preEditSnapshot) {
+      setConfig(structuredClone(preEditSnapshot));
+      setErrors({});
+      setToast({ message: 'Reverted to previous configuration', type: 'success' });
+    }
+  }, [preEditSnapshot]);
 
   if (loading && !initialized) {
     return (
@@ -211,6 +229,15 @@ export function ConfigPage(): React.JSX.Element {
           >
             {showPreview ? 'Hide JSON' : 'Show JSON'}
           </button>
+          {preEditSnapshot && JSON.stringify(preEditSnapshot) !== JSON.stringify(config) && (
+            <button
+              className="config-revert-button"
+              onClick={handleRevert}
+              type="button"
+            >
+              Revert
+            </button>
+          )}
           <button
             className="config-save-button"
             onClick={handleSave}

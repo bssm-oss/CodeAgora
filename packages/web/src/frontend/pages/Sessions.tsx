@@ -17,9 +17,25 @@ import type {
   SortDirection,
 } from '../utils/session-filters.js';
 import {
-  filterSessions,
   sortSessions,
 } from '../utils/session-filters.js';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface PaginatedResponse {
+  items: SessionMetadata[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const PAGE_SIZE = 50;
 
 const DEFAULT_FILTERS: SessionFiltersType = {
   search: '',
@@ -27,6 +43,10 @@ const DEFAULT_FILTERS: SessionFiltersType = {
   dateFrom: '',
   dateTo: '',
 };
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 /**
  * Aggregate sessions by date for the trend chart.
@@ -42,25 +62,46 @@ function buildTrendData(sessions: readonly SessionMetadata[]): TrendDataPoint[] 
   return sorted.map(([label, value]) => ({ label, value }));
 }
 
+// ============================================================================
+// Component
+// ============================================================================
+
 export function Sessions(): React.JSX.Element {
   const navigate = useNavigate();
-  const { data: rawSessions, loading, error, refetch } = useApi<SessionMetadata[]>('/api/sessions');
+  const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<SessionFiltersType>(DEFAULT_FILTERS);
   const [sortColumn, setSortColumn] = useState<SortColumn>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
 
-  const sessions = rawSessions ?? [];
+  // Build API URL with server-side filters
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(PAGE_SIZE));
+    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.set('dateTo', filters.dateTo);
+    return `/api/sessions?${params.toString()}`;
+  }, [page, filters]);
 
-  const filtered = useMemo(
-    () => filterSessions(sessions, filters),
-    [sessions, filters],
-  );
+  const { data: response, loading, error, refetch } = useApi<PaginatedResponse>(apiUrl);
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = useCallback((newFilters: SessionFiltersType) => {
+    setFilters(newFilters);
+    setPage(1);
+  }, []);
+
+  const sessions = response?.items ?? [];
+  const total = response?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const sorted = useMemo(
-    () => sortSessions(filtered, sortColumn, sortDirection),
-    [filtered, sortColumn, sortDirection],
+    () => sortSessions(sessions, sortColumn, sortDirection),
+    [sessions, sortColumn, sortDirection],
   );
 
   const trendData = useMemo(
@@ -95,7 +136,6 @@ export function Sessions(): React.JSX.Element {
   const handleCompare = useCallback(() => {
     const keys = [...selectedIds];
     if (keys.length !== 2) return;
-    // Keys are in "date/sessionId" format
     const [keyA, keyB] = keys;
     void navigate(`/compare/${keyA}/${keyB}`);
   }, [selectedIds, navigate]);
@@ -142,12 +182,12 @@ export function Sessions(): React.JSX.Element {
     <div className="page">
       <div className="page-header">
         <h2>Sessions</h2>
-        <span className="page-header__count">{sorted.length} session{sorted.length !== 1 ? 's' : ''}</span>
+        <span className="page-header__count">{total} session{total !== 1 ? 's' : ''}</span>
       </div>
 
       <TrendChart data={trendData} title="Sessions per Day" />
 
-      <SessionFilters filters={filters} onFilterChange={setFilters} />
+      <SessionFilters filters={filters} onFilterChange={handleFilterChange} />
 
       {selectedIds.size === 2 && (
         <div className="compare-bar">
@@ -167,6 +207,31 @@ export function Sessions(): React.JSX.Element {
         onSelectionChange={handleSelectionChange}
         focusedIndex={focusedIndex}
       />
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <nav className="pagination" aria-label="Session pagination">
+          <button
+            className="pagination__button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            type="button"
+          >
+            Previous
+          </button>
+          <span className="pagination__info">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            className="pagination__button"
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            type="button"
+          >
+            Next
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

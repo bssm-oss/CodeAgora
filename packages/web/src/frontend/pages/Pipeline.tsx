@@ -11,7 +11,7 @@ import { LiveDiscussion } from '../components/LiveDiscussion.js';
 import { ReviewTrigger } from '../components/ReviewTrigger.js';
 
 export function Pipeline(): React.JSX.Element {
-  const { stages, currentStage, events, discussions, connected } = usePipelineEvents();
+  const { stages, currentStage, events, discussions, connected, pipelineRunning } = usePipelineEvents();
 
   const hasActivity = currentStage !== null || events.length > 0;
 
@@ -30,8 +30,24 @@ export function Pipeline(): React.JSX.Element {
         </div>
       )}
 
-      {!hasActivity && connected && (
-        <ReviewTrigger onStarted={() => { /* WebSocket events will drive the pipeline UI */ }} />
+      {connected && pipelineRunning && !hasActivity && (
+        <div className="pipeline-notice pipeline-notice--info">
+          A review pipeline is currently running. Waiting for events...
+        </div>
+      )}
+
+      {!hasActivity && connected && !pipelineRunning && (
+        <>
+          <div className="pipeline-idle">
+            <div className="pipeline-idle__icon">&#9881;</div>
+            <h3 className="pipeline-idle__title">No active pipeline</h3>
+            <p className="pipeline-idle__description">
+              Start a code review by submitting a diff, PR URL, or staged changes below.
+              The pipeline will run through initialization, parallel review, discussion, and verdict stages.
+            </p>
+          </div>
+          <ReviewTrigger onStarted={() => { /* WebSocket events will drive the pipeline UI */ }} />
+        </>
       )}
 
       {hasActivity && (

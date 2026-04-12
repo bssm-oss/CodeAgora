@@ -594,14 +594,15 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
       expect(typeof body['uptime']).toBe('number');
     }, 10_000);
 
-    it('GET /api/sessions returns session list', async () => {
+    it('GET /api/sessions returns paginated session list', async () => {
       const res = await app.request('/api/sessions', { headers: { Authorization: `Bearer ${authToken}` } });
       expect(res.status).toBe(200);
 
-      const body = await res.json() as unknown[];
-      expect(Array.isArray(body)).toBe(true);
-      // We should have sessions from the full pipeline + quick mode runs
-      expect(body.length).toBeGreaterThanOrEqual(1);
+      const body = await res.json() as { items: unknown[]; total: number; page: number; limit: number };
+      expect(Array.isArray(body.items)).toBe(true);
+      expect(body.total).toBeGreaterThanOrEqual(1);
+      expect(body.page).toBe(1);
+      expect(body.limit).toBe(50);
     }, 10_000);
 
     it('GET /api/config returns configuration', async () => {

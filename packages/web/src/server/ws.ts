@@ -7,7 +7,9 @@ import type { Hono } from 'hono';
 import type { ProgressEmitter, ProgressEvent } from '@codeagora/core/pipeline/progress.js';
 import type { DiscussionEmitter, DiscussionEvent } from '@codeagora/core/l2/event-emitter.js';
 import { createNodeWebSocket } from '@hono/node-ws';
-import { getAuthToken, compareTokens } from './middleware.js';
+import { getAuthToken, compareTokens, AUTH_COOKIE_NAME, isAllowedOrigin } from './middleware.js';
+import { getActiveEmitter } from './routes/review.js';
+import { logger } from './logger.js';
 
 // ============================================================================
 // Connection Limits
@@ -49,14 +51,18 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
   app.get('/ws', (c, next) => {
-    // Origin validation — only allow localhost origins
+    // Origin validation — uses same pinned origins as CORS middleware
     const origin = c.req.header('Origin') ?? '';
-    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-    if (origin && !isLocalhost) {
+    if (!isAllowedOrigin(origin)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
-    // Prefer token from Sec-WebSocket-Protocol header (secure) over query param (deprecated)
+    // Auth: try cookie first (httpOnly, set by POST /api/auth), then protocol header, then query param
+    const cookieHeader = c.req.header('Cookie');
+    const cookieToken = cookieHeader
+      ? cookieHeader.match(new RegExp(`(?:^|;\\s*)${AUTH_COOKIE_NAME}=([^;]*)`))?.[1] ?? null
+      : null;
+
     const protocolHeader = c.req.header('sec-websocket-protocol');
     const protocolToken = protocolHeader?.split(',')
       .map(p => p.trim())
@@ -64,13 +70,13 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
       ?.slice(6); // Remove 'token.' prefix
 
     const queryToken = c.req.query('token');
-    if (queryToken && !protocolToken) {
-      console.warn('[WebSocket] Token via query param is deprecated — use Sec-WebSocket-Protocol header');
+    if (queryToken && !protocolToken && !cookieToken) {
+      logger.warn('WebSocket token via query param is deprecated — use httpOnly cookie or Sec-WebSocket-Protocol header');
     }
 
     const authHeader = c.req.header('Authorization');
     const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const token = protocolToken ?? queryToken ?? headerToken;
+    const token = cookieToken ?? protocolToken ?? queryToken ?? headerToken;
     if (!compareTokens(token, getAuthToken())) {
       return c.json({ error: 'Authentication required' }, 401);
     }
@@ -92,6 +98,17 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
       return {
         onOpen(_event, ws) {
           activeConnections++;
+
+          // Send pipeline status snapshot on connect (for reconnection recovery)
+          const isRunning = getActiveEmitter() !== null;
+          try {
+            ws.send(JSON.stringify({
+              type: 'sync',
+              data: { pipelineRunning: isRunning },
+            }));
+          } catch {
+            // Client may have already disconnected
+          }
 
           // Attach progress listener
           if (progressEmitter) {

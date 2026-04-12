@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { healthRoutes } from '../../src/server/routes/health.js';
-import { sessionRoutes } from '../../src/server/routes/sessions.js';
+import { sessionRoutes, invalidateSessionCache } from '../../src/server/routes/sessions.js';
 import { modelRoutes } from '../../src/server/routes/models.js';
 import { configRoutes } from '../../src/server/routes/config.js';
 import { costRoutes } from '../../src/server/routes/costs.js';
@@ -136,6 +136,7 @@ describe('GET /api/health', () => {
 describe('Session Routes', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    invalidateSessionCache();
   });
 
   it('GET /api/sessions should return session list', async () => {
@@ -155,13 +156,15 @@ describe('Session Routes', () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(1);
-    expect(body[0].sessionId).toBe('001');
-    expect(body[0].date).toBe('2025-01-15');
+    expect(body.items).toHaveLength(1);
+    expect(body.total).toBe(1);
+    expect(body.page).toBe(1);
+    expect(body.limit).toBe(50);
+    expect(body.items[0].sessionId).toBe('001');
+    expect(body.items[0].date).toBe('2025-01-15');
   });
 
-  it('GET /api/sessions should return empty array when no sessions exist', async () => {
+  it('GET /api/sessions should return empty list when no sessions exist', async () => {
     const app = new Hono();
     app.route('/api/sessions', sessionRoutes);
 
@@ -171,7 +174,7 @@ describe('Session Routes', () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body).toEqual([]);
+    expect(body).toEqual({ items: [], total: 0, page: 1, limit: 50 });
   });
 
   it('GET /api/sessions/:date/:id should return session detail', async () => {

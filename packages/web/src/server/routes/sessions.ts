@@ -11,15 +11,23 @@ import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
 
 const CA_ROOT = '.ca';
 
-export const sessionRoutes = new Hono();
+// ============================================================================
+// Session Index Cache
+// ============================================================================
 
-/**
- * GET /api/sessions — List all sessions from .ca/sessions/ directory tree.
- */
-sessionRoutes.get('/', async (c) => {
+const CACHE_TTL_MS = 30_000; // 30 seconds
+
+let sessionCache: SessionMetadata[] | null = null;
+let cacheTimestamp = 0;
+
+async function loadAllSessions(): Promise<SessionMetadata[]> {
+  const now = Date.now();
+  if (sessionCache && now - cacheTimestamp < CACHE_TTL_MS) {
+    return sessionCache;
+  }
+
   const sessionsDir = path.join(CA_ROOT, 'sessions');
   const dateDirs = await readdirSafe(sessionsDir);
-
   const sessions: SessionMetadata[] = [];
 
   for (const dateDir of dateDirs) {
@@ -40,7 +48,74 @@ sessionRoutes.get('/', async (c) => {
     }
   }
 
-  return c.json(sessions);
+  // Sort once at cache time (newest first)
+  sessions.sort((a, b) => {
+    const dateCmp = b.date.localeCompare(a.date);
+    if (dateCmp !== 0) return dateCmp;
+    return b.sessionId.localeCompare(a.sessionId);
+  });
+
+  sessionCache = sessions;
+  cacheTimestamp = now;
+  return sessions;
+}
+
+/** Invalidate the session cache. Call after pipeline completes or sessions change. */
+export function invalidateSessionCache(): void {
+  sessionCache = null;
+  cacheTimestamp = 0;
+}
+
+// ============================================================================
+// Routes
+// ============================================================================
+
+export const sessionRoutes = new Hono();
+
+/**
+ * GET /api/sessions — List sessions with pagination and server-side filtering.
+ * Query params:
+ *   page (default 1), limit (default 50, max 200)
+ *   status — filter by session status (e.g. "completed", "failed")
+ *   search — case-insensitive substring match on sessionId/diffPath
+ *   dateFrom, dateTo — inclusive date range filter (YYYY-MM-DD)
+ * Returns { items, total, page, limit }.
+ */
+sessionRoutes.get('/', async (c) => {
+  let sessions = [...await loadAllSessions()];
+
+  // Server-side filters
+  const statusFilter = c.req.query('status');
+  if (statusFilter && statusFilter !== 'all') {
+    sessions = sessions.filter((s) => s.status === statusFilter);
+  }
+
+  const search = c.req.query('search')?.toLowerCase();
+  if (search) {
+    sessions = sessions.filter(
+      (s) =>
+        s.sessionId.toLowerCase().includes(search) ||
+        (s.diffPath ?? '').toLowerCase().includes(search),
+    );
+  }
+
+  const dateFrom = c.req.query('dateFrom');
+  if (dateFrom) {
+    sessions = sessions.filter((s) => s.date >= dateFrom);
+  }
+
+  const dateTo = c.req.query('dateTo');
+  if (dateTo) {
+    sessions = sessions.filter((s) => s.date <= dateTo);
+  }
+
+  const page = Math.max(1, parseInt(c.req.query('page') ?? '1', 10) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(c.req.query('limit') ?? '50', 10) || 50));
+  const total = sessions.length;
+  const start = (page - 1) * limit;
+  const items = sessions.slice(start, start + limit);
+
+  return c.json({ items, total, page, limit });
 });
 
 /**
