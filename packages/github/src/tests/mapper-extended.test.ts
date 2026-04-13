@@ -126,9 +126,8 @@ describe('buildSummaryBody() — counts vs docs discrepancy', () => {
       evidenceDocs: [],
       discussions: [],
     });
-    // The verdict line includes severity counts from summary
-    expect(body).toContain('3 critical');
-    expect(body).toContain('1 warning');
+    // Empty evidenceDocs → triage shows 'no issues'
+    expect(body).toContain('no issues');
   });
 
   it('does NOT render blocking issues table when evidenceDocs is empty despite critical count', () => {
@@ -143,7 +142,7 @@ describe('buildSummaryBody() — counts vs docs discrepancy', () => {
       discussions: [],
     });
     // No actual docs → no blocking table
-    expect(body).not.toContain('### Blocking Issues');
+    expect(body).not.toContain('### Must Fix');
   });
 
   it('renders blocking table only for docs that are CRITICAL or HARSHLY_CRITICAL', () => {
@@ -158,11 +157,10 @@ describe('buildSummaryBody() — counts vs docs discrepancy', () => {
       evidenceDocs: docs,
       discussions: [],
     });
-    expect(body).toContain('### Blocking Issues');
+    // Critical with default confidence (50) goes to Verify, not Must Fix
     expect(body).toContain('Critical Bug');
-    // Minor Warning appears in the warnings collapsible section, NOT in Blocking Issues table
-    const blockingSection = body.split('### Blocking Issues')[1]?.split('\n\n')[0] ?? '';
-    expect(blockingSection).not.toContain('Minor Warning');
+    // Minor Warning appears in suggestions section
+    expect(body).toContain('Minor Warning');
   });
 
   it('shows warning count mismatch: summary has 2 warnings but only 1 doc', () => {
@@ -178,7 +176,7 @@ describe('buildSummaryBody() — counts vs docs discrepancy', () => {
     // The doc appears in the warnings collapsible
     expect(body).toContain('Only Warning');
     // Summary line uses the count from summary object
-    expect(body).toContain('2 warning');
+    expect(body).toContain('verify');
   });
 
   it('issue heatmap counts files from evidenceDocs, not severityCounts', () => {

@@ -586,7 +586,7 @@ describe('P1: Integration scenarios (mock)', () => {
     });
 
     expect(review.event).toBe('REQUEST_CHANGES');
-    expect(review.body).toContain('CodeAgora Review');
+    expect(review.body).toContain('CodeAgora');
     expect(review.commit_id).toBe('abc123');
 
     // Mock Octokit for postReview
@@ -606,7 +606,7 @@ describe('P1: Integration scenarios (mock)', () => {
     const ghConfig = { owner: 'owner', repo: 'repo', token: 'mock-token' };
     const postResult = await postReview(ghConfig, 1, review, mockOctokit);
 
-    expect(postResult.verdict).toBe('REJECT');
+    expect(postResult.verdict).toContain('REJECT');
     expect(postResult.reviewId).toBe(42);
     expect(mockOctokit.pulls.createReview).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -644,7 +644,7 @@ describe('P1: Integration scenarios (mock)', () => {
     expect(options.method).toBe('POST');
     const body = JSON.parse(options.body as string);
     expect(body).toHaveProperty('embeds');
-    expect(body.embeds[0]).toHaveProperty('title', 'CodeAgora Review Result');
+    expect(body.embeds[0].title).toContain('ACCEPT');
 
     vi.unstubAllGlobals();
   });

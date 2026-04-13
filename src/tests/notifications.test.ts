@@ -100,7 +100,7 @@ describe('sendDiscordNotification()', () => {
     const body = JSON.parse((init as RequestInit).body as string) as Record<string, unknown>;
     expect(Array.isArray(body['embeds'])).toBe(true);
     const embed = (body['embeds'] as Record<string, unknown>[])[0]!;
-    expect(embed['title']).toBe('CodeAgora Review Result');
+    expect(embed['title']).toContain('REJECT');
     expect(Array.isArray(embed['fields'])).toBe(true);
   });
 

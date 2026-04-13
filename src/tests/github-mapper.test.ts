@@ -17,6 +17,7 @@ const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   suggestion: 'Use parameterized queries',
   filePath: 'src/db/queries.ts',
   lineRange: [42, 45] as [number, number],
+  confidence: 90,
   ...overrides,
 });
 
@@ -139,7 +140,7 @@ describe('buildSummaryBody', () => {
     });
     expect(body).toContain('<!-- codeagora-v3 -->');
     expect(body).toContain('REJECT');
-    expect(body).toContain('CodeAgora Review');
+    expect(body).toContain('CodeAgora');
   });
 
   it('renders blocking issues table for critical docs', () => {
@@ -150,7 +151,7 @@ describe('buildSummaryBody', () => {
       evidenceDocs: [makeDoc()],
       discussions: [],
     });
-    expect(body).toContain('Blocking Issues');
+    expect(body).toContain('Must Fix');
     expect(body).toContain('src/db/queries.ts');
   });
 
@@ -166,8 +167,8 @@ describe('buildSummaryBody', () => {
       evidenceDocs: docs,
       discussions: [],
     });
-    expect(body).toContain('1 warning(s)');
-    expect(body).toContain('1 suggestion(s)');
+    expect(body).toContain('Verify');
+    expect(body).toContain('suggestion(s)');
     expect(body).toContain('<details>');
   });
 
