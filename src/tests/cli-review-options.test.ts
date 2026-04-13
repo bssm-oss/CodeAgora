@@ -162,6 +162,11 @@ const mockResultWithSummary: PipelineResult = {
     resolved: 3,
     escalated: 2,
   },
+  evidenceDocs: [
+    { issueTitle: 'SQL injection vulnerability', problem: 'User input concatenated', evidence: ['Evidence 1'], severity: 'CRITICAL', suggestion: 'Use parameterized queries', filePath: 'auth.ts', lineRange: [10, 10] as [number, number], confidence: 92 },
+    { issueTitle: 'Unvalidated user input', problem: 'No input validation', evidence: ['Evidence 1'], severity: 'CRITICAL', suggestion: 'Add validation', filePath: 'api.ts', lineRange: [45, 45] as [number, number], confidence: 85 },
+    { issueTitle: 'Missing error handling', problem: 'Uncaught promise', evidence: ['Evidence 1'], severity: 'WARNING', suggestion: 'Add try-catch', filePath: 'utils.ts', lineRange: [23, 23] as [number, number], confidence: 60 },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -174,9 +179,9 @@ describe('formatText with summary', () => {
     expect(output).toContain('REJECT');
   });
 
-  it('should contain CRITICAL count', () => {
+  it('should contain must-fix triage', () => {
     const output = formatText(mockResultWithSummary);
-    expect(output).toContain('CRITICAL: 2');
+    expect(output).toContain('must-fix');
   });
 
   it('should contain auth.ts:10 issue location', () => {

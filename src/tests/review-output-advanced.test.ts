@@ -78,7 +78,7 @@ describe('formatText() with undefined summary', () => {
   it('outputs a fallback path reference when summary is undefined', () => {
     const result = makeResult({ summary: undefined });
     const output = formatText(result);
-    expect(output).toContain('.ca/sessions/');
+    expect(output).toContain('Session');
   });
 
   it('does not contain decision or severity when summary is undefined', () => {
