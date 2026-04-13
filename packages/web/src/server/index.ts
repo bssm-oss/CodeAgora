@@ -96,7 +96,9 @@ export function startServer(options: ServerOptions = {}): {
     { fetch: app.fetch, port, hostname },
     (info) => {
       const token = getAuthToken();
-      logger.info({ url: `http://${hostname}:${info.port}`, token }, 'CodeAgora dashboard started');
+      logger.info({ url: `http://${hostname}:${info.port}`, token: token.slice(0, 8) + '...' }, 'CodeAgora dashboard started');
+      console.log(`  Dashboard: http://${hostname}:${info.port}`);
+      console.log(`  Token: ${token}`);
       if (!process.env['CODEAGORA_DASHBOARD_TOKEN']) {
         logger.info('Token persisted to .ca/dashboard-token — set CODEAGORA_DASHBOARD_TOKEN to override');
       }

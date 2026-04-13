@@ -783,7 +783,9 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     if (hallucinationResult.uncertain.length > 0) {
       console.log(`[Hallucination Filter] ${hallucinationResult.uncertain.length} finding(s) flagged as uncertain (low confidence after penalty)`);
     }
-    allEvidenceDocs = hallucinationResult.filtered;
+    // Keep uncertain findings in the pipeline (confidence already penalized,
+    // triage will classify them as "verify" or "ignore" for human review)
+    allEvidenceDocs = [...hallucinationResult.filtered, ...hallucinationResult.uncertain];
 
     // === CONFIDENCE: Compute L1 confidence for non-rule docs ===
     const totalReviewers = allReviewerInputs.length;

@@ -123,8 +123,8 @@ function promptLine(prompt: string): Promise<string> {
 
 function detectProviderFromKey(key: string): string {
   if (key.startsWith('gsk_')) return 'groq';
-  if (key.startsWith('sk-')) return 'openai';
   if (key.startsWith('sk-ant-')) return 'anthropic';
+  if (key.startsWith('sk-')) return 'openai';
   if (key.startsWith('AI')) return 'google';
   if (key.startsWith('ghp_') || key.startsWith('gho_')) return 'github-models';
   if (key.startsWith('nvapi-')) return 'nvidia-nim';
