@@ -19,6 +19,7 @@ import {
 import { formatOutput, type OutputFormat } from './formatters/review-output.js';
 import { parseReviewerOption, readStdin } from './options/review-options.js';
 import { formatError } from './utils/errors.js';
+import { dim } from './utils/colors.js';
 // @codeagora/notifications is optional — dynamically imported when needed
 import ora from 'ora';
 import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
@@ -92,6 +93,7 @@ program
   .option('--json-stream', 'Stream NDJSON events during review (for CI/pipelines)')
   .option('--no-cache', 'Skip result caching — always run a fresh review')
   .option('--fail-on-reject', 'Exit 1 on REJECT verdict (default: false)', false)
+  .option('--fail-on-severity <level>', 'Exit 1 if any issue at or above this severity (SUGGESTION|WARNING|CRITICAL|HARSHLY_CRITICAL)')
   .action(async (diffPath: string | undefined, options: {
     dryRun?: boolean;
     output: string;
@@ -112,12 +114,24 @@ program
     jsonStream?: boolean;
     cache: boolean;
     failOnReject?: boolean;
+    failOnSeverity?: string;
   }) => {
     // Hoist stdinTmpPath so finally block can clean it up (#77)
     let stdinTmpPath: string | undefined;
     try {
       if (options.quiet && options.verbose) {
         options.verbose = false; // --quiet takes precedence
+      }
+
+      // Check for interrupted sessions
+      if (!options.quiet) {
+        try {
+          const { recoverStaleSessions } = await import('@codeagora/core/session/manager.js');
+          const recovered = await recoverStaleSessions();
+          if (recovered > 0) {
+            console.error(dim(`\u26A0 ${recovered} interrupted session(s) recovered. Run 'agora sessions' to inspect.`));
+          }
+        } catch { /* ignore — .ca/ may not exist yet */ }
       }
 
       const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit'];
@@ -202,6 +216,7 @@ program
         };
       } else if (diffPath === '-' || (!diffPath && !process.stdin.isTTY)) {
         // Handle stdin
+        if (!options.quiet) console.error(dim('Reading diff from stdin...'));
         const stdinContent = await readStdin();
         stdinTmpPath = path.join(process.cwd(), '.ca', `tmp-stdin-${Date.now()}.patch`);
         await fs.mkdir(path.dirname(stdinTmpPath), { recursive: true });
@@ -443,6 +458,20 @@ program
 
       if (result.summary?.decision === 'REJECT' && options.failOnReject) {
         process.exit(1);
+      }
+
+      // --fail-on-severity: exit 1 if any issue at or above the threshold
+      if (options.failOnSeverity && result.summary?.severityCounts) {
+        const order = ['SUGGESTION', 'WARNING', 'CRITICAL', 'HARSHLY_CRITICAL'];
+        const threshold = order.indexOf(options.failOnSeverity.toUpperCase());
+        if (threshold >= 0) {
+          const hasIssueAtOrAbove = order.slice(threshold).some(
+            (sev) => (result.summary!.severityCounts[sev as keyof typeof result.summary.severityCounts] ?? 0) > 0
+          );
+          if (hasIssueAtOrAbove) {
+            process.exit(1);
+          }
+        }
       }
 
       if (result.status !== 'success') {

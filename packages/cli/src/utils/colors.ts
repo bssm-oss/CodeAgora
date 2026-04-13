@@ -5,6 +5,11 @@
 
 import pc from 'picocolors';
 
+// Auto-disable color in CI environments that don't support it
+if (!process.env['FORCE_COLOR'] && (process.env['CI'] || process.env['GITHUB_ACTIONS'] || process.env['JENKINS_URL'])) {
+  process.env['NO_COLOR'] = '1';
+}
+
 export const dim = pc.dim;
 export const bold = pc.bold;
 export const cyan = pc.cyan;

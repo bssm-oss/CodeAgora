@@ -650,6 +650,10 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // === DIFF CHUNKING ===
     const chunks = await chunkDiff(diffContent, { maxTokens: config.chunking?.maxTokens ?? 8000 });
 
+    if (chunks.length > 1) {
+      progress?.stageUpdate('init', 50, `Large diff split into ${chunks.length} chunks for parallel review`);
+    }
+
     // Guard: empty diff produces no chunks
     if (chunks.length === 0) {
       await session.setStatus('completed');

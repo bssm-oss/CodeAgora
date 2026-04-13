@@ -12,7 +12,7 @@ import { reviewOptionsSchema, stagedSchema } from './shared-schema.js';
 export function registerReviewQuick(server: McpServer): void {
   server.tool(
     'review_quick',
-    'Fast multi-LLM code review (L1 only, no debate). Returns structured issues with severity, confidence, and file locations.',
+    'Quick code review — 3 AI reviewers scan your diff in parallel (~10s). Returns verdict (ACCEPT/REJECT) + issues grouped as must-fix/verify/ignore with severity, confidence %, and file locations. No debate phase. Use for rapid feedback on small changes.',
     {
       diff: z.string().optional().describe('Unified diff content (optional if staged=true)'),
       ...reviewOptionsSchema,

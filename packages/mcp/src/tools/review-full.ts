@@ -11,7 +11,7 @@ import { reviewOptionsSchema, stagedSchema } from './shared-schema.js';
 export function registerReviewFull(server: McpServer): void {
   server.tool(
     'review_full',
-    'Full pipeline review with multi-model debate. Thorough consensus-based code review.',
+    'Thorough code review — multiple AI models review your diff, then debate disagreements to reach consensus (~30s). Returns verdict + issues with confidence scores + debate summary. More accurate than review_quick.',
     {
       diff: z.string().optional().describe('Unified diff content (optional if staged=true)'),
       ...reviewOptionsSchema,

@@ -134,6 +134,7 @@ export class SessionManager {
           };
           const fsSync = require('fs') as typeof import('fs');
           fsSync.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf-8');
+          process.stderr.write(`\nSession interrupted. Partial results saved:\n  agora sessions show ${this.date}/${this.sessionId}\n`);
         } catch {
           // Best effort — process is dying, nothing more we can do
         }

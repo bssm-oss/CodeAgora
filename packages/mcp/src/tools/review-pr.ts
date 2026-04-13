@@ -42,7 +42,7 @@ async function resolvePrUrl(prUrl?: string, prNumber?: number): Promise<string> 
 export function registerReviewPr(server: McpServer): void {
   server.tool(
     'review_pr',
-    'Fetch a GitHub PR diff and run full multi-LLM code review. Supports PR URL or just a PR number (auto-detects repo from git remote).',
+    'Review a GitHub PR — fetches the diff automatically and runs full multi-LLM review. Supports PR URL (https://github.com/owner/repo/pull/123) or just a PR number (auto-detects owner/repo from git remote). Can post results back as PR comments with --post_review.',
     {
       pr_url: z.string()
         .regex(
