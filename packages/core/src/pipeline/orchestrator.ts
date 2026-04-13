@@ -320,7 +320,17 @@ async function executeL1Reviews(
 
     const reviewResults = await executeReviewers(
       reviewerInputs,
-      config.errorHandling.maxRetries
+      config.errorHandling.maxRetries,
+      undefined, // concurrency (default 5)
+      undefined, // options (default)
+      (reviewerId, issueCount, _elapsed, total, completed) => {
+        progress?.stageUpdate(
+          'review',
+          Math.round((completed / total) * 80),
+          `${reviewerId}: ${issueCount} issue(s) found (${completed}/${total})`,
+          { reviewerId, completed, total },
+        );
+      },
     );
 
     // Emit per-chunk progress

@@ -529,15 +529,42 @@ program
 
 program
   .command('init')
-  .description('Initialize CodeAgora in current project')
+  .description('Initialize CodeAgora in current project (simple 2-step setup)')
   .option('--format <format>', 'Config format (json or yaml)', 'json')
   .option('--force', 'Overwrite existing files', false)
   .option('-y, --yes', 'Skip prompts, use defaults', false)
   .option('--ci', 'also create GitHub Actions workflow', false)
-  .action(async (options: { format: string; force: boolean; yes: boolean; ci: boolean }) => {
+  .option('--advanced', 'Full wizard with provider/model/reviewer customization', false)
+  .action(async (options: { format: string; force: boolean; yes: boolean; ci: boolean; advanced: boolean }) => {
     try {
       const format = options.format === 'yaml' ? 'yaml' : 'json';
       const isInteractive = !options.yes && process.stdin.isTTY;
+
+      // Simple mode (default): detect provider, prompt key if needed, generate config
+      if (isInteractive && !options.advanced) {
+        const { detectAvailableProvider, runInlineSetup } = await import('./utils/inline-setup.js');
+        const existing = detectAvailableProvider();
+        if (existing) {
+          const { buildDefaultConfig } = await import('@codeagora/core/config/loader.js');
+          const config = buildDefaultConfig(existing.name);
+          const caDir = path.join(process.cwd(), '.ca');
+          await fs.mkdir(caDir, { recursive: true });
+          const configPath = path.join(caDir, format === 'yaml' ? 'config.yaml' : 'config.json');
+          await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+          console.log(`\u2713 Config created with ${existing.name} (${existing.envVar} detected)`);
+          console.log(`\nRun your first review:`);
+          console.log(`  git diff | agora review`);
+          return;
+        }
+        // No keys — run inline setup
+        await runInlineSetup(process.cwd());
+        console.log(`\nRun your first review:`);
+        console.log(`  git diff | agora review`);
+        console.log(`\nFor full customization: agora init --advanced`);
+        return;
+      }
+
+      // Advanced mode or non-interactive
       let result;
       if (isInteractive) {
         try {
@@ -843,14 +870,22 @@ program
   .action(async (session: string) => {
     try {
       const result = await loadSessionForReplay(process.cwd(), session);
-      console.log(`Session ${result.sessionPath} — ${result.decision}`);
-      console.log(`Evidence documents: ${result.evidenceDocs.length}`);
+      const sessionId = session.split('/')[1] ?? '';
+      const date = session.split('/')[0] ?? '';
+
       if (result.evidenceDocs.length > 0) {
-        const output = formatOutput({ status: 'success', sessionId: session.split('/')[1] ?? '', date: session.split('/')[0] ?? '', evidenceDocs: result.evidenceDocs } as Parameters<typeof formatOutput>[0], 'text');
+        const output = formatOutput(
+          { status: 'success', sessionId, date, evidenceDocs: result.evidenceDocs } as Parameters<typeof formatOutput>[0],
+          'text',
+        );
         console.log(output);
+      } else {
+        console.log(`Session ${date}/${sessionId} — ${result.decision}`);
+        console.log('No evidence documents found in this session.');
       }
+
       if (!result.diffContent) {
-        console.log('(Original diff file not available for annotated output)');
+        console.error(dim('Note: original diff not available. Use --output text (default) or re-run the review.'));
       }
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : error);

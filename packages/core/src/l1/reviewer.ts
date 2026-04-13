@@ -83,11 +83,13 @@ export async function executeReviewers(
   inputs: ReviewerInput[],
   maxRetries: number = 2,
   concurrency: number = 5,
-  options: ExecuteReviewersOptions = {}
+  options: ExecuteReviewersOptions = {},
+  onReviewerComplete?: (reviewerId: string, issueCount: number, elapsed: number, total: number, completed: number) => void,
 ): Promise<ReviewOutput[]> {
   const cb = options.circuitBreaker ?? _defaultCircuitBreaker;
   const hm = options.healthMonitor ?? _defaultHealthMonitor;
   const results: ReviewOutput[] = [];
+  let completedCount = 0;
 
   // Process in batches to avoid 429 rate limit storms
   for (let i = 0; i < inputs.length; i += concurrency) {
@@ -100,6 +102,14 @@ export async function executeReviewers(
       const result = batchResults[j];
       if (result.status === 'fulfilled') {
         results.push(result.value);
+        completedCount++;
+        onReviewerComplete?.(
+          result.value.reviewerId,
+          result.value.evidenceDocs.length,
+          0, // elapsed not tracked per-reviewer yet
+          inputs.length,
+          completedCount,
+        );
       } else {
         // Unexpected rejection — executeReviewer should catch all errors,
         // but handle gracefully just in case

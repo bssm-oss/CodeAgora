@@ -101,13 +101,14 @@ export async function explainSession(baseDir: string, sessionPath: string): Prom
     lines.push('');
     lines.push(`L3: Head verdict \u2014 ${verdict['decision']}`);
     if (verdict['reasoning']) {
-      lines.push(`  \u2192 ${String(verdict['reasoning']).slice(0, 200)}`);
+      lines.push(`  \u2192 ${String(verdict['reasoning'])}`);
     }
     const questions = verdict['questionsForHuman'] as string[] | undefined;
     if (questions && questions.length > 0) {
-      lines.push(`  \u2192 Questions for human: ${questions.length}`);
-      for (const q of questions.slice(0, 3)) {
-        lines.push(`    \u2022 "${q}"`);
+      lines.push('');
+      lines.push(`  Questions for human review:`);
+      for (const q of questions) {
+        lines.push(`    \u2022 ${q}`);
       }
     }
   }
