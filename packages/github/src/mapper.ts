@@ -330,81 +330,60 @@ export function buildSummaryBody(params: {
 
   lines.push(MARKER);
   lines.push('');
-  lines.push('## CodeAgora Review');
-
-  // Triage digest (#410)
-  const triageDigest = buildTriageDigest(evidenceDocs);
-  if (triageDigest) {
-    lines.push('');
-    lines.push(triageDigest);
-  }
-
-  lines.push('');
-
-  // Verdict line
+  // Unified header: verdict + triage
   const vb = VERDICT_BADGE[summary.decision] ?? { emoji: '\u2753', label: summary.decision };
-  const severityParts = SEVERITY_ORDER
-    .filter((s) => (summary.severityCounts[s] ?? 0) > 0)
-    .map((s) => `${summary.severityCounts[s]} ${s.toLowerCase()}`);
+  const triage = triageDocs(evidenceDocs);
+  const triageStr = formatTriageCounts(triage.counts);
+  const reviewerStr = summary.totalReviewers > 0 ? `${summary.totalReviewers} reviewers` : '';
+  const debateStr = summary.totalDiscussions > 0 ? `${summary.totalDiscussions} debates` : '';
+  const metaParts = [reviewerStr, debateStr].filter(Boolean).join(' \u00B7 ');
 
-  lines.push(
-    `**Verdict: ${vb.emoji} ${vb.label}** \u00B7 ${severityParts.join(' \u00B7 ')}`,
-  );
+  lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
+  lines.push('');
+  lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
   lines.push(`> ${summary.reasoning}`);
   lines.push('');
 
-  // Blocking issues table
-  const blocking = evidenceDocs.filter(
-    (d) => d.severity === 'HARSHLY_CRITICAL' || d.severity === 'CRITICAL',
-  );
-  if (blocking.length > 0) {
-    lines.push('### Blocking Issues');
+  // Must Fix section
+  if (triage.mustFix.length > 0) {
+    lines.push('### Must Fix');
     lines.push('');
-    lines.push('| Severity | File | Line | Issue | Confidence |');
-    lines.push('|----------|------|------|-------|------------|');
-    for (const doc of blocking) {
+    lines.push('| | File | Issue | Confidence |');
+    lines.push('|--|------|-------|-----------|');
+    for (const doc of triage.mustFix) {
       const badge = SEVERITY_BADGE[doc.severity]!;
-      const confCell = getConfidenceBadge(doc.confidence) || '—';
-      const unverified = (doc.confidence ?? 100) <= 30 ? ' ⚠️' : '';
+      const confCell = getConfidenceBadge(doc.confidence) || '\u2014';
+      const unverified = (doc.confidence ?? 100) <= 30 ? ' \u26A0\uFE0F' : '';
       lines.push(
-        `| ${badge.emoji} ${badge.label}${unverified} | \`${doc.filePath}\` | ${doc.lineRange[0]}\u2013${doc.lineRange[1]} | ${doc.issueTitle} | ${confCell} |`,
+        `| ${badge.emoji}${unverified} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
       );
-    }
-    const lowConfCount = blocking.filter((d) => (d.confidence ?? 100) <= 30).length;
-    if (lowConfCount > 0) {
-      lines.push('');
-      lines.push(`> ⚠️ ${lowConfCount} finding(s) marked with low confidence (≤30%) — verify before acting.`);
     }
     lines.push('');
   }
 
-  // Warnings (collapsible)
-  const warnings = evidenceDocs.filter((d) => d.severity === 'WARNING');
-  if (warnings.length > 0) {
-    lines.push('<details>');
-    lines.push(`<summary>${warnings.length} warning(s)</summary>`);
+  // Verify section
+  if (triage.verify.length > 0) {
+    lines.push('### Verify');
     lines.push('');
-    lines.push('| Severity | File | Line | Issue | Confidence |');
-    lines.push('|----------|------|------|-------|------------|');
-    for (const doc of warnings) {
-      const confCell = getConfidenceBadge(doc.confidence) || '—';
+    lines.push('| | File | Issue | Confidence |');
+    lines.push('|--|------|-------|-----------|');
+    for (const doc of triage.verify) {
+      const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\uD83D\uDFE1' };
+      const confCell = getConfidenceBadge(doc.confidence) || '\u2014';
       lines.push(
-        `| \u{1F7E1} WARNING | \`${doc.filePath}\` | ${doc.lineRange[0]} | ${doc.issueTitle} | ${confCell} |`,
+        `| ${badge.emoji} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
       );
     }
-    lines.push('');
-    lines.push('</details>');
     lines.push('');
   }
 
   // Suggestions (collapsible)
-  const suggestions = evidenceDocs.filter((d) => d.severity === 'SUGGESTION');
-  if (suggestions.length > 0) {
+  if (triage.ignore.length > 0) {
     lines.push('<details>');
-    lines.push(`<summary>${suggestions.length} suggestion(s)</summary>`);
+    lines.push(`<summary>${triage.ignore.length} suggestion(s)</summary>`);
     lines.push('');
-    for (const doc of suggestions) {
+    for (const doc of triage.ignore) {
       lines.push(
         `- \`${doc.filePath}:${doc.lineRange[0]}\` \u2014 ${doc.issueTitle}`,
       );

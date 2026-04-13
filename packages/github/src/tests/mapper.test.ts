@@ -343,8 +343,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('abc-xyz');
   });
 
-  it('renders a blocking issues table for CRITICAL docs', () => {
-    const doc = makeDoc({ severity: 'CRITICAL' });
+  it('renders Must Fix section for high-confidence CRITICAL docs', () => {
+    const doc = makeDoc({ severity: 'CRITICAL', confidence: 90 });
     const body = buildSummaryBody({
       summary: makeSummary(),
       sessionId: 'sess-001',
@@ -352,12 +352,12 @@ describe('buildSummaryBody', () => {
       evidenceDocs: [doc],
       discussions: [],
     });
-    expect(body).toContain('### Blocking Issues');
+    expect(body).toContain('### Must Fix');
     expect(body).toContain('Null pointer dereference');
   });
 
-  it('renders a blocking issues table for HARSHLY_CRITICAL docs', () => {
-    const doc = makeDoc({ severity: 'HARSHLY_CRITICAL' });
+  it('renders Must Fix section for HARSHLY_CRITICAL docs', () => {
+    const doc = makeDoc({ severity: 'HARSHLY_CRITICAL', confidence: 90 });
     const body = buildSummaryBody({
       summary: makeSummary(),
       sessionId: 'sess-001',
@@ -365,7 +365,7 @@ describe('buildSummaryBody', () => {
       evidenceDocs: [doc],
       discussions: [],
     });
-    expect(body).toContain('HARSHLY CRITICAL');
+    expect(body).toContain('Must Fix');
   });
 
   it('renders collapsible warnings section', () => {
@@ -377,7 +377,7 @@ describe('buildSummaryBody', () => {
       evidenceDocs: [doc],
       discussions: [],
     });
-    expect(body).toContain('warning(s)');
+    expect(body).toContain('suggestion(s)');
     expect(body).toContain('Missing guard clause');
   });
 
@@ -600,7 +600,7 @@ describe('buildSummaryBody triage digest', () => {
       evidenceDocs: docs,
       discussions: [],
     });
-    expect(body).toContain('Triage:');
+    expect(body).toContain('must-fix');
     expect(body).toContain('1 must-fix');
     expect(body).toContain('1 verify');
     expect(body).toContain('1 ignore');
@@ -615,11 +615,10 @@ describe('buildSummaryBody triage digest', () => {
       evidenceDocs: docs,
       discussions: [],
     });
-    const headingIdx = body.indexOf('## CodeAgora Review');
-    const triageIdx = body.indexOf('Triage:');
-    const verdictIdx = body.indexOf('**Verdict:');
+    // New format: heading includes verdict, triage is on next line
+    const headingIdx = body.indexOf('## ');
+    const triageIdx = body.indexOf('must-fix');
     expect(headingIdx).toBeLessThan(triageIdx);
-    expect(triageIdx).toBeLessThan(verdictIdx);
   });
 
   it('omits triage digest when no evidenceDocs', () => {
@@ -630,6 +629,6 @@ describe('buildSummaryBody triage digest', () => {
       evidenceDocs: [],
       discussions: [],
     });
-    expect(body).not.toContain('Triage:');
+    expect(body).not.toContain('must-fix');
   });
 });
