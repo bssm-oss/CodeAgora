@@ -94,6 +94,7 @@ program
   .option('--no-cache', 'Skip result caching — always run a fresh review')
   .option('--fail-on-reject', 'Exit 1 on REJECT verdict (default: false)', false)
   .option('--fail-on-severity <level>', 'Exit 1 if any issue at or above this severity (SUGGESTION|WARNING|CRITICAL|HARSHLY_CRITICAL)')
+  .option('--scope <paths>', 'Only review changes in these paths (comma-separated, e.g. "packages/web,packages/core")')
   .action(async (diffPath: string | undefined, options: {
     dryRun?: boolean;
     output: string;
@@ -115,6 +116,7 @@ program
     cache: boolean;
     failOnReject?: boolean;
     failOnSeverity?: string;
+    scope?: string;
   }) => {
     // Hoist stdinTmpPath so finally block can clean it up (#77)
     let stdinTmpPath: string | undefined;
@@ -294,6 +296,28 @@ program
       }
 
       // Build pipeline options from CLI flags
+      // --scope: filter diff to only include changes in specified paths
+      if (options.scope) {
+        const scopes = options.scope.split(',').map((s) => s.trim());
+        const diffContent = await fs.readFile(resolvedPath, 'utf-8');
+        const filteredLines: string[] = [];
+        let include = false;
+        for (const line of diffContent.split('\n')) {
+          if (line.startsWith('diff --git')) {
+            include = scopes.some((scope) => line.includes(`b/${scope}`));
+          }
+          if (include) filteredLines.push(line);
+        }
+        if (filteredLines.length === 0) {
+          console.error(dim(`No changes found in scope: ${options.scope}`));
+          return;
+        }
+        await fs.writeFile(resolvedPath, filteredLines.join('\n'), 'utf-8');
+        if (!options.quiet) {
+          console.error(dim(`Scoped to: ${options.scope}`));
+        }
+      }
+
       const pipelineOptions = {
         diffPath: resolvedPath,
         ...(options.provider && { providerOverride: options.provider }),
@@ -1185,6 +1209,56 @@ program
     console.log(`${bold}\x1b[33m  ██║ ╚═╝ ██║██║  ██║██████╔╝███████╗    ██████╔╝   ██║   ╚█████╔╝╚██████╔╝███████║   ██║   ██║ ╚████║${reset}`);
     console.log(`${bold}\x1b[33m  ╚═╝     ╚═╝╚═╝  ╚═╝╚═════╝ ╚══════╝    ╚═════╝    ╚═╝    ╚════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═══╝${reset}`);
     console.log('');
+  });
+
+// Persona management
+const personaCmd = program.command('persona').description('Manage reviewer personas');
+
+personaCmd
+  .command('list')
+  .description('List all available personas (built-in + custom)')
+  .action(async () => {
+    const { listPersonas } = await import('./commands/persona.js');
+    console.log(await listPersonas(process.cwd()));
+  });
+
+personaCmd
+  .command('show <name>')
+  .description('Show persona prompt text')
+  .action(async (name: string) => {
+    const { showPersona } = await import('./commands/persona.js');
+    console.log(await showPersona(name));
+  });
+
+personaCmd
+  .command('create <name>')
+  .description('Create a custom persona template')
+  .action(async (name: string) => {
+    const { createPersona } = await import('./commands/persona.js');
+    console.log(await createPersona(name, process.cwd()));
+  });
+
+// Version check command
+program
+  .command('check-update')
+  .description('Check for newer version on npm')
+  .action(async () => {
+    const current = process.env.CODEAGORA_VERSION ?? 'dev';
+    console.log(`Current: v${current}`);
+    try {
+      const res = await fetch('https://registry.npmjs.org/codeagora/latest');
+      if (res.ok) {
+        const data = await res.json() as { version: string };
+        if (data.version !== current) {
+          console.log(`Latest:  v${data.version}`);
+          console.log(`\nUpdate:  npm i -g codeagora@latest`);
+        } else {
+          console.log('Already up to date.');
+        }
+      }
+    } catch {
+      console.log('Could not check npm registry.');
+    }
   });
 
 if (process.env.NODE_ENV !== 'test') {

@@ -10,6 +10,7 @@ import { severityColor, decisionColor, dim, bold } from '../utils/colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { formatAnnotated } from './annotated-output.js';
 import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
+import { lookupCwe } from '@codeagora/shared/data/cwe-mapping.js';
 
 export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'annotated' | 'html' | 'junit';
 
@@ -78,7 +79,9 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
     const loc = `${doc.filePath}:${lineLabel}`;
 
     lines.push(`    ${fn(`${doc.severity}${confStr}`)}   ${dim(loc)}`);
-    lines.push(`    ${bold(doc.issueTitle)}`);
+    const cwe = lookupCwe(doc.issueTitle);
+    const cweStr = cwe ? dim(` [CWE-${cwe.id}]`) : '';
+    lines.push(`    ${bold(doc.issueTitle)}${cweStr}`);
 
     if (verbose) {
       lines.push(`    \u2506 ${doc.problem}`);
