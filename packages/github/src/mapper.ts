@@ -9,6 +9,7 @@ import type { GitHubReview, GitHubReviewComment, DiffPositionIndex } from './typ
 import { resolveLineRange } from './diff-parser.js';
 import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
+import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
 
 // ============================================================================
 // Constants
@@ -25,32 +26,9 @@ const MARKER = '<!-- codeagora-v3 -->';
  */
 export function buildTriageDigest(docs: EvidenceDocument[]): string | null {
   if (docs.length === 0) return null;
-
-  let mustFix = 0;
-  let verify = 0;
-  let ignore = 0;
-
-  for (const doc of docs) {
-    const conf = doc.confidence ?? 50;
-    const isCritical = doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
-    const isWarning = doc.severity === 'WARNING';
-
-    if (isCritical && conf > 50) {
-      mustFix++;
-    } else if ((isCritical && conf <= 50) || (isWarning && conf > 50)) {
-      verify++;
-    } else {
-      ignore++;
-    }
-  }
-
-  const parts: string[] = [];
-  if (mustFix > 0) parts.push(`${mustFix} must-fix`);
-  if (verify > 0) parts.push(`${verify} verify`);
-  if (ignore > 0) parts.push(`${ignore} ignore`);
-
-  if (parts.length === 0) return null;
-  return `\u{1F4CB} **Triage:** ${parts.join(' \u00B7 ')}`;
+  const { counts } = triageDocs(docs);
+  const formatted = formatTriageCounts(counts);
+  return formatted === 'no issues' ? null : `\u{1F4CB} **Triage:** ${formatted}`;
 }
 
 /** GitHub enforces 65,535 char limit on review body; use 60K ceiling for safety. */

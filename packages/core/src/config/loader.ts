@@ -59,6 +59,23 @@ export async function loadConfig(): Promise<Config> {
   return loadConfigFrom(process.cwd());
 }
 
+/**
+ * Build a sensible default config for zero-config first run.
+ * Uses the given provider with 3 auto-selected reviewers.
+ */
+export function buildDefaultConfig(provider: string = 'groq'): Config {
+  return validateConfig({
+    mode: 'pragmatic',
+    reviewers: {
+      count: 3,
+      constraints: { minFamilies: 1 },
+    },
+    discussion: { maxRounds: 2 },
+    head: { provider, model: 'auto', backend: 'api', enabled: true },
+    errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
+  });
+}
+
 // ============================================================================
 // Internal helpers
 // ============================================================================

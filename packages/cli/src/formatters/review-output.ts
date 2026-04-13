@@ -9,6 +9,7 @@ import { SEVERITY_ORDER } from '@codeagora/core/types/core.js';
 import { severityColor, decisionColor, dim, bold } from '../utils/colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { formatAnnotated } from './annotated-output.js';
+import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
 
 export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'annotated' | 'html' | 'junit';
 
@@ -39,99 +40,106 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
 
   if (!result.summary) {
-    // Fallback: no summary available
     lines.push(t('review.complete'));
     lines.push(`  ${t('review.session', { date: result.date, sessionId: result.sessionId })}`);
-    lines.push(`  Output: .ca/sessions/${result.date}/${result.sessionId}/`);
     return lines.join('\n');
   }
 
   const s = result.summary;
+  const docs = result.evidenceDocs ?? [];
+  const triage = triageDocs(docs);
 
-  // Decision header
+  // ── Verdict Box ──────────────────────────────────────────
+  const decEmoji = s.decision === 'ACCEPT' ? '\u2705' : s.decision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
   const colorFn = decisionColor[s.decision] ?? bold;
-  lines.push(`${colorFn(s.decision)}  ${dim(s.reasoning)}`);
+  const triageStr = formatTriageCounts(triage.counts);
+  const reviewerStr = s.totalReviewers > 0
+    ? `${s.totalReviewers - s.forfeitedReviewers} reviewers`
+    : '';
+  const debateStr = s.totalDiscussions > 0 ? `${s.totalDiscussions} debates` : '';
+  const metaParts = [reviewerStr, debateStr].filter(Boolean).join(' \u00B7 ');
+
+  lines.push('');
+  lines.push(`  \u250C${ '\u2500'.repeat(47) }\u2510`);
+  lines.push(`  \u2502  ${colorFn(`${decEmoji} ${s.decision}`)}  \u00B7  ${triageStr}${ ' '.repeat(Math.max(0, 30 - triageStr.length)) }\u2502`);
+  if (metaParts) {
+    lines.push(`  \u2502  ${dim(metaParts)}${ ' '.repeat(Math.max(0, 45 - metaParts.length)) }\u2502`);
+  }
+  lines.push(`  \u2514${ '\u2500'.repeat(47) }\u2518`);
   lines.push('');
 
-  // Severity summary line
-  const severityParts = SEVERITY_ORDER
-    .filter((sev) => (s.severityCounts[sev] ?? 0) > 0)
-    .map((sev) => {
-      const fn = severityColor[sev] ?? ((x: string) => x);
-      return fn(`${sev}: ${s.severityCounts[sev]}`);
-    });
-  if (severityParts.length > 0) {
-    lines.push(severityParts.join('  '));
-    lines.push('');
-  }
+  // ── Issue rendering helper ──
+  const renderIssue = (doc: EvidenceDocument, verbose: boolean) => {
+    const fn = severityColor[doc.severity as keyof typeof severityColor] ?? ((x: string) => x);
+    const confStr = doc.confidence != null ? ` ${doc.confidence}%` : '';
+    const lineLabel = doc.lineRange[0] === doc.lineRange[1]
+      ? `${doc.lineRange[0]}`
+      : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
+    const loc = `${doc.filePath}:${lineLabel}`;
 
-  // Verbose mode: show all evidence documents with full detail
-  if (options?.verbose && result.evidenceDocs && result.evidenceDocs.length > 0) {
-    lines.push(bold('Detailed Issues:'));
-    for (const doc of result.evidenceDocs) {
-      const fn = severityColor[doc.severity as keyof typeof severityColor] ?? ((x: string) => x);
-      const confidenceBadge = doc.confidence != null ? ` (${doc.confidence}%)` : '';
-      const lineLabel = doc.lineRange[0] === doc.lineRange[1]
-        ? `${doc.lineRange[0]}`
-        : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
-      const header = fn(`[${doc.severity}]${confidenceBadge}`);
-      lines.push(`\u250C\u2500 ${header} ${doc.issueTitle} \u2014 ${dim(`${doc.filePath}:${lineLabel}`)}`);
-      lines.push(`\u2502  ${bold('Problem:')} ${doc.problem}`);
+    lines.push(`    ${fn(`${doc.severity}${confStr}`)}   ${dim(loc)}`);
+    lines.push(`    ${bold(doc.issueTitle)}`);
+
+    if (verbose) {
+      lines.push(`    \u2506 ${doc.problem}`);
       if (doc.evidence.length > 0) {
-        lines.push(`\u2502  ${bold('Evidence:')}`);
-        for (let i = 0; i < doc.evidence.length; i++) {
-          lines.push(`\u2502    ${i + 1}. ${doc.evidence[i]}`);
+        for (const ev of doc.evidence) {
+          lines.push(`    \u2506 ${dim(ev)}`);
         }
       }
-      lines.push(`\u2502  ${bold('Suggestion:')} ${doc.suggestion}`);
-      lines.push('\u2514\u2500');
-    }
-    lines.push('');
-  } else if (s.topIssues.length > 0) {
-    // Default: Top issues (up to 5) — with confidence badge if available
-    lines.push(bold('Top Issues:'));
-    for (const issue of s.topIssues.slice(0, 5)) {
-      const fn = severityColor[issue.severity as keyof typeof severityColor] ?? ((x: string) => x);
-      // Look up confidence from evidenceDocs by matching filePath + lineRange
-      const matchingDoc = result.evidenceDocs?.find(
-        (d) => d.filePath === issue.filePath &&
-               d.lineRange[0] === issue.lineRange[0] &&
-               d.issueTitle === issue.title
-      );
-      const confidenceBadge = matchingDoc?.confidence != null
-        ? ` (${matchingDoc.confidence}%)`
-        : '';
-      const sevLabel = `${issue.severity}${confidenceBadge}`;
-      const sev = fn(sevLabel.padEnd(16 + confidenceBadge.length));
-      const loc = dim(`${issue.filePath}:${issue.lineRange[0]}`);
-      lines.push(`  ${sev}  ${loc}  ${issue.title}`);
-    }
-    lines.push('');
-  }
-
-  // Discussion summary
-  if (s.totalDiscussions > 0) {
-    lines.push(
-      dim(
-        t('review.discussions', { total: s.totalDiscussions, resolved: s.resolved, escalated: s.escalated })
-      )
-    );
-  }
-
-  // Reviewer completion summary (Task 4)
-  if (s.totalReviewers > 0) {
-    const completed = s.totalReviewers - s.forfeitedReviewers;
-    if (s.forfeitedReviewers > 0) {
-      lines.push(
-        dim(`Reviewers: ${completed}/${s.totalReviewers} completed (${s.forfeitedReviewers} skipped)`)
-      );
+      lines.push(`    \u2506 Fix: ${doc.suggestion}`);
     } else {
-      lines.push(dim(`Reviewers: ${completed}/${s.totalReviewers} completed`));
+      // Show one-line problem summary
+      const shortProblem = doc.problem.length > 80 ? doc.problem.slice(0, 77) + '...' : doc.problem;
+      lines.push(`    \u2506 ${dim(shortProblem)}`);
+    }
+    lines.push('');
+  };
+
+  // ── Must Fix ──
+  if (triage.mustFix.length > 0) {
+    lines.push(`  \u2500\u2500 must-fix ${ '\u2500'.repeat(40) }`);
+    lines.push('');
+    for (const doc of triage.mustFix) {
+      renderIssue(doc, !!options?.verbose);
     }
   }
 
-  // Session reference
-  lines.push(dim(t('review.session', { date: result.date, sessionId: result.sessionId })));
+  // ── Verify ──
+  if (triage.verify.length > 0) {
+    lines.push(`  \u2500\u2500 verify ${ '\u2500'.repeat(42) }`);
+    lines.push('');
+    for (const doc of triage.verify) {
+      renderIssue(doc, !!options?.verbose);
+    }
+  }
+
+  // ── Suggestions (collapsed by default) ──
+  if (triage.ignore.length > 0) {
+    if (options?.verbose) {
+      lines.push(`  \u2500\u2500 suggestions ${ '\u2500'.repeat(37) }`);
+      lines.push('');
+      for (const doc of triage.ignore) {
+        renderIssue(doc, true);
+      }
+    } else {
+      lines.push(dim(`  \u2500\u2500 ${triage.ignore.length} suggestion(s) (--verbose to expand) \u2500\u2500`));
+      lines.push('');
+    }
+  }
+
+  // ── Zero issues celebration ──
+  if (docs.length === 0 && s.decision === 'ACCEPT') {
+    lines.push(`  ${bold('No issues found across all reviewers. Ship it!')} \uD83D\uDE80`);
+    lines.push('');
+  }
+
+  // ── Reasoning ──
+  lines.push(dim(`  ${s.reasoning}`));
+  lines.push('');
+
+  // ── Session footer ──
+  lines.push(dim(`  Session ${result.date}/${result.sessionId}`));
 
   return lines.join('\n');
 }

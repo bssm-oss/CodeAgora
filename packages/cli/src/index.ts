@@ -222,6 +222,32 @@ program
         process.exit(1);
       }
 
+      // Zero-config: if no config exists, try inline setup
+      try {
+        await loadConfig();
+      } catch {
+        const { detectAvailableProvider, runInlineSetup } = await import('./utils/inline-setup.js');
+        const existing = detectAvailableProvider();
+        if (existing) {
+          // API key exists but no config — create default config silently
+          const { buildDefaultConfig } = await import('@codeagora/core/config/loader.js');
+          const config = buildDefaultConfig(existing.name);
+          const caDir = path.join(process.cwd(), '.ca');
+          await fs.mkdir(caDir, { recursive: true });
+          await fs.writeFile(path.join(caDir, 'config.json'), JSON.stringify(config, null, 2));
+          if (!options.quiet) {
+            console.error(`  \u2713 Auto-configured with ${existing.name} (${existing.envVar} detected)`);
+          }
+        } else {
+          // No config, no keys — run inline setup
+          if (!process.stdin.isTTY) {
+            console.error('No config and no API keys found. Run `agora init` to set up.');
+            process.exit(1);
+          }
+          await runInlineSetup(process.cwd());
+        }
+      }
+
       if (options.dryRun) {
         console.log('Validating config...');
         const config = await loadConfig();
