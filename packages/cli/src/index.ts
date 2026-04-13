@@ -374,7 +374,7 @@ program
       }
 
       if (result.cached && !options.quiet) {
-        console.error(t('cli.error.cacheHit'));
+        console.error(t('cli.info.cacheHit'));
       }
 
       // Build format options: verbose flag + annotated-specific options

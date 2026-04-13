@@ -278,6 +278,22 @@ export type Config = z.infer<typeof ConfigSchema>;
 // Config Loader
 // ============================================================================
 
+/** Default values for optional config sections */
+const CONFIG_DEFAULTS = {
+  supporters: { pool: [] },
+  moderator: { model: 'auto', backend: 'api' as const, provider: 'groq' },
+  discussion: { maxRounds: 3, registrationThreshold: { CRITICAL: 1, WARNING: 2 } },
+  errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
+  autoApprove: { enabled: false },
+  prompts: {},
+  reviewContext: {},
+};
+
 export function validateConfig(configJson: unknown): Config {
-  return ConfigSchema.parse(configJson);
+  // Apply defaults for missing sections so minimal configs work
+  const withDefaults = {
+    ...CONFIG_DEFAULTS,
+    ...(configJson as Record<string, unknown>),
+  };
+  return ConfigSchema.parse(withDefaults);
 }

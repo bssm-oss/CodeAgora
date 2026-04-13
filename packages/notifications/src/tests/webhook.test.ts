@@ -113,14 +113,16 @@ describe('sendDiscordNotification', () => {
     expect(body.embeds[0].description).toContain('Specific reasoning about the review.');
   });
 
-  it('embed fields include Decision, Session, and Severity Counts', async () => {
+  it('embed fields include Triage, Debates, and Issues', async () => {
     await sendDiscordNotification(DISCORD_URL, makePayload());
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    const fieldNames = body.embeds[0].fields.map((f: { name: string }) => f.name);
-    expect(fieldNames).toContain('Decision');
-    expect(fieldNames).toContain('Session');
-    expect(fieldNames).toContain('Severity Counts');
+    const embed = body.embeds[0];
+    const fieldNames = embed.fields.map((f: { name: string }) => f.name);
+    expect(fieldNames).toContain('Triage');
+    expect(fieldNames).toContain('Debates');
+    expect(fieldNames).toContain('Issues');
+    expect(embed.footer.text).toContain('Session');
   });
 
   it('retries with exponential backoff on non-ok response without throwing', async () => {
@@ -165,20 +167,20 @@ describe('sendDiscordNotification', () => {
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
     const topIssuesField = body.embeds[0].fields.find(
-      (f: { name: string }) => f.name === 'Top Issues',
+      (f: { name: string }) => f.name === 'Issues',
     );
     expect(topIssuesField).toBeDefined();
     expect(topIssuesField.value).toContain('SQL Injection');
   });
 
-  it('shows "None" in Top Issues when topIssues is empty', async () => {
+  it('shows celebration message when topIssues is empty', async () => {
     await sendDiscordNotification(DISCORD_URL, makePayload({ topIssues: [] }));
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    const topIssuesField = body.embeds[0].fields.find(
-      (f: { name: string }) => f.name === 'Top Issues',
+    const issuesField = body.embeds[0].fields.find(
+      (f: { name: string }) => f.name === 'Issues',
     );
-    expect(topIssuesField.value).toBe('None');
+    expect(issuesField.value).toContain('Clean code');
   });
 });
 

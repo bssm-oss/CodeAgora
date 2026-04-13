@@ -143,33 +143,42 @@ async function postWebhook(url: string, body: unknown): Promise<void> {
 
 function buildDiscordEmbed(payload: NotificationPayload): object {
   const color = DECISION_COLORS[payload.decision] ?? 0x888888;
+  const emoji = payload.decision === 'ACCEPT' ? '\u2705' : payload.decision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
 
-  // Severity summary field
-  const severityLines = SEVERITY_ORDER
-    .filter((s) => (payload.severityCounts[s] ?? 0) > 0)
-    .map((s) => `${s}: ${payload.severityCounts[s]}`);
-  const severityValue = severityLines.length > 0 ? severityLines.join('\n') : 'None';
+  // Triage-based issue summary
+  let mustFix = 0;
+  let verify = 0;
+  let ignore = 0;
+  for (const issue of payload.topIssues) {
+    const isCritical = issue.severity === 'CRITICAL' || issue.severity === 'HARSHLY_CRITICAL';
+    if (isCritical) mustFix++;
+    else if (issue.severity === 'WARNING') verify++;
+    else ignore++;
+  }
+  const triageParts: string[] = [];
+  if (mustFix > 0) triageParts.push(`${mustFix} must-fix`);
+  if (verify > 0) triageParts.push(`${verify} verify`);
+  if (ignore > 0) triageParts.push(`${ignore} ignore`);
+  const triageStr = triageParts.join(' \u00B7 ') || 'no issues';
 
-  // Top issues field (max 5)
+  // Top issues with triage labels
   const issueLines = payload.topIssues.slice(0, 5).map(
-    (i) => `[${i.severity}] ${i.filePath} — ${i.title}`
+    (i) => `${i.severity === 'CRITICAL' || i.severity === 'HARSHLY_CRITICAL' ? '\uD83D\uDD34' : '\uD83D\uDFE1'} ${i.filePath} \u2014 ${i.title}`
   );
   const issuesValue = issueLines.length > 0
     ? truncate(issueLines.join('\n'), 1024)
-    : 'None';
+    : 'Clean code! \uD83D\uDE80';
 
   const fields = [
-    { name: 'Decision', value: payload.decision, inline: true },
-    { name: 'Session', value: `${payload.date}/${payload.sessionId}`, inline: true },
-    { name: 'Discussions', value: `${payload.totalDiscussions} total, ${payload.resolved} resolved, ${payload.escalated} escalated`, inline: false },
-    { name: 'Severity Counts', value: severityValue, inline: true },
-    { name: 'Top Issues', value: issuesValue, inline: false },
+    { name: 'Triage', value: triageStr, inline: true },
+    { name: 'Debates', value: `${payload.totalDiscussions} total \u00B7 ${payload.resolved} resolved`, inline: true },
+    { name: 'Issues', value: issuesValue, inline: false },
   ];
 
   return {
     embeds: [
       {
-        title: 'CodeAgora Review Result',
+        title: `${emoji} ${payload.decision}`,
         description: truncate(payload.reasoning, 4096),
         color,
         fields,
