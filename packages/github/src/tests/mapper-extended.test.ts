@@ -164,7 +164,7 @@ describe('buildSummaryBody() — counts vs docs discrepancy', () => {
   });
 
   it('shows warning count mismatch: summary has 2 warnings but only 1 doc', () => {
-    const docs = [makeDoc({ severity: 'WARNING', issueTitle: 'Only Warning' })];
+    const docs = [makeDoc({ severity: 'WARNING', issueTitle: 'Only Warning', confidence: 60 })];
     const summary = makeSummary({ severityCounts: { WARNING: 2 } });
     const body = buildSummaryBody({
       summary,
