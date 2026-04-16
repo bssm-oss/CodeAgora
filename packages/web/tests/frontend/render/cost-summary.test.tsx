@@ -46,14 +46,9 @@ describe('CostSummary', () => {
     expect(screen.getByText('2 sessions')).toBeInTheDocument();
   });
 
-  it('handles empty data with zero costs', () => {
+  it('handles empty data with friendly message', () => {
     render(<CostSummary sessions={[]} />);
-    expect(screen.getByText('Total Spend')).toBeInTheDocument();
-    // Both Total and Avg show $0.0000 when empty
-    expect(screen.getAllByText('$0.0000')).toHaveLength(2);
-    expect(screen.getByText('0 sessions')).toBeInTheDocument();
-    // Most expensive session and top reviewer show '--' when empty
-    expect(screen.getAllByText('--')).toHaveLength(2);
+    expect(screen.getByText('No cost data yet. Costs are tracked after reviews with paid models.')).toBeInTheDocument();
   });
 
   it('shows most expensive session identifier', () => {

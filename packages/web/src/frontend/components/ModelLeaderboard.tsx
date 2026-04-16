@@ -75,7 +75,7 @@ export function ModelLeaderboard({ arms }: ModelLeaderboardProps): React.JSX.Ele
     return (
       <div className="model-leaderboard">
         <h3 className="model-leaderboard__title">Model Leaderboard</h3>
-        <p className="model-leaderboard__empty">No model data available</p>
+        <p className="model-leaderboard__empty">No models reviewed yet. Run a code review to see model performance.</p>
       </div>
     );
   }

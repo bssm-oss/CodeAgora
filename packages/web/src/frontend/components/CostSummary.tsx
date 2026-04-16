@@ -17,6 +17,14 @@ interface CostSummaryProps {
 }
 
 export function CostSummary({ sessions }: CostSummaryProps): React.JSX.Element {
+  if (sessions.length === 0) {
+    return (
+      <div className="cost-summary-grid">
+        <p className="cost-summary__empty">No cost data yet. Costs are tracked after reviews with paid models.</p>
+      </div>
+    );
+  }
+
   const total = computeTotalCost(sessions);
   const average = computeAverageCost(sessions);
   const mostExpensive = findMostExpensive(sessions);

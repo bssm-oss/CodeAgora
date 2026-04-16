@@ -30,6 +30,7 @@ export function ReviewTrigger({ onStarted }: ReviewTriggerProps): React.JSX.Elem
   const [model, setModel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const canSubmit =
     !submitting &&
@@ -44,6 +45,7 @@ export function ReviewTrigger({ onStarted }: ReviewTriggerProps): React.JSX.Elem
 
       setSubmitting(true);
       setError(null);
+      setSuccess(null);
 
       const body: Record<string, unknown> = {
         mode: reviewMode,
@@ -69,6 +71,13 @@ export function ReviewTrigger({ onStarted }: ReviewTriggerProps): React.JSX.Elem
           return;
         }
 
+        // Reset form and show success
+        setDiff('');
+        setPrUrl('');
+        setProvider('');
+        setModel('');
+        setSuccess('Review started! Check Pipeline or Sessions page for results.');
+        setTimeout(() => setSuccess(null), 5000);
         onStarted();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Network error.');
@@ -183,6 +192,13 @@ export function ReviewTrigger({ onStarted }: ReviewTriggerProps): React.JSX.Elem
           </div>
         )}
       </div>
+
+      {/* Success message */}
+      {success && (
+        <div className="review-trigger__success" role="status">
+          {success}
+        </div>
+      )}
 
       {/* Error message */}
       {error && (

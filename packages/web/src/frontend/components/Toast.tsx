@@ -1,6 +1,6 @@
 /**
  * Toast — Notification component for success/error messages.
- * Auto-dismisses after 3 seconds. Fixed position bottom-right with slide-in animation.
+ * Auto-dismisses after 5 seconds. Fixed position bottom-right with slide-in animation.
  */
 
 import React, { useEffect } from 'react';
@@ -15,7 +15,7 @@ interface ToastProps {
 
 export function Toast({ message, type, onDismiss }: ToastProps): React.JSX.Element {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 3000);
+    const timer = setTimeout(onDismiss, 5000);
     return () => clearTimeout(timer);
   }, [onDismiss]);
 

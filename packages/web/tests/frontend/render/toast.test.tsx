@@ -42,12 +42,12 @@ describe('Toast', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  it('calls onDismiss after 3 seconds', () => {
+  it('calls onDismiss after 5 seconds', () => {
     const onDismiss = vi.fn();
     render(<Toast message="Auto dismiss" type="success" onDismiss={onDismiss} />);
 
     expect(onDismiss).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(3000);
+    vi.advanceTimersByTime(5000);
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 

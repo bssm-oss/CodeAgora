@@ -42,8 +42,7 @@ export function Pipeline(): React.JSX.Element {
             <div className="pipeline-idle__icon">&#9881;</div>
             <h3 className="pipeline-idle__title">No active pipeline</h3>
             <p className="pipeline-idle__description">
-              Start a code review by submitting a diff, PR URL, or staged changes below.
-              The pipeline will run through initialization, parallel review, discussion, and verdict stages.
+              No active review. Start one below to see live progress.
             </p>
           </div>
           <ReviewTrigger onStarted={() => { /* WebSocket events will drive the pipeline UI */ }} />

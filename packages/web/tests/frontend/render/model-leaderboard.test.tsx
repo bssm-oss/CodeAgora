@@ -45,7 +45,7 @@ describe('ModelLeaderboard', () => {
 
   it('handles empty arms gracefully', () => {
     render(<ModelLeaderboard arms={[]} />);
-    expect(screen.getByText('No model data available')).toBeInTheDocument();
+    expect(screen.getByText('No models reviewed yet. Run a code review to see model performance.')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
