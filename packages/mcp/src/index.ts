@@ -18,7 +18,7 @@ import { registerConfigSet } from './tools/config-set.js';
 
 const server = new McpServer({
   name: 'codeagora',
-  version: '2.3.2',
+  version: '2.3.3',
 });
 
 // Register all tools

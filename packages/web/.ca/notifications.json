@@ -1,5 +1,35 @@
 [
   {
+    "id": "025430ff-0e0f-46da-9d54-88f6b95ef64d",
+    "type": "review_complete",
+    "sessionId": "2026-04-16/008",
+    "verdict": "ACCEPT",
+    "message": "Review completed: ACCEPT",
+    "urgent": false,
+    "read": false,
+    "createdAt": "2026-04-16T14:06:05.252Z"
+  },
+  {
+    "id": "f23fc8af-e46b-4ae0-b8bc-9ec216c9005e",
+    "type": "review_complete",
+    "sessionId": "2026-04-16/004",
+    "verdict": "ACCEPT",
+    "message": "Review completed: ACCEPT",
+    "urgent": false,
+    "read": false,
+    "createdAt": "2026-04-16T07:35:47.749Z"
+  },
+  {
+    "id": "34c0bcf0-e094-4de8-8140-67c6069404f1",
+    "type": "review_complete",
+    "sessionId": "2026-04-16/002",
+    "verdict": "ACCEPT",
+    "message": "Review completed: ACCEPT",
+    "urgent": false,
+    "read": false,
+    "createdAt": "2026-04-16T06:44:03.140Z"
+  },
+  {
     "id": "notif-001",
     "type": "verdict_reject",
     "sessionId": "2026-03-23/001",
