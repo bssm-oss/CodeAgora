@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.3.3 (2026-04-16)
+
+### Web UX
+- Pipeline 페이지 WS 없이도 ReviewTrigger 폼 표시
+- ReviewTrigger 제출 후 폼 리셋 + 성공 메시지
+- Models/Costs empty state 친절한 안내 메시지
+- Toast auto-dismiss 3초 → 5초
+- Pipeline idle 메시지 간결화
+
+## 2.3.2 (2026-04-16)
+
+### Fallback/Retry 강화
+- **Error Classifier** — 에러를 rate-limited/auth/transient/permanent로 분류
+- **AI SDK maxRetries: 0** — 이중 재시도 제거 (앱 레벨 완전 제어)
+- **429 retry-after 인식** — 헤더 파싱, 적절한 대기 후 재시도
+- **429는 circuit breaker 미기록** — rate limit ≠ 모델 고장
+- **Fallback chain health check** — 죽은 모델 자동 skip
+- **L2 supporter 1회 재시도** — transient/rate-limited만
+- **L3 head verdict 1회 재시도** — 실패 시 rule-based fallback
+- 리뷰어 응답률 2/5 → 5/5 (무료 모델 기준), 속도 196초 → 83초
+
+## 2.3.1 (2026-04-16)
+
+### Bug Fixes
+- SARIF 출력 포맷 지원 추가 (`--output sarif`)
+- 빈 stdin 입력 시 exit 1 반환
+- agreement 커맨드 result.json 없을 때 reviews/ fallback
+- CI typecheck 에러 수정 (DiscussionVerdict, MockInstance, Dirent)
+- Node 20 AbortSignal 호환성 수정
+
+### Refactoring (10 PRs merged)
+- CLI index.ts 1,302줄 → 292줄 (8개 모듈 추출)
+- Core orchestrator 1,092줄 → 550줄 (4개 모듈 추출)
+- Core moderator 888줄 → 774줄 (supporter-selector 분리)
+- GitHub mapper 597줄 → 186줄 (formatter 분리)
+- Notifications 중복 코드 제거 (constants, utils 추출)
+- MCP 미사용 export 제거
+- CI 워크플로우 안정성 개선 (4건)
+
+### Tests
+- TUI: 0 → 37개
+- CLI review: 64개
+- Web API 통합: 46개
+- Error classifier: 27개
+- 총 4,800+ tests
+
 ## 2.3.0 (2026-04-13)
 
 ### Web Dashboard — Production Hardening

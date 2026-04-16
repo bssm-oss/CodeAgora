@@ -1,6 +1,0 @@
-{
-  "decision": "ACCEPT",
-  "reasoning": "Only SUGGESTION-level findings identified (documentation, optional chaining style). No security, logic, or correctness issues. Safe to merge.",
-  "codeChanges": [],
-  "questionsForHuman": []
-}

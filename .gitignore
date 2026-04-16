@@ -5,6 +5,7 @@ node_modules/
 # Build outputs (allow dist/action.js for GitHub Action)
 dist/*
 !dist/action.js
+packages/*/dist/
 *.tsbuildinfo
 
 # Environment & Secrets
@@ -46,6 +47,10 @@ yarn-error.log*
 reviews/
 .cache/
 .review-cache/
+
+# CodeAgora session data & config (local)
+.ca/
+packages/web/.ca/
 
 # Storage
 .storage/
