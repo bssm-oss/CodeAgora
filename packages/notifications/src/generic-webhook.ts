@@ -4,6 +4,7 @@
  */
 
 import { createHmac } from 'crypto';
+import { fetchWithRetry } from './utils.js';
 
 export interface GenericWebhookConfig {
   url: string;
@@ -82,39 +83,14 @@ export async function sendGenericWebhook(
     .update(body)
     .digest('hex');
 
-  const maxAttempts = 3;
-  const backoffBaseMs = 1000;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    if (i > 0) {
-      await new Promise<void>((resolve) => setTimeout(resolve, backoffBaseMs * Math.pow(2, i - 1)));
-    }
-    try {
-      const res = await fetch(config.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CodeAgora-Event': event,
-          'X-CodeAgora-Signature': `sha256=${signature}`,
-        },
-        body,
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok) return;
-      // Don't retry client errors (4xx) — they will never succeed
-      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
-        process.stderr.write(`[codeagora] Generic webhook returned ${res.status}, not retrying\n`);
-        return;
-      }
-      if (i === maxAttempts - 1) {
-        process.stderr.write(`[codeagora] Generic webhook returned ${res.status}\n`);
-      }
-    } catch (err) {
-      if (i === maxAttempts - 1) {
-        process.stderr.write(
-          `[codeagora] Generic webhook failed: ${err instanceof Error ? err.message : String(err)}\n`,
-        );
-      }
-    }
-  }
+  await fetchWithRetry(
+    config.url,
+    body,
+    {
+      'Content-Type': 'application/json',
+      'X-CodeAgora-Event': event,
+      'X-CodeAgora-Signature': `sha256=${signature}`,
+    },
+    { timeoutMs: 10000, logLabel: 'Generic webhook' },
+  );
 }
