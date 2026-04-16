@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/notifications",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "CodeAgora notification webhooks — Discord and Slack integration",
   "type": "module",
   "license": "MIT",

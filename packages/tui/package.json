@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/tui",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "CodeAgora interactive terminal UI — ink-based review interface",
   "type": "module",
   "license": "MIT",
