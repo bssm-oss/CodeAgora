@@ -3,6 +3,9 @@
  * Fire-and-forget: errors are logged, not thrown.
  */
 
+import { DECISION_COLORS, SEVERITY_ORDER } from './constants.js';
+import { truncate, fetchWithRetry } from './utils.js';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -50,25 +53,12 @@ export interface NotificationPayload {
 // Helpers
 // ============================================================================
 
-const DECISION_COLORS: Record<string, number> = {
-  ACCEPT: 0x00ff00,
-  REJECT: 0xff0000,
-  NEEDS_HUMAN: 0xffff00,
-};
-
 const SEVERITY_EMOJI: Record<string, string> = {
   HARSHLY_CRITICAL: ':red_circle:',
   CRITICAL: ':orange_circle:',
   WARNING: ':yellow_circle:',
   SUGGESTION: ':blue_circle:',
 };
-
-const SEVERITY_ORDER = ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'];
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max - 3) + '...';
-}
 
 const ALLOWED_WEBHOOK_HOSTS = new Set([
   'discord.com',
@@ -96,45 +86,15 @@ export function validateWebhookUrl(url: string): void {
   }
 }
 
-/** Base delay in ms for exponential backoff between retry attempts. */
-const BACKOFF_BASE_MS = 1000;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function postWebhook(url: string, body: unknown): Promise<void> {
   validateWebhookUrl(url);
-  const maxAttempts = 3;
-  for (let i = 0; i < maxAttempts; i++) {
-    if (i > 0) {
-      await delay(BACKOFF_BASE_MS * Math.pow(2, i - 1)); // 1s, 2s
-    }
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.ok) return;
-      // Don't retry client errors (4xx) — they will never succeed
-      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
-        const redacted = (() => { try { return new URL(url).hostname; } catch { return '[invalid-url]'; } })();
-        process.stderr.write(`[codeagora] webhook returned ${res.status} (${redacted}), not retrying\n`);
-        return;
-      }
-      if (i === maxAttempts - 1) {
-        const redacted = (() => { try { return new URL(url).hostname; } catch { return '[invalid-url]'; } })();
-        process.stderr.write(`[codeagora] webhook returned ${res.status} (${redacted})\n`);
-      }
-    } catch (err) {
-      if (i === maxAttempts - 1) {
-        const redacted = (() => { try { return new URL(url).hostname; } catch { return '[invalid-url]'; } })();
-        process.stderr.write(`[codeagora] webhook failed (${redacted}): ${err instanceof Error ? err.message : String(err)}\n`);
-      }
-    }
-  }
+  const redacted = (() => { try { return new URL(url).hostname; } catch { return '[invalid-url]'; } })();
+  await fetchWithRetry(
+    url,
+    JSON.stringify(body),
+    { 'Content-Type': 'application/json' },
+    { logLabel: `webhook (${redacted})` },
+  );
 }
 
 // ============================================================================

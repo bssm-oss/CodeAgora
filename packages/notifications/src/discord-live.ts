@@ -7,6 +7,8 @@
 import type { DiscussionEvent } from '@codeagora/core/l2/event-emitter.js';
 import type { NotificationPayload } from './webhook.js';
 import { validateWebhookUrl } from './webhook.js';
+import { DECISION_COLORS, SEVERITY_ORDER } from './constants.js';
+import { truncate } from './utils.js';
 
 // ============================================================================
 // Types
@@ -20,11 +22,6 @@ export interface DiscordLiveConfig {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max - 3) + '...';
-}
 
 const STANCE_EMOJI: Record<string, string> = {
   agree: '\u2705',
@@ -149,14 +146,6 @@ export function createDiscordLiveHandler(config: DiscordLiveConfig) {
 // ============================================================================
 // Pipeline Summary (2.3)
 // ============================================================================
-
-const DECISION_COLORS: Record<string, number> = {
-  ACCEPT: 0x00ff00,
-  REJECT: 0xff0000,
-  NEEDS_HUMAN: 0xffff00,
-};
-
-const SEVERITY_ORDER = ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'];
 
 /**
  * Post a final pipeline summary to Discord (2.3).
