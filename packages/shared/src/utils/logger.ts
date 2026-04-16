@@ -1,5 +1,7 @@
 /**
  * Logging System for V3
+ *
+ * Provides session-scoped logging with markdown output support.
  */
 
 import { appendMarkdown, getLogsDir } from './fs.js';
