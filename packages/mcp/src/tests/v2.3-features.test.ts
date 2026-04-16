@@ -53,15 +53,6 @@ describe('v2.3.0 helpers exports', () => {
     expect(typeof mod.getStagedDiff).toBe('function');
   });
 
-  it('still exports backward-compatible runQuickReview', async () => {
-    const mod = await import('../helpers.js');
-    expect(typeof mod.runQuickReview).toBe('function');
-  });
-
-  it('still exports backward-compatible runFullReview', async () => {
-    const mod = await import('../helpers.js');
-    expect(typeof mod.runFullReview).toBe('function');
-  });
 });
 
 // ============================================================================

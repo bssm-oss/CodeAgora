@@ -54,14 +54,14 @@ describe('MCP tool module exports', () => {
 // ---------------------------------------------------------------------------
 
 describe('MCP helpers module exports', () => {
-  it('exports runQuickReview as a function', async () => {
+  it('exports runReviewCompact as a function', async () => {
     const mod = await import('@codeagora/mcp/helpers.js');
-    expect(typeof mod.runQuickReview).toBe('function');
+    expect(typeof mod.runReviewCompact).toBe('function');
   });
 
-  it('exports runFullReview as a function', async () => {
+  it('exports runReviewRaw as a function', async () => {
     const mod = await import('@codeagora/mcp/helpers.js');
-    expect(typeof mod.runFullReview).toBe('function');
+    expect(typeof mod.runReviewRaw).toBe('function');
   });
 });
 

@@ -144,24 +144,3 @@ export async function runReviewCompact(
   });
 }
 
-// ============================================================================
-// Backward-compatible wrappers
-// ============================================================================
-
-/**
- * Quick review: L1 only, no debate, no head verdict.
- */
-export async function runQuickReview(diff: string, reviewerCount: number = 3): Promise<CompactReviewResult> {
-  return runReviewCompact(diff, {
-    skipDiscussion: true,
-    skipHead: true,
-    reviewerCount,
-  });
-}
-
-/**
- * Full review: L0→L1→L2→L3 pipeline.
- */
-export async function runFullReview(diff: string): Promise<CompactReviewResult> {
-  return runReviewCompact(diff, {});
-}

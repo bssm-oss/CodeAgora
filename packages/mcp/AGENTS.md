@@ -11,7 +11,7 @@ MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code revi
 | File | Description |
 |------|-------------|
 | `src/index.ts` | MCP server setup — creates McpServer, registers all 7 tools, starts stdio transport |
-| `src/helpers.ts` | Shared logic: `runReviewWithDiff()`, `runQuickReview()`, `runFullReview()` — core review orchestration |
+| `src/helpers.ts` | Shared logic: `runReviewCompact()`, `runReviewRaw()`, `getStagedDiff()` — core review orchestration |
 | `src/tools/review-quick.ts` | `review_quick` tool — L1-only (parallel reviewers), no debate, no head verdict |
 | `src/tools/review-full.ts` | `review_full` tool — Full L0→L1→L2→L3 pipeline with debate and consensus |
 | `src/tools/review-pr.ts` | `review_pr` tool — PR-specific review with GitHub integration (issues, comments) |
