@@ -184,7 +184,7 @@ describe('executeReviewers — timeout policy', () => {
     const promise = executeReviewers([input], 0, 5, freshOptions());
 
     // Signal should not be aborted yet
-    expect(capturedSignal?.aborted).toBe(false);
+    expect(capturedSignal?.aborted).toBeFalsy();
 
     // Advance past the timeout
     await vi.advanceTimersByTimeAsync(5001);
