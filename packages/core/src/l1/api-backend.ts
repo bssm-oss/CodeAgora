@@ -33,6 +33,7 @@ export async function executeViaAISDK(input: BackendInput): Promise<string> {
       : { prompt }),
     abortSignal,
     ...(temperature !== undefined && { temperature }),
+    maxRetries: 0, // Disable AI SDK internal retries — app-level retry in reviewer.ts
   });
 
   return text;

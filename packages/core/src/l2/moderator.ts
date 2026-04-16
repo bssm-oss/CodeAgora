@@ -6,6 +6,8 @@
 import type { Discussion, DiscussionRound, DiscussionVerdict, ModeratorReport } from '../types/core.js';
 import type { ModeratorConfig, DiscussionSettings, SupporterPoolConfig } from '../types/config.js';
 import { executeBackend } from '../l1/backend.js';
+import { retryOnError } from '@codeagora/shared/utils/recovery.js';
+import { classifyError } from '../l1/error-classifier.js';
 import { writeDiscussionRound, writeDiscussionVerdict, writeSupportersLog } from './writer.js';
 import { checkForObjections, handleObjections } from './objection.js';
 import { selectSupporters, loadPersona } from './supporter-selector.js';
@@ -360,14 +362,21 @@ If NEUTRAL:
     ? `${personaContent}\n\n---\n\n${basePrompt}`
     : basePrompt;
 
-  const response = await executeBackend({
-    backend: supporter.backend,
-    model: supporter.model,
-    provider: supporter.provider,
-    prompt,
-    timeout: supporter.timeout,
-    temperature: supporter.temperature,
-  });
+  const response = await retryOnError(
+    () => executeBackend({
+      backend: supporter.backend,
+      model: supporter.model,
+      provider: supporter.provider,
+      prompt,
+      timeout: supporter.timeout,
+      temperature: supporter.temperature,
+    }),
+    (err) => {
+      const cls = classifyError(err);
+      return cls.kind === 'rate-limited' || cls.kind === 'transient';
+    },
+    { maxRetries: 1, baseDelay: 2000, maxDelay: 10000, backoffFactor: 2 },
+  );
 
   const stance = parseStance(response);
 

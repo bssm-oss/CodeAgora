@@ -11,6 +11,7 @@ import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '@codeagora/shared/utils/diff.js';
 import { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 import { HealthMonitor } from '../l0/health-monitor.js';
+import { classifyError } from './error-classifier.js';
 
 /** Log when parser returns 0 issues on a non-empty response — likely unparseable output */
 function logParseFailure(model: string, reviewerId: string, responseLength: number, isFallback: boolean): void {
@@ -248,11 +249,10 @@ async function executeReviewerWithGuards(
         };
       }
       lastError = error instanceof Error ? error : new Error(String(error));
+      const classification = classifyError(error);
 
-      // Auth errors (401/403) are permanent — forfeit immediately without
-      // recording to circuit breaker to avoid blocking the model (#270)
-      const errMsg = lastError.message;
-      if (/\b(401|403)\b/.test(errMsg) || /\b(Unauthorized|Forbidden)\b/i.test(errMsg)) {
+      // Auth errors — forfeit immediately without CB recording (#270)
+      if (classification.kind === 'auth') {
         return {
           reviewerId: config.id,
           model: config.model,
@@ -260,14 +260,27 @@ async function executeReviewerWithGuards(
           evidenceDocs: [],
           rawResponse: '',
           status: 'forfeit',
-          error: `Auth error (permanent): ${errMsg}`,
+          error: `Auth error (permanent): ${lastError.message}`,
         };
       }
 
-      if (useGuards) cb.recordFailure(provider!, config.model);
+      // Permanent errors (4xx except 429/401/403) — skip remaining retries
+      if (classification.kind === 'permanent') {
+        break;
+      }
+
+      // Rate-limited (429) — do NOT record as CB failure (rate limit ≠ model broken)
+      // Transient (5xx/timeout) — record as CB failure
+      if (classification.kind === 'transient' && useGuards) {
+        cb.recordFailure(provider!, config.model);
+      }
 
       if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        // 429: use retry-after delay; transient: exponential backoff
+        const delay = classification.kind === 'rate-limited'
+          ? (classification.retryAfterMs ?? 5000)
+          : 1000 * (attempt + 1);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     } finally {
       clearTimeout(timeoutId);
@@ -279,6 +292,12 @@ async function executeReviewerWithGuards(
   for (const fb of fallbacks) {
     const fallbackProvider = fb.provider;
     const useFallbackGuards = !!fallbackProvider;
+
+    // Skip fallbacks with open circuit or exhausted RPD budget
+    if (useFallbackGuards && !hm.isAvailable(fallbackProvider!, fb.model)) {
+      continue;
+    }
+
     try {
       if (useFallbackGuards) hm.recordRequest(fallbackProvider!);
 
@@ -305,8 +324,14 @@ async function executeReviewerWithGuards(
         rawResponse: response,
         status: 'success',
       };
-    } catch {
-      if (useFallbackGuards) cb.recordFailure(fallbackProvider!, fb.model);
+    } catch (fbError) {
+      // Only record transient errors as CB failures (not 429 rate limits)
+      if (useFallbackGuards) {
+        const fbClass = classifyError(fbError);
+        if (fbClass.kind === 'transient') {
+          cb.recordFailure(fallbackProvider!, fb.model);
+        }
+      }
       // this fallback failed — continue to next in chain
     }
   }

@@ -133,17 +133,31 @@ describe('executeReviewers — fallback mechanism', () => {
     expect(mockExecuteBackend).toHaveBeenCalledTimes(2);
   });
 
-  it('5. no fallback configured — existing retry behavior, returns forfeit', async () => {
+  it('5. no fallback configured — permanent error skips retries, returns forfeit', async () => {
+    // Permanent errors (unclassified) skip remaining retries
     mockExecuteBackend.mockRejectedValue(new Error('primary error'));
 
-    // No fallback field
+    const input = makeInput();
+
+    const results = await executeReviewers([input], 1, 5, freshOptions()); // retries=1
+    const result = results[0];
+
+    expect(result.status).toBe('forfeit');
+    // Permanent error breaks after first attempt (no retry)
+    expect(mockExecuteBackend).toHaveBeenCalledTimes(1);
+  });
+
+  it('5b. no fallback configured — transient error retries, returns forfeit', async () => {
+    // Transient errors (5xx) do retry
+    mockExecuteBackend.mockRejectedValue(Object.assign(new Error('server error'), { statusCode: 500 }));
+
     const input = makeInput();
 
     const results = await executeReviewers([input], 1, 5, freshOptions()); // retries=1 → 2 attempts
     const result = results[0];
 
     expect(result.status).toBe('forfeit');
-    // only primary retries, no fallback
+    // Transient: 1 initial + 1 retry = 2 calls
     expect(mockExecuteBackend).toHaveBeenCalledTimes(2);
   });
 

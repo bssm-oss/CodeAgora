@@ -37,16 +37,25 @@ export async function makeHeadVerdict(
 
 async function llmVerdict(report: ModeratorReport, config: HeadConfig, language?: 'en' | 'ko'): Promise<HeadVerdict> {
   const { executeBackend } = await import('../l1/backend.js');
+  const { retryOnError } = await import('@codeagora/shared/utils/recovery.js');
+  const { classifyError } = await import('../l1/error-classifier.js');
 
   const prompt = buildHeadPrompt(report, language);
-  const response = await executeBackend({
-    backend: config.backend,
-    model: config.model,
-    provider: config.provider,
-    prompt,
-    timeout: config.timeout ?? 120,
-    temperature: 0.2,
-  });
+  const response = await retryOnError(
+    () => executeBackend({
+      backend: config.backend,
+      model: config.model,
+      provider: config.provider,
+      prompt,
+      timeout: config.timeout ?? 120,
+      temperature: 0.2,
+    }),
+    (err) => {
+      const cls = classifyError(err);
+      return cls.kind === 'rate-limited' || cls.kind === 'transient';
+    },
+    { maxRetries: 1, baseDelay: 3000, maxDelay: 15000, backoffFactor: 2 },
+  );
 
   return parseHeadResponse(response, report);
 }
