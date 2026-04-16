@@ -26,17 +26,17 @@ export function Pipeline(): React.JSX.Element {
 
       {!connected && (
         <div className="pipeline-notice pipeline-notice--warning">
-          WebSocket disconnected. Reconnect to receive live updates.
+          WebSocket disconnected. You can still start reviews, but live progress updates are unavailable.
         </div>
       )}
 
-      {connected && pipelineRunning && !hasActivity && (
+      {pipelineRunning && !hasActivity && (
         <div className="pipeline-notice pipeline-notice--info">
-          <span className="pipeline-spinner" /> A review pipeline is currently running. Live updates will appear shortly...
+          <span className="pipeline-spinner" /> A review pipeline is currently running. {connected ? 'Live updates will appear shortly...' : 'Check Sessions page for results.'}
         </div>
       )}
 
-      {!hasActivity && connected && !pipelineRunning && (
+      {!hasActivity && !pipelineRunning && (
         <>
           <div className="pipeline-idle">
             <div className="pipeline-idle__icon">&#9881;</div>
