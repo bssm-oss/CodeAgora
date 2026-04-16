@@ -11,51 +11,25 @@ jobs:
   size-label:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Label PR by size
         uses: actions/github-script@v7
         with:
           script: |
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
+            const { owner, repo } = context.repo;
+            const pr = context.issue.number;
 
+            const { data: files } = await github.rest.pulls.listFiles({ owner, repo, pull_number: pr });
             const changes = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
 
-            const labels = ['size/XS', 'size/S', 'size/M', 'size/L', 'size/XL'];
-            let label;
-            if (changes < 10) label = 'size/XS';
-            else if (changes < 50) label = 'size/S';
-            else if (changes < 200) label = 'size/M';
-            else if (changes < 500) label = 'size/L';
-            else label = 'size/XL';
+            const sizeLabels = ['size/XS', 'size/S', 'size/M', 'size/L', 'size/XL'];
+            const label =
+              changes < 10 ? 'size/XS' :
+              changes < 50 ? 'size/S' :
+              changes < 200 ? 'size/M' :
+              changes < 500 ? 'size/L' : 'size/XL';
 
-            const current = await github.rest.issues.listLabelsOnIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            for (const l of current.data) {
-              if (labels.includes(l.name) && l.name !== label) {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  name: l.name,
-                });
-              }
-            }
+            const { data: current } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr });
+            const keep = current.map(l => l.name).filter(n => !sizeLabels.includes(n));
 
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: [label],
-            });
-
-            console.log(`PR #${context.issue.number}: ${changes} changes -> ${label}`);
+            await github.rest.issues.setLabels({ owner, repo, issue_number: pr, labels: [...keep, label] });
+            console.log(`PR #${pr}: ${changes} changes → ${label}`);
