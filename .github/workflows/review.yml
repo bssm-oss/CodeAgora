@@ -26,19 +26,87 @@ jobs:
           echo "::warning::Fork PR detected — secrets are unavailable. Skipping review."
           echo "skip=true" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - name: Check API key
+        id: key-check
         if: steps.fork-check.outputs.skip != 'true'
+        run: |
+          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ] && [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
+            echo "::warning::No API key configured. Set OPENROUTER_API_KEY or GROQ_API_KEY in repo secrets."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         with:
           fetch-depth: 0
 
+      - name: Generate CI config
+        if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
+        run: |
+          mkdir -p .ca
+          if [ -n "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+            cat > .ca/config.json << 'CONF'
+          {
+            "mode": "pragmatic",
+            "language": "en",
+            "reviewers": [
+              { "id": "r1", "model": "openai/gpt-oss-120b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              { "id": "r2", "model": "nvidia/nemotron-3-super-120b-a12b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              { "id": "r3", "model": "z-ai/glm-4.5-air:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
+            ],
+            "supporters": {
+              "pool": [
+                { "id": "s1", "model": "openai/gpt-oss-20b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
+              ],
+              "pickCount": 1,
+              "pickStrategy": "random",
+              "devilsAdvocate": { "id": "da", "model": "openai/gpt-oss-20b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
+              "personaAssignment": "random"
+            },
+            "moderator": { "model": "z-ai/glm-4.5-air:free", "backend": "api", "provider": "openrouter" },
+            "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
+            "head": { "backend": "api", "model": "openai/gpt-oss-120b:free", "provider": "openrouter", "enabled": true },
+            "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+          }
+          CONF
+          else
+            cat > .ca/config.json << 'CONF'
+          {
+            "mode": "pragmatic",
+            "language": "en",
+            "reviewers": [
+              { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
+              { "id": "r2", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
+              { "id": "r3", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+            ],
+            "supporters": {
+              "pool": [
+                { "id": "s1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+              ],
+              "pickCount": 1,
+              "pickStrategy": "random",
+              "devilsAdvocate": { "id": "da", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
+              "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
+              "personaAssignment": "random"
+            },
+            "moderator": { "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq" },
+            "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
+            "head": { "backend": "api", "model": "llama-3.3-70b-versatile", "provider": "groq", "enabled": true },
+            "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+          }
+          CONF
+          fi
+
       - name: CodeAgora Review
-        if: steps.fork-check.outputs.skip != 'true'
+        if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         uses: ./
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
           max-diff-lines: '5000'
         env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           CODEAGORA_APP_ID: ${{ secrets.CODEAGORA_APP_ID }}
           CODEAGORA_APP_PRIVATE_KEY: ${{ secrets.CODEAGORA_APP_PRIVATE_KEY }}
