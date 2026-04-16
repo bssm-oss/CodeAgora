@@ -12,7 +12,7 @@ export const healthRoutes = new Hono();
 healthRoutes.get('/', (c) => {
   return c.json({
     status: 'ok',
-    version: '2.0.0',
+    version: '2.3.1',
     uptime: Math.floor((Date.now() - startTime) / 1000),
   });
 });
