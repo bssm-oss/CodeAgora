@@ -224,6 +224,7 @@
   "cli.error.prFormat": "--pr must be a GitHub PR URL or a number",
   "cli.error.diffPathRequired": "diff-path required (or pipe via stdin, or use --pr)",
   "cli.error.diffFileNotFound": "Diff file not found: {path}",
+  "cli.error.emptyDiff": "Empty diff — nothing to review.",
   "cli.info.cacheHit": "Cache hit — returning previous review result. Use --no-cache for a fresh review.",
   "cli.error.notificationsNotInstalled": "@codeagora/notifications is not installed.",
   "cli.error.notificationsInstall": "Install: npm i -g @codeagora/notifications",

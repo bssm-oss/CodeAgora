@@ -153,11 +153,36 @@ program.command('agreement <session>').description('Show reviewer agreement matr
     const [date, id] = session.split('/');
     if (!date || !id) { console.error(t('cli.error.sessionFormat')); process.exit(1); }
     const sessionDir = path.join(process.cwd(), '.ca', 'sessions', date, id);
-    const raw = await fs.readFile(path.join(sessionDir, 'result.json'), 'utf-8');
-    const result = JSON.parse(raw) as { reviewerMap?: Record<string, string[]> };
-    if (!result.reviewerMap) { console.error(t('cli.error.noReviewerMap')); process.exit(1); }
-    const allIds = [...new Set(Object.values(result.reviewerMap).flat())];
-    console.log(formatAgreementMatrix(computeAgreementMatrix(result.reviewerMap, allIds)));
+
+    let reviewerMap: Record<string, string[]> | undefined;
+
+    // Try result.json first
+    try {
+      const raw = await fs.readFile(path.join(sessionDir, 'result.json'), 'utf-8');
+      const result = JSON.parse(raw) as { reviewerMap?: Record<string, string[]> };
+      reviewerMap = result.reviewerMap;
+    } catch {
+      // Fallback: build reviewerMap from individual review files
+      try {
+        const reviewsDir = path.join(sessionDir, 'reviews');
+        const files = await fs.readdir(reviewsDir);
+        const map: Record<string, string[]> = {};
+        for (const file of files) {
+          if (!file.endsWith('.json')) continue;
+          const review = JSON.parse(await fs.readFile(path.join(reviewsDir, file), 'utf-8'));
+          const rid = review.reviewerId ?? file.replace('.json', '');
+          const issues: string[] = (review.issues ?? review.evidenceDocs ?? []).map(
+            (i: { filePath?: string; lineRange?: number[] }) => `${i.filePath ?? '?'}:${i.lineRange?.[0] ?? '?'}`
+          );
+          map[rid] = issues;
+        }
+        if (Object.keys(map).length > 0) reviewerMap = map;
+      } catch { /* no reviews directory */ }
+    }
+
+    if (!reviewerMap) { console.error(t('cli.error.noReviewerMap')); process.exit(1); }
+    const allIds = [...new Set(Object.values(reviewerMap).flat())];
+    console.log(formatAgreementMatrix(computeAgreementMatrix(reviewerMap, allIds)));
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : error);
     process.exit(1);

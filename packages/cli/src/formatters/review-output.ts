@@ -9,10 +9,11 @@ import { SEVERITY_ORDER } from '@codeagora/core/types/core.js';
 import { severityColor, decisionColor, dim, bold } from '../utils/colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { formatAnnotated } from './annotated-output.js';
+import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
 import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
 import { lookupCwe } from '@codeagora/shared/data/cwe-mapping.js';
 
-export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'annotated' | 'html' | 'junit';
+export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'annotated' | 'html' | 'junit' | 'sarif';
 
 // ============================================================================
 // Text format (default)
@@ -496,6 +497,12 @@ function toEvidenceDoc(issue: {
 // Unified dispatcher
 // ============================================================================
 
+function formatSarif(result: PipelineResult): string {
+  const docs: EvidenceDocument[] = result.summary?.topIssues.map(toEvidenceDoc) ?? [];
+  const report = buildSarifReport(docs, result.sessionId ?? 'unknown');
+  return serializeSarif(report);
+}
+
 /**
  * Format a PipelineResult using the requested output format.
  *
@@ -528,6 +535,8 @@ export function formatOutput(
       return formatHtml(result);
     case 'junit':
       return formatJunit(result);
+    case 'sarif':
+      return formatSarif(result);
     default: {
       // Exhaustive check — TypeScript will warn if a case is missing
       const _exhaustive: never = format;

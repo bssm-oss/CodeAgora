@@ -74,7 +74,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       } catch { /* ignore — .ca/ may not exist yet */ }
     }
 
-    const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit'];
+    const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit', 'sarif'];
     if (!validFormats.includes(options.output)) {
       console.error(`Invalid output format: "${options.output}". Valid formats: ${validFormats.join(', ')}`);
       process.exit(1);
@@ -158,6 +158,10 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       // Handle stdin
       if (!options.quiet) console.error(dim('Reading diff from stdin...'));
       const stdinContent = await readStdin();
+      if (!stdinContent.trim()) {
+        console.error(t('cli.error.emptyDiff'));
+        process.exit(1);
+      }
       stdinTmpPath = path.join(process.cwd(), '.ca', `tmp-stdin-${Date.now()}.patch`);
       await fs.mkdir(path.dirname(stdinTmpPath), { recursive: true });
       await fs.writeFile(stdinTmpPath, stdinContent);
