@@ -140,7 +140,7 @@ async function getFsMock() {
 }
 
 /** Minimal successful PipelineResult */
-function makeSuccessResult(overrides: Record<string, unknown> = {}) {
+function makeSuccessResult(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     sessionId: '001',
     date: '2026-04-16',
@@ -209,9 +209,10 @@ async function runReviewCommand(args: string[] = []) {
 // ============================================================================
 
 describe('review command — action handler', () => {
-  let exitSpy: ReturnType<typeof vi.spyOn>;
-  let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let exitSpy: any;
+  let consoleLogSpy: any;
+  let consoleErrorSpy: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -564,22 +565,24 @@ describe('review command — action handler', () => {
 
   describe('--fail-on-reject', () => {
     it('does not trigger exit on ACCEPT verdict', () => {
-      const result = makeSuccessResult({ summary: { ...makeSuccessResult().summary, decision: 'ACCEPT' } });
+      const base = makeSuccessResult();
+      const summary = { ...(base.summary as Record<string, unknown>), decision: 'ACCEPT' };
+      const result = makeSuccessResult({ summary });
       const failOnReject = true;
 
-      if (result.summary?.decision === 'REJECT' && failOnReject) {
+      if ((result.summary as Record<string, unknown>)?.decision === 'REJECT' && failOnReject) {
         throw new Error('should not reach here');
       }
       // No error — ACCEPT does not trigger exit
     });
 
     it('would trigger exit on REJECT verdict', () => {
-      const result = makeSuccessResult({
-        summary: { ...makeSuccessResult().summary, decision: 'REJECT' },
-      });
+      const base = makeSuccessResult();
+      const summary = { ...(base.summary as Record<string, unknown>), decision: 'REJECT' };
+      const result = makeSuccessResult({ summary });
       const failOnReject = true;
 
-      const shouldExit = result.summary?.decision === 'REJECT' && failOnReject;
+      const shouldExit = (result.summary as Record<string, unknown>)?.decision === 'REJECT' && failOnReject;
       expect(shouldExit).toBe(true);
     });
   });
@@ -695,9 +698,10 @@ describe('review command — action handler', () => {
 
     it('does not set noCache when cache is enabled (default)', () => {
       const cache = true;
+      const extra = !cache ? { noCache: true } : {};
       const pipelineOptions = {
         diffPath: '/tmp/test.diff',
-        ...(!cache && { noCache: true }),
+        ...extra,
       };
 
       expect(pipelineOptions).not.toHaveProperty('noCache');
@@ -724,12 +728,14 @@ describe('review command — action handler', () => {
 
   describe('--context-lines option', () => {
     it('defaults to 20 when not specified', () => {
-      const contextLines = undefined ?? 20;
+      const raw: number | undefined = undefined;
+      const contextLines = raw ?? 20;
       expect(contextLines).toBe(20);
     });
 
     it('uses provided value', () => {
-      const contextLines = 40 ?? 20;
+      const raw: number | undefined = 40;
+      const contextLines = raw ?? 20;
       expect(contextLines).toBe(40);
     });
 

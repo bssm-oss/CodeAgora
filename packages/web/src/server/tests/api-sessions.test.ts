@@ -103,7 +103,7 @@ describe('API Integration — /api/sessions', () => {
     vi.stubEnv('CODEAGORA_DASHBOARD_TOKEN', VALID_TOKEN);
 
     // Reset readdir/readFile defaults
-    mockReaddir.mockResolvedValue([] as unknown as ReturnType<typeof readdir>);
+    mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
     mockReadFile.mockRejectedValue(new Error('ENOENT'));
   });
 
@@ -160,9 +160,9 @@ describe('API Integration — /api/sessions', () => {
     it('returns session list with default pagination', async () => {
       mockReaddir.mockImplementation(async (dirPath: unknown) => {
         const p = String(dirPath);
-        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as ReturnType<typeof readdir>;
-        if (p.endsWith('2025-01-15')) return ['001'] as unknown as ReturnType<typeof readdir>;
-        return [] as unknown as ReturnType<typeof readdir>;
+        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        if (p.endsWith('2025-01-15')) return ['001'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        return [] as unknown as Awaited<ReturnType<typeof readdir>>;
       });
 
       mockReadFile.mockResolvedValue(JSON.stringify(sampleMetadata));
@@ -189,9 +189,9 @@ describe('API Integration — /api/sessions', () => {
 
       mockReaddir.mockImplementation(async (dirPath: unknown) => {
         const p = String(dirPath);
-        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as ReturnType<typeof readdir>;
-        if (p.endsWith('2025-01-15')) return ['001', '002', '003'] as unknown as ReturnType<typeof readdir>;
-        return [] as unknown as ReturnType<typeof readdir>;
+        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        if (p.endsWith('2025-01-15')) return ['001', '002', '003'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        return [] as unknown as Awaited<ReturnType<typeof readdir>>;
       });
 
       let callIndex = 0;
@@ -218,9 +218,9 @@ describe('API Integration — /api/sessions', () => {
 
       mockReaddir.mockImplementation(async (dirPath: unknown) => {
         const p = String(dirPath);
-        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as ReturnType<typeof readdir>;
-        if (p.endsWith('2025-01-15')) return ['001', '002'] as unknown as ReturnType<typeof readdir>;
-        return [] as unknown as ReturnType<typeof readdir>;
+        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        if (p.endsWith('2025-01-15')) return ['001', '002'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        return [] as unknown as Awaited<ReturnType<typeof readdir>>;
       });
 
       let callIdx = 0;
@@ -242,9 +242,9 @@ describe('API Integration — /api/sessions', () => {
     it('supports search filter on sessionId', async () => {
       mockReaddir.mockImplementation(async (dirPath: unknown) => {
         const p = String(dirPath);
-        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as ReturnType<typeof readdir>;
-        if (p.endsWith('2025-01-15')) return ['001'] as unknown as ReturnType<typeof readdir>;
-        return [] as unknown as ReturnType<typeof readdir>;
+        if (p.endsWith('sessions')) return ['2025-01-15'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        if (p.endsWith('2025-01-15')) return ['001'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        return [] as unknown as Awaited<ReturnType<typeof readdir>>;
       });
 
       mockReadFile.mockResolvedValue(JSON.stringify(sampleMetadata));
@@ -281,7 +281,7 @@ describe('API Integration — /api/sessions', () => {
         return '{}';
       });
 
-      mockReaddir.mockResolvedValue([] as unknown as ReturnType<typeof readdir>);
+      mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
 
       const app = await getApp();
       const res = await app.request('/api/sessions/2025-01-15/001', { headers: authHeaders() });
@@ -335,7 +335,7 @@ describe('API Integration — /api/sessions', () => {
 
   describe('GET /api/sessions/:date/:id/reviews', () => {
     it('returns review array for valid session', async () => {
-      mockReaddir.mockResolvedValue(['reviewer-1.json'] as unknown as ReturnType<typeof readdir>);
+      mockReaddir.mockResolvedValue(['reviewer-1.json'] as unknown as Awaited<ReturnType<typeof readdir>>);
       mockReadFile.mockResolvedValue(JSON.stringify(sampleReview));
 
       const app = await getApp();
@@ -351,7 +351,7 @@ describe('API Integration — /api/sessions', () => {
     });
 
     it('returns empty array when no reviews exist', async () => {
-      mockReaddir.mockResolvedValue([] as unknown as ReturnType<typeof readdir>);
+      mockReaddir.mockResolvedValue([] as unknown as Awaited<ReturnType<typeof readdir>>);
 
       const app = await getApp();
       const res = await app.request('/api/sessions/2025-01-15/001/reviews', {
@@ -386,9 +386,9 @@ describe('API Integration — /api/sessions', () => {
 
       mockReaddir.mockImplementation(async (dirPath: unknown) => {
         const p = String(dirPath);
-        if (p.endsWith('/discussions')) return ['disc-001'] as unknown as ReturnType<typeof readdir>;
-        if (p.endsWith('/disc-001')) return ['verdict.md'] as unknown as ReturnType<typeof readdir>;
-        return [] as unknown as ReturnType<typeof readdir>;
+        if (p.endsWith('/discussions')) return ['disc-001'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        if (p.endsWith('/disc-001')) return ['verdict.md'] as unknown as Awaited<ReturnType<typeof readdir>>;
+        return [] as unknown as Awaited<ReturnType<typeof readdir>>;
       });
 
       mockReadFile.mockImplementation(async (filePath: unknown) => {

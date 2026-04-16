@@ -499,7 +499,7 @@ function toEvidenceDoc(issue: {
 
 function formatSarif(result: PipelineResult): string {
   const docs: EvidenceDocument[] = result.summary?.topIssues.map(toEvidenceDoc) ?? [];
-  const report = buildSarifReport(docs, result.sessionId ?? 'unknown');
+  const report = buildSarifReport(docs, result.sessionId ?? 'unknown', result.date ?? 'unknown');
   return serializeSarif(report);
 }
 
