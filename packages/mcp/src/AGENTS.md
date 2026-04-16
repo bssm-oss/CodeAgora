@@ -11,7 +11,7 @@ MCP server implementation exposing CodeAgora pipeline as tools for Claude and ot
 | File | Description |
 |------|-------------|
 | `index.ts` | Server setup — McpServer creation, tool registration, stdio transport start |
-| `helpers.ts` | Core review logic — `runReviewWithDiff()`, `runQuickReview()`, `runFullReview()` |
+| `helpers.ts` | Core review logic — `runReviewCompact()`, `runReviewRaw()`, `getStagedDiff()` |
 
 ## Subdirectories
 
@@ -38,7 +38,7 @@ MCP server implementation exposing CodeAgora pipeline as tools for Claude and ot
 ### Tool Structure
 Each tool file exports a single register function that:
 1. Validates input with zod schema
-2. Calls helper function (`runQuickReview()`, `runFullReview()`, etc.)
+2. Calls helper function (`runReviewCompact()`, `runReviewRaw()`, etc.)
 3. Formats result with `formatCompact()` if needed
 4. Returns MCP-compatible response
 

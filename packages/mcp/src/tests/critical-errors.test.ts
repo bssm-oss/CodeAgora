@@ -50,22 +50,22 @@ describe('M-04: runPipeline throw propagates as MCP error', () => {
     vi.resetModules();
   });
 
-  it('runQuickReview propagates pipeline errors when runPipeline throws', async () => {
+  it('runReviewCompact propagates pipeline errors when runPipeline throws', async () => {
     // Mock the pipeline orchestrator to throw
     vi.doMock('@codeagora/core/pipeline/orchestrator.js', () => ({
       runPipeline: vi.fn().mockRejectedValue(new Error('pipeline exploded')),
     }));
 
     // Re-import helpers after mocking
-    const { runQuickReview } = await import('../helpers.js');
+    const { runReviewCompact } = await import('../helpers.js');
 
     // helpers.ts does not catch runPipeline throws — the error propagates out.
     // The MCP tool layer (review-quick.ts) wraps this in try/catch and returns isError.
     // Here we verify the raw error propagates (is not silently swallowed).
-    await expect(runQuickReview('some diff')).rejects.toThrow('pipeline exploded');
+    await expect(runReviewCompact('some diff')).rejects.toThrow('pipeline exploded');
   });
 
-  it('runFullReview returns error-shaped result when pipeline returns non-success status', async () => {
+  it('runReviewCompact returns error-shaped result when pipeline returns non-success status', async () => {
     vi.doMock('@codeagora/core/pipeline/orchestrator.js', () => ({
       runPipeline: vi.fn().mockResolvedValue({
         status: 'error',
@@ -74,15 +74,15 @@ describe('M-04: runPipeline throw propagates as MCP error', () => {
       }),
     }));
 
-    const { runFullReview } = await import('../helpers.js');
-    const result = await runFullReview('some diff');
+    const { runReviewCompact } = await import('../helpers.js');
+    const result = await runReviewCompact('some diff');
 
     expect(result.decision).toBe('ERROR');
     expect(result.reasoning).toBe('All reviewers failed');
     expect(Array.isArray(result.issues)).toBe(true);
   });
 
-  it('runFullReview returns ERROR when pipeline returns success but missing summary', async () => {
+  it('runReviewCompact returns ERROR when pipeline returns success but missing summary', async () => {
     vi.doMock('@codeagora/core/pipeline/orchestrator.js', () => ({
       runPipeline: vi.fn().mockResolvedValue({
         status: 'success',
@@ -91,8 +91,8 @@ describe('M-04: runPipeline throw propagates as MCP error', () => {
       }),
     }));
 
-    const { runFullReview } = await import('../helpers.js');
-    const result = await runFullReview('some diff');
+    const { runReviewCompact } = await import('../helpers.js');
+    const result = await runReviewCompact('some diff');
 
     expect(result.decision).toBe('ERROR');
   });

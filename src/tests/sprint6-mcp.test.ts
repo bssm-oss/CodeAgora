@@ -218,9 +218,9 @@ describe('MCP tool modules', () => {
     expect(typeof mod.registerStats).toBe('function');
   });
 
-  it('helpers exports runQuickReview and runFullReview', async () => {
+  it('helpers exports runReviewCompact and runReviewRaw', async () => {
     const mod = await import('@codeagora/mcp/helpers.js');
-    expect(typeof mod.runQuickReview).toBe('function');
-    expect(typeof mod.runFullReview).toBe('function');
+    expect(typeof mod.runReviewCompact).toBe('function');
+    expect(typeof mod.runReviewRaw).toBe('function');
   });
 });
