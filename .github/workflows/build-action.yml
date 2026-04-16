@@ -27,7 +27,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build action bundle
+        id: build
         run: node scripts/build-action.mjs
+
+      - name: Verify build output
+        if: steps.build.outcome != 'success'
+        run: |
+          echo "::error::Build step failed — aborting before commit"
+          exit 1
 
       - name: Check for changes
         id: diff

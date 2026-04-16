@@ -32,7 +32,8 @@ jobs:
       - name: Smoke test
         run: |
           npm pack
-          mkdir /tmp/smoke && cd /tmp/smoke
+          SMOKE_DIR="$(mktemp -d)"
+          cd "$SMOKE_DIR"
           npm init -y
           npm i $GITHUB_WORKSPACE/codeagora-*.tgz
           npx agora --version
@@ -40,18 +41,60 @@ jobs:
 
       # Publish core package
       - name: Publish codeagora
-        run: npm publish --access public || true
+        id: publish-core
+        continue-on-error: true
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       # Publish optional packages
-      - name: Publish optional packages
-        run: |
-          for pkg in web tui mcp notifications; do
-            cd packages/$pkg && npm publish --access public || true && cd ../..
-          done
+      - name: Publish @codeagora/web
+        id: publish-web
+        continue-on-error: true
+        run: cd packages/web && npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @codeagora/tui
+        id: publish-tui
+        continue-on-error: true
+        run: cd packages/tui && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @codeagora/mcp
+        id: publish-mcp
+        continue-on-error: true
+        run: cd packages/mcp && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @codeagora/notifications
+        id: publish-notifications
+        continue-on-error: true
+        run: cd packages/notifications && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish summary
+        if: always()
+        run: |
+          failed=0
+          for result in \
+            "${{ steps.publish-core.outcome }}" \
+            "${{ steps.publish-web.outcome }}" \
+            "${{ steps.publish-tui.outcome }}" \
+            "${{ steps.publish-mcp.outcome }}" \
+            "${{ steps.publish-notifications.outcome }}"; do
+            if [ "$result" = "failure" ]; then
+              failed=$((failed + 1))
+            fi
+          done
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::$failed package(s) failed to publish"
+            exit 1
+          fi
+          echo "All packages published successfully"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
