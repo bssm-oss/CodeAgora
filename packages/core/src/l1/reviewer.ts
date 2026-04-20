@@ -11,6 +11,35 @@ import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '@codeagora/shared/utils/diff.js';
 import { truncateLines } from '@codeagora/shared/utils/truncate.js';
 import { resolvePromptTier } from './prompt-tier.js';
+import { getCalibrationMultiplier, shouldAutoCalibrate } from './calibration.js';
+import type { EvidenceDocument } from '../types/core.js';
+
+/**
+ * Apply tier-based calibration multiplier to a doc's confidence in-place.
+ * Writes both `doc.confidence` (so downstream stages see calibrated value)
+ * and `confidenceTrace.calibrated` (for transparency in the trace viewer).
+ * No-op when auto-calibration is disabled for this reviewer.
+ */
+function applyCalibration(
+  doc: EvidenceDocument,
+  config: ReviewerConfig,
+  reviewContext: { calibrateReviewerConfidence?: boolean } | undefined,
+): void {
+  if (doc.confidence === undefined) return;
+  if (!shouldAutoCalibrate({ reviewContext, config })) return;
+  const multiplier = getCalibrationMultiplier(config);
+  if (multiplier === 1.0) {
+    // Skip no-op work but still mark calibration stage so trace viewer can
+    // show "calibrated: ×1.00" vs unrecorded. Minor UX.
+    doc.confidence = Math.round(doc.confidence);
+  } else {
+    doc.confidence = Math.max(0, Math.min(100, Math.round(doc.confidence * multiplier)));
+  }
+  doc.confidenceTrace = {
+    ...(doc.confidenceTrace ?? {}),
+    calibrated: doc.confidence,
+  };
+}
 import { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 import { HealthMonitor } from '../l0/health-monitor.js';
 import { classifyError } from './error-classifier.js';
@@ -62,6 +91,13 @@ export interface ReviewerInput {
   projectContext?: string;
   /** Pre-analysis enriched context (#411, #414, #415, #407, #408) */
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext;
+  /**
+   * Enable tier-based auto-calibration of reviewer-emitted confidence (#467).
+   * When true, `raw × multiplier` is applied after parse and before
+   * hallucination filter. Per-reviewer `config.calibrationMultiplier` is
+   * respected regardless of this flag.
+   */
+  calibrateReviewerConfidence?: boolean;
 }
 
 // ============================================================================
@@ -235,6 +271,10 @@ async function executeReviewerWithGuards(
 
       if (useGuards) cb.recordSuccess(provider!, config.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
+      // #467: apply model-specific calibration multiplier to each doc's
+      // confidence before it enters hallucination filter / corroboration.
+      const reviewContext = { calibrateReviewerConfidence: input.calibrateReviewerConfidence };
+      for (const doc of evidenceDocs) applyCalibration(doc, config, reviewContext);
       if (evidenceDocs.length === 0 && response.length > 0 && !isExplicitNoIssues(response)) {
         logParseFailure(config.model, config.id, response, false);
       }
@@ -323,6 +363,11 @@ async function executeReviewerWithGuards(
 
       if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
+      // #467: calibrate using the FALLBACK model's tier, not the primary's,
+      // since the output came from the fallback.
+      const fbConfig = { ...config, model: fb.model, provider: fb.provider } as ReviewerConfig;
+      const reviewContext = { calibrateReviewerConfidence: input.calibrateReviewerConfidence };
+      for (const doc of evidenceDocs) applyCalibration(doc, fbConfig, reviewContext);
       if (evidenceDocs.length === 0 && response.length > 0 && !isExplicitNoIssues(response)) {
         logParseFailure(fb.model, config.id, response, true);
       }

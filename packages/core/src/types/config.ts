@@ -59,6 +59,13 @@ export const AgentConfigSchema = z
      * See #464.
      */
     promptTier: z.enum(['lite', 'standard']).optional(),
+    /**
+     * Per-reviewer confidence calibration multiplier (#467). When set,
+     * reviewer-emitted confidence is multiplied by this value BEFORE
+     * hallucination filter + corroboration. Range: [0, 1]. Explicit
+     * value overrides tier-based auto-calibration.
+     */
+    calibrationMultiplier: z.number().min(0).max(1).optional(),
   })
   .refine(
     (data) => data.backend !== 'opencode' || data.provider !== undefined,
@@ -266,6 +273,14 @@ export const ReviewContextSchema = z.object({
   })).optional(),
   /** Verify CRITICAL+ code suggestions compile before posting (default: true) (#413) */
   verifySuggestions: z.boolean().optional(),
+  /**
+   * Apply tier-based calibration multiplier to reviewer-emitted confidence
+   * values before hallucination filter / corroboration. Default false
+   * (reviewer confidence used as-is — legacy behavior). Per-reviewer
+   * `calibrationMultiplier` is respected regardless of this global flag.
+   * See #467.
+   */
+  calibrateReviewerConfidence: z.boolean().optional(),
 }).optional();
 export type ReviewContext = z.infer<typeof ReviewContextSchema>;
 

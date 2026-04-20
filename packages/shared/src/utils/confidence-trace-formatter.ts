@@ -27,7 +27,7 @@ interface StageRow {
   note: string;
 }
 
-const STAGE_ORDER = ['raw', 'filtered', 'corroborated', 'verified', 'final'] as const;
+const STAGE_ORDER = ['raw', 'calibrated', 'filtered', 'corroborated', 'verified', 'final'] as const;
 
 /**
  * Match a ratio to a known multiplier (within rounding tolerance).
@@ -79,7 +79,9 @@ export function buildTraceRows(doc: TraceableDoc): StageRow[] {
         ? 'skipped (below CRITICAL threshold or passed)'
         : stage === 'final'
           ? 'not populated (pre-#319 session)'
-          : 'not recorded';
+          : stage === 'calibrated'
+            ? 'disabled (reviewContext.calibrateReviewerConfidence=false)'
+            : 'not recorded';
       rows.push(renderStage(stage, null, note));
       continue;
     }
@@ -89,6 +91,16 @@ export function buildTraceRows(doc: TraceableDoc): StageRow[] {
       note = 'reviewer self-reported';
     } else if (prev === null) {
       note = 'recorded (prior stage absent)';
+    } else if (stage === 'calibrated') {
+      // Calibration uses model-specific multipliers (#467) — don't reuse
+      // the hallucination-filter penalty labels from inferMultiplier which
+      // would misattribute the ratio to "dissent" / "speculation" etc.
+      if (prev > 0 && Number.isFinite(prev) && Number.isFinite(value)) {
+        const ratio = value / prev;
+        note = `×${ratio.toFixed(2)} (model calibration — L0 tier-based)`;
+      } else {
+        note = 'calibrated from raw';
+      }
     } else {
       const inferred = inferMultiplier(value, prev);
       if (inferred) {
