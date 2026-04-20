@@ -183,4 +183,75 @@ describe('postReview()', () => {
       postReview(makeConfig(), 1, makeReview(), octokit as never),
     ).rejects.toThrow('Bad credentials');
   });
+
+  // -------------------------------------------------------------------------
+  // "GitHub Actions is not permitted to approve pull requests" — downgrade
+  // APPROVE → COMMENT so the review body + inline comments still land.
+  // -------------------------------------------------------------------------
+
+  it('downgrades APPROVE → COMMENT when token lacks approval permission', async () => {
+    const approvalError = Object.assign(
+      new Error('Unprocessable Entity: "GitHub Actions is not permitted to approve pull requests."'),
+      { status: 422 },
+    );
+    const octokit = makeOctokit();
+
+    // First call (event=APPROVE) → 422 permission error
+    // Second call (event=COMMENT downgrade) → success
+    octokit.pulls.createReview
+      .mockRejectedValueOnce(approvalError)
+      .mockResolvedValue({
+        data: {
+          id: 888,
+          html_url: 'https://github.com/test-owner/test-repo/pull/1#pullrequestreview-888',
+        },
+      });
+
+    const review = makeReview({ event: 'APPROVE', body: 'Looks good.' });
+    const result = await postReview(makeConfig(), 1, review, octokit as never);
+
+    expect(result.reviewId).toBe(888);
+    // Verdict is still ACCEPT — the body marker determines verdict, not the event
+    expect(result.verdict).toBe('ACCEPT');
+    // Two calls total: first APPROVE (failed), second COMMENT (succeeded)
+    expect(octokit.pulls.createReview).toHaveBeenCalledTimes(2);
+    const firstCall = octokit.pulls.createReview.mock.calls[0][0];
+    const secondCall = octokit.pulls.createReview.mock.calls[1][0];
+    expect(firstCall.event).toBe('APPROVE');
+    expect(secondCall.event).toBe('COMMENT');
+    // Body + comments preserved
+    expect(secondCall.body).toBe('Looks good.');
+  });
+
+  it('does NOT downgrade for unrelated 422 errors on APPROVE', async () => {
+    // A 422 without the "not permitted to approve" message should NOT
+    // trigger the APPROVE→COMMENT downgrade; it should enter bisection.
+    const positionError = Object.assign(
+      new Error('Unprocessable Entity: invalid position'),
+      { status: 422 },
+    );
+    const octokit = makeOctokit();
+
+    // First call → 422 (position), bisection probe → 422 (probe fails),
+    // final with empty comments → success.
+    octokit.pulls.createReview
+      .mockRejectedValueOnce(positionError)
+      .mockRejectedValueOnce(positionError)
+      .mockResolvedValue({
+        data: { id: 555, html_url: 'https://github.com/test-owner/test-repo/pull/1#pullrequestreview-555' },
+      });
+
+    const review = makeReview({
+      event: 'APPROVE',
+      body: 'Looks good.',
+      comments: [{ path: 'src/foo.ts', position: 1, side: 'RIGHT', body: 'issue' }],
+    });
+
+    const result = await postReview(makeConfig(), 1, review, octokit as never);
+    expect(result.reviewId).toBe(555);
+    // Final post should retain APPROVE event (downgrade only kicks in for
+    // the specific permission error, not arbitrary 422s).
+    const finalCall = octokit.pulls.createReview.mock.calls[octokit.pulls.createReview.mock.calls.length - 1][0];
+    expect(finalCall.event).toBe('APPROVE');
+  });
 });
