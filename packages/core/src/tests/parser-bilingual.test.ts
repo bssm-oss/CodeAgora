@@ -315,4 +315,106 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     const result = computeL1Confidence(doc, allDocs, 2, 100);
     expect(result).toBe(68);
   });
+
+  // -------------------------------------------------------------------------
+  // Lonely-high-severity extra penalty
+  // -------------------------------------------------------------------------
+
+  function makeCriticalDoc(filePath: string, lineStart: number, confidence?: number, severity: EvidenceDocument['severity'] = 'CRITICAL'): EvidenceDocument {
+    return {
+      issueTitle: 'Test',
+      problem: 'Test problem',
+      evidence: [],
+      severity,
+      suggestion: 'Fix it',
+      filePath,
+      lineRange: [lineStart, lineStart + 10],
+      ...(confidence !== undefined && { confidence }),
+    };
+  }
+
+  it('single-reviewer CRITICAL (1/5), small diff → extra ×0.75 on top of ×0.5', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'CRITICAL');
+    const allDocs = [
+      makeCriticalDoc('src/foo.ts', 10, undefined, 'CRITICAL'),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    // base = Math.round(80 * 0.6 + 20 * 0.4) = 56
+    // small-diff penalty 0.5, lonely-HS extra 0.75 → combined 0.375
+    // Math.round(56 * 0.375) = Math.round(21) = 21
+    const result = computeL1Confidence(doc, allDocs, 5, 100);
+    expect(result).toBe(21);
+  });
+
+  it('single-reviewer HARSHLY_CRITICAL (1/5), small diff → same extra penalty as CRITICAL', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'HARSHLY_CRITICAL');
+    const allDocs = [
+      makeCriticalDoc('src/foo.ts', 10, undefined, 'HARSHLY_CRITICAL'),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    const result = computeL1Confidence(doc, allDocs, 5, 100);
+    expect(result).toBe(21);
+  });
+
+  it('single-reviewer CRITICAL (1/5), large diff → 0.7 × 0.75 = 0.525', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'CRITICAL');
+    const allDocs = [
+      makeCriticalDoc('src/foo.ts', 10, undefined, 'CRITICAL'),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    // base = 56, penalty = 0.7 × 0.75 = 0.525, Math.round(56 * 0.525) = 29
+    const result = computeL1Confidence(doc, allDocs, 5, 600);
+    expect(result).toBe(29);
+  });
+
+  it('single-reviewer WARNING (1/5) → no extra penalty (only 0.5, unchanged)', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'WARNING');
+    const allDocs = [
+      makeCriticalDoc('src/foo.ts', 10, undefined, 'WARNING'),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    // WARNING → no lonely-HS extra penalty, baseline 0.5 → 28 (matches existing behavior)
+    const result = computeL1Confidence(doc, allDocs, 5, 100);
+    expect(result).toBe(28);
+  });
+
+  it('single-reviewer SUGGESTION (1/5) → no extra penalty', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'SUGGESTION');
+    const allDocs = [
+      makeCriticalDoc('src/foo.ts', 10, undefined, 'SUGGESTION'),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+      makeDoc('src/quux.ts', 400),
+    ];
+    const result = computeL1Confidence(doc, allDocs, 5, 100);
+    expect(result).toBe(28);
+  });
+
+  it('corroborated CRITICAL (3/5) → no extra penalty (boost path only)', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'CRITICAL');
+    const allDocs = [
+      makeCriticalDoc('src/foo.ts', 10, undefined, 'CRITICAL'),
+      makeCriticalDoc('src/foo.ts', 12, undefined, 'CRITICAL'),
+      makeCriticalDoc('src/foo.ts', 14, undefined, 'CRITICAL'),
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+    ];
+    // agreeing = 3 → boost path, lonely-HS not triggered
+    // base = 72, boost = 86 (from earlier test)
+    const result = computeL1Confidence(doc, allDocs, 5);
+    expect(result).toBe(86);
+  });
 });
