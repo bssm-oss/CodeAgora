@@ -169,6 +169,18 @@ export function formatFindingTrace(doc: TraceableDoc, index: number): string[] {
     lines.push(`    ${label}  ${value}   ${row.note}`);
   }
 
+  // Evidence quality (#468) — 0–1 score recorded alongside the filtered
+  // stage. Rendered separately because it's a quality measure, not a
+  // confidence stage. The derived multiplier (0.7 + 0.3 × score) is
+  // already folded into `filtered`.
+  const evidence = doc.confidenceTrace?.evidence;
+  if (typeof evidence === 'number') {
+    const pct = `${Math.round(evidence * 100)}%`.padStart(4);
+    const mult = (0.7 + 0.3 * evidence).toFixed(2);
+    const label = 'evidence'.padEnd(labelWidth);
+    lines.push(`    ${label}  ${pct}   quality (×${mult} applied to filtered)`);
+  }
+
   const tab = classifyTriageTab(doc);
   lines.push(`    → ${tab} tab`);
   return lines;

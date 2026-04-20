@@ -55,13 +55,52 @@ const REMOVALS_ONLY_DIFF = `diff --git a/src/deprecated.ts b/src/deprecated.ts
 // Helper
 // ============================================================================
 
+// Default doc values are intentionally rich so the #468 evidence-quality
+// check (check 6) scores 1.0 → multiplier 1.0 → no penalty. That lets
+// each `describe(Check N)` block exercise its specific check in
+// isolation.
+const DEFAULT_PROBLEM =
+  'At `src/utils.ts:10` the helper `computeValue(input)` is invoked without validating the `options.timeout` parameter. ' +
+  'The call site at line 12 forwards the raw user-provided value directly into `setTimeoutWrapper(input)`, bypassing ' +
+  'the sanitisation performed inside `normaliseTimeout()`. This allows unexpected NaN or negative values to propagate ' +
+  'through the scheduler and eventually land in `setTimeout(callback, value)` where the platform coerces them in ' +
+  'provider-specific ways.';
+const DEFAULT_EVIDENCE = [
+  'Line 10 of `src/utils.ts` introduces the unguarded call to `computeValue(input)`.',
+  'The subsequent call chain `setTimeoutWrapper(input)` → `setTimeout(callback, value)` never validates the argument.',
+  'Comparable helpers such as `normaliseTimeout()` already perform the sanity check but are not applied here.',
+];
+
+/**
+ * Wrap a short, check-specific problem snippet with enough surrounding
+ * context (length + specificity markers + file:line citation) to keep
+ * the #468 evidence-quality sub-scores at 1.0. Use when a test wants to
+ * exercise checks 3–5 against a minimal trigger string without also
+ * taking a check-6 multiplier.
+ *
+ * Padding deliberately avoids backticked code quotes ≥10 chars so it
+ * does not trip Check 3 (fabricated code quote) for diffs that don't
+ * contain those symbols. Specificity is carried by plain-text
+ * file:line citations, `line N` phrasing, and camelCase identifiers.
+ */
+function richProblem(snippet: string): string {
+  return (
+    `At src/utils.ts:10 inside the introduced call: ${snippet} ` +
+    'This bug was introduced on line 10 of src/utils.ts where the new ' +
+    'call site forwards the unvalidated argument into setTimeoutWrapper(input) ' +
+    'without running it through the normaliseTimeout() helper, which means ' +
+    'negative or NaN values can reach setTimeout(callback, value) and trigger ' +
+    'provider-specific coercion that the caller does not expect.'
+  );
+}
+
 function makeDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
   return {
     issueTitle: 'Test Issue',
-    problem: 'Some problem description',
-    evidence: ['evidence line'],
+    problem: DEFAULT_PROBLEM,
+    evidence: [...DEFAULT_EVIDENCE],
     severity: 'WARNING',
-    suggestion: 'Fix it',
+    suggestion: 'Add a null check for the timeout value before forwarding to setTimeoutWrapper.',
     filePath: 'src/utils.ts',
     lineRange: [10, 12] as [number, number],
     source: 'llm',
@@ -151,7 +190,7 @@ describe('Check 2: Line range overlap', () => {
 describe('Check 3: Code quote verification', () => {
   it('should penalize confidence for fabricated code quotes', () => {
     const docs = [makeDoc({
-      problem: 'The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong',
+      problem: richProblem('The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -162,7 +201,7 @@ describe('Check 3: Code quote verification', () => {
 
   it('should not penalize confidence for real code quotes', () => {
     const docs = [makeDoc({
-      problem: 'The code `const b = computeValue()` is problematic',
+      problem: richProblem('The code `const b = computeValue()` is problematic'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -173,7 +212,7 @@ describe('Check 3: Code quote verification', () => {
 
   it('should ignore short code quotes (< 10 chars)', () => {
     const docs = [makeDoc({
-      problem: 'Variable `x` and `y` are bad',
+      problem: richProblem('Variable `x` and `y` are bad'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -183,7 +222,7 @@ describe('Check 3: Code quote verification', () => {
 
   it('should handle mixed real and fabricated quotes', () => {
     const docs = [makeDoc({
-      problem: 'The `const b = computeValue()` is fine but `totallyFakeCodeThatDoesNotExist` is bad',
+      problem: richProblem('The `const b = computeValue()` is fine but `totallyFakeCodeThatDoesNotExist` is bad'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -194,7 +233,7 @@ describe('Check 3: Code quote verification', () => {
 
   it('should penalize when majority of quotes are fabricated', () => {
     const docs = [makeDoc({
-      problem: '`fakeSnippetOne1234` and `fakeSnippetTwo5678` and `fakeSnippetThreeABC` are wrong',
+      problem: richProblem('`fakeSnippetOne1234` and `fakeSnippetTwo5678` and `fakeSnippetThreeABC` are wrong'),
       confidence: 60,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -203,7 +242,7 @@ describe('Check 3: Code quote verification', () => {
   });
 
   it('should not crash on problem text with no backticks', () => {
-    const docs = [makeDoc({ problem: 'No code quotes here at all', confidence: 80 })];
+    const docs = [makeDoc({ problem: richProblem('No code quotes here at all'), confidence: 80 })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
     expect(result.filtered[0].confidence).toBe(80);
@@ -219,7 +258,7 @@ describe('Check 4: Self-contradiction detection', () => {
     const docs = [makeDoc({
       filePath: 'src/deprecated.ts',
       lineRange: [1, 5],
-      problem: 'A new variable was added without type annotation',
+      problem: richProblem('A new variable was added without type annotation'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
@@ -231,7 +270,7 @@ describe('Check 4: Self-contradiction detection', () => {
     const docs = [makeDoc({
       filePath: 'src/new-feature.ts',
       lineRange: [1, 5],
-      problem: 'The function was removed without deprecation notice',
+      problem: richProblem('The function was removed without deprecation notice'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
@@ -243,7 +282,7 @@ describe('Check 4: Self-contradiction detection', () => {
     const docs = [makeDoc({
       filePath: 'src/new-feature.ts',
       lineRange: [1, 5],
-      problem: 'A new function was added without error handling',
+      problem: richProblem('A new function was added without error handling'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
@@ -255,7 +294,7 @@ describe('Check 4: Self-contradiction detection', () => {
     const docs = [makeDoc({
       filePath: 'src/new-feature.ts',
       lineRange: [1, 5],
-      problem: 'The function has a potential null reference',
+      problem: richProblem('The function has a potential null reference'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
@@ -267,7 +306,7 @@ describe('Check 4: Self-contradiction detection', () => {
     const docs = [makeDoc({
       filePath: 'src/deprecated.ts',
       lineRange: [1, 5],
-      problem: 'The new import `totallyFakeCodeSnippetHere` was added incorrectly',
+      problem: richProblem('The new import `totallyFakeCodeSnippetHere` was added incorrectly'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
@@ -287,7 +326,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'The helper may not exist in the target environment, causing runtime failure.',
+      problem: richProblem('The helper may not exist in the target environment, causing runtime failure.'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -299,7 +338,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'Potentially unsupported API invocation for this provider.',
+      problem: richProblem('Potentially unsupported API invocation for this provider.'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -311,7 +350,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'This computation could fail under high concurrency.',
+      problem: richProblem('This computation could fail under high concurrency.'),
       confidence: 90,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -324,13 +363,13 @@ describe('Check 5: Speculative language penalty', () => {
       makeDoc({
         filePath: 'src/utils.ts',
         lineRange: [10, 12],
-        problem: 'The function appears to handle null incorrectly.',
+        problem: richProblem('The function appears to handle null incorrectly.'),
         confidence: 80,
       }),
       makeDoc({
         filePath: 'src/utils.ts',
         lineRange: [10, 12],
-        problem: 'This seems to leak a file handle.',
+        problem: richProblem('This seems to leak a file handle.'),
         confidence: 80,
       }),
     ];
@@ -344,7 +383,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'The helper returns an unchecked value.',
+      problem: richProblem('The helper returns an unchecked value.'),
       suggestion: 'Add a null check; the current code unclear about edge cases.',
       confidence: 80,
     })];
@@ -357,7 +396,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'The helper returns without validating the input range.',
+      problem: richProblem('The helper returns without validating the input range.'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -370,7 +409,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'The May 2026 release introduces a breaking change in this helper.',
+      problem: richProblem('The May 2026 release introduces a breaking change in this helper.'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -382,7 +421,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/deprecated.ts',
       lineRange: [1, 5],
-      problem: 'A new variable was added that may leak memory.',
+      problem: richProblem('A new variable was added that may leak memory.'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
@@ -396,7 +435,7 @@ describe('Check 5: Speculative language penalty', () => {
     const docs = [makeDoc({
       filePath: 'src/utils.ts',
       lineRange: [10, 12],
-      problem: 'The helper appears to mishandle null inputs.',
+      problem: richProblem('The helper appears to mishandle null inputs.'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -415,7 +454,7 @@ describe('Uncertainty routing', () => {
     const docs = [makeDoc({
       filePath: 'src/deprecated.ts',
       lineRange: [1, 5],
-      problem: 'A `totallyFakeCodeSnippetHere` was introduced that is wrong',
+      problem: richProblem('A `totallyFakeCodeSnippetHere` was introduced that is wrong'),
       confidence: 30, // After penalties: 30 * 0.5 (quote) * 0.5 (contradiction) = 8 < 20
     })];
     const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
@@ -493,7 +532,7 @@ describe('Edge cases', () => {
 
   it('should handle doc with undefined confidence', () => {
     const docs = [makeDoc({
-      problem: 'The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong',
+      problem: richProblem('The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong'),
       confidence: undefined,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -511,7 +550,7 @@ describe('Edge cases', () => {
 describe('ConfidenceTrace: filtered stage', () => {
   it('should populate confidenceTrace.filtered after code-quote penalty', () => {
     const docs = [makeDoc({
-      problem: 'The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong',
+      problem: richProblem('The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -523,7 +562,7 @@ describe('ConfidenceTrace: filtered stage', () => {
 
   it('should populate confidenceTrace.filtered as pass-through when no penalty applied', () => {
     const docs = [makeDoc({
-      problem: 'Plain problem description with no fabricated quotes',
+      problem: richProblem('Plain problem description with no fabricated quotes'),
       confidence: 75,
     })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
@@ -535,7 +574,7 @@ describe('ConfidenceTrace: filtered stage', () => {
     const docs = [makeDoc({
       filePath: 'src/deprecated.ts',
       lineRange: [1, 5],
-      problem: 'A `totallyFakeCodeSnippetHere` was introduced that is wrong',
+      problem: richProblem('A `totallyFakeCodeSnippetHere` was introduced that is wrong'),
       confidence: 30,
     })];
     const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);

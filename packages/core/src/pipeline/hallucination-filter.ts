@@ -2,19 +2,21 @@
  * Pre-Debate Hallucination Filter (#428)
  * Validates evidence documents against the actual diff before L2 debate.
  *
- * 5 checks (zero model cost):
+ * 6 checks (zero model cost):
  * 1. File existence — filePath must be in diff file list
  * 2. Line range — lineRange must overlap at least one diff hunk
  * 3. Code quote — inline code quotes must exist in diff content
  * 4. Self-contradiction — finding must not contradict observed change direction
  * 5. Speculative language — hedge markers in problem/suggestion dampen confidence
+ * 6. Evidence quality (#468) — vague/short evidence dampens confidence
  *
  * Findings that fail checks 1-2 are hard-removed.
- * Checks 3-5 apply confidence penalties (soft) and may flag as uncertain.
+ * Checks 3-6 apply confidence penalties (soft) and may flag as uncertain.
  */
 
 import type { EvidenceDocument } from '../types/core.js';
 import { extractFileListFromDiff, parseDiffFileRanges } from '@codeagora/shared/utils/diff.js';
+import { scoreEvidence, evidenceMultiplier } from './evidence-scorer.js';
 
 export interface FilterResult {
   filtered: EvidenceDocument[];
@@ -205,13 +207,25 @@ export function filterHallucinations(
       doc.confidence = penalized; // BC: legacy single-field confidence
     }
 
-    // ConfidenceTrace: record post-filter confidence (stage 2 of 5).
-    // Always set before routing so uncertain-bucket docs also carry the trace.
-    // Pass-through (no penalties applied) → filtered === raw.
+    // Check 6 (#468): Evidence quality penalty — vague/short evidence
+    // dampens confidence. The FP class exposed by the #472 baseline
+    // (short template-style problem text, no file:line citations, no
+    // backtick identifiers) scores low here and gets the full ×0.7.
+    const evScore = scoreEvidence(doc);
+    const evMultiplier = evidenceMultiplier(evScore);
+    if (evMultiplier < 1.0) {
+      const penalized = Math.round((doc.confidence ?? 50) * evMultiplier);
+      doc.confidence = penalized; // BC: legacy single-field confidence
+    }
+
+    // ConfidenceTrace: record post-filter confidence + evidence quality.
+    // Always set before routing so uncertain-bucket docs also carry the
+    // trace. Pass-through (no penalties) → filtered === raw.
     if (doc.confidence !== undefined) {
       doc.confidenceTrace = {
         ...(doc.confidenceTrace ?? {}),
         filtered: doc.confidence,
+        evidence: evScore,
       };
     }
 
