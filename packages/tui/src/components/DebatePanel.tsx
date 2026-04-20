@@ -9,7 +9,7 @@ export interface DebateRound {
   round: number;
   supporters: Array<{
     id: string;
-    stance: 'AGREE' | 'DISAGREE';
+    stance: 'AGREE' | 'DISAGREE' | 'NEUTRAL';
     reasoning: string;
     isDevilsAdvocate?: boolean;
   }>;
