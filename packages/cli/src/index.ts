@@ -33,6 +33,7 @@ import { runDoctor, formatDoctorReport, runLiveHealthCheck } from './commands/do
 import { listProviders, formatProviderList } from './commands/providers.js';
 import { getModelLeaderboard, formatLeaderboard } from './commands/models.js';
 import { explainSession } from './commands/explain.js';
+import { traceSession } from './commands/trace.js';
 import { computeAgreementMatrix, formatAgreementMatrix } from './commands/agreement.js';
 import { loadSessionForReplay } from './commands/replay.js';
 import { startDashboard } from './commands/dashboard.js';
@@ -147,6 +148,20 @@ program.command('explain <session>').description('Explain a past review session 
     process.exit(1);
   }
 });
+
+program
+  .command('trace <session>')
+  .description('Show confidence-trace breakdown per finding (e.g. 2026-04-20/001)')
+  .option('-f, --finding <idx>', 'Drill into a specific finding by 1-based index', (v) => parseInt(v, 10))
+  .action(async (session: string, opts: { finding?: number }) => {
+    try {
+      const result = await traceSession(process.cwd(), session, { finding: opts.finding });
+      console.log(result.output);
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
 
 program.command('agreement <session>').description('Show reviewer agreement matrix for a session').action(async (session: string) => {
   try {
