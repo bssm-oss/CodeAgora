@@ -91,4 +91,24 @@ describe('buildReviewerMessages', () => {
     const { user } = buildReviewerMessages(SAMPLE_DIFF, '');
     expect(user).toContain('No summary provided');
   });
+
+  // -------------------------------------------------------------------------
+  // Few-shot examples: both "issue present" and "no issues" cases
+  // -------------------------------------------------------------------------
+
+  it('system contains both a positive (issue) and negative (no-issues) example', () => {
+    const { system } = buildReviewerMessages(SAMPLE_DIFF, SAMPLE_SUMMARY);
+    // Positive example — preserved from earlier revisions
+    expect(system).toContain('SQL Injection Vulnerability');
+    // Negative example — reviewer should have canonical "no-issues" format
+    expect(system).toMatch(/Example 2.*NO issues/is);
+    expect(system).toContain('## No Issues');
+  });
+
+  it('user prompt directs to No Issues format when nothing to flag', () => {
+    const { user } = buildReviewerMessages(SAMPLE_DIFF, SAMPLE_SUMMARY);
+    // Instruction must point to Example 2 and forbid fabricated Issue blocks
+    expect(user).toMatch(/No Issues/i);
+    expect(user).toMatch(/do not.*invent|do NOT invent/i);
+  });
 });

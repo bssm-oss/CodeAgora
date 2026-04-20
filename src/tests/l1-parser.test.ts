@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseEvidenceResponse } from '@codeagora/core/l1/parser.js';
+import { parseEvidenceResponse, isExplicitNoIssues } from '@codeagora/core/l1/parser.js';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -59,6 +59,65 @@ describe('parseEvidenceResponse()', () => {
     it('is case-insensitive for no-issues phrases', () => {
       expect(parseEvidenceResponse('NO ISSUES FOUND')).toHaveLength(0);
       expect(parseEvidenceResponse('LOOKS GOOD')).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // isExplicitNoIssues() — used by L1 reviewer to gate parse-failure logs
+  // -------------------------------------------------------------------------
+
+  describe('isExplicitNoIssues()', () => {
+    it('recognizes canonical "no issues found" phrasing', () => {
+      expect(isExplicitNoIssues('No issues found.')).toBe(true);
+      expect(isExplicitNoIssues('No problems found in this diff.')).toBe(true);
+      expect(isExplicitNoIssues('no concerns')).toBe(true);
+    });
+
+    it('recognizes qualifier variants (significant/real/critical/major/obvious)', () => {
+      expect(isExplicitNoIssues('No significant issues identified.')).toBe(true);
+      expect(isExplicitNoIssues('No real problems detected.')).toBe(true);
+      expect(isExplicitNoIssues('No critical concerns in this change.')).toBe(true);
+      expect(isExplicitNoIssues('No obvious bugs.')).toBe(true);
+    });
+
+    it('recognizes "nothing to flag/report/fix" phrasings', () => {
+      expect(isExplicitNoIssues('Nothing to flag.')).toBe(true);
+      expect(isExplicitNoIssues('Nothing to report here.')).toBe(true);
+      expect(isExplicitNoIssues('Nothing to fix.')).toBe(true);
+    });
+
+    it('recognizes "looks good/fine/ok" phrasings', () => {
+      expect(isExplicitNoIssues('The code looks good to me.')).toBe(true);
+      expect(isExplicitNoIssues('Looks fine.')).toBe(true);
+      expect(isExplicitNoIssues('This looks clean.')).toBe(true);
+    });
+
+    it('recognizes short approvals (LGTM, ship it, all good)', () => {
+      expect(isExplicitNoIssues('LGTM')).toBe(true);
+      expect(isExplicitNoIssues('Ship it!')).toBe(true);
+      expect(isExplicitNoIssues('All good.')).toBe(true);
+      expect(isExplicitNoIssues('All clear.')).toBe(true);
+    });
+
+    it('recognizes Korean "no issues" phrasings', () => {
+      expect(isExplicitNoIssues('문제 없음')).toBe(true);
+      expect(isExplicitNoIssues('이슈 없음')).toBe(true);
+      expect(isExplicitNoIssues('괜찮습니다')).toBe(true);
+    });
+
+    it('handles markdown heading prefix before the phrase', () => {
+      expect(isExplicitNoIssues('## No Issues\n\nLooks good.')).toBe(true);
+      expect(isExplicitNoIssues('### Result\n\nNothing to flag.')).toBe(true);
+    });
+
+    it('returns false for empty/whitespace responses', () => {
+      expect(isExplicitNoIssues('')).toBe(false);
+      expect(isExplicitNoIssues('   \n\t  ')).toBe(false);
+    });
+
+    it('returns false for actual issue prose (not an approval)', () => {
+      expect(isExplicitNoIssues('The function has a SQL injection vulnerability.')).toBe(false);
+      expect(isExplicitNoIssues('Memory leak detected in handler.')).toBe(false);
     });
   });
 

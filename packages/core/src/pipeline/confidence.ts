@@ -37,7 +37,15 @@ export function computeL1Confidence(
   if (agreeing === 1 && totalReviewers >= 3) {
     // Diff-size correction: large diffs may have legitimate single-reviewer finds
     const isLargeDiff = (totalDiffLines ?? 0) > 500;
-    const penalty = isLargeDiff ? 0.7 : 0.5;
+    let penalty = isLargeDiff ? 0.7 : 0.5;
+    // Lonely-high-severity correction: a single reviewer declaring
+    // CRITICAL/HARSHLY_CRITICAL with no independent corroboration is a
+    // common false-positive mode — they may be pattern-matching on
+    // security keywords without verifying the actual impact. Apply an
+    // additional dampener so such claims land in verify/suggestion rather
+    // than must-fix before L2 discussion has a chance to downgrade them.
+    const isHighSeverity = doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
+    if (isHighSeverity) penalty *= 0.75;
     base = Math.round(base * penalty);
   } else if (agreeing >= 3) {
     // Strong corroboration boost (capped at 100)

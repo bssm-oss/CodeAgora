@@ -54,6 +54,17 @@ function is422Error(err: unknown): boolean {
 }
 
 /**
+ * Check if a 422 error is specifically the "GitHub Actions is not permitted
+ * to approve pull requests" limitation (GITHUB_TOKEN cannot submit APPROVE
+ * reviews — this is a platform restriction, not a code problem).
+ */
+function isApprovalPermissionError(err: unknown): boolean {
+  if (!is422Error(err)) return false;
+  const message = err instanceof Error ? err.message : String(err);
+  return /not permitted to approve/i.test(message);
+}
+
+/**
  * Check if an error is a 429 rate-limit error.
  */
 function is429Error(err: unknown): boolean {
@@ -121,19 +132,47 @@ async function postReviewWithRetry(
   review: GitHubReview,
   inlineComments: Array<{ path: string; position: number; body: string }>,
 ): Promise<{ id: number; html_url: string }> {
+  // Effective review may be downgraded below (APPROVE → COMMENT) if the token
+  // lacks approval permission. `effectiveEvent` is the event used for all
+  // downstream posts once that downgrade decision is made.
+  let effectiveEvent: GitHubReview['event'] = review.event;
+
   try {
     const response = await createReviewWithRateLimit(kit, {
       owner: config.owner,
       repo: config.repo,
       pull_number: prNumber,
       commit_id: review.commit_id,
-      event: review.event,
+      event: effectiveEvent,
       body: review.body,
       comments: inlineComments,
     });
     return response.data;
   } catch (err: unknown) {
     if (!is422Error(err)) throw err;
+
+    // GITHUB_TOKEN from Actions cannot submit APPROVE reviews (platform
+    // restriction). Downgrade to COMMENT so the summary + inline findings
+    // still land on the PR. Verdict still conveyed via the body.
+    if (isApprovalPermissionError(err) && effectiveEvent === 'APPROVE') {
+      console.warn('[GitHub] GITHUB_TOKEN cannot approve PRs; downgrading APPROVE → COMMENT to preserve review body + inline comments.');
+      effectiveEvent = 'COMMENT';
+      try {
+        const response = await createReviewWithRateLimit(kit, {
+          owner: config.owner,
+          repo: config.repo,
+          pull_number: prNumber,
+          commit_id: review.commit_id,
+          event: effectiveEvent,
+          body: review.body,
+          comments: inlineComments,
+        });
+        return response.data;
+      } catch (retryErr: unknown) {
+        if (!is422Error(retryErr)) throw retryErr;
+        // Still 422 → must be position errors; fall through to bisection.
+      }
+    }
 
     // 422: at least one comment has a bad position — bisect to find valid ones
     const totalCount = inlineComments.length;
@@ -144,7 +183,7 @@ async function postReviewWithRetry(
         repo: config.repo,
         pull_number: prNumber,
         commit_id: review.commit_id,
-        event: review.event,
+        event: effectiveEvent,
         body: review.body,
         comments: [],
       });
@@ -167,7 +206,7 @@ async function postReviewWithRetry(
       repo: config.repo,
       pull_number: prNumber,
       commit_id: review.commit_id,
-      event: review.event,
+      event: effectiveEvent,
       body: review.body,
       comments: survivors,
     });

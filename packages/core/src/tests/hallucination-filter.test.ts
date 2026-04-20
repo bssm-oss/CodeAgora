@@ -279,6 +279,134 @@ describe('Check 4: Self-contradiction detection', () => {
 });
 
 // ============================================================================
+// Check 5: Speculative Language Penalty
+// ============================================================================
+
+describe('Check 5: Speculative language penalty', () => {
+  it('should penalize "may not exist" phrasing', () => {
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'The helper may not exist in the target environment, causing runtime failure.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(56); // 80 * 0.7
+  });
+
+  it('should penalize "potentially unsupported" phrasing', () => {
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'Potentially unsupported API invocation for this provider.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(56);
+  });
+
+  it('should penalize "could fail" phrasing', () => {
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'This computation could fail under high concurrency.',
+      confidence: 90,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(63); // round(90 * 0.7)
+  });
+
+  it('should penalize "appears to" / "seems to" phrasing', () => {
+    const docs = [
+      makeDoc({
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+        problem: 'The function appears to handle null incorrectly.',
+        confidence: 80,
+      }),
+      makeDoc({
+        filePath: 'src/utils.ts',
+        lineRange: [10, 12],
+        problem: 'This seems to leak a file handle.',
+        confidence: 80,
+      }),
+    ];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(56);
+    expect(result.filtered[1].confidence).toBe(56);
+  });
+
+  it('should penalize when hedge marker is in suggestion text only', () => {
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'The helper returns an unchecked value.',
+      suggestion: 'Add a null check; the current code unclear about edge cases.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(56);
+  });
+
+  it('should NOT penalize plain declarative findings', () => {
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'The helper returns without validating the input range.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(80);
+  });
+
+  it('should NOT trip on "may" used non-speculatively', () => {
+    // "may" without a speculative collocation should not match
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'The May 2026 release introduces a breaking change in this helper.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidence).toBe(80);
+  });
+
+  it('should stack with contradiction penalty', () => {
+    const docs = [makeDoc({
+      filePath: 'src/deprecated.ts',
+      lineRange: [1, 5],
+      problem: 'A new variable was added that may leak memory.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
+
+    // check 4 (contradiction: claims "added" but only removals) × check 5 (hedge "may leak")
+    // 80 * 0.5 * 0.7 = 28
+    expect(result.filtered[0].confidence).toBe(28);
+  });
+
+  it('should populate confidenceTrace.filtered after speculation penalty', () => {
+    const docs = [makeDoc({
+      filePath: 'src/utils.ts',
+      lineRange: [10, 12],
+      problem: 'The helper appears to mishandle null inputs.',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidenceTrace?.filtered).toBe(56);
+    expect(result.filtered[0].confidenceTrace?.filtered).toBe(result.filtered[0].confidence);
+  });
+});
+
+// ============================================================================
 // Uncertainty Routing
 // ============================================================================
 

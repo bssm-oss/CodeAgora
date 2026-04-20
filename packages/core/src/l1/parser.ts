@@ -13,6 +13,44 @@ import { fuzzyMatchFilePath } from '@codeagora/shared/utils/diff.js';
 const EVIDENCE_BLOCK_REGEX = /## Issue:\s*(.+?)\n[\s\S]*?### (?:Problem|문제)\n([\s\S]*?)### (?:Evidence|근거)\n([\s\S]*?)### (?:Severity|심각도)\n([\s\S]*?)### (?:Suggestion|제안)\n([\s\S]*?)(?=\n## Issue:|$)/gi;
 
 /**
+ * Patterns that explicitly signal "no issues" — used both to short-circuit
+ * parsing and (via isExplicitNoIssues) to suppress spurious parse-failure logs.
+ *
+ * Anchored to common phrasings seen in reviewer outputs across model families:
+ *   - "No (significant|real|critical|major) issues|problems|concerns found/here"
+ *   - "Nothing to (flag|report|fix|review|worry about)"
+ *   - "(The code) looks (good|fine|ok|okay|clean|correct)"
+ *   - "All (good|ok|clear)"
+ *   - "LGTM" / "ship it"
+ *   - Korean: "문제 없음", "이슈 없음", "괜찮"
+ */
+const NO_ISSUES_PATTERNS: RegExp[] = [
+  /\bno\s+(?:significant|real|critical|major|obvious|notable|serious)?\s*(?:issues?|problems?|concerns?|bugs?)\b/i,
+  /\bnothing\s+(?:to\s+)?(?:flag|report|fix|review|worry)\b/i,
+  /\b(?:the\s+)?(?:code|diff|change)?\s*looks\s+(?:good|fine|ok|okay|clean|correct)\b/i,
+  /\ball\s+(?:good|ok|okay|clear)\b/i,
+  /\blgtm\b/i,
+  /\bship\s+it\b/i,
+  /문제\s*없/,
+  /이슈\s*없/,
+  /괜찮/,
+];
+
+/**
+ * Returns true if `response` explicitly signals "no issues found" —
+ * i.e. the parser returning [] is an intentional empty result, not a parse failure.
+ * Used by L1 reviewer to suppress the unparseable-response warning log.
+ */
+export function isExplicitNoIssues(response: string): boolean {
+  const trimmed = response.trim();
+  if (trimmed.length === 0) return false;
+  // Strip leading markdown header(s) like "## No Issues" / "### Result" so
+  // patterns match the prose body even when prefixed with a heading.
+  const normalized = trimmed.replace(/^\s*#{1,6}\s+[^\n]*\n+/, '');
+  return NO_ISSUES_PATTERNS.some((p) => p.test(normalized) || p.test(trimmed));
+}
+
+/**
  * Parse reviewer response into evidence documents
  */
 export function parseEvidenceResponse(
@@ -57,19 +95,8 @@ export function parseEvidenceResponse(
     }
   }
 
-  // Only treat as "no issues" when no evidence blocks were parsed AND
-  // the response explicitly says so (not just contains the phrase in passing)
-  if (documents.length === 0) {
-    const lowerResponse = response.toLowerCase().trim();
-    if (
-      lowerResponse.includes('no issues found') ||
-      lowerResponse.includes('no problems found') ||
-      /^(the\s+)?(code\s+)?looks\s+good/m.test(lowerResponse)
-    ) {
-      return [];
-    }
-  }
-
+  // No evidence blocks parsed: let callers decide via isExplicitNoIssues()
+  // whether this was an intentional empty result vs a parse failure.
   return documents;
 }
 

@@ -2,14 +2,15 @@
  * Pre-Debate Hallucination Filter (#428)
  * Validates evidence documents against the actual diff before L2 debate.
  *
- * 4 checks (zero model cost):
+ * 5 checks (zero model cost):
  * 1. File existence — filePath must be in diff file list
  * 2. Line range — lineRange must overlap at least one diff hunk
  * 3. Code quote — inline code quotes must exist in diff content
  * 4. Self-contradiction — finding must not contradict observed change direction
+ * 5. Speculative language — hedge markers in problem/suggestion dampen confidence
  *
  * Findings that fail checks 1-2 are hard-removed.
- * Checks 3-4 apply confidence penalties (soft) and may flag as uncertain.
+ * Checks 3-5 apply confidence penalties (soft) and may flag as uncertain.
  */
 
 import type { EvidenceDocument } from '../types/core.js';
@@ -58,6 +59,44 @@ function parseDiffChangeDirection(diffContent: string): Map<string, { added: str
 // Contradiction signal keywords
 const ADDED_SIGNALS = ['added', 'introduced', 'new import', 'new variable', 'new function'];
 const REMOVED_SIGNALS = ['removed', 'deleted', 'missing', 'no longer'];
+
+/**
+ * Hedge / speculative-language markers (Check 5).
+ *
+ * Reviewers often flag concerns they can't verify from the diff alone
+ * (e.g. "model may not exist on provider", "could fail at runtime"). The
+ * severity label may still be CRITICAL while the wording signals low
+ * conviction. Dampening confidence on these markers nudges such findings
+ * toward the verify/uncertain bucket instead of must-fix.
+ *
+ * Kept conservative: each pattern requires a specific speculative
+ * collocation (not just the word "may") to avoid false matches on
+ * legitimate hedged descriptions of diff-local bugs.
+ */
+const SPECULATIVE_MARKERS: RegExp[] = [
+  /\b(?:may|might|could)\b\s+(?:\w+\s+){0,2}(?:not|fail|break|cause|lead|be|exist|return|throw|work|support|allow|have|leak|crash)\b/i,
+  /\bpotentially\s+(?:unsupported|broken|incorrect|missing|invalid|unavailable|unsafe|insecure)\b/i,
+  /\bpossibly\b/i,
+  /\bperhaps\b/i,
+  /\bunverifi(?:ed|able)\b/i,
+  /\bappears?\s+to\b/i,
+  /\bseems?\s+to\b/i,
+  /\bassum(?:e|ed|ing)\b/i,
+  /\bunclear\b/i,
+  /\bnot\s+(?:sure|certain|confirmed|verified)\b/i,
+  /\bcan'?t\s+(?:verify|confirm)\b/i,
+];
+
+const SPECULATION_PENALTY = 0.7;
+
+/**
+ * Check 5: Detect speculative/hedge language signaling low reviewer conviction.
+ * Returns a penalty multiplier (0.7 on hit, 1.0 otherwise).
+ */
+function checkSpeculation(doc: EvidenceDocument): number {
+  const haystack = `${doc.problem}\n${doc.suggestion ?? ''}`;
+  return SPECULATIVE_MARKERS.some((p) => p.test(haystack)) ? SPECULATION_PENALTY : 1.0;
+}
 
 /**
  * Check 4: Detect self-contradiction between finding description and diff.
@@ -156,6 +195,13 @@ export function filterHallucinations(
     const contradictionPenalty = checkContradiction(doc, changeMap);
     if (contradictionPenalty < 1.0) {
       const penalized = Math.round((doc.confidence ?? 50) * contradictionPenalty);
+      doc.confidence = penalized; // BC: legacy single-field confidence
+    }
+
+    // Check 5: Speculative language penalty — hedge words dampen confidence
+    const speculationPenalty = checkSpeculation(doc);
+    if (speculationPenalty < 1.0) {
+      const penalized = Math.round((doc.confidence ?? 50) * speculationPenalty);
       doc.confidence = penalized; // BC: legacy single-field confidence
     }
 
