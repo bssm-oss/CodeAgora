@@ -259,6 +259,19 @@ Two fixture kinds live side by side:
 
 Current seed fixtures: 3 recall cases (off-by-one, null-deref, SQL injection) + 1 FP regression (PR #490 moderator regex). See `benchmarks/golden-bugs/README.md` for fixture format.
 
+### Baseline (n=1, 2026-04-20)
+
+Single live run with the default 3-reviewer OpenRouter config ([run #24666562754](https://github.com/bssm-oss/CodeAgora/actions/runs/24666562754)):
+
+| Metric | Value |
+|---|---|
+| mean recall@3 | 100.0% |
+| mean recall@5 | 100.0% |
+| mean recall@10 | 100.0% |
+| FP regressions triggered | 1/1 |
+
+All three recall cases (off-by-one, null-deref, SQL injection) caught in top-3. The `fp-moderator-regex` case — which mirrors the merged PR #490 diff — triggered the FP branch with 3 CRITICAL findings at 100% confidence, confirming the "high-confidence corroborated FP" blind spot the calibration stack does not yet cover. This baseline is a single-run sample; values will drift between runs due to LLM non-determinism.
+
 ---
 
 ## License

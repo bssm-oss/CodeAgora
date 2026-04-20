@@ -2,23 +2,45 @@ diff --git a/packages/core/src/l2/moderator.ts b/packages/core/src/l2/moderator.
 index 7777777..8888888 100644
 --- a/packages/core/src/l2/moderator.ts
 +++ b/packages/core/src/l2/moderator.ts
-@@ -750,10 +750,16 @@ function extractModeratorJsonPayload(response: string): string | null {
-   const trimmed = response.trim();
-   if (trimmed.startsWith('{')) {
-     return trimmed;
-   }
--  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
--  if (match) {
--    return match[1].trim();
-+  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
-+  if (fenceMatch) {
-+    return fenceMatch[1].trim();
-   }
-   return null;
- }
+@@ -745,3 +745,44 @@
++/**
++ * JSON schema for moderator forced-decision verdict.
++ * Kept structurally compatible with the markdown-parser output.
++ */
++const ModeratorVerdictJsonSchema = z.object({
++  severity: z.enum(['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION', 'DISMISSED']),
++  reasoning: z.string().min(1),
++});
 +
-+export function parseForcedDecisionJson(response: string) {
++/** Extract a JSON payload from a possibly-wrapped response (whole-response only). */
++function extractModeratorJsonPayload(response: string): string | null {
++  const trimmed = response.trim();
++  const fullFence = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
++  if (fullFence && fullFence[1]) return fullFence[1].trim();
++  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
++  return null;
++}
++
++/**
++ * Parse a JSON-mode moderator verdict response. Returns null when the
++ * response is not recognizable as JSON (caller can fall back to the
++ * regex-based parser).
++ */
++export function parseForcedDecisionJson(
++  response: string,
++): { severity: Severity; reasoning: string } | null {
 +  const payload = extractModeratorJsonPayload(response);
-+  if (!payload) return null;
-+  return ModeratorVerdictJsonSchema.safeParse(JSON.parse(payload)).data ?? null;
++  if (payload === null) return null;
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(payload);
++  } catch {
++    return null;
++  }
++  const result = ModeratorVerdictJsonSchema.safeParse(parsed);
++  if (!result.success) return null;
++  return {
++    severity: result.data.severity,
++    reasoning: result.data.reasoning,
++  };
 +}

@@ -4,5 +4,5 @@
   "source": "CodeAgora PR #490 (merged 2026-04-20 with admin override)",
   "category": "fp-regression",
   "expectedFindings": [],
-  "notes": "Self-review on PR #490 falsely claimed the regex literal contained zero-width-space characters at 90–93% confidence, with 2/3 reviewer corroboration. Verification via `od -c` showed pure ASCII. A competent review of this diff must report no findings — any CRITICAL/HARSHLY_CRITICAL claim about invisible characters is a regression of the exact FP the calibration stack is meant to catch."
+  "notes": "Mirrors the actual merged PR #490 diff: schema, payload extractor, and parseForcedDecisionJson with try/catch around JSON.parse, plus Zod safeParse for schema validation. No real bug exists in this code. Self-review on the original PR falsely claimed the regex literal contained zero-width-space characters at 90–93% confidence (verified pure ASCII via `od -c`). Any finding at CRITICAL/HARSHLY_CRITICAL on this diff is a regression of the calibration stack."
 }
