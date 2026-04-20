@@ -147,14 +147,26 @@ export function filterHallucinations(
         }
       }
       if (fabricatedCount > codeQuotes.length / 2) {
-        doc.confidence = Math.round((doc.confidence ?? 50) * 0.5);
+        const penalized = Math.round((doc.confidence ?? 50) * 0.5);
+        doc.confidence = penalized; // BC: legacy single-field confidence
       }
     }
 
     // Check 4: Self-contradiction detection
     const contradictionPenalty = checkContradiction(doc, changeMap);
     if (contradictionPenalty < 1.0) {
-      doc.confidence = Math.round((doc.confidence ?? 50) * contradictionPenalty);
+      const penalized = Math.round((doc.confidence ?? 50) * contradictionPenalty);
+      doc.confidence = penalized; // BC: legacy single-field confidence
+    }
+
+    // ConfidenceTrace: record post-filter confidence (stage 2 of 5).
+    // Always set before routing so uncertain-bucket docs also carry the trace.
+    // Pass-through (no penalties applied) → filtered === raw.
+    if (doc.confidence !== undefined) {
+      doc.confidenceTrace = {
+        ...(doc.confidenceTrace ?? {}),
+        filtered: doc.confidence,
+      };
     }
 
     // Route low-confidence findings to uncertain instead of filtered

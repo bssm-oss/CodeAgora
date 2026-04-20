@@ -45,6 +45,11 @@ export function parseEvidenceResponse(
         filePath: fileInfo.filePath,
         lineRange: fileInfo.lineRange,
         ...(reviewerConfidence !== undefined && { confidence: reviewerConfidence }),
+        // ConfidenceTrace: record raw reviewer-emitted confidence (stage 1 of 5).
+        // See packages/shared/src/types/confidence-trace.ts for stage semantics.
+        ...(reviewerConfidence !== undefined && {
+          confidenceTrace: { raw: reviewerConfidence },
+        }),
       });
     } catch (_error) {
       // Skip malformed evidence blocks
