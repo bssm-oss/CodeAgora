@@ -16,7 +16,11 @@ import { SeveritySchema } from './severity.js';
 
 export const ExpectedFindingSchema = z.object({
   filePath: z.string().min(1),
-  lineRange: z.tuple([z.number().int().min(1), z.number().int().min(1)]),
+  lineRange: z
+    .tuple([z.number().int().min(1), z.number().int().min(1)])
+    .refine(([start, end]) => start <= end, {
+      message: 'lineRange must be non-inverted (start <= end)',
+    }),
   /**
    * Allowed deviation (in lines) around `lineRange` when matching. Defaults
    * to 10 to stay consistent with the hallucination filter's ±10 window.

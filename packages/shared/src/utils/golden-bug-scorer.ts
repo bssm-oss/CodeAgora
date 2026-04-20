@@ -14,7 +14,7 @@
  * regression — `falsePositives` contains the offending findings.
  */
 
-import { SEVERITY_ORDER, type Severity } from '../types/severity.js';
+import type { Severity } from '../types/severity.js';
 import {
   DEFAULT_LINE_TOLERANCE,
   type ExpectedFinding,

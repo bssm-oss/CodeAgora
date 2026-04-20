@@ -65,6 +65,25 @@ describe('GoldenBugFixtureSchema', () => {
     });
     expect(fx.expectedFindings).toEqual([]);
   });
+
+  it('rejects inverted lineRange (start > end)', () => {
+    expect(() =>
+      GoldenBugFixtureSchema.parse({
+        id: 'inverted',
+        title: 't',
+        source: 's',
+        category: 'hotfix',
+        expectedFindings: [
+          {
+            filePath: 'a.ts',
+            lineRange: [12, 10],
+            minSeverity: 'WARNING',
+            rationale: 'r',
+          },
+        ],
+      }),
+    ).toThrow(/non-inverted/);
+  });
 });
 
 describe('matching primitives', () => {
