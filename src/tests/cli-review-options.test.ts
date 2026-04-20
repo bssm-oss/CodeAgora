@@ -104,9 +104,10 @@ describe('formatGithub', () => {
   it('should contain severity section headers when issues are present', () => {
     // successResult has no evidenceDocs — sections only render when count > 0
     // Use mockResultWithSummary which has CRITICAL and WARNING evidence docs
+    // SEVERITY_GITHUB maps CRITICAL → 'Error', WARNING → 'Warning'
     const output = formatGithub(mockResultWithSummary);
-    expect(output).toContain('CRITICAL');
-    expect(output).toContain('WARNING');
+    expect(output).toContain('Error');
+    expect(output).toContain('Warning');
   });
 
   it('should format error with ❌', () => {
