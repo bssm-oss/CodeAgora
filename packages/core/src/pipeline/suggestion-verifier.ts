@@ -147,7 +147,15 @@ export async function verifySuggestions(
 
     // Apply confidence penalty on failure
     if (result.status === 'failed') {
-      doc.confidence = Math.round((doc.confidence ?? 50) * 0.5);
+      const penalized = Math.round((doc.confidence ?? 50) * 0.5);
+      doc.confidence = penalized; // BC: legacy single-field confidence
+      // ConfidenceTrace: record post-suggestion-verify confidence (stage 4 of 5).
+      // Only populated on verification failure — pass/skipped docs leave
+      // `verified` absent so downstream consumers fall back to `corroborated`.
+      doc.confidenceTrace = {
+        ...(doc.confidenceTrace ?? {}),
+        verified: penalized,
+      };
     }
   }
 }
