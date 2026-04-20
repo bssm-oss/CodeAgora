@@ -1,0 +1,55 @@
+/**
+ * Confidence value at each pipeline stage.
+ *
+ * Every field is written ONCE (append-only semantics) and never mutated after
+ * assignment. This type replaces the single `confidence` field that previously
+ * changed meaning across five different pipeline stages.
+ *
+ * Stage ordering (matches packages/core/src/pipeline/orchestrator.ts):
+ *   parser → hallucination-filter → L1 corroboration → suggestion-verifier → L2 adjust
+ */
+
+import { z } from 'zod';
+
+export const ConfidenceTraceSchema = z.object({
+  /**
+   * Raw confidence parsed from reviewer output (e.g., "(85%)").
+   * Set by: packages/core/src/l1/parser.ts
+   * Range: 0–100, or undefined if the reviewer did not emit a confidence value.
+   */
+  raw: z.number().min(0).max(100).optional(),
+
+  /**
+   * Confidence after hallucination-filter penalties.
+   * Set by: packages/core/src/pipeline/hallucination-filter.ts
+   * Equals raw × 0.5 when code-quote fabrication or self-contradiction detected;
+   * otherwise equals raw (pass-through).
+   */
+  filtered: z.number().min(0).max(100).optional(),
+
+  /**
+   * Confidence after L1 corroboration (agreement-weighted blend).
+   * Set by: packages/core/src/pipeline/confidence.ts via orchestrator.ts
+   * Formula: round(filtered × 0.6 + agreementRate × 0.4), scaled by agreeing count.
+   */
+  corroborated: z.number().min(0).max(100).optional(),
+
+  /**
+   * Confidence after suggestion-verifier (CRITICAL+ only, tsc transpile check).
+   * Set by: packages/core/src/pipeline/suggestion-verifier.ts
+   * Equals corroborated × 0.5 when suggestion fails to compile; otherwise
+   * absent (downstream consumers fall back to `corroborated`).
+   */
+  verified: z.number().min(0).max(100).optional(),
+
+  /**
+   * Final confidence after L2 discussion adjustment.
+   * Set by: packages/core/src/pipeline/stage-executors.ts adjustConfidenceFromDiscussion
+   * This is the authoritative value for downstream consumers (triage, formatter,
+   * GitHub mapper, TUI, web). For docs that did not enter L2, this mirrors
+   * `verified ?? corroborated`.
+   */
+  final: z.number().min(0).max(100).optional(),
+});
+
+export type ConfidenceTrace = z.infer<typeof ConfidenceTraceSchema>;

@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { ConfidenceTraceSchema } from '@codeagora/shared/types/confidence-trace.js';
 
 // ============================================================================
 // Result Type (functional error handling)
@@ -48,7 +49,19 @@ export const EvidenceDocumentSchema = z.object({
   filePath: z.string(),
   lineRange: z.tuple([z.number(), z.number()]),
   source: z.enum(['llm', 'rule']).optional(),
+  /**
+   * @deprecated Use `confidenceTrace.final` for all downstream reads. The
+   * single-field confidence is being split into per-stage ConfidenceTrace
+   * values. This field is currently maintained in parallel for backward
+   * compatibility with existing tests and call sites.
+   */
   confidence: z.number().min(0).max(100).optional(),
+  /**
+   * Per-stage confidence values. Each field is written once by the owning
+   * pipeline stage and never mutated afterward. See ConfidenceTrace for
+   * stage ordering and semantics.
+   */
+  confidenceTrace: ConfidenceTraceSchema.optional(),
   suggestionVerified: z.enum(['passed', 'failed', 'skipped']).optional(),
 });
 export type EvidenceDocument = z.infer<typeof EvidenceDocumentSchema>;
