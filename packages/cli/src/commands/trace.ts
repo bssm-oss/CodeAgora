@@ -35,10 +35,21 @@ function assertSafeSessionPath(baseDir: string, date: string, id: string): strin
   if (date.includes('..') || id.includes('..')) {
     throw new Error('Path traversal detected in session path');
   }
+  // Null-byte injection guard (some platforms interpret \0 as path terminator)
+  if (date.includes('\0') || id.includes('\0')) {
+    throw new Error('Path traversal detected in session path');
+  }
   const sessionDir = path.join(baseDir, '.ca', 'sessions', date, id);
   const resolved = path.resolve(sessionDir);
   const expectedPrefix = path.resolve(path.join(baseDir, '.ca', 'sessions'));
-  if (!resolved.startsWith(expectedPrefix + path.sep)) {
+  // Use path.relative for cross-platform containment check. startsWith on
+  // Windows is case-sensitive but the file system is not, so a path like
+  // `C:\...` could match `c:\...` only at runtime, creating a traversal
+  // bypass. path.relative normalizes both sides and yields a clean answer:
+  // if the relative path starts with `..` or is absolute, `resolved` is
+  // outside `expectedPrefix`. See #485 self-review (HARSHLY_CRITICAL).
+  const rel = path.relative(expectedPrefix, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
     throw new Error('Session path resolves outside sessions directory');
   }
   return sessionDir;

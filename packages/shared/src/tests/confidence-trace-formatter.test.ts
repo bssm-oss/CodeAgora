@@ -129,6 +129,56 @@ describe('classifyTriageTab', () => {
   });
 });
 
+describe('formatFindingTrace — defensive handling (#485 review)', () => {
+  it('renders placeholders for missing filePath / issueTitle / severity', () => {
+    const broken = {
+      confidenceTrace: { final: 50 },
+      lineRange: [1, 1] as [number, number],
+    } as unknown as TraceableDoc;
+    const lines = formatFindingTrace(broken, 1);
+    expect(lines[0]).toContain('<unknown file>');
+    expect(lines[0]).toContain('<untitled>');
+    expect(lines[0]).toContain('<unknown severity>');
+  });
+
+  it('renders "?" when lineRange is missing or malformed', () => {
+    const noRange = {
+      issueTitle: 'No range',
+      severity: 'WARNING',
+      filePath: 'src/a.ts',
+      confidenceTrace: { final: 50 },
+    } as unknown as TraceableDoc;
+    expect(formatFindingTrace(noRange, 1)[0]).toContain(':?');
+
+    const badRange = {
+      issueTitle: 'Bad range',
+      severity: 'WARNING',
+      filePath: 'src/a.ts',
+      lineRange: 'not an array',
+      confidenceTrace: { final: 50 },
+    } as unknown as TraceableDoc;
+    expect(formatFindingTrace(badRange, 1)[0]).toContain(':?');
+  });
+
+  it('does not throw when entire doc shape is malformed', () => {
+    const trash = { severity: null } as unknown as TraceableDoc;
+    expect(() => formatFindingTrace(trash, 99)).not.toThrow();
+  });
+});
+
+describe('buildTraceRows — NaN guard in inferMultiplier', () => {
+  it('does not match any multiplier when stage values are non-finite', () => {
+    const doc = {
+      issueTitle: 't', severity: 'WARNING', filePath: 'a.ts',
+      lineRange: [1, 1] as [number, number],
+      confidenceTrace: { raw: NaN as unknown as number, filtered: 50 },
+    } as TraceableDoc;
+    const rows = buildTraceRows(doc);
+    const filtered = rows.find(r => r.label === 'filtered');
+    expect(filtered?.note).not.toMatch(/×0\.|×1\./);
+  });
+});
+
 describe('formatFindingTrace', () => {
   it('produces a header line with index, path, severity', () => {
     const doc = makeDoc({

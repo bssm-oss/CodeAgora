@@ -34,7 +34,10 @@ const STAGE_ORDER = ['raw', 'filtered', 'corroborated', 'verified', 'final'] as 
  * Returns the label for the first matching multiplier, or null if unclear.
  */
 function inferMultiplier(current: number, prev: number): { ratio: number; label: string } | null {
-  if (prev === 0) return null;
+  // Guard against non-finite inputs (malformed trace → NaN/Infinity) —
+  // an NaN ratio matches nothing below so we'd be safe, but we'd still
+  // do wasted comparisons. Bail early. See #485 self-review (SUGGESTION).
+  if (!Number.isFinite(current) || !Number.isFinite(prev) || prev === 0) return null;
   const ratio = current / prev;
   const KNOWN: Array<[number, string]> = [
     [1.0, 'pass-through'],
@@ -125,10 +128,26 @@ export function classifyTriageTab(doc: TraceableDoc): 'must-fix' | 'verify' | 'i
  */
 export function formatFindingTrace(doc: TraceableDoc, index: number): string[] {
   const lines: string[] = [];
-  const lineRange = doc.lineRange[0] === doc.lineRange[1]
-    ? `${doc.lineRange[0]}`
-    : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
-  lines.push(`[${index}] ${doc.filePath}:${lineRange} — ${doc.issueTitle} (${doc.severity})`);
+  // Defensive: TraceableDoc declares these fields as required but the CLI
+  // reads untyped session JSON, which may be malformed or from an older
+  // pipeline version. Fall back to placeholders instead of throwing on
+  // missing / invalid fields. See #485 self-review.
+  const filePath = typeof doc.filePath === 'string' && doc.filePath.length > 0
+    ? doc.filePath : '<unknown file>';
+  const issueTitle = typeof doc.issueTitle === 'string' && doc.issueTitle.length > 0
+    ? doc.issueTitle : '<untitled>';
+  const severity = typeof doc.severity === 'string' && doc.severity.length > 0
+    ? doc.severity : '<unknown severity>';
+  const hasValidRange = Array.isArray(doc.lineRange)
+    && doc.lineRange.length === 2
+    && Number.isFinite(doc.lineRange[0])
+    && Number.isFinite(doc.lineRange[1]);
+  const lineRange = !hasValidRange
+    ? '?'
+    : doc.lineRange[0] === doc.lineRange[1]
+      ? `${doc.lineRange[0]}`
+      : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
+  lines.push(`[${index}] ${filePath}:${lineRange} — ${issueTitle} (${severity})`);
 
   const rows = buildTraceRows(doc);
   const labelWidth = Math.max(...rows.map(r => r.label.length));
