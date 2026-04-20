@@ -121,6 +121,14 @@ export const ModeratorConfigSchema = z.object({
   model: z.string(),
   provider: z.string().optional(),
   timeout: z.number().default(120),
+  /**
+   * Forced-decision output format. Default (undefined/'markdown') uses the
+   * existing regex-based parser (structured "severity:" field → JSON-like
+   * pattern → keyword scan). `'json'` switches the prompt to emit a JSON
+   * object matching the forced-decision schema, which cheap models follow
+   * more reliably than markdown keywords. See #465.
+   */
+  outputFormat: z.enum(['markdown', 'json']).optional(),
 });
 export type ModeratorConfig = z.infer<typeof ModeratorConfigSchema>;
 
