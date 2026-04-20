@@ -67,7 +67,7 @@ export function formatCompact(params: {
       file: doc.filePath,
       line: doc.lineRange[0],
       title: doc.issueTitle,
-      confidence: doc.confidence ?? 50,
+      confidence: doc.confidenceTrace?.final ?? doc.confidence ?? 50,
     };
     const flaggers = reviewerMap?.[key];
     if (flaggers && flaggers.length > 0) {

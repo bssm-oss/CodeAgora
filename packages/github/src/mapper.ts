@@ -80,7 +80,7 @@ export function buildReviewComments(
 
     // Confidence filtering (1.6): skip inline comment if below threshold
     if (minConfidence !== undefined && minConfidence > 0) {
-      if ((doc.confidence ?? 0) < minConfidence) continue;
+      if ((doc.confidenceTrace?.final ?? doc.confidence ?? 0) < minConfidence) continue;
     }
 
     const position = resolveLineRange(positionIndex, doc.filePath, doc.lineRange);

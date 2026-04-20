@@ -211,7 +211,13 @@ export async function executeL2Discussions(
       d.filePath === verdict.filePath && Math.abs(d.lineRange[0] - verdict.lineRange[0]) <= 5
     );
     for (const doc of matchingDocs) {
-      doc.confidence = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
+      const adjusted = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
+      doc.confidence = adjusted; // BC: legacy single-field confidence
+      // ConfidenceTrace: record final confidence (stage 5 of 5).
+      doc.confidenceTrace = {
+        ...(doc.confidenceTrace ?? {}),
+        final: adjusted,
+      };
     }
 
     // Propagate average confidence to verdict for use in L3 head prompt (#229).

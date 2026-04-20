@@ -17,7 +17,7 @@ type TriageTab = 'must-fix' | 'verify' | 'suggestions';
 // ============================================================================
 
 function classifyIssue(issue: AggregatedIssue): TriageTab {
-  const conf = issue.confidence ?? 50;
+  const conf = issue.confidenceTrace?.final ?? issue.confidence ?? 50;
   if (conf < 20) return 'suggestions';
   const isCritical = issue.severity === 'CRITICAL' || issue.severity === 'HARSHLY_CRITICAL';
   const isWarning = issue.severity === 'WARNING';
@@ -88,11 +88,14 @@ export function TriageTabs({ evidenceDocs }: Props): React.JSX.Element {
                 <span className={`severity-badge ${severityClassMap[issue.severity]}`}>
                   {severityLabelMap[issue.severity]}
                 </span>
-                {issue.confidence !== undefined && (
-                  <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                    {issue.confidence}% confidence
-                  </span>
-                )}
+                {(() => {
+                  const conf = issue.confidenceTrace?.final ?? issue.confidence;
+                  return conf !== undefined ? (
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                      {conf}% confidence
+                    </span>
+                  ) : null;
+                })()}
                 <span style={{ fontSize: '12px', color: 'var(--color-accent)', fontFamily: 'var(--font-mono)' }}>
                   {issue.filePath}:{issue.lineRange[0]}-{issue.lineRange[1]}
                 </span>

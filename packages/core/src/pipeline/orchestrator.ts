@@ -429,6 +429,19 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       progress?.stageComplete('discuss', 'Discussions complete');
     }
 
+    // ConfidenceTrace: backfill `final` for docs that did not enter L2.
+    // Order: verified (suggestion-verifier failure) > corroborated (L1) > legacy confidence.
+    // Docs adjusted by L2 already have `final` set by stage-executors.ts.
+    for (const doc of allEvidenceDocs) {
+      const trace = doc.confidenceTrace;
+      if (trace && trace.final === undefined) {
+        const fallback = trace.verified ?? trace.corroborated ?? doc.confidence;
+        if (fallback !== undefined) {
+          doc.confidenceTrace = { ...trace, final: fallback };
+        }
+      }
+    }
+
     await writeSuggestions(date, sessionId, thresholdResult.suggestions);
 
     // === LIGHTWEIGHT MODE: Skip L3 head verdict (6.2) ===

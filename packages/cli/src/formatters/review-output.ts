@@ -87,7 +87,8 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   const totalReviewers = s.totalReviewers - s.forfeitedReviewers;
   const renderIssue = (doc: EvidenceDocument, verbose: boolean) => {
     const fn = severityColor[doc.severity as keyof typeof severityColor] ?? ((x: string) => x);
-    const confStr = doc.confidence != null ? ` ${doc.confidence}%` : '';
+    const confValue = doc.confidenceTrace?.final ?? doc.confidence;
+    const confStr = confValue != null ? ` ${confValue}%` : '';
     const lineLabel = doc.lineRange[0] === doc.lineRange[1]
       ? `${doc.lineRange[0]}`
       : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
@@ -265,7 +266,8 @@ export function formatMarkdown(result: PipelineResult, options?: FormatOptions):
       lines.push('### Detailed Issues');
       lines.push('');
       for (const doc of result.evidenceDocs) {
-        const confidenceBadge = doc.confidence != null ? ` (${doc.confidence}%)` : '';
+        const confValue = doc.confidenceTrace?.final ?? doc.confidence;
+        const confidenceBadge = confValue != null ? ` (${confValue}%)` : '';
         const lineLabel = doc.lineRange[0] === doc.lineRange[1]
           ? `${doc.lineRange[0]}`
           : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
@@ -375,7 +377,8 @@ export function formatGithub(result: PipelineResult): string {
     lines.push('');
     const sevDocs = ghDocs.filter(d => d.severity === severity);
     for (const doc of sevDocs) {
-      const confStr = doc.confidence != null ? ` (${doc.confidence}%)` : '';
+      const confValue = doc.confidenceTrace?.final ?? doc.confidence;
+      const confStr = confValue != null ? ` (${confValue}%)` : '';
       lines.push(`- [ ] \`${doc.filePath}:${doc.lineRange[0]}\` — **${doc.issueTitle}**${confStr}`);
     }
     lines.push('');

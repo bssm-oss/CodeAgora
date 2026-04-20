@@ -114,7 +114,7 @@ export function mapToInlineCommentBody(
 
   lines.push(`${badge.emoji} **${badge.label}** \u2014 ${doc.issueTitle}`);
   lines.push('');
-  const confidenceBadge = getConfidenceBadge(doc.confidence);
+  const confidenceBadge = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence);
   if (confidenceBadge) {
     lines.push(`**Confidence:** ${confidenceBadge}`);
     lines.push('');
@@ -282,8 +282,9 @@ export function buildSummaryBody(params: {
     lines.push('|--|------|-------|-----------|');
     for (const doc of triage.mustFix) {
       const badge = SEVERITY_BADGE[doc.severity]!;
-      const confCell = getConfidenceBadge(doc.confidence) || '\u2014';
-      const unverified = (doc.confidence ?? 100) <= 30 ? ' \u26A0\uFE0F' : '';
+      const conf = doc.confidenceTrace?.final ?? doc.confidence;
+      const confCell = getConfidenceBadge(conf) || '\u2014';
+      const unverified = (conf ?? 100) <= 30 ? ' \u26A0\uFE0F' : '';
       lines.push(
         `| ${badge.emoji}${unverified} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
       );
@@ -299,7 +300,7 @@ export function buildSummaryBody(params: {
     lines.push('|--|------|-------|-----------|');
     for (const doc of triage.verify) {
       const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\uD83D\uDFE1' };
-      const confCell = getConfidenceBadge(doc.confidence) || '\u2014';
+      const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
       lines.push(
         `| ${badge.emoji} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
       );

@@ -17,7 +17,15 @@ interface EvidenceDoc {
   suggestion: string;
   filePath: string;
   lineRange: [number, number];
+  /** @deprecated Use confidenceTrace.final when available. */
   confidence?: number;
+  confidenceTrace?: {
+    raw?: number;
+    filtered?: number;
+    corroborated?: number;
+    verified?: number;
+    final?: number;
+  };
 }
 
 interface ReviewEntry {
@@ -36,7 +44,15 @@ interface AggregatedIssue {
   suggestion: string;
   filePath: string;
   lineRange: [number, number];
+  /** @deprecated Use confidenceTrace.final when available. */
   confidence?: number;
+  confidenceTrace?: {
+    raw?: number;
+    filtered?: number;
+    corroborated?: number;
+    verified?: number;
+    final?: number;
+  };
   reviewers: string[];
 }
 

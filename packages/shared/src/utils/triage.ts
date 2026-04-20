@@ -36,7 +36,7 @@ export interface TriageSummary {
  * - ignore:   SUGGESTION, or confidence <20%
  */
 export function classifyTriage(doc: EvidenceDocument): TriageCategory {
-  const conf = doc.confidence ?? 50;
+  const conf = doc.confidenceTrace?.final ?? doc.confidence ?? 50;
 
   if (conf < 20) return 'ignore';
 
