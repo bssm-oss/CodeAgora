@@ -187,4 +187,73 @@ describe('buildReviewerMessages', () => {
       expect(stripDelim(withoutFlag.user)).toBe(stripDelim(withMarkdown.user));
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Prompt tier: lite (#464)
+  // -------------------------------------------------------------------------
+
+  describe('promptTier: lite', () => {
+    it('produces a substantially shorter system prompt than standard', () => {
+      const standard = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, undefined, 'standard',
+      );
+      const lite = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, undefined, 'lite',
+      );
+      // Lite must be meaningfully shorter — target is ~50% but assert ≥30%
+      // reduction to leave some wiggle room for future tweaks
+      const ratio = lite.system.length / standard.system.length;
+      expect(ratio).toBeLessThan(0.7);
+    });
+
+    it('preserves essentials: role, severity guide, delimiter defense', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, undefined, 'lite',
+      );
+      expect(system).toMatch(/senior code reviewer/i);
+      expect(system).toContain('HARSHLY_CRITICAL');
+      expect(system).toContain('CRITICAL');
+      expect(system).toContain('WARNING');
+      expect(system).toMatch(/untrusted/i);
+    });
+
+    it('drops verbose sections: extensive analysis checklist, long examples', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, undefined, 'lite',
+      );
+      // Standard prompt has a 5-item checklist; lite has 3 items.
+      // Standard prompt has a long SQL injection example; lite does not.
+      expect(system).not.toContain('SQL Injection Vulnerability');
+      expect(system).not.toContain('Example 1 — When an issue IS present');
+      // Security boundaries / Resource lifecycle are standard-only checklist items
+      expect(system).not.toContain('Resource lifecycle');
+    });
+
+    it('lite + JSON mode: JSON schema block present, markdown example absent', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'json', 'lite',
+      );
+      expect(system).toMatch(/## Output Format/);
+      expect(system).toContain('"findings"');
+      expect(system).toContain('"severity"');
+      // Empty-result convention still taught
+      expect(system).toMatch(/\{\s*"findings":\s*\[\]\s*\}/);
+    });
+
+    it('lite + markdown mode: retains ## Issue: template', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'markdown', 'lite',
+      );
+      expect(system).toContain('## Issue:');
+      expect(system).toContain('### Problem');
+      expect(system).toContain('### Severity');
+    });
+
+    it('lite prompt still includes the diff (user message)', () => {
+      const { user } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, undefined, 'lite',
+      );
+      expect(user).toContain(SAMPLE_DIFF);
+    });
+  });
 });
