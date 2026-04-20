@@ -29,11 +29,18 @@ export function computeL1Confidence(
   totalDiffLines?: number,
 ): number {
   if (activeReviewers <= 0) return 50;
+  // Count LLM-source docs that flagged approximately the same location.
+  // - Exclude `source === 'rule'`: static-analysis findings come from linters,
+  //   not from the reviewer pool, so they should not inflate reviewer agreement.
+  // - Clamp the rate at 100: a single reviewer can emit multiple docs at the
+  //   same location (e.g. duplicate findings in one chunk), which would
+  //   otherwise push agreeing > activeReviewers and yield a nonsensical rate.
   const agreeing = allDocs.filter(d =>
+    d.source !== 'rule' &&
     d.filePath === doc.filePath &&
     Math.abs(d.lineRange[0] - doc.lineRange[0]) <= 5
   ).length;
-  const agreementRate = Math.round((agreeing / activeReviewers) * 100);
+  const agreementRate = Math.min(100, Math.round((agreeing / activeReviewers) * 100));
 
   let base: number;
   if (doc.confidence !== undefined && doc.confidence >= 0 && doc.confidence <= 100) {

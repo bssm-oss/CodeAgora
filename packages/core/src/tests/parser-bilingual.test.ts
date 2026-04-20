@@ -462,4 +462,56 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     expect(result).toBe(61);
     expect(result).toBeGreaterThan(20); // above uncertain threshold
   });
+
+  // -------------------------------------------------------------------------
+  // Agreement-rate clamp + rule-source exclusion (#484 self-review feedback)
+  // -------------------------------------------------------------------------
+
+  it('clamps agreementRate at 100 when one reviewer emits multiple docs at same location', () => {
+    // Pathological but possible: a single chunk/reviewer produces 3 findings
+    // at auth.ts:10. Without the clamp, agreeing=3 / active=1 → rate=300% →
+    // base blend = round(80*0.6 + 300*0.4) = 168 → clamped to 100 at the end,
+    // but the blend math was nonsensical mid-flight. Clamp prevents drift.
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [
+      makeDoc('src/foo.ts', 10),
+      makeDoc('src/foo.ts', 11),
+      makeDoc('src/foo.ts', 12),
+    ];
+    // agreeing = 3 (all within ±5 of line 10), activeReviewers = 1
+    // raw rate = 300 → clamped to 100
+    // base = round(80 * 0.6 + 100 * 0.4) = round(48 + 40) = 88
+    // agreeing=3 hits BOOST branch (>= 3) → min(100, round(88 * 1.2)) = 100
+    const result = computeL1Confidence(doc, allDocs, 1, 100);
+    expect(result).toBe(100);
+    expect(result).toBeLessThanOrEqual(100); // invariant
+  });
+
+  it('excludes rule-source docs from agreeing count', () => {
+    const doc: EvidenceDocument = {
+      issueTitle: 'Test', problem: 'p', evidence: [], severity: 'WARNING',
+      suggestion: 's', filePath: 'src/foo.ts', lineRange: [10, 20],
+      confidence: 80,
+      source: 'llm',
+    };
+    const allDocs: EvidenceDocument[] = [
+      doc,
+      // This rule-source doc at the same location should NOT count as
+      // "reviewer agreement" — static analyzers are a separate signal class.
+      {
+        issueTitle: 'Linter', problem: 'p', evidence: [], severity: 'WARNING',
+        suggestion: 's', filePath: 'src/foo.ts', lineRange: [10, 10],
+        source: 'rule',
+      },
+      makeDoc('src/bar.ts', 100),
+      makeDoc('src/baz.ts', 200),
+      makeDoc('src/qux.ts', 300),
+    ];
+    // With the filter: agreeing = 1 (doc itself, rule doc excluded)
+    // Without the filter (bug): agreeing = 2 → no penalty, higher confidence
+    // activeReviewers = 5 → dissent branch → base × 0.5
+    // base = round(80 * 0.6 + 20 * 0.4) = 56, ×0.5 = 28
+    const result = computeL1Confidence(doc, allDocs, 5, 100);
+    expect(result).toBe(28);
+  });
 });
