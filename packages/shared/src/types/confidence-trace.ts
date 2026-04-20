@@ -61,6 +61,17 @@ export const ConfidenceTraceSchema = z.object({
    * `verified ?? corroborated`.
    */
   final: z.number().min(0).max(100).optional(),
+
+  /**
+   * Evidence quality score (#468). Not a confidence stage — a 0–1 quality
+   * measure recorded by the hallucination filter (check 6) alongside the
+   * `filtered` confidence. Reflects three equally weighted sub-scores:
+   * evidence list length, problem text length, and specificity-marker
+   * density. The derived multiplier (0.7 + 0.3 × evidence) is folded
+   * into the `filtered` value — this field is kept for trace-viewer
+   * introspection and future calibration tuning.
+   */
+  evidence: z.number().min(0).max(1).optional(),
 });
 
 export type ConfidenceTrace = z.infer<typeof ConfidenceTraceSchema>;
