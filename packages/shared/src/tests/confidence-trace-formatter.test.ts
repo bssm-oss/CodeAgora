@@ -18,14 +18,26 @@ function makeDoc(overrides: Partial<TraceableDoc> = {}): TraceableDoc {
 }
 
 describe('buildTraceRows', () => {
-  it('renders all 5 stages when trace is fully populated', () => {
+  it('renders all 6 stages when trace is fully populated', () => {
+    const doc = makeDoc({
+      confidenceTrace: { raw: 80, calibrated: 72, filtered: 72, corroborated: 86, verified: 86, final: 86 },
+    });
+    const rows = buildTraceRows(doc);
+    expect(rows).toHaveLength(6);
+    expect(rows.map(r => r.label)).toEqual(['raw', 'calibrated', 'filtered', 'corroborated', 'verified', 'final']);
+    expect(rows.map(r => r.value)).toEqual([80, 72, 72, 86, 86, 86]);
+  });
+
+  it('marks calibrated stage as disabled when absent (default off)', () => {
+    // Most sessions won't have calibration enabled — calibrated stage
+    // should render as "disabled (...)" placeholder rather than crash.
     const doc = makeDoc({
       confidenceTrace: { raw: 80, filtered: 80, corroborated: 96, verified: 96, final: 96 },
     });
     const rows = buildTraceRows(doc);
-    expect(rows).toHaveLength(5);
-    expect(rows.map(r => r.label)).toEqual(['raw', 'filtered', 'corroborated', 'verified', 'final']);
-    expect(rows.map(r => r.value)).toEqual([80, 80, 96, 96, 96]);
+    const cal = rows.find(r => r.label === 'calibrated');
+    expect(cal?.value).toBeNull();
+    expect(cal?.note).toMatch(/disabled|calibrateReviewerConfidence/);
   });
 
   it('marks verified stage as skipped when absent (below CRITICAL threshold)', () => {

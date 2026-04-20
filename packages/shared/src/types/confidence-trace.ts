@@ -20,6 +20,17 @@ export const ConfidenceTraceSchema = z.object({
   raw: z.number().min(0).max(100).optional(),
 
   /**
+   * Confidence after model-specific calibration (#467).
+   * Set by: packages/core/src/l1/reviewer.ts via calibration.ts
+   * Equals raw × tier-based multiplier when opt-in
+   * (`reviewContext.calibrateReviewerConfidence: true`) or when
+   * `config.calibrationMultiplier` is set explicitly. Absent when
+   * calibration is disabled (default) — downstream stages then see
+   * the raw value directly in `doc.confidence`.
+   */
+  calibrated: z.number().min(0).max(100).optional(),
+
+  /**
    * Confidence after hallucination-filter penalties.
    * Set by: packages/core/src/pipeline/hallucination-filter.ts
    * Equals raw × 0.5 when code-quote fabrication or self-contradiction detected;
