@@ -1,0 +1,17 @@
+{
+  "id": "null-deref-early-access",
+  "title": "getDisplayName dereferences user before null check",
+  "source": "synthetic — classic ordering bug",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "src/user/profile.ts",
+      "lineRange": [4, 4],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "user.displayName is read before the `user === null` check, so a null user crashes before reaching the Anonymous branch",
+      "keyword": "null"
+    }
+  ],
+  "notes": "Refactor moved the property read above its null guard. Review must raise CRITICAL — this is a reliable NPE."
+}

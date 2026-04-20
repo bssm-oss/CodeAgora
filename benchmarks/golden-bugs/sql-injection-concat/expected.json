@@ -1,0 +1,17 @@
+{
+  "id": "sql-injection-concat",
+  "title": "findUserByEmail concatenates email into SQL string",
+  "source": "synthetic — OWASP A03:2021 reproducer",
+  "category": "cve-shaped",
+  "expectedFindings": [
+    {
+      "filePath": "src/db/users.ts",
+      "lineRange": [5, 6],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "email is concatenated into the SQL string instead of being bound as a parameter — classic SQL injection",
+      "keyword": "injection"
+    }
+  ],
+  "notes": "Patch replaces a parameterized query with string concatenation. Review must raise CRITICAL or HARSHLY_CRITICAL and mention SQL injection."
+}

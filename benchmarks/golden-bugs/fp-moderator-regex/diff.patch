@@ -1,0 +1,24 @@
+diff --git a/packages/core/src/l2/moderator.ts b/packages/core/src/l2/moderator.ts
+index 7777777..8888888 100644
+--- a/packages/core/src/l2/moderator.ts
++++ b/packages/core/src/l2/moderator.ts
+@@ -750,10 +750,16 @@ function extractModeratorJsonPayload(response: string): string | null {
+   const trimmed = response.trim();
+   if (trimmed.startsWith('{')) {
+     return trimmed;
+   }
+-  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+-  if (match) {
+-    return match[1].trim();
++  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
++  if (fenceMatch) {
++    return fenceMatch[1].trim();
+   }
+   return null;
+ }
++
++export function parseForcedDecisionJson(response: string) {
++  const payload = extractModeratorJsonPayload(response);
++  if (!payload) return null;
++  return ModeratorVerdictJsonSchema.safeParse(JSON.parse(payload)).data ?? null;
++}

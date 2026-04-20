@@ -1,0 +1,8 @@
+{
+  "id": "fp-moderator-regex",
+  "title": "PR #490 moderator JSON fence regex — FP regression case",
+  "source": "CodeAgora PR #490 (merged 2026-04-20 with admin override)",
+  "category": "fp-regression",
+  "expectedFindings": [],
+  "notes": "Self-review on PR #490 falsely claimed the regex literal contained zero-width-space characters at 90–93% confidence, with 2/3 reviewer corroboration. Verification via `od -c` showed pure ASCII. A competent review of this diff must report no findings — any CRITICAL/HARSHLY_CRITICAL claim about invisible characters is a regression of the exact FP the calibration stack is meant to catch."
+}

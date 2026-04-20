@@ -45,7 +45,9 @@
     "test:all": "vitest run && cd packages/web && vitest run",
     "test:coverage": "vitest run --coverage",
     "dev": "pnpm --filter @codeagora/cli dev",
-    "build:action": "node scripts/build-action.mjs"
+    "build:action": "node scripts/build-action.mjs",
+    "bench:fn": "tsx scripts/bench-fn.ts",
+    "bench:fn:run": "tsx scripts/bench-fn-run.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
