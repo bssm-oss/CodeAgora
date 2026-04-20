@@ -9,15 +9,18 @@ import type { ReviewOutput } from '../types/core.js';
 import { parseEvidenceResponse, isExplicitNoIssues } from './parser.js';
 import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '@codeagora/shared/utils/diff.js';
+import { truncateLines } from '@codeagora/shared/utils/truncate.js';
 import { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 import { HealthMonitor } from '../l0/health-monitor.js';
 import { classifyError } from './error-classifier.js';
 
 /** Log when parser returns 0 issues on a non-empty response — likely unparseable output */
-function logParseFailure(model: string, reviewerId: string, responseLength: number, isFallback: boolean): void {
+function logParseFailure(model: string, reviewerId: string, response: string, isFallback: boolean): void {
   const prefix = isFallback ? 'fallback ' : '';
+  const preview = truncateLines(response, 5);
   process.stderr.write(
-    `[Parser] ${prefix}model=${model} reviewer=${reviewerId}: 0 issues from ${responseLength} chars — possible unparseable response\n`
+    `[Parser] ${prefix}model=${model} reviewer=${reviewerId}: 0 issues from ${response.length} chars — possible unparseable response\n` +
+    `[Parser] preview:\n${preview}\n`
   );
 }
 
@@ -225,7 +228,7 @@ async function executeReviewerWithGuards(
       if (useGuards) cb.recordSuccess(provider!, config.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
       if (evidenceDocs.length === 0 && response.length > 0 && !isExplicitNoIssues(response)) {
-        logParseFailure(config.model, config.id, response.length, false);
+        logParseFailure(config.model, config.id, response, false);
       }
 
       return {
@@ -313,7 +316,7 @@ async function executeReviewerWithGuards(
       if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
       if (evidenceDocs.length === 0 && response.length > 0 && !isExplicitNoIssues(response)) {
-        logParseFailure(fb.model, config.id, response.length, true);
+        logParseFailure(fb.model, config.id, response, true);
       }
 
       return {
