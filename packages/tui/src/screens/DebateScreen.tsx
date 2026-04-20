@@ -190,7 +190,7 @@ export function DebateScreen({ discussions }: Props): React.JSX.Element {
                           key={s.id}
                           reviewerId={s.id}
                           model=""
-                          stance={s.stance === 'AGREE' ? 'agree' : 'disagree'}
+                          stance={s.stance === 'AGREE' ? 'agree' : s.stance === 'NEUTRAL' ? 'neutral' : 'disagree'}
                           message={s.reasoning}
                           isDevilsAdvocate={s.isDevilsAdvocate === true}
                         />

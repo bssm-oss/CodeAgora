@@ -33,7 +33,7 @@ function parseIssueCount(message: string): number {
 
 function formatDiscussionRounds(disc: DiscussionState): string {
   const roundParts = disc.rounds.map((round) => {
-    const stances = round.stances.map(s => `${s.supporterId} ${s.stance === 'AGREE' ? '✅' : '❌'}`).join(' · ');
+    const stances = round.stances.map(s => `${s.supporterId} ${s.stance === 'AGREE' ? '✅' : s.stance === 'NEUTRAL' ? '⚠️' : '❌'}`).join(' · ');
     const suffix = round.consensusReached ? ' → consensus' : '';
     return `Round ${round.roundNum}: ${stances}${suffix}`;
   });

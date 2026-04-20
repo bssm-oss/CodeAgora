@@ -9,7 +9,7 @@ import { colors } from '../theme.js';
 interface Props {
   reviewerId: string;
   model: string;
-  stance: 'agree' | 'disagree';
+  stance: 'agree' | 'disagree' | 'neutral';
   message: string;
   isDevilsAdvocate: boolean;
 }
@@ -19,8 +19,8 @@ interface Props {
 // ============================================================================
 
 export function ChatBubble({ reviewerId, model, stance, message, isDevilsAdvocate }: Props): React.JSX.Element {
-  const stanceIcon = stance === 'agree' ? '✅' : '❌';
-  const stanceColor = stance === 'agree' ? colors.success : colors.error;
+  const stanceIcon = stance === 'agree' ? '✅' : stance === 'neutral' ? '⚠️' : '❌';
+  const stanceColor = stance === 'agree' ? colors.success : stance === 'neutral' ? colors.warning : colors.error;
   const borderColor = isDevilsAdvocate ? colors.accent : stanceColor;
 
   return (

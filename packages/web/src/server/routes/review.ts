@@ -234,7 +234,8 @@ reviewRoutes.post('/', async (c) => {
             message: `Review completed: REJECT — ${Object.entries(result.summary?.severityCounts ?? {}).map(([k, v]) => `${v} ${k}`).join(', ')}`,
             urgent: true,
           });
-        } else if (verdict === 'NEEDS_HUMAN') {
+        } else if (verdict === 'NEEDS_HUMAN' && !isQuick) {
+          // Skip urgent alert for quick mode: skipHead always returns NEEDS_HUMAN by design
           await createNotification({
             type: 'verdict_needs_human',
             sessionId: `${result.date}/${result.sessionId}`,

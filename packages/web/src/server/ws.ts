@@ -71,12 +71,16 @@ export function setupWebSocket(app: Hono): WebSocketSetup {
     const authHeader = c.req.header('Authorization');
     const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
+    // Try each auth method independently so a stale/invalid cookie
+    // does not block fallback to Bearer or protocol token.
     let wsAuthenticated = false;
     if (cookieValue) {
       wsAuthenticated = verifySessionCookie(cookieValue);
-    } else if (protocolToken) {
+    }
+    if (!wsAuthenticated && protocolToken) {
       wsAuthenticated = compareTokens(protocolToken, getAuthToken());
-    } else if (headerToken) {
+    }
+    if (!wsAuthenticated && headerToken) {
       wsAuthenticated = compareTokens(headerToken, getAuthToken());
     }
 

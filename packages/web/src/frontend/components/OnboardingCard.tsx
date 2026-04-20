@@ -41,14 +41,14 @@ export function OnboardingCard(): React.JSX.Element {
         <button
           type="button"
           style={{ ...btnBase, background: 'var(--color-accent)', color: '#0d1117', border: 'none' }}
-          onClick={() => navigate('/pipeline')}
+          onClick={() => navigate('/pipeline?mode=diff')}
         >
           📋 Paste Diff
         </button>
         <button
           type="button"
           style={{ ...btnBase, background: 'transparent', color: 'var(--color-text)' }}
-          onClick={() => navigate('/pipeline')}
+          onClick={() => navigate('/pipeline?mode=pr')}
         >
           🔗 PR URL
         </button>
