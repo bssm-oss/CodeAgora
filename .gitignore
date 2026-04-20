@@ -51,6 +51,12 @@ reviews/
 # CodeAgora session data & config (local)
 .ca/
 packages/web/.ca/
+# Benchmark config is committed; runtime session data stays local.
+!benchmarks/.ca/
+benchmarks/.ca/sessions/
+benchmarks/.ca/logs/
+benchmarks/.ca/cache/
+benchmarks/.ca/model-quality.json
 
 # Storage
 .storage/
