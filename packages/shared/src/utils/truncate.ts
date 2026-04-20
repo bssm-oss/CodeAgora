@@ -19,7 +19,7 @@ export function truncateLines(text: string, maxLines: number): string {
   if (maxLines <= 0) return '';
   const lines = text.split('\n');
   if (lines.length <= maxLines) return text;
-  const kept = lines.slice(0, maxLines - 1);
+  const kept = lines.slice(0, maxLines);
   const omitted = lines.length - kept.length;
   return `${kept.join('\n')}\n... (${omitted} more lines)`;
 }
