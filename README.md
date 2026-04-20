@@ -259,18 +259,21 @@ Two fixture kinds live side by side:
 
 Current seed fixtures: 3 recall cases (off-by-one, null-deref, SQL injection) + 1 FP regression (PR #490 moderator regex). See `benchmarks/golden-bugs/README.md` for fixture format.
 
-### Baseline (n=1, 2026-04-20)
+### Baseline (n=3, 2026-04-20)
 
-Single live run with the default 3-reviewer OpenRouter config ([run #24666562754](https://github.com/bssm-oss/CodeAgora/actions/runs/24666562754)):
+Three live runs with the default 3-reviewer OpenRouter config ([#24666562754](https://github.com/bssm-oss/CodeAgora/actions/runs/24666562754), [#24667305646](https://github.com/bssm-oss/CodeAgora/actions/runs/24667305646), [#24667897271](https://github.com/bssm-oss/CodeAgora/actions/runs/24667897271)):
 
-| Metric | Value |
-|---|---|
-| mean recall@3 | 100.0% |
-| mean recall@5 | 100.0% |
-| mean recall@10 | 100.0% |
-| FP regressions triggered | 1/1 |
+| Metric | Mean | Min | Max |
+|---|---|---|---|
+| recall@3 | 100.0% | 100.0% | 100.0% |
+| recall@5 | 100.0% | 100.0% | 100.0% |
+| recall@10 | 100.0% | 100.0% | 100.0% |
+| FPs per fp-regression fixture | 2.3 | 2 | 3 |
+| fp-regression triggered | 3/3 runs |
 
-All three recall cases (off-by-one, null-deref, SQL injection) caught in top-3. The `fp-moderator-regex` case — which mirrors the merged PR #490 diff — triggered the FP branch with 3 CRITICAL findings at 100% confidence, confirming the "high-confidence corroborated FP" blind spot the calibration stack does not yet cover. This baseline is a single-run sample; values will drift between runs due to LLM non-determinism.
+**Recall stable** — all three recall cases (off-by-one, null-deref, SQL injection) caught in top-3 on every run.
+
+**FP regression triggered on every run** — but the *content* of the phantom findings shifts between runs: CRITICAL×3 about unhandled `JSON.parse` on run 1, WARNING×2 about regex DoS + input size on run 2, WARNING + CRITICAL about unbounded string + missing type import on run 3. Each individual claim is a plausible-sounding, code-level assertion that the review would make against a real diff, which is exactly why the current calibration stack does not filter them. This confirms the "high-confidence corroborated FP" blind spot documented in `project_calibration_stack.md`. This fixture is the regression gate for future calibration work (see #468).
 
 ---
 
