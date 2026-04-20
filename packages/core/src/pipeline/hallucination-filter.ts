@@ -2,21 +2,25 @@
  * Pre-Debate Hallucination Filter (#428)
  * Validates evidence documents against the actual diff before L2 debate.
  *
- * 6 checks (zero model cost):
+ * 7 checks (zero model cost):
  * 1. File existence — filePath must be in diff file list
  * 2. Line range — lineRange must overlap at least one diff hunk
  * 3. Code quote — inline code quotes must exist in diff content
  * 4. Self-contradiction — finding must not contradict observed change direction
  * 5. Speculative language — hedge markers in problem/suggestion dampen confidence
  * 6. Evidence quality (#468) — vague/short evidence dampens confidence
+ * 7. Finding-class prior (#468 follow-up) — empirically FP-heavy claim
+ *    classes (ReDoS, "may throw", missing-validation, zero-width) take
+ *    an additional multiplier derived from observed base rates.
  *
  * Findings that fail checks 1-2 are hard-removed.
- * Checks 3-6 apply confidence penalties (soft) and may flag as uncertain.
+ * Checks 3-7 apply confidence penalties (soft) and may flag as uncertain.
  */
 
 import type { EvidenceDocument } from '../types/core.js';
 import { extractFileListFromDiff, parseDiffFileRanges } from '@codeagora/shared/utils/diff.js';
 import { scoreEvidence, evidenceMultiplier } from './evidence-scorer.js';
+import { matchFindingClass } from './finding-class-scorer.js';
 
 export interface FilterResult {
   filtered: EvidenceDocument[];
@@ -218,14 +222,25 @@ export function filterHallucinations(
       doc.confidence = penalized; // BC: legacy single-field confidence
     }
 
-    // ConfidenceTrace: record post-filter confidence + evidence quality.
-    // Always set before routing so uncertain-bucket docs also carry the
-    // trace. Pass-through (no penalties) → filtered === raw.
+    // Check 7 (#468 follow-up): Finding-class prior — empirically
+    // FP-heavy claim categories take an additional multiplier. See
+    // finding-class-scorer.ts for the table.
+    const classMatch = matchFindingClass(doc);
+    if (classMatch && classMatch.multiplier < 1.0) {
+      const penalized = Math.round((doc.confidence ?? 50) * classMatch.multiplier);
+      doc.confidence = penalized; // BC: legacy single-field confidence
+    }
+
+    // ConfidenceTrace: record post-filter confidence + evidence quality
+    // + matched class (if any). Always set before routing so
+    // uncertain-bucket docs also carry the trace. Pass-through (no
+    // penalties) → filtered === raw.
     if (doc.confidence !== undefined) {
       doc.confidenceTrace = {
         ...(doc.confidenceTrace ?? {}),
         filtered: doc.confidence,
         evidence: evScore,
+        ...(classMatch ? { classPrior: classMatch.id } : {}),
       };
     }
 

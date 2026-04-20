@@ -72,6 +72,17 @@ export const ConfidenceTraceSchema = z.object({
    * introspection and future calibration tuning.
    */
   evidence: z.number().min(0).max(1).optional(),
+
+  /**
+   * Finding-class prior id (#468 follow-up). Check 7 in the
+   * hallucination filter tags the finding with a class id like "redos"
+   * / "may-throw" / "missing-validation" / "zero-width" /
+   * "generic-potential" when an empirically FP-heavy pattern matches
+   * the issue title or problem. The class's multiplier is already
+   * folded into `filtered`; this field exists only so the trace
+   * viewer can label *why* filtered dropped. Absent when no class matched.
+   */
+  classPrior: z.string().optional(),
 });
 
 export type ConfidenceTrace = z.infer<typeof ConfidenceTraceSchema>;

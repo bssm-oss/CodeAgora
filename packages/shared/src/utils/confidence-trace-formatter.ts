@@ -181,6 +181,15 @@ export function formatFindingTrace(doc: TraceableDoc, index: number): string[] {
     lines.push(`    ${label}  ${pct}   quality (×${mult} applied to filtered)`);
   }
 
+  // Finding-class prior (#468 follow-up) — which empirically FP-heavy
+  // class matched this finding, if any. The multiplier is already
+  // folded into `filtered`; this line is purely for explainability.
+  const classPrior = doc.confidenceTrace?.classPrior;
+  if (typeof classPrior === 'string') {
+    const label = 'class'.padEnd(labelWidth);
+    lines.push(`    ${label}   —    prior: ${classPrior} (multiplier applied to filtered)`);
+  }
+
   const tab = classifyTriageTab(doc);
   lines.push(`    → ${tab} tab`);
   return lines;

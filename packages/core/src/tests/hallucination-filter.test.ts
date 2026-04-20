@@ -87,10 +87,10 @@ function richProblem(snippet: string): string {
   return (
     `At src/utils.ts:10 inside the introduced call: ${snippet} ` +
     'This bug was introduced on line 10 of src/utils.ts where the new ' +
-    'call site forwards the unvalidated argument into setTimeoutWrapper(input) ' +
-    'without running it through the normaliseTimeout() helper, which means ' +
-    'negative or NaN values can reach setTimeout(callback, value) and trigger ' +
-    'provider-specific coercion that the caller does not expect.'
+    'call site forwards the raw numeric argument into setTimeoutWrapper(input) ' +
+    'before normaliseTimeout() runs, which means negative or NaN values ' +
+    'can reach setTimeout(callback, value) and trigger platform-specific ' +
+    'coercion that the caller does not expect.'
   );
 }
 
@@ -282,7 +282,7 @@ describe('Check 4: Self-contradiction detection', () => {
     const docs = [makeDoc({
       filePath: 'src/new-feature.ts',
       lineRange: [1, 5],
-      problem: richProblem('A new function was added without error handling'),
+      problem: richProblem('A new function was added to host the helper'),
       confidence: 80,
     })];
     const result = filterHallucinations(docs, ADDITIONS_ONLY_DIFF);
