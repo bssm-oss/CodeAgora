@@ -398,8 +398,14 @@ export function buildReviewerMessages(
 ): ReviewerMessages {
   // Use a cryptographically random delimiter to guard against prompt injection
   const delimiter = `DIFF_${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
-  // Escape any sequence of 3+ backticks to prevent code fence breakout
-  const safeDiffContent = diffContent.replace(/`{3,}/g, (m) => m.replace(/`/g, '\u0060'));
+  // Neutralize triple-backtick sequences so untrusted diff content cannot
+  // close our enclosing code fence. The previous implementation replaced
+  // each "`" with `\u0060` — which is THE SAME CHARACTER (grave accent, the
+  // Unicode name for backtick) — making the escape a no-op. #486 self-review.
+  // Interleave a zero-width space (U+200B) between backticks so the sequence
+  // no longer matches markdown's code-fence pattern while staying visually
+  // transparent to the reader.
+  const safeDiffContent = diffContent.replace(/`{3,}/g, (m) => m.split('').join('\u200B'));
   const useJsonFormat = outputFormat === 'json';
 
   const system = `You are a ruthless, senior code reviewer. Your job is to find **real bugs, security holes, and logic errors** that will break production. This code WILL be deployed if you don't catch the problems. Be thorough. Be aggressive. Miss nothing.

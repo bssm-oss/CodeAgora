@@ -109,6 +109,31 @@ describe('parseJsonEvidenceResponse', () => {
     expect(parseJsonEvidenceResponse('No issues found.')).toBeNull();
   });
 
+  it('warns to stderr when all findings fail validation (but still returns [])', () => {
+    // #486 self-review: returning [] silently would mask a real reviewer
+    // signal as "no issues". Expect stderr warning to aid debugging.
+    const originalWrite = process.stderr.write;
+    let captured = '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stderr.write as any) = (s: string | Uint8Array): boolean => {
+      captured += s.toString();
+      return true;
+    };
+    try {
+      const allInvalid = JSON.stringify({
+        findings: [
+          { title: 'bad', severity: 'NOT_REAL' },
+          { wrong_shape: true },
+        ],
+      });
+      const docs = parseJsonEvidenceResponse(allInvalid);
+      expect(docs).toEqual([]);
+      expect(captured).toMatch(/all failed schema validation/i);
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+  });
+
   it('returns null for JSON envelope with wrong top-level shape', () => {
     // Object but no `findings` key → union validation rejects
     expect(parseJsonEvidenceResponse('{"reviews": []}')).toBeNull();

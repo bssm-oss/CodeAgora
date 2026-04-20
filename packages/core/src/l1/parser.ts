@@ -141,6 +141,17 @@ export function parseJsonEvidenceResponse(
       }),
     });
   }
+
+  // #486 self-review: if the reviewer emitted findings but ALL failed Zod
+  // validation, returning [] would silently mask reviewer signal as "no
+  // issues". Surface this on stderr so operators can inspect the raw output.
+  // We still return an array (not null) because JSON structure was intact —
+  // the fault is in content, not parsing; markdown fallback wouldn't help.
+  if (rawFindings.length > 0 && documents.length === 0) {
+    process.stderr.write(
+      `[Parser] JSON response had ${rawFindings.length} finding(s) but ALL failed schema validation — check reviewer raw output for field-shape issues\n`
+    );
+  }
   return documents;
 }
 
