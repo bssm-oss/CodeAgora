@@ -230,6 +230,25 @@ pnpm cli review path/to/diff.patch
 
 ---
 
+## Benchmarks
+
+Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative measurement framework (see #472).
+
+```bash
+pnpm bench:fn -- --validate-only                     # schema-check fixtures
+pnpm bench:fn -- --results path/to/results-dir       # score against pre-computed review output
+pnpm bench:fn -- --results path/to/results-dir --json  # CI-friendly JSON report
+```
+
+Two fixture kinds live side by side:
+
+- **Recall cases** (`expectedFindings` non-empty) — review must surface each listed bug. Misses count as FN.
+- **FP regression cases** (`expectedFindings` is `[]`) — review must report nothing. Any finding is a regression.
+
+Current seed fixtures: 3 recall cases (off-by-one, null-deref, SQL injection) + 1 FP regression (PR #490 moderator regex). Live-pipeline baseline recording is deferred to #472 Phase 2. See `benchmarks/golden-bugs/README.md` for fixture format.
+
+---
+
 ## License
 
 MIT

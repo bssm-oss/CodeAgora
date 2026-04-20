@@ -1,0 +1,17 @@
+{
+  "id": "off-by-one-slice",
+  "title": "pagination.paginate returns pageSize+1 items",
+  "source": "synthetic — canonical off-by-one",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "src/utils/pagination.ts",
+      "lineRange": [6, 6],
+      "lineTolerance": 2,
+      "minSeverity": "WARNING",
+      "rationale": "end index adds pageSize + 1 instead of pageSize — returns one extra item per page",
+      "keyword": "page"
+    }
+  ],
+  "notes": "Clear off-by-one. A competent review must flag that `end = start + pageSize + 1` produces pageSize+1 items per page."
+}

@@ -1,0 +1,18 @@
+diff --git a/src/utils/pagination.ts b/src/utils/pagination.ts
+index 1111111..2222222 100644
+--- a/src/utils/pagination.ts
++++ b/src/utils/pagination.ts
+@@ -1,12 +1,12 @@
+ export function paginate<T>(items: T[], page: number, pageSize: number): T[] {
+   if (page < 1 || pageSize < 1) {
+     throw new RangeError('page and pageSize must be >= 1');
+   }
+   const start = (page - 1) * pageSize;
+-  const end = start + pageSize;
++  const end = start + pageSize + 1;
+   return items.slice(start, end);
+ }
+
+ export function pageCount(total: number, pageSize: number): number {
+   return Math.ceil(total / pageSize);
+ }

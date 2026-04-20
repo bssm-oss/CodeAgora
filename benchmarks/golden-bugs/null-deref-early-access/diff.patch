@@ -1,0 +1,22 @@
+diff --git a/src/user/profile.ts b/src/user/profile.ts
+index 3333333..4444444 100644
+--- a/src/user/profile.ts
++++ b/src/user/profile.ts
+@@ -1,10 +1,11 @@
+ import type { User } from './types.js';
+
+ export function getDisplayName(user: User | null): string {
+-  if (user === null) {
+-    return 'Anonymous';
+-  }
+-  return user.displayName ?? user.email;
++  const name = user.displayName ?? user.email;
++  if (user === null) {
++    return 'Anonymous';
++  }
++  return name;
+ }
+
+ export function isAdmin(user: User): boolean {
+   return user.role === 'admin';
+ }

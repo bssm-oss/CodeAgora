@@ -1,0 +1,20 @@
+diff --git a/src/db/users.ts b/src/db/users.ts
+index 5555555..6666666 100644
+--- a/src/db/users.ts
++++ b/src/db/users.ts
+@@ -1,12 +1,12 @@
+ import { db } from './connection.js';
+
+ export async function findUserByEmail(email: string) {
+-  return db.query(
+-    'SELECT id, email, role FROM users WHERE email = $1',
+-    [email],
+-  );
++  const sql =
++    "SELECT id, email, role FROM users WHERE email = '" + email + "'";
++  return db.query(sql);
+ }
+
+ export async function countUsers() {
+   return db.query('SELECT COUNT(*) FROM users');
+ }
