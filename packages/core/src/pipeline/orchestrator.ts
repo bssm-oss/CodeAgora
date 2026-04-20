@@ -19,6 +19,7 @@ import type { ProgressEmitter } from './progress.js';
 import { chunkDiff } from './chunker.js';
 import { analyzeTrivialDiff } from './auto-approve.js';
 import { computeL1Confidence } from './confidence.js';
+import { isExplicitNoIssues } from '../l1/parser.js';
 import { loadLearnedPatterns } from '../learning/store.js';
 import { applyLearnedPatterns } from '../learning/filter.js';
 import { loadReviewRules } from '../rules/loader.js';
@@ -364,11 +365,17 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     allEvidenceDocs = [...hallucinationResult.filtered, ...hallucinationResult.uncertain];
 
     // === CONFIDENCE: Compute L1 confidence for non-rule docs ===
-    const totalReviewers = allReviewerInputs.length;
+    // Active reviewers = those who produced usable output (issue docs OR explicit
+    // "no issues"). Unparseable / forfeited reviewers are excluded from the
+    // denominator — they didn't effectively cast a vote (see #462).
+    const activeReviewers = allReviewResults.filter(r =>
+      r.status === 'success' &&
+      (r.evidenceDocs.length > 0 || isExplicitNoIssues(r.rawResponse))
+    ).length;
     const totalDiffLines = filteredDiffContent.split('\n').length;
     for (const doc of allEvidenceDocs) {
       if (doc.source !== 'rule') {
-        const corroborated = computeL1Confidence(doc, allEvidenceDocs, totalReviewers, totalDiffLines);
+        const corroborated = computeL1Confidence(doc, allEvidenceDocs, activeReviewers, totalDiffLines);
         doc.confidence = corroborated; // BC: legacy single-field confidence
         // ConfidenceTrace: record post-corroboration confidence (stage 3 of 5).
         doc.confidenceTrace = {
