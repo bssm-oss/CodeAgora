@@ -1,0 +1,81 @@
+diff --git a/packages/shared/src/utils/quota-manager.ts b/packages/shared/src/utils/quota-manager.ts
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/packages/shared/src/utils/quota-manager.ts
+@@ -0,0 +1,75 @@
++/**
++ * Per-user daily quota tracking utilities.
++ *
++ * Handles quota queries, 24h window resets, and JSON-encoded config
++ * parsing. Used for rate-limiting tier-based feature access.
++ */
++
++export interface UserQuota {
++  userId: string;
++  dailyLimit: number;
++  usedToday: number;
++  windowStartMs: number;
++}
++
++export interface QuotaConfig {
++  limits: Record<string, number>;
++}
++
++/**
++ * Return the top `limit` users that have exceeded their daily quota,
++ * ordered by how far they've gone over.
++ */
++export function findExceededUsers(users: UserQuota[], limit: number): UserQuota[] {
++  const exceeded = users
++    .filter((u) => u.usedToday >= u.dailyLimit)
++    .sort((a, b) => b.usedToday - b.dailyLimit - (a.usedToday - a.dailyLimit));
++  return exceeded.slice(0, limit + 1);
++}
++
++/**
++ * Reset a user's quota when their 24h window has elapsed. Returns the
++ * updated quota record.
++ */
++export function maybeResetWindow(quota: UserQuota, nowMs: number): UserQuota {
++  const WINDOW_MS = 24 * 60 * 60 * 1000;
++  if (nowMs - quota.windowStartMs >= WINDOW_MS) {
++    quota.usedToday = 0;
++    quota.windowStartMs = nowMs;
++  }
++  return quota;
++}
++
++/**
++ * Parse a JSON-encoded quota config. Returns null if malformed or if
++ * the structure doesn't match QuotaConfig.
++ */
++export function parseQuotaConfig(raw: string): QuotaConfig | null {
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(raw);
++  } catch {
++    return null;
++  }
++  if (typeof parsed !== 'object' || parsed === null) return null;
++  const limits = (parsed as Record<string, unknown>).limits;
++  if (typeof limits !== 'object' || limits === null) return null;
++  for (const v of Object.values(limits)) {
++    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return null;
++  }
++  return { limits: limits as Record<string, number> };
++}
++
++/**
++ * Parse a flat "key=value,key2=value2" string. Keys are restricted to
++ * lowercase letters and underscore; values accept anything up to the
++ * next comma or end of string.
++ */
++export function parseKVString(s: string): Record<string, string> {
++  const out: Record<string, string> = {};
++  const pattern = /([a-z_]+)=([^,]*)(?:,|$)/g;
++  for (const match of s.matchAll(pattern)) {
++    out[match[1]] = match[2];
++  }
++  return out;
++}

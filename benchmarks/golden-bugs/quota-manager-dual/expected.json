@@ -1,0 +1,25 @@
+{
+  "id": "quota-manager-dual",
+  "title": "quota-manager: off-by-one slice + input mutation",
+  "source": "CodeAgora PR #495 (live-eval harness for #468, not merged)",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "packages/shared/src/utils/quota-manager.ts",
+      "lineRange": [27, 27],
+      "lineTolerance": 3,
+      "minSeverity": "WARNING",
+      "rationale": "findExceededUsers returns limit+1 items per page: slice(0, limit + 1). A competent review must flag the off-by-one.",
+      "keyword": "off-by-one"
+    },
+    {
+      "filePath": "packages/shared/src/utils/quota-manager.ts",
+      "lineRange": [34, 36],
+      "lineTolerance": 3,
+      "minSeverity": "WARNING",
+      "rationale": "maybeResetWindow mutates its input quota parameter (quota.usedToday = 0; quota.windowStartMs = nowMs) despite a 'returns updated quota' contract. Breaks purity expectations for callers who share the object.",
+      "keyword": "mutat"
+    }
+  ],
+  "notes": "Recall case derived from the PR #495 live evaluation run for #468. Expected findings correspond to the two real bugs planted in the diff. Also serves as an implicit FP-suppression check: parseQuotaConfig and parseKVString are correct code; any CRITICAL finding against them is evidence that the calibration stack is still generating phantom complaints about generic patterns (JSON.parse / regex DoS / type assertion / missing validation). Generic complaints against these functions should land in verify or suggestion tier, not must-fix."
+}
