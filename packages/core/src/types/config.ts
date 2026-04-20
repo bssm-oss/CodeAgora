@@ -44,6 +44,13 @@ export const AgentConfigSchema = z
     timeout: z.number().default(120),
     enabled: z.boolean().default(true),
     fallback: z.union([FallbackSchema, z.array(FallbackSchema)]).optional(),
+    /**
+     * Reviewer output format. Default (undefined/'markdown') uses the
+     * `## Issue:` markdown-block protocol. `'json'` switches the reviewer
+     * prompt to emit JSON matching EvidenceDocument schema, which smaller
+     * models often follow more reliably than markdown structure. See #463.
+     */
+    outputFormat: z.enum(['markdown', 'json']).optional(),
   })
   .refine(
     (data) => data.backend !== 'opencode' || data.provider !== undefined,

@@ -3,7 +3,9 @@
  * Parses reviewer responses into structured evidence documents
  */
 
+import { z } from 'zod';
 import type { EvidenceDocument, Severity } from '../types/core.js';
+import { SeveritySchema } from '../types/core.js';
 import { fuzzyMatchFilePath } from '@codeagora/shared/utils/diff.js';
 
 // ============================================================================
@@ -50,13 +52,117 @@ export function isExplicitNoIssues(response: string): boolean {
   return NO_ISSUES_PATTERNS.some((p) => p.test(normalized) || p.test(trimmed));
 }
 
+// ============================================================================
+// JSON output mode (#463)
+//
+// Cheap models often follow JSON format more reliably than markdown structure.
+// When a reviewer is configured with `outputFormat: 'json'` the prompt asks
+// for a JSON payload matching ReviewerJsonFindingSchema, and this parser
+// accepts it (alongside the markdown path via auto-detection).
+// ============================================================================
+
+const ReviewerJsonFindingSchema = z.object({
+  title: z.string().min(1),
+  filePath: z.string().min(1),
+  lineRange: z.tuple([z.number(), z.number()]),
+  severity: SeveritySchema,
+  confidence: z.number().min(0).max(100).optional(),
+  problem: z.string().min(1),
+  evidence: z.array(z.string()).default([]),
+  suggestion: z.string().default(''),
+});
+
+const ReviewerJsonEnvelopeSchema = z.union([
+  z.object({ findings: z.array(z.unknown()) }),
+  z.array(z.unknown()),
+]);
+
 /**
- * Parse reviewer response into evidence documents
+ * Extract JSON substring from a response when the entire response is either
+ * raw JSON (starts with `{`/`[`) or a single ```json fenced block.
+ * Deliberately strict: we do NOT pick up embedded code fences that might
+ * just be quoted evidence inside a markdown-formatted review.
+ */
+function extractJsonPayload(response: string): string | null {
+  const trimmed = response.trim();
+  // Whole response wrapped in a single ```json ... ``` (or unlabeled ```) block
+  const fullFence = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+  if (fullFence && fullFence[1]) return fullFence[1].trim();
+  // Raw JSON start — response is unwrapped JSON object/array
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
+  return null;
+}
+
+/**
+ * Parse a JSON reviewer response into EvidenceDocument[].
+ * Accepts either `{ "findings": [...] }` or a bare `[...]` array.
+ * Individual findings that fail schema validation are dropped silently —
+ * graceful degradation matters more than strict all-or-nothing semantics.
+ *
+ * Returns null when the response is not recognizable as JSON at all
+ * (caller can then fall back to markdown parsing).
+ */
+export function parseJsonEvidenceResponse(
+  response: string,
+): EvidenceDocument[] | null {
+  const payload = extractJsonPayload(response);
+  if (payload === null) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+
+  const envelope = ReviewerJsonEnvelopeSchema.safeParse(parsed);
+  if (!envelope.success) return null;
+
+  const rawFindings = Array.isArray(envelope.data)
+    ? envelope.data
+    : envelope.data.findings;
+
+  const documents: EvidenceDocument[] = [];
+  for (const raw of rawFindings) {
+    const finding = ReviewerJsonFindingSchema.safeParse(raw);
+    if (!finding.success) continue;
+    const f = finding.data;
+    documents.push({
+      issueTitle: f.title,
+      problem: f.problem,
+      evidence: f.evidence,
+      severity: f.severity,
+      suggestion: f.suggestion,
+      filePath: f.filePath,
+      lineRange: f.lineRange,
+      ...(f.confidence !== undefined && { confidence: f.confidence }),
+      ...(f.confidence !== undefined && {
+        confidenceTrace: { raw: f.confidence },
+      }),
+    });
+  }
+  return documents;
+}
+
+/**
+ * Parse reviewer response into evidence documents.
+ *
+ * Auto-detects JSON (via leading `{`/`[` or code fence) and routes to the
+ * JSON parser first; falls back to markdown parsing if JSON is malformed
+ * or absent. This way callers don't need to know which output format the
+ * reviewer used.
  */
 export function parseEvidenceResponse(
   response: string,
   diffFilePaths?: string[]
 ): EvidenceDocument[] {
+  // Phase 1: try JSON (#463). Returns null only if response isn't JSON-shaped
+  // at all; an empty findings array is a valid "no issues" signal and short-
+  // circuits straight to [].
+  const jsonDocs = parseJsonEvidenceResponse(response);
+  if (jsonDocs !== null) return jsonDocs;
+
+  // Phase 2: markdown protocol (default).
   const documents: EvidenceDocument[] = [];
   const matches = Array.from(response.matchAll(EVIDENCE_BLOCK_REGEX));
 

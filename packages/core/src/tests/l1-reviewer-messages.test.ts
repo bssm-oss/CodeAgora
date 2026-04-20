@@ -111,4 +111,66 @@ describe('buildReviewerMessages', () => {
     expect(user).toMatch(/No Issues/i);
     expect(user).toMatch(/do not.*invent|do NOT invent/i);
   });
+
+  // -------------------------------------------------------------------------
+  // JSON output mode (#463)
+  // -------------------------------------------------------------------------
+
+  describe('outputFormat: json', () => {
+    it('system prompt includes the JSON schema and empty-findings convention', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'json',
+      );
+      expect(system).toMatch(/## Output Format/);
+      expect(system).toContain('"findings"');
+      expect(system).toContain('"severity"');
+      expect(system).toContain('"lineRange"');
+      // Empty-findings signal must be taught explicitly
+      expect(system).toMatch(/\{\s*"findings":\s*\[\]\s*\}/);
+    });
+
+    it('system prompt omits the markdown ## Issue: example blocks', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'json',
+      );
+      expect(system).not.toContain('SQL Injection Vulnerability');
+      expect(system).not.toContain('Example 1 — When an issue IS present');
+      expect(system).not.toContain('## No Issues');
+    });
+
+    it('user prompt asks for raw JSON output (no code fences)', () => {
+      const { user } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'json',
+      );
+      expect(user).toMatch(/JSON/);
+      expect(user).toMatch(/no code fences|no prose/i);
+    });
+
+    it('preserves untrusted-diff delimiter defense in JSON mode', () => {
+      const { system, user } = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'json',
+      );
+      expect(system).toMatch(/untrusted/i);
+      // Delimiter tag announced in system, used in user (same as markdown mode)
+      const delimMatch = system.match(/<(DIFF_[A-Z0-9]+)>/);
+      expect(delimMatch).not.toBeNull();
+      const tag = delimMatch![1];
+      expect(user).toContain(`<${tag}>`);
+      expect(user).toContain(`</${tag}>`);
+    });
+  });
+
+  describe('outputFormat: markdown (default)', () => {
+    it('matches behavior when outputFormat is undefined', () => {
+      const withoutFlag = buildReviewerMessages(SAMPLE_DIFF, SAMPLE_SUMMARY);
+      const withMarkdown = buildReviewerMessages(
+        SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, 'markdown',
+      );
+      // System + user text should be structurally identical (modulo the
+      // per-call delimiter, which is deliberately random)
+      const stripDelim = (s: string) => s.replace(/DIFF_[A-Z0-9]+/g, 'DIFF_XXX');
+      expect(stripDelim(withoutFlag.system)).toBe(stripDelim(withMarkdown.system));
+      expect(stripDelim(withoutFlag.user)).toBe(stripDelim(withMarkdown.user));
+    });
+  });
 });
