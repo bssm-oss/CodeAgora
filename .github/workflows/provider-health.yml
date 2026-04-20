@@ -24,6 +24,28 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+      # doctor --live runs its base environment checks first (.ca/ dir,
+      # config file, API keys, CLIs). Those checks are meaningful for
+      # user environments but not in CI — the workspace is intentionally
+      # missing .ca/ (gitignored) and most CLIs. Write a minimal config
+      # so the env checks pass and the run's exit code reflects only the
+      # live provider pings we actually care about.
+      - name: Generate stub config for doctor
+        run: |
+          mkdir -p .ca
+          cat > .ca/config.json << 'CONF'
+          {
+            "mode": "pragmatic",
+            "language": "en",
+            "reviewers": [
+              { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+            ],
+            "moderator": { "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq" },
+            "head": { "backend": "api", "model": "llama-3.3-70b-versatile", "provider": "groq", "enabled": true },
+            "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+          }
+          CONF
+
       - name: Ping Tier 1 providers
         id: health
         continue-on-error: true
