@@ -184,23 +184,27 @@ describe('computeL1Confidence — reviewer confidence blending (#238)', () => {
     expect(result).toBe(50);
   });
 
-  it('blends reviewer 100% + agreement 100% → 100', () => {
+  it('blends reviewer 100% + agreement 100%, single-active sparse → 80 (×0.8)', () => {
+    // Sparse regime (#462): only 1 active reviewer, no corroboration data.
+    // Previously this returned 100 because the old logic skipped the penalty
+    // when totalReviewers<3; that was an oversight — single-reviewer 100%
+    // confidence is a sample-size-1 claim, not a verified one.
     const doc = makeDoc('src/foo.ts', 10, 100);
     const allDocs = [makeDoc('src/foo.ts', 10)];
     const result = computeL1Confidence(doc, allDocs, 1);
-    // Math.round(100 * 0.6 + 100 * 0.4) = 100
-    expect(result).toBe(100);
+    // Math.round(100 * 0.6 + 100 * 0.4) = 100, then sparse ×0.8 = 80
+    expect(result).toBe(80);
   });
 
-  it('blends reviewer 0% + agreement 100% → 40', () => {
+  it('blends reviewer 0% + agreement 100%, single-active sparse → 32 (×0.8)', () => {
     const doc = makeDoc('src/foo.ts', 10, 0);
     const allDocs = [makeDoc('src/foo.ts', 10)];
     const result = computeL1Confidence(doc, allDocs, 1);
-    // Math.round(0 * 0.6 + 100 * 0.4) = 40
-    expect(result).toBe(40);
+    // Math.round(0 * 0.6 + 100 * 0.4) = 40, then sparse ×0.8 = 32
+    expect(result).toBe(32);
   });
 
-  it('returns 50 for zero totalReviewers regardless of reviewer confidence', () => {
+  it('returns 50 for zero activeReviewers regardless of reviewer confidence', () => {
     const doc = makeDoc('src/foo.ts', 10, 80);
     expect(computeL1Confidence(doc, [], 0)).toBe(50);
   });
@@ -224,8 +228,9 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     };
   }
 
-  it('single reviewer (1/5), small diff → confidence × 0.5', () => {
-    // Only 1 doc agrees (itself), totalReviewers >= 3, small diff
+  it('dissent (1 agree / 5 active), small diff → confidence × 0.5', () => {
+    // Dissent regime (#462): 5 reviewers active, only 1 agreed. The other 4
+    // effectively disagreed (they reviewed the same diff and didn't flag it).
     const doc = makeDoc('src/foo.ts', 10, 80);
     const allDocs = [
       makeDoc('src/foo.ts', 10),   // agreeing (same file+line)
@@ -234,14 +239,14 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
       makeDoc('src/qux.ts', 300),
       makeDoc('src/quux.ts', 400),
     ];
-    // agreeing = 1, totalReviewers = 5, agreementRate = 20
+    // agreeing = 1, activeReviewers = 5, agreementRate = 20
     // base = Math.round(80 * 0.6 + 20 * 0.4) = Math.round(48 + 8) = 56
-    // penalty (small diff): 56 * 0.5 = 28
+    // dissent penalty (small diff): 56 * 0.5 = 28
     const result = computeL1Confidence(doc, allDocs, 5, 100);
     expect(result).toBe(28);
   });
 
-  it('single reviewer (1/5), large diff (>500 lines) → confidence × 0.7', () => {
+  it('dissent (1 agree / 5 active), large diff (>500 lines) → confidence × 0.7', () => {
     const doc = makeDoc('src/foo.ts', 10, 80);
     const allDocs = [
       makeDoc('src/foo.ts', 10),
@@ -304,13 +309,14 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     expect(result).toBe(64);
   });
 
-  it('totalReviewers < 3 → no penalty even for single reviewer', () => {
+  it('2 active reviewers (1 agree) → no penalty (between sparse and dissent)', () => {
     const doc = makeDoc('src/foo.ts', 10, 80);
     const allDocs = [
       makeDoc('src/foo.ts', 10),
       makeDoc('src/bar.ts', 100),
     ];
-    // agreeing = 1, but totalReviewers = 2 (< 3), so no penalty
+    // agreeing = 1, activeReviewers = 2 — neither sparse (requires active===1)
+    // nor dissent (requires active>=3). Middle ground: no penalty applied.
     // agreementRate = 50, base = Math.round(80 * 0.6 + 50 * 0.4) = 68
     const result = computeL1Confidence(doc, allDocs, 2, 100);
     expect(result).toBe(68);
@@ -416,5 +422,44 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     // base = 72, boost = 86 (from earlier test)
     const result = computeL1Confidence(doc, allDocs, 5);
     expect(result).toBe(86);
+  });
+
+  // -------------------------------------------------------------------------
+  // Active-participants denominator — sparse regime (#462)
+  // Observed scenario: 5 reviewers configured, 4 returned unparseable, only
+  // 1 produced a finding. Orchestrator now passes activeReviewers=1, not 5.
+  // -------------------------------------------------------------------------
+
+  it('sparse: 1 active reviewer (4 others unparseable) → ×0.8 mild penalty', () => {
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    const allDocs = [makeDoc('src/foo.ts', 10)];
+    // agreeing=1, activeReviewers=1 → sparse branch (not dissent)
+    // agreementRate = 100, base = Math.round(80 * 0.6 + 100 * 0.4) = 88
+    // sparse penalty ×0.8 → Math.round(70.4) = 70
+    const result = computeL1Confidence(doc, allDocs, 1, 100);
+    expect(result).toBe(70);
+  });
+
+  it('sparse: CRITICAL severity does NOT get lonely-HS extra (no dissent signal)', () => {
+    const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'CRITICAL');
+    const allDocs = [makeCriticalDoc('src/foo.ts', 10, undefined, 'CRITICAL')];
+    // activeReviewers=1 → sparse branch, no extra lonely-HS multiplier
+    // base = 88, ×0.8 = 70 (same as WARNING above — high severity doesn't
+    // matter when we have zero dissent evidence)
+    const result = computeL1Confidence(doc, allDocs, 1, 100);
+    expect(result).toBe(70);
+  });
+
+  it('sparse regime preserves finding above uncertainty threshold for real bug scenario', () => {
+    // Matches the #462 motivation: real bug, raw 60%, only 1 active reviewer.
+    // Previously (pre-#462) this would have been 60%×0.5 = 30 (wrongly treated
+    // as dissent). Now it's base × 0.8 → stays well above the 20% uncertain
+    // threshold, so genuine single-reviewer finds don't get buried.
+    const doc = makeDoc('src/foo.ts', 10, 60);
+    const allDocs = [makeDoc('src/foo.ts', 10)];
+    // base = Math.round(60 * 0.6 + 100 * 0.4) = 76, ×0.8 = Math.round(60.8) = 61
+    const result = computeL1Confidence(doc, allDocs, 1, 100);
+    expect(result).toBe(61);
+    expect(result).toBeGreaterThan(20); // above uncertain threshold
   });
 });
