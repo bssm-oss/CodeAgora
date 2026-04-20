@@ -3,6 +3,7 @@
  * Manages discussion lifecycle, coordinates supporters, writes final report
  */
 
+import { z } from 'zod';
 import type { Discussion, DiscussionRound, DiscussionVerdict, ModeratorReport } from '../types/core.js';
 import type { ModeratorConfig, DiscussionSettings, SupporterPoolConfig } from '../types/config.js';
 import { executeBackend } from '../l1/backend.js';
@@ -484,7 +485,28 @@ async function moderatorForcedDecision(
   rounds: DiscussionRound[],
   config: ModeratorConfig
 ): Promise<{ severity: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED'; reasoning: string }> {
-  const prompt = `You are the moderator. The discussion has reached max rounds without consensus.
+  const useJsonFormat = config.outputFormat === 'json';
+  const roundsBlock = rounds.map((r, i) =>
+    `Round ${i + 1}:\n${r.supporterResponses.map(s => `- ${s.supporterId}: ${s.stance} — ${s.response.substring(0, 200)}`).join('\n')}`
+  ).join('\n\n');
+
+  const prompt = useJsonFormat
+    ? `You are the moderator. The discussion has reached max rounds without consensus.
+
+Issue: ${discussion.issueTitle}
+Severity claimed: ${discussion.severity}
+
+Review all rounds and make a final decision. Respond with VALID JSON only — no code fences, no prose before or after.
+
+{
+  "severity": "HARSHLY_CRITICAL" | "CRITICAL" | "WARNING" | "SUGGESTION" | "DISMISSED",
+  "reasoning": "string (1-3 sentences explaining your decision)"
+}
+
+Rounds:
+${roundsBlock}
+`
+    : `You are the moderator. The discussion has reached max rounds without consensus.
 
 Issue: ${discussion.issueTitle}
 Severity claimed: ${discussion.severity}
@@ -494,7 +516,7 @@ Review all rounds and make a final decision:
 - Reasoning
 
 Rounds:
-${rounds.map((r, i) => `Round ${i + 1}:\n${r.supporterResponses.map(s => `- ${s.supporterId}: ${s.stance} — ${s.response.substring(0, 200)}`).join('\n')}`).join('\n\n')}
+${roundsBlock}
 `;
 
   const response = await executeBackend({
@@ -719,15 +741,63 @@ function normalizeStance(raw: string): Stance {
 }
 
 /**
+ * Zod schema for the JSON-mode moderator verdict envelope (#465).
+ * Kept structurally compatible with the markdown-parser output.
+ */
+const ModeratorVerdictJsonSchema = z.object({
+  severity: z.enum(['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION', 'DISMISSED']),
+  reasoning: z.string().min(1),
+});
+
+/** Extract a JSON payload from a possibly-wrapped response (whole-response only). */
+function extractModeratorJsonPayload(response: string): string | null {
+  const trimmed = response.trim();
+  const fullFence = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
+  if (fullFence && fullFence[1]) return fullFence[1].trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
+  return null;
+}
+
+/**
+ * Parse a JSON-mode moderator verdict response. Returns null when the
+ * response is not recognizable as JSON (caller can fall back to the
+ * regex-based parser).
+ */
+export function parseForcedDecisionJson(
+  response: string,
+): { severity: Severity; reasoning: string } | null {
+  const payload = extractModeratorJsonPayload(response);
+  if (payload === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  const result = ModeratorVerdictJsonSchema.safeParse(parsed);
+  if (!result.success) return null;
+  return {
+    severity: result.data.severity,
+    reasoning: result.data.reasoning,
+  };
+}
+
+/**
  * Parse moderator forced decision from LLM response.
  *
  * Priority:
+ * 0. JSON envelope (if outputFormat: 'json' — #465). Zod-validated.
  * 1. Structured patterns: "Severity: WARNING", "**Severity:** CRITICAL"
- * 2. JSON-like: "severity": "WARNING"
- * 3. Keyword scan on full response (most specific first)
+ * 2. JSON-like regex: "severity": "WARNING"
+ * 3. Keyword scan on first 10 lines (most specific first)
  * 4. Default: WARNING
  */
 export function parseForcedDecision(response: string): { severity: Severity; reasoning: string } {
+  // Phase 0: try JSON envelope first. Graceful fall-through to existing
+  // regex path on any failure — preserves legacy behavior for markdown-mode.
+  const jsonResult = parseForcedDecisionJson(response);
+  if (jsonResult !== null) return jsonResult;
+
   const SEVERITY_ORDER: Severity[] = [
     'HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION', 'DISMISSED',
   ];
