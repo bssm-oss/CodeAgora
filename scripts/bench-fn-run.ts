@@ -75,8 +75,20 @@ async function loadFixtures(filter: Set<string> | null): Promise<GoldenBugFixtur
     if (filter && !filter.has(entry.name)) continue;
     const dir = path.join(fixturesDir, entry.name);
     await stat(path.join(dir, 'diff.patch'));
-    const raw = await readFile(path.join(dir, 'expected.json'), 'utf8');
-    const parsed = GoldenBugFixtureSchema.parse(JSON.parse(raw));
+    const expectedPath = path.join(dir, 'expected.json');
+    let parsed: GoldenBugFixture;
+    try {
+      const raw = await readFile(expectedPath, 'utf8');
+      parsed = GoldenBugFixtureSchema.parse(JSON.parse(raw));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`fixture ${entry.name}: failed to load expected.json — ${msg}`);
+    }
+    if (parsed.id !== entry.name) {
+      throw new Error(
+        `fixture ${entry.name}: id "${parsed.id}" does not match directory name`,
+      );
+    }
     out.push(parsed);
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
@@ -117,23 +129,28 @@ async function main(): Promise<void> {
   // Pipeline reads config from process.cwd()/.ca/config.json — chdir into
   // benchmarks/ so the committed benchmark config is picked up regardless
   // of where the caller invoked the script from.
+  const originalCwd = process.cwd();
   process.chdir(benchmarkCwd);
 
   const summary: { id: string; findings: number; status: 'ok' | 'error'; error?: string }[] = [];
-  for (const fixture of fixtures) {
-    process.stderr.write(`[${fixture.id}] running... `);
-    const started = Date.now();
-    try {
-      const findings = await runOne(fixture.id, args.skipHead);
-      const outPath = path.join(resultsDir, `${fixture.id}.json`);
-      await writeFile(outPath, JSON.stringify(findings, null, 2) + '\n');
-      summary.push({ id: fixture.id, findings: findings.length, status: 'ok' });
-      process.stderr.write(`ok (${findings.length} finding(s), ${Math.round((Date.now() - started) / 1000)}s)\n`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      summary.push({ id: fixture.id, findings: 0, status: 'error', error: msg });
-      process.stderr.write(`ERROR: ${msg}\n`);
+  try {
+    for (const fixture of fixtures) {
+      process.stderr.write(`[${fixture.id}] running... `);
+      const started = Date.now();
+      try {
+        const findings = await runOne(fixture.id, args.skipHead);
+        const outPath = path.join(resultsDir, `${fixture.id}.json`);
+        await writeFile(outPath, JSON.stringify(findings, null, 2) + '\n');
+        summary.push({ id: fixture.id, findings: findings.length, status: 'ok' });
+        process.stderr.write(`ok (${findings.length} finding(s), ${Math.round((Date.now() - started) / 1000)}s)\n`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        summary.push({ id: fixture.id, findings: 0, status: 'error', error: msg });
+        process.stderr.write(`ERROR: ${msg}\n`);
+      }
     }
+  } finally {
+    process.chdir(originalCwd);
   }
 
   console.log('\n== bench-fn-run summary ==');

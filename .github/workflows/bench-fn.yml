@@ -46,17 +46,22 @@ jobs:
       - name: Run live pipeline on fixtures
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          BENCH_FIXTURES: ${{ inputs.fixtures }}
+          BENCH_SKIP_HEAD: ${{ inputs.skip_head }}
+          BENCH_RESULTS: ${{ github.workspace }}/bench-out
         run: |
-          set -e
-          ARGS="--results ${{ github.workspace }}/bench-out"
-          if [ -n "${{ inputs.fixtures }}" ]; then
-            ARGS="$ARGS --fixtures ${{ inputs.fixtures }}"
+          set -euo pipefail
+          # Build args as an array to avoid word-splitting surprises from
+          # workflow_dispatch user input.
+          ARGS=(--results "$BENCH_RESULTS")
+          if [ -n "$BENCH_FIXTURES" ]; then
+            ARGS+=(--fixtures "$BENCH_FIXTURES")
           fi
-          if [ "${{ inputs.skip_head }}" = "true" ]; then
-            ARGS="$ARGS --skip-head"
+          if [ "$BENCH_SKIP_HEAD" = "true" ]; then
+            ARGS+=(--skip-head)
           fi
-          echo "bench-fn-run args: $ARGS"
-          pnpm bench:fn:run -- $ARGS
+          echo "bench-fn-run args: ${ARGS[*]}"
+          pnpm bench:fn:run -- "${ARGS[@]}"
 
       - name: Score results
         id: score
