@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Panel } from '../components/Panel.js';
 import { ScrollableList } from '../components/ScrollableList.js';
+import { ChatBubble } from '../components/ChatBubble.js';
 import type { DebateRound } from '../components/DebatePanel.js';
 import {
   colors,
@@ -50,6 +51,16 @@ function discussionStatusColor(status: DebateDiscussion['status']): string {
     case 'escalated': return colors.error;
     default:          return colors.muted;
   }
+}
+
+/** Build consensus summary line for a discussion */
+function buildConsensusSummary(discussion: DebateDiscussion): string | null {
+  if (discussion.status !== 'resolved') return null;
+  const lastRound = discussion.rounds[discussion.rounds.length - 1];
+  if (!lastRound?.consensusReached) return null;
+  const roundCount = discussion.rounds.length;
+  const supporterCount = lastRound.supporters.length;
+  return `${icons.check} Consensus: ${discussion.severity} (${supporterCount}/${supporterCount}) after ${roundCount} round${roundCount !== 1 ? 's' : ''}`;
 }
 
 // ============================================================================
@@ -152,43 +163,38 @@ export function DebateScreen({ discussions }: Props): React.JSX.Element {
                   <Text color={colors.primary}>{selected.filePath}</Text>
                 </Box>
 
-                {/* Rounds */}
+                {/* Consensus summary */}
+                {(() => {
+                  const summary = buildConsensusSummary(selected);
+                  return summary ? (
+                    <Box marginBottom={1}>
+                      <Text color={colors.success} bold>{summary}</Text>
+                    </Box>
+                  ) : null;
+                })()}
+
+                {/* Rounds with ChatBubble */}
                 {selected.rounds.length === 0 ? (
                   <Text dimColor>No rounds yet.</Text>
                 ) : (
                   selected.rounds.map((r) => (
                     <Box key={r.round} flexDirection="column" marginBottom={1}>
-                      <Text bold color={colors.muted}>Round {r.round}</Text>
-                      {r.supporters.map((s) => (
-                        <Box key={s.id} marginLeft={2} flexDirection="column">
-                          <Box>
-                            <Text
-                              color={s.stance === 'AGREE' ? colors.success : colors.error}
-                              bold
-                            >
-                              {s.stance}
-                            </Text>
-                            {s.isDevilsAdvocate === true && (
-                              <Text color={colors.accent}> [DA]</Text>
-                            )}
-                            <Text color={colors.muted}> {s.id}</Text>
-                          </Box>
-                          <Box marginLeft={2}>
-                            <Text wrap="wrap">{s.reasoning}</Text>
-                          </Box>
-                        </Box>
-                      ))}
-                      <Box marginLeft={2} marginTop={1}>
-                        {r.consensusReached ? (
-                          <Text color={colors.success}>
-                            {icons.check} Consensus reached
-                          </Text>
-                        ) : (
-                          <Text color={colors.warning}>
-                            {icons.cross} No consensus
-                          </Text>
+                      <Box marginBottom={1}>
+                        <Text bold color={colors.muted}>Round {r.round}</Text>
+                        {r.consensusReached && (
+                          <Text color={colors.success}> {icons.check} consensus</Text>
                         )}
                       </Box>
+                      {r.supporters.map((s) => (
+                        <ChatBubble
+                          key={s.id}
+                          reviewerId={s.id}
+                          model=""
+                          stance={s.stance === 'AGREE' ? 'agree' : 'disagree'}
+                          message={s.reasoning}
+                          isDevilsAdvocate={s.isDevilsAdvocate === true}
+                        />
+                      ))}
                     </Box>
                   ))
                 )}

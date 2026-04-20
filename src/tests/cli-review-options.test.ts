@@ -101,8 +101,10 @@ describe('formatGithub', () => {
     expect(output).toContain('🔍 CodeAgora Review');
   });
 
-  it('should contain severity section headers', () => {
-    const output = formatGithub(successResult);
+  it('should contain severity section headers when issues are present', () => {
+    // successResult has no evidenceDocs — sections only render when count > 0
+    // Use mockResultWithSummary which has CRITICAL and WARNING evidence docs
+    const output = formatGithub(mockResultWithSummary);
     expect(output).toContain('CRITICAL');
     expect(output).toContain('WARNING');
   });

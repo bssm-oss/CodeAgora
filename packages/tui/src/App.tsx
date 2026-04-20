@@ -32,14 +32,12 @@ export function App(): React.JSX.Element {
 
   useInput((input) => {
     if (input === 'q') {
-      // Do not handle 'q' when on a detail/modal/editing screen — let the screen handle it
+      // Screens that handle their own 'q' input — do not intercept
       if (screen === 'context' || screen === 'sessions' || screen === 'debate' || screen === 'config') {
         return;
       }
-      if (screen === 'results') {
-        // From results, go home
-        navigate('home');
-      } else if (canGoBack) {
+      // Unified: go back if possible, quit only from home
+      if (canGoBack) {
         goBack();
       } else {
         exit();

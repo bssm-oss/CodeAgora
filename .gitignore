@@ -63,6 +63,9 @@ packages/web/.ca/
 # Archives
 .archive/
 
+# Build outputs — packages
+packages/*/dist/
+
 # CodeAgora runtime (local data, not shared)
 .codeagora/
 .ca/sessions/
@@ -70,3 +73,9 @@ packages/web/.ca/
 .ca/model-quality.json
 .ca/dashboard-token
 .claude/worktrees/
+
+# Playwright MCP runtime
+.playwright-mcp/
+
+# E2E test screenshots
+web-e2e-*.png

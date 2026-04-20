@@ -54,8 +54,13 @@ export async function postToGitHub(
   const { stdout: diff } = await execFile('gh', ['pr', 'view', prUrl, '--json', 'headRefOid', '-q', '.headRefOid']);
   const headSha = diff.trim();
 
+  const token = process.env['GITHUB_TOKEN'] ?? '';
+  if (!token) {
+    throw new Error('GITHUB_TOKEN environment variable is required for posting reviews');
+  }
+
   const ghConfig = {
-    token: process.env['GITHUB_TOKEN'] ?? '',
+    token,
     owner: owner!,
     repo: repo!,
   };
@@ -68,6 +73,16 @@ export async function postToGitHub(
   const { stdout: prDiff } = await execFile('gh', ['pr', 'diff', prUrl]);
   const positionIndex = buildDiffPositionIndex(prDiff);
 
+  const reviewerMap = result.reviewerMap
+    ? new Map(Object.entries(result.reviewerMap))
+    : undefined;
+  const reviewerOpinions = result.reviewerOpinions
+    ? new Map(Object.entries(result.reviewerOpinions))
+    : undefined;
+  const supporterModelMap = result.supporterModelMap
+    ? new Map(Object.entries(result.supporterModelMap))
+    : undefined;
+
   const review = mapToGitHubReview({
     summary: result.summary,
     evidenceDocs: result.evidenceDocs ?? [],
@@ -76,6 +91,10 @@ export async function postToGitHub(
     headSha,
     sessionId: result.sessionId,
     sessionDate: result.date,
+    reviewerMap,
+    reviewerOpinions,
+    devilsAdvocateId: result.devilsAdvocateId,
+    supporterModelMap,
   });
 
   const postResult = await postReview(ghConfig, prNumber, review);

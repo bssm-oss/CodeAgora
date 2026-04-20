@@ -50,6 +50,19 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   const s = result.summary;
   const docs = result.evidenceDocs ?? [];
   const triage = triageDocs(docs);
+  const reviewerMap = result.reviewerMap ?? {};
+
+  // ── Diff Stats ───────────────────────────────────────────
+  if (result.diffComplexity) {
+    const dc = result.diffComplexity;
+    const fileWord = dc.fileCount === 1 ? 'file' : 'files';
+    let statsLine = `  ${dc.fileCount} ${fileWord}  +${dc.addedLines} −${dc.removedLines}  ${dc.level}`;
+    if (dc.securitySensitiveFiles.length > 0) {
+      statsLine += `  ${dim(`[⚠ ${dc.securitySensitiveFiles.join(', ')}]`)}`;
+    }
+    lines.push(dim(statsLine));
+    lines.push('');
+  }
 
   // ── Verdict Box ──────────────────────────────────────────
   const decEmoji = s.decision === 'ACCEPT' ? '\u2705' : s.decision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
@@ -71,6 +84,7 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   lines.push('');
 
   // ── Issue rendering helper ──
+  const totalReviewers = s.totalReviewers - s.forfeitedReviewers;
   const renderIssue = (doc: EvidenceDocument, verbose: boolean) => {
     const fn = severityColor[doc.severity as keyof typeof severityColor] ?? ((x: string) => x);
     const confStr = doc.confidence != null ? ` ${doc.confidence}%` : '';
@@ -83,6 +97,20 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
     const cwe = lookupCwe(doc.issueTitle);
     const cweStr = cwe ? dim(` [CWE-${cwe.id}]`) : '';
     lines.push(`    ${bold(doc.issueTitle)}${cweStr}`);
+
+    // Meta line: reviewer agreement + verification status
+    const mapKey = `${doc.filePath}:${doc.lineRange[0]}`;
+    const agreeingReviewers = reviewerMap[mapKey]?.length ?? 0;
+    const reviewerMeta = totalReviewers > 0 && agreeingReviewers > 0
+      ? `${agreeingReviewers}/${totalReviewers} reviewers`
+      : '';
+    const verifiedMeta = doc.suggestionVerified === 'passed' ? '\u2713 fix verified'
+      : doc.suggestionVerified === 'failed' ? '\u2717 fix unverified'
+      : '';
+    const metaParts = [reviewerMeta, verifiedMeta].filter(Boolean).join(' \u00B7 ');
+    if (metaParts) {
+      lines.push(`    \u2506 ${dim(metaParts)}`);
+    }
 
     if (verbose) {
       lines.push(`    \u2506 ${doc.problem}`);
@@ -135,6 +163,40 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   // ── Zero issues celebration ──
   if (docs.length === 0 && s.decision === 'ACCEPT') {
     lines.push(`  ${bold('No issues found across all reviewers. Ship it!')} \uD83D\uDE80`);
+    lines.push('');
+  }
+
+  // ── L2 Discussions ──
+  const activeDiscussions = (result.discussions ?? []).filter(d => d.finalSeverity !== 'DISMISSED');
+  if (activeDiscussions.length > 0) {
+    lines.push(`  \u2500\u2500 discussions ${ '\u2500'.repeat(37) }`);
+    lines.push('');
+    for (const d of activeDiscussions) {
+      const icon = d.consensusReached ? '\u2714' : '\u2716';
+      const outcome = d.consensusReached ? 'consensus' : 'escalated';
+      const confStr = d.avgConfidence != null ? `  ${d.avgConfidence}%` : '';
+      const roundStr = `${d.rounds} round${d.rounds !== 1 ? 's' : ''}`;
+      const loc = `${d.filePath}:${d.lineRange[0]}`;
+      lines.push(`    ${icon} ${dim(d.discussionId)}  ${dim(loc)}  ${d.finalSeverity}   ${outcome}  ${roundStr}${confStr}`);
+    }
+    lines.push('');
+  }
+
+  // ── Questions for Human ──
+  if (s.decision === 'NEEDS_HUMAN' && s.questionsForHuman && s.questionsForHuman.length > 0) {
+    lines.push(`  \u2500\u2500 questions for human ${ '\u2500'.repeat(28) }`);
+    lines.push('');
+    for (const q of s.questionsForHuman) {
+      const shortQ = q.length > 80 ? q.slice(0, 77) + '...' : q;
+      lines.push(`    \u2022 ${shortQ}`);
+    }
+    lines.push('');
+  }
+
+  // ── Performance (verbose only) ──
+  if (options?.verbose && result.performanceText) {
+    lines.push(`  \u2500\u2500 performance ${ '\u2500'.repeat(37) }`);
+    lines.push(result.performanceText);
     lines.push('');
   }
 
@@ -236,6 +298,32 @@ export function formatMarkdown(result: PipelineResult, options?: FormatOptions):
     lines.push('');
   }
 
+  // ── L2 Discussions table ──
+  const mdDiscussions = (result.discussions ?? []).filter(d => d.finalSeverity !== 'DISMISSED');
+  if (mdDiscussions.length > 0) {
+    lines.push('### L2 Discussions');
+    lines.push('');
+    lines.push('| Discussion | Location | Severity | Outcome | Rounds | Confidence |');
+    lines.push('|---|---|---|---|---|---|');
+    for (const d of mdDiscussions) {
+      const outcome = d.consensusReached ? 'consensus' : 'escalated';
+      const confStr = d.avgConfidence != null ? `${d.avgConfidence}%` : '—';
+      lines.push(`| ${d.discussionId} | \`${d.filePath}:${d.lineRange[0]}\` | ${d.finalSeverity} | ${outcome} | ${d.rounds} | ${confStr} |`);
+    }
+    lines.push('');
+  }
+
+  // ── Questions for Human ──
+  const mdQuestions = result.summary?.questionsForHuman;
+  if (mdQuestions && mdQuestions.length > 0) {
+    lines.push('### Questions for Human Review');
+    lines.push('');
+    mdQuestions.forEach((q, i) => {
+      lines.push(`${i + 1}. ${q}`);
+    });
+    lines.push('');
+  }
+
   lines.push(`See full report: \`.ca/sessions/${result.date}/${result.sessionId}/\``);
 
   return lines.join('\n');
@@ -269,11 +357,27 @@ export function formatGithub(result: PipelineResult): string {
   lines.push(`✅ **Review completed** — Session \`${result.date}/${result.sessionId}\``);
   lines.push('');
 
-  // Severity groups with actual counts from summary
+  // Decision + reasoning
+  if (result.summary) {
+    lines.push(`**Decision:** ${result.summary.decision}`);
+    lines.push('');
+    lines.push(`> ${result.summary.reasoning}`);
+    lines.push('');
+  }
+
+  // Severity groups with actual issue checkboxes
+  const ghDocs = result.evidenceDocs ?? [];
   for (const severity of SEVERITY_ORDER) {
     const count = result.summary?.severityCounts[severity] ?? 0;
+    if (count === 0) continue;
     const { emoji, label } = SEVERITY_GITHUB[severity] ?? { emoji: '⚪', label: severity };
-    lines.push(`### ${emoji} **${label}** / ${severity} (${count})`);
+    lines.push(`### ${emoji} **${label}** (${count})`);
+    lines.push('');
+    const sevDocs = ghDocs.filter(d => d.severity === severity);
+    for (const doc of sevDocs) {
+      const confStr = doc.confidence != null ? ` (${doc.confidence}%)` : '';
+      lines.push(`- [ ] \`${doc.filePath}:${doc.lineRange[0]}\` — **${doc.issueTitle}**${confStr}`);
+    }
     lines.push('');
   }
 

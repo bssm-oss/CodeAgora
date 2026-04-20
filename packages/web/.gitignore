@@ -1,2 +1,9 @@
 .claude/worktrees/
-.claude/worktrees/
+
+# Runtime data
+dist/
+.ca/sessions/
+.ca/logs/
+.ca/model-quality.json
+.ca/dashboard-token
+.ca/notifications.json

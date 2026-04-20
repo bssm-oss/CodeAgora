@@ -73,6 +73,8 @@ export interface PipelineSummary {
   totalDiscussions: number;
   resolved: number;
   escalated: number;
+  /** Human-review questions from L3 head verdict */
+  questionsForHuman?: string[];
 }
 
 export interface PipelineResult {
@@ -514,6 +516,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         totalDiscussions: moderatorReport.summary.totalDiscussions,
         resolved: moderatorReport.summary.resolved,
         escalated: moderatorReport.summary.escalated,
+        questionsForHuman: headVerdict.questionsForHuman,
       },
       evidenceDocs: allEvidenceDocs,
       discussions: moderatorReport.discussions,

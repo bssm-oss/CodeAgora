@@ -10,6 +10,7 @@ import { StatCards } from '../components/StatCards.js';
 import { RecentActivity } from '../components/RecentActivity.js';
 import { QuickActions } from '../components/QuickActions.js';
 import { WeeklyTrend } from '../components/WeeklyTrend.js';
+import { OnboardingCard } from '../components/OnboardingCard.js';
 
 interface SessionMetadata {
   sessionId: string;
@@ -100,17 +101,22 @@ export function Dashboard(): React.JSX.Element {
         )}
       </div>
 
-      <StatCards sessions={sessionList} costs={costSummary} />
-
-      <div className="dashboard-grid">
-        <div className="dashboard-grid__main">
-          <WeeklyTrend sessions={sessionList} />
-          <RecentActivity sessions={sessionList} limit={10} />
-        </div>
-        <div className="dashboard-grid__side">
-          <QuickActions />
-        </div>
-      </div>
+      {sessionList.length === 0 ? (
+        <OnboardingCard />
+      ) : (
+        <>
+          <StatCards sessions={sessionList} costs={costSummary} />
+          <div className="dashboard-grid">
+            <div className="dashboard-grid__main">
+              <WeeklyTrend sessions={sessionList} />
+              <RecentActivity sessions={sessionList} limit={10} />
+            </div>
+            <div className="dashboard-grid__side">
+              <QuickActions />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

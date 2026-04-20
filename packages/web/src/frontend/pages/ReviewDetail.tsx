@@ -4,7 +4,7 @@ import { useApi } from '../hooks/useApi.js';
 import { VerdictBanner } from '../components/VerdictBanner.js';
 import { SeveritySummary } from '../components/SeveritySummary.js';
 import { DiffViewer } from '../components/DiffViewer.js';
-import { IssueCard } from '../components/IssueCard.js';
+import { TriageTabs } from '../components/TriageTabs.js';
 import {
   aggregateIssues,
   computeSeverityCounts,
@@ -147,29 +147,10 @@ export function ReviewDetail(): React.JSX.Element {
         </section>
       )}
 
-      {/* Issues List */}
+      {/* Issues — triage-grouped view */}
       <section className="review-detail__section">
         <h3>Issues ({issues.length})</h3>
-        {issues.length === 0 ? (
-          <p className="review-detail__empty">No issues found.</p>
-        ) : (
-          <div className="review-detail__issues">
-            {issues.map((issue, idx) => (
-              <IssueCard
-                key={`${issue.filePath}-${issue.lineRange[0]}-${idx}`}
-                issueTitle={issue.issueTitle}
-                problem={issue.problem}
-                evidence={issue.evidence}
-                severity={issue.severity}
-                suggestion={issue.suggestion}
-                filePath={issue.filePath}
-                lineRange={issue.lineRange}
-                confidence={issue.confidence}
-                reviewers={issue.reviewers}
-              />
-            ))}
-          </div>
-        )}
+        <TriageTabs evidenceDocs={issues} />
       </section>
 
       {/* Discussions */}
