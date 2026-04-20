@@ -375,3 +375,59 @@ describe('Edge cases', () => {
     expect(result.filtered[0].confidence).toBe(25);
   });
 });
+
+// ============================================================================
+// ConfidenceTrace population
+// ============================================================================
+
+describe('ConfidenceTrace: filtered stage', () => {
+  it('should populate confidenceTrace.filtered after code-quote penalty', () => {
+    const docs = [makeDoc({
+      problem: 'The code `thisIsAFabricatedCodeSnippetThatDoesNotExist` is wrong',
+      confidence: 80,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidenceTrace?.filtered).toBe(40);
+    // BC parity: legacy `confidence` field mirrors trace.filtered within this stage.
+    expect(result.filtered[0].confidenceTrace?.filtered).toBe(result.filtered[0].confidence);
+  });
+
+  it('should populate confidenceTrace.filtered as pass-through when no penalty applied', () => {
+    const docs = [makeDoc({
+      problem: 'Plain problem description with no fabricated quotes',
+      confidence: 75,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered[0].confidenceTrace?.filtered).toBe(75);
+  });
+
+  it('should populate confidenceTrace.filtered for docs routed to uncertain', () => {
+    const docs = [makeDoc({
+      filePath: 'src/deprecated.ts',
+      lineRange: [1, 5],
+      problem: 'A `totallyFakeCodeSnippetHere` was introduced that is wrong',
+      confidence: 30,
+    })];
+    const result = filterHallucinations(docs, REMOVALS_ONLY_DIFF);
+
+    // Routed to uncertain bucket, but trace must still be populated so
+    // downstream stages can reconstruct the history.
+    expect(result.uncertain).toHaveLength(1);
+    expect(result.uncertain[0].confidenceTrace?.filtered).toBeLessThan(20);
+    expect(result.uncertain[0].confidenceTrace?.filtered).toBe(result.uncertain[0].confidence);
+  });
+
+  it('should not populate confidenceTrace for rule-source findings', () => {
+    const docs = [makeDoc({
+      source: 'rule',
+      filePath: 'src/nonexistent.ts',
+      confidence: 90,
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    // Rule-source docs bypass the filter entirely — filter does not write trace.
+    expect(result.filtered[0].confidenceTrace).toBeUndefined();
+  });
+});

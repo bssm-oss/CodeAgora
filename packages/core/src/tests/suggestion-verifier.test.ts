@@ -195,4 +195,35 @@ describe('verifySuggestions', () => {
     // access should not have been called since there are no candidates
     expect(mockAccess).not.toHaveBeenCalled();
   });
+
+  // ========================================================================
+  // ConfidenceTrace population
+  // ========================================================================
+
+  describe('ConfidenceTrace: verified stage', () => {
+    it('should populate confidenceTrace.verified only on verification failure', async () => {
+      mockAccess.mockResolvedValue(undefined);
+
+      const brokenDoc = makeDoc({
+        severity: 'CRITICAL',
+        suggestion: '```ts\nconst x: = ;\n```',
+        confidence: 80,
+      });
+      const validDoc = makeDoc({
+        severity: 'CRITICAL',
+        suggestion: '```ts\nconst a = 1;\n```',
+        confidence: 80,
+      });
+
+      await verifySuggestions(repoPath, [brokenDoc, validDoc]);
+
+      // Failure writes verified = confidence * 0.5 = 40
+      expect(brokenDoc.confidenceTrace?.verified).toBe(40);
+      // BC parity: legacy field mirrors trace.verified on failure.
+      expect(brokenDoc.confidenceTrace?.verified).toBe(brokenDoc.confidence);
+
+      // Pass: verified stays absent so downstream falls back to corroborated.
+      expect(validDoc.confidenceTrace?.verified).toBeUndefined();
+    });
+  });
 });
