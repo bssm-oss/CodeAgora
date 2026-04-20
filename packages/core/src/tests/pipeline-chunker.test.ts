@@ -231,6 +231,21 @@ describe('BUILT_IN_ARTIFACT_PATTERNS', () => {
     'src/__snapshots__/foo.test.ts.snap',
     'components/__snapshots__/Button.test.tsx.snap',
     'src/foo.snap',
+    // Additional ecosystems
+    'assets/hero.avif',
+    'releases/archive.bz2',
+    'pkg/runtime.wasm',
+    'src/foo.pyc',
+    'src/__pycache__/compiled.cpython-312.pyc',
+    'dist/my_pkg-1.0-py3-none-any.whl',
+    'dist/my_pkg.egg-info/PKG-INFO',
+    'vendor/github.com/pkg/errors/errors.go',
+    'target/debug/build/foo.o',
+    'target/release/build/foo.o',
+    'classes/com/example/Foo.class',
+    'libs/common-1.0.jar',
+    'deploy/webapp-1.0.war',
+    '.bundle/config',
   ].filter((p) => !p.endsWith('.ignored-ext-so-skip'));
 
   // Files that MUST survive the built-in filter — real source code that
