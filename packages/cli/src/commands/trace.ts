@@ -81,7 +81,11 @@ export async function traceSession(
     lines.push(...formatSessionTrace([]));
   } else if (options.finding !== undefined) {
     const idx = options.finding;
-    if (idx < 1 || idx > docs.length) {
+    // Number.isInteger guard: CLI parseInt can yield NaN on non-numeric input
+    // (e.g. `--finding abc`). NaN fails every comparison silently, so without
+    // this check docs[NaN-1] would be undefined and downstream formatting
+    // would crash. See #485 self-review.
+    if (!Number.isInteger(idx) || idx < 1 || idx > docs.length) {
       throw new Error(`Finding index ${idx} out of range (session has ${docs.length} findings, use 1-${docs.length})`);
     }
     lines.push(...formatFindingTrace(docs[idx - 1], idx));

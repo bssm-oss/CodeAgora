@@ -120,6 +120,30 @@ describe('traceSession', () => {
     ).rejects.toThrow(/out of range/);
   });
 
+  it('throws for --finding with NaN or non-integer value', async () => {
+    // parseInt('abc') → NaN; without the Number.isInteger guard, NaN < 1
+    // and NaN > len both evaluate to false, silently passing through to
+    // docs[NaN-1] = undefined and crashing in the formatter. See #485 review.
+    await writeSession('2026-04-20', '006', {
+      summary: { decision: 'ACCEPT' },
+      evidenceDocs: [
+        {
+          issueTitle: 'Only one',
+          severity: 'WARNING',
+          filePath: 'src/a.ts',
+          lineRange: [1, 1],
+          confidenceTrace: { raw: 50, final: 50 },
+        },
+      ],
+    });
+    await expect(
+      traceSession(tmpDir, '2026-04-20/006', { finding: NaN }),
+    ).rejects.toThrow(/out of range/);
+    await expect(
+      traceSession(tmpDir, '2026-04-20/006', { finding: 1.5 }),
+    ).rejects.toThrow(/out of range/);
+  });
+
   it('blocks path traversal in session argument', async () => {
     await expect(
       traceSession(tmpDir, '../../../etc/passwd'),
