@@ -255,27 +255,96 @@ export function chunkDiffFiles(
 // ============================================================================
 
 /**
- * Default patterns for files that should never be reviewed.
- * These are build outputs, lock files, and minified bundles — not source code.
- * Users can add additional patterns via .reviewignore.
+ * Default patterns for files that should never be reviewed (#482).
+ * Build outputs, lock files, generated code, binary assets, and test
+ * snapshots — not source code. Users can add project-specific additions
+ * via `.reviewignore`.
  */
 export const BUILT_IN_ARTIFACT_PATTERNS = [
+  // Build outputs — directory-level
   'dist/**',
   'build/**',
   'out/**',
   '.next/**',
   '.nuxt/**',
+  '.svelte-kit/**',
+  '.turbo/**',
+  '.docusaurus/**',
+  'storybook-static/**',
   'coverage/**',
   'node_modules/**',
+
+  // Minified / bundled
   '**/*.min.js',
   '**/*.min.css',
+  '**/*.min.mjs',
   '**/*.bundle.js',
+  '**/*.bundle.css',
+  '**/*.bundle.mjs',
+
+  // Source maps
+  '**/*.js.map',
+  '**/*.mjs.map',
+  '**/*.css.map',
+  '**/*.d.ts.map',
+
+  // Generated code (by convention)
+  '**/*.pb.go',
+  '**/*.pb.ts',
+  '**/*.pb.py',
+  '**/*_pb.js',
+  '**/*_pb.ts',
+  '**/*.gen.ts',
+  '**/*.gen.go',
+  '**/*_generated.go',
+  '**/*_generated.ts',
+
+  // Lock files — JS ecosystem
   'pnpm-lock.yaml',
   'package-lock.json',
   'yarn.lock',
   'bun.lockb',
-  '**/*.d.ts.map',
-  '**/*.js.map',
+  'bun.lock',
+  // Lock files — other ecosystems
+  'Cargo.lock',
+  'poetry.lock',
+  'Pipfile.lock',
+  'uv.lock',
+  'composer.lock',
+  'Gemfile.lock',
+  'go.sum',
+  'mix.lock',
+  'flake.lock',
+
+  // Binary assets
+  '**/*.png',
+  '**/*.jpg',
+  '**/*.jpeg',
+  '**/*.gif',
+  '**/*.webp',
+  '**/*.ico',
+  '**/*.bmp',
+  '**/*.tiff',
+  '**/*.woff',
+  '**/*.woff2',
+  '**/*.ttf',
+  '**/*.otf',
+  '**/*.eot',
+  '**/*.mp3',
+  '**/*.mp4',
+  '**/*.mov',
+  '**/*.webm',
+  '**/*.pdf',
+  '**/*.zip',
+  '**/*.tar',
+  '**/*.gz',
+  '**/*.tgz',
+  '**/*.7z',
+  '**/*.rar',
+
+  // Test snapshots
+  '**/*.snap',
+  '**/__snapshots__/**',
 ];
 
 // ============================================================================

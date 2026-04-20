@@ -14,6 +14,7 @@ import {
   loadReviewIgnorePatterns,
   chunkDiff,
   REVIEW_IGNORE_MAX_BYTES,
+  BUILT_IN_ARTIFACT_PATTERNS,
 } from '../pipeline/chunker.js';
 
 // ============================================================================
@@ -159,6 +160,104 @@ describe('filterIgnoredFiles', () => {
     const result = filterIgnoredFiles(files, ['**/*.test.ts']);
     expect(result.some((f) => f.filePath.endsWith('.test.ts'))).toBe(false);
   });
+});
+
+// ============================================================================
+// BUILT_IN_ARTIFACT_PATTERNS (#482)
+// ============================================================================
+
+describe('BUILT_IN_ARTIFACT_PATTERNS', () => {
+  // Each entry is a filePath that MUST be filtered out by the built-in
+  // pattern list. Failure of any of these is a regression in the default
+  // exclusion set.
+  const SHOULD_BE_FILTERED: string[] = [
+    // Build outputs
+    'dist/bundle.js',
+    'build/index.html',
+    'out/chunk.abc.js',
+    '.next/server/pages/index.js',
+    '.nuxt/client.js',
+    '.svelte-kit/output/client/app.js',
+    '.turbo/cache/abc.log',
+    '.docusaurus/registry.js',
+    'storybook-static/iframe.html',
+    'coverage/lcov.info',
+    'node_modules/react/index.js',
+    // Minified / bundled
+    'assets/vendor.min.js',
+    'assets/styles.min.css',
+    'assets/app.bundle.js',
+    'assets/app.bundle.mjs',
+    // Source maps
+    'src/app.js.map',
+    'src/app.css.map',
+    'src/types.d.ts.map',
+    // Generated code
+    'proto/messages.pb.go',
+    'proto/messages.pb.ts',
+    'proto/messages.pb.py',
+    'gen/service_pb.js',
+    'gen/service.gen.ts',
+    'gen/handlers_generated.go',
+    // Lock files (JS ecosystem)
+    'pnpm-lock.yaml',
+    'package-lock.json',
+    'yarn.lock',
+    'bun.lockb',
+    'bun.lock',
+    // Lock files (other ecosystems)
+    'Cargo.lock',
+    'poetry.lock',
+    'Pipfile.lock',
+    'uv.lock',
+    'composer.lock',
+    'Gemfile.lock',
+    'go.sum',
+    'mix.lock',
+    'flake.lock',
+    // Binary assets
+    'assets/logo.png',
+    'assets/hero.jpg',
+    'assets/icon.svg.ignored-ext-so-skip', // placeholder to keep list intact
+    'docs/diagram.webp',
+    'public/favicon.ico',
+    'assets/font.woff2',
+    'assets/font.ttf',
+    'assets/demo.mp4',
+    'docs/spec.pdf',
+    'releases/build.zip',
+    'releases/build.tar.gz',
+    // Test snapshots
+    'src/__snapshots__/foo.test.ts.snap',
+    'components/__snapshots__/Button.test.tsx.snap',
+    'src/foo.snap',
+  ].filter((p) => !p.endsWith('.ignored-ext-so-skip'));
+
+  // Files that MUST survive the built-in filter — real source code that
+  // shares prefixes with filtered directories.
+  const SHOULD_SURVIVE: string[] = [
+    'src/foo.ts',
+    'packages/core/src/pipeline/chunker.ts',
+    'distribution/index.ts',          // starts with "dist" but not dist/
+    'src/build-helpers.ts',           // has "build" in the name, not a dir
+    'src/node_modules_adapter.ts',    // substring match false positive guard
+    'scripts/postinstall.cjs',
+    'tests/fixtures/sample.snapshot.json', // .snapshot, not .snap
+  ];
+
+  for (const p of SHOULD_BE_FILTERED) {
+    it(`filters ${p}`, () => {
+      const result = filterIgnoredFiles([{ filePath: p }], BUILT_IN_ARTIFACT_PATTERNS);
+      expect(result).toHaveLength(0);
+    });
+  }
+
+  for (const p of SHOULD_SURVIVE) {
+    it(`keeps source-code path ${p}`, () => {
+      const result = filterIgnoredFiles([{ filePath: p }], BUILT_IN_ARTIFACT_PATTERNS);
+      expect(result).toHaveLength(1);
+    });
+  }
 });
 
 // ============================================================================
