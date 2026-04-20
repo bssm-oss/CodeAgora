@@ -51,6 +51,14 @@ export const AgentConfigSchema = z
      * models often follow more reliably than markdown structure. See #463.
      */
     outputFormat: z.enum(['markdown', 'json']).optional(),
+    /**
+     * Prompt verbosity tier. Default (undefined) auto-resolves from the
+     * L0 model registry: S+/S/A+/A/A- tiers use 'standard' (full prompt),
+     * B+/B/C tiers and unknown models use 'lite' (~50% compressed prompt
+     * focused on the essentials). Explicit setting overrides auto-detection.
+     * See #464.
+     */
+    promptTier: z.enum(['lite', 'standard']).optional(),
   })
   .refine(
     (data) => data.backend !== 'opencode' || data.provider !== undefined,
