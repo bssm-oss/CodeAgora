@@ -50,23 +50,26 @@ jobs:
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "openai/gpt-oss-120b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              { "id": "r2", "model": "nvidia/nemotron-3-super-120b-a12b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              { "id": "r3", "model": "z-ai/glm-4.5-air:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
+              { "id": "r1", "model": "x-ai/grok-code-fast-1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              { "id": "r2", "model": "qwen/qwen3-coder",      "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              { "id": "r3", "model": "minimax/minimax-m2.5",  "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              { "id": "r4", "model": "openai/gpt-5-mini",     "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              { "id": "r5", "model": "z-ai/glm-4.6",          "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
             ],
             "supporters": {
               "pool": [
-                { "id": "s1", "model": "openai/gpt-oss-20b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
+                { "id": "s1", "model": "qwen/qwen3.6-plus",   "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+                { "id": "s2", "model": "moonshotai/kimi-k2",  "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
               ],
-              "pickCount": 1,
+              "pickCount": 2,
               "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da", "model": "openai/gpt-oss-20b:free", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
+              "devilsAdvocate": { "id": "da", "model": "deepseek/deepseek-r1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
               "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
               "personaAssignment": "random"
             },
-            "moderator": { "model": "z-ai/glm-4.5-air:free", "backend": "api", "provider": "openrouter" },
+            "moderator": { "model": "deepseek/deepseek-v3.2", "backend": "api", "provider": "openrouter" },
             "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
-            "head": { "backend": "api", "model": "openai/gpt-oss-120b:free", "provider": "openrouter", "enabled": true },
+            "head": { "backend": "api", "model": "openai/gpt-5.4-mini", "provider": "openrouter", "enabled": true },
             "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
           }
           CONF
