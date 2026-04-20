@@ -9,6 +9,24 @@ export interface DiscussionVerdictLike {
 }
 
 /**
+ * Collapse a finding's evidence into a short normalized fingerprint.
+ * Two reviewers that emit the same (or near-identical) evidence text
+ * will produce the same fingerprint — used by the echo-detection
+ * dampener below to catch correlated-failure cascades where multiple
+ * reviewers latch onto the same superficial cue.
+ */
+function claimFingerprint(doc: EvidenceDocument): string {
+  const evidenceText = (doc.evidence ?? []).join(' | ');
+  if (evidenceText.length === 0) return '';
+  return evidenceText
+    .toLowerCase()
+    .replace(/[`*_#\-]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
+
+/**
  * L1 confidence: (agreeing reviewers / active reviewers) * 100
  *
  * "Agreeing" = docs at same filePath + similar lineRange (within ±5 lines).
@@ -21,6 +39,12 @@ export interface DiscussionVerdictLike {
  * reviewers failed to produce parseable output, the single surviving finding
  * was penalized as 1/5 "disagreement" even though 4 reviewers had simply
  * been silent. See #462 for context.
+ *
+ * Witness-based echo dampener (#468 follow-up): when 3+ co-located
+ * findings exist AND a majority of them collapse to the same evidence
+ * fingerprint, the "agreement" is almost certainly multiple reviewers
+ * echoing the same superficial cue rather than independently
+ * corroborating. Apply a ×0.75 dampener in that case.
  */
 export function computeL1Confidence(
   doc: EvidenceDocument,
@@ -35,11 +59,12 @@ export function computeL1Confidence(
   // - Clamp the rate at 100: a single reviewer can emit multiple docs at the
   //   same location (e.g. duplicate findings in one chunk), which would
   //   otherwise push agreeing > activeReviewers and yield a nonsensical rate.
-  const agreeing = allDocs.filter(d =>
+  const coLocated = allDocs.filter(d =>
     d.source !== 'rule' &&
     d.filePath === doc.filePath &&
     Math.abs(d.lineRange[0] - doc.lineRange[0]) <= 5
-  ).length;
+  );
+  const agreeing = coLocated.length;
   const agreementRate = Math.min(100, Math.round((agreeing / activeReviewers) * 100));
 
   let base: number;
@@ -79,6 +104,23 @@ export function computeL1Confidence(
   } else if (agreeing >= 3) {
     // Strong corroboration boost (capped at 100)
     base = Math.min(100, Math.round(base * 1.2));
+  }
+
+  // Echo-detection dampener (#468 follow-up, research note #5): if the
+  // "agreement" is actually multiple reviewers echoing the same
+  // evidence text, collapse the boost. Triggers only when 3+ co-located
+  // findings carry non-empty evidence AND a majority share the same
+  // fingerprint — i.e. it's clearly a correlated cascade, not
+  // independent witnessing.
+  const withEvidence = coLocated.filter((d) => (d.evidence?.length ?? 0) > 0);
+  if (withEvidence.length >= 3) {
+    const fingerprints = withEvidence.map(claimFingerprint).filter((f) => f.length > 0);
+    if (fingerprints.length >= 3) {
+      const distinctCount = new Set(fingerprints).size;
+      if (distinctCount <= Math.floor(fingerprints.length / 2)) {
+        base = Math.round(base * 0.75);
+      }
+    }
   }
 
   return Math.max(0, Math.min(100, base));
