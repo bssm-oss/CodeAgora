@@ -6,7 +6,7 @@
 import crypto from 'crypto';
 import type { ReviewerConfig, FallbackConfig } from '../types/config.js';
 import type { ReviewOutput } from '../types/core.js';
-import { parseEvidenceResponse } from './parser.js';
+import { parseEvidenceResponse, isExplicitNoIssues } from './parser.js';
 import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '@codeagora/shared/utils/diff.js';
 import { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
@@ -224,7 +224,7 @@ async function executeReviewerWithGuards(
 
       if (useGuards) cb.recordSuccess(provider!, config.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
-      if (evidenceDocs.length === 0 && response.length > 0) {
+      if (evidenceDocs.length === 0 && response.length > 0 && !isExplicitNoIssues(response)) {
         logParseFailure(config.model, config.id, response.length, false);
       }
 
@@ -312,7 +312,7 @@ async function executeReviewerWithGuards(
 
       if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
-      if (evidenceDocs.length === 0 && response.length > 0) {
+      if (evidenceDocs.length === 0 && response.length > 0 && !isExplicitNoIssues(response)) {
         logParseFailure(fb.model, config.id, response.length, true);
       }
 
