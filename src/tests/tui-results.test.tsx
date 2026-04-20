@@ -24,15 +24,15 @@ const mockResult: PipelineResult = {
         filePath: 'auth.ts',
         lineRange: [10, 10] as [number, number],
         title: 'SQL injection',
-        confidence: 80, // needed for triage: CRITICAL + conf > 50 → must-fix tab
-      } as any,
+        confidence: 80,
+      },
       {
-        severity: 'WARNING',
+        severity: 'CRITICAL',
         filePath: 'utils.ts',
         lineRange: [5, 5] as [number, number],
         title: 'Missing validation',
-        confidence: 80, // WARNING + conf > 50 → verify tab
-      } as any,
+        confidence: 75,
+      },
     ],
     totalDiscussions: 3,
     resolved: 2,
@@ -93,12 +93,12 @@ describe('ResultsScreen', () => {
   });
 
   it('shows issue list with file paths', () => {
-    // Default tab is must-fix. CRITICAL+conf80 → must-fix; WARNING+conf80 → verify.
-    // Only must-fix items are visible on initial render.
     const { lastFrame } = render(<ResultsScreen result={mockResult} />);
     const frame = lastFrame() ?? '';
     expect(frame).toContain('auth.ts');
     expect(frame).toContain('SQL injection');
+    expect(frame).toContain('utils.ts');
+    expect(frame).toContain('Missing validation');
   });
 
   it('renders "No issues" for empty results', () => {

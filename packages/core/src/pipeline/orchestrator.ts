@@ -69,6 +69,7 @@ export interface PipelineSummary {
     filePath: string;
     lineRange: [number, number];
     title: string;
+    confidence?: number;
   }>;
   totalDiscussions: number;
   resolved: number;
@@ -461,7 +462,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
           totalReviewers: allReviewerInputs.length,
           forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
           severityCounts,
-          topIssues: allEvidenceDocs.slice(0, 5).map(d => ({ severity: d.severity, filePath: d.filePath, lineRange: d.lineRange, title: d.issueTitle })),
+          topIssues: allEvidenceDocs.slice(0, 5).map(d => ({ severity: d.severity, filePath: d.filePath, lineRange: d.lineRange, title: d.issueTitle, confidence: d.confidenceTrace?.final ?? d.confidence })),
           totalDiscussions: moderatorReport.summary.totalDiscussions,
           resolved: moderatorReport.summary.resolved,
           escalated: moderatorReport.summary.escalated,
@@ -517,6 +518,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         filePath: d.filePath,
         lineRange: d.lineRange,
         title: d.issueTitle,
+        confidence: d.confidenceTrace?.final ?? d.confidence,
       }));
 
     progress?.pipelineComplete('Done!');

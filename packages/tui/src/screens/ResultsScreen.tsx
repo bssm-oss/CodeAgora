@@ -46,9 +46,7 @@ function lineRangeStr(issue: Issue): string {
 
 /** Classify an issue for triage */
 function classifyIssue(issue: Issue): TriageTab {
-  const legacy = (issue as unknown as { confidence?: number }).confidence;
-  const traceFinal = (issue as unknown as { confidenceTrace?: { final?: number } }).confidenceTrace?.final;
-  const conf = traceFinal ?? legacy ?? 50;
+  const conf = issue.confidence ?? 50;
   if (conf < 20) return 'suggestions';
   const isCritical = issue.severity === 'CRITICAL' || issue.severity === 'HARSHLY_CRITICAL';
   const isWarning = issue.severity === 'WARNING';
