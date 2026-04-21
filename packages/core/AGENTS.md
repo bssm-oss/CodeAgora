@@ -4,15 +4,19 @@
 # core
 
 ## Purpose
-Core review pipeline implementation for CodeAgora. Contains the 4-layer review architecture (L0-L3), configuration management, session handling, plugin system, and custom rules. This is the heart of the multi-LLM collaborative review engine.
+Core review pipeline implementation for CodeAgora. Contains the full 10-stage review pipeline (L0 model intelligence, Pre-Analysis, L1 parallel reviewers, Hallucination Filter, Confidence Computation, Suggestion Verification, L2 debate, L3 head verdict), configuration management, session handling, plugin system, and custom rules. This is the heart of the multi-LLM collaborative review engine.
 
 ## Key Layers
 | Layer | Purpose |
 |-------|---------|
 | **L0** | Model Intelligence — bandit learning, health monitoring, model selection, specificity scoring, quality tracking |
-| **L1** | Parallel Reviewers — multi-backend execution (API/CLI), circuit breaker, response parsing, provider registry |
-| **L2** | Discussion & Debate — moderator orchestration, supporter coordination, deduplication, objection handling, threshold filtering |
-| **L3** | Head Verdict — final verdict generation (LLM-based or rule-based), evidence grouping |
+| **Pre-Analysis** | 5 analyzers that enrich diff context before L1: semantic diff classification, TS diagnostics, change impact, AI rule detection, artifact exclusion |
+| **L1** | Parallel Reviewers — multi-backend execution (API/CLI), specialist personas, circuit breaker, response parsing, provider registry |
+| **Hallucination Filter** | 4-check false positive reduction (file existence, line range, code quote fabrication, self-contradiction) + class priors + speculative language penalties |
+| **Confidence** | ConfidenceTrace — corroboration scoring, diff-size correction, finding-class priors, evidence quality scoring |
+| **Suggestion Verification** | tsc transpile check for CRITICAL+ suggestions |
+| **L2** | Discussion & Debate — moderator orchestration, supporter coordination, adversarial prompts, deduplication, static analysis injection |
+| **L3** | Head Verdict — final verdict (ACCEPT / REJECT / NEEDS_HUMAN), triage digest (must-fix / verify / ignore), evidence grouping |
 | **Pipeline** | Orchestrator connecting all layers: chunking, cost estimation, dryrun, progress tracking, telemetry, auto-approve |
 
 ## Subdirectories

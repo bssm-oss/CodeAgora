@@ -21,5 +21,6 @@ We will respond within 48 hours and work on a fix.
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | Yes       |
+| 2.x     | Yes       |
+| 1.x     | No        |
 | < 1.0   | No        |

@@ -8,7 +8,7 @@
 Reference documentation for the CodeAgora multi-agent code review system. This directory contains:
 
 - **Product strategy & vision**: Why the system exists, target users, core hypothesis
-- **Architecture & design**: 6-stage pipeline (Pre-Analysis, L0-L3, Hallucination Filter), component boundaries, data flow
+- **Architecture & design**: 10-stage pipeline (CLI → L0 → Pre-Analysis → L1 → Rules & Learning → Hallucination Filter → Confidence → Suggestion Verification → L2 → L3), component boundaries, data flow
 - **Integration patterns**: GitHub Actions, PR comments, SARIF output, webhooks
 - **Research & roadmap**: Academic foundations (MAD), implementation phases, feature catalog
 - **Implementation guides**: Complete specifications for developers building new features
@@ -31,7 +31,7 @@ These documents guide both strategic decision-making and tactical implementation
 
 **When exploring CodeAgora:**
 1. Start with `1_PRD.md` to understand the core problem and hypothesis
-2. Read `3_V3_DESIGN.md` for the current architecture
+2. Read `ARCHITECTURE.md` for the current architecture (note: `3_V3_DESIGN.md` is an archival design doc, not current)
 3. Reference `5_GITHUB_INTEGRATION.md` when working on GitHub-related features
 4. Check `6_WEB_AND_UX_EXPANSION.md` for the feature roadmap and next phases
 5. Consult `MAD_RESEARCH_AND_IMPROVEMENTS.md` when optimizing debate logic or discussion protocols
@@ -51,7 +51,7 @@ These documents guide both strategic decision-making and tactical implementation
 - `3_V3_DESIGN.md` describes the original v3 design; for current architecture see `ARCHITECTURE.md`
 - `5_GITHUB_INTEGRATION.md` is a complete spec; changes require team sign-off
 - `6_WEB_AND_UX_EXPANSION.md` is the source of truth for feature phases and priorities
-- `MAD_RESEARCH_AND_IMPROVEMENTS.md` is evergreen research; implementation status tracked separately in IMPLEMENT_PLAN.md (root docs/)
+- `MAD_RESEARCH_AND_IMPROVEMENTS.md` is evergreen research; implementation status is tracked in git history and CHANGELOG.md
 
 **When adding new documentation:**
 - Create focused documents (one purpose per file)

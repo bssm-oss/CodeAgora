@@ -14,6 +14,8 @@ GitHub Actions workflows, issue templates, and PR configuration. Automates CI/CD
 | `workflows/release.yml` | Build and publish npm packages on version tag (v*) |
 | `workflows/review.yml` | Run CodeAgora review on PRs; post findings as comments (skippable via `review:skip` label) |
 | `workflows/pr-size.yml` | Auto-label PRs by diff size (XS, S, M, L, XL) |
+| `workflows/build-action.yml` | Rebuild `dist/action.js` bundle on push to main (auto-commits via `[skip ci]`) |
+| `workflows/provider-health.yml` | Scheduled provider health checks across registered API providers |
 | `PULL_REQUEST_TEMPLATE.md` | Template for PR description (Summary, Changes, Test Plan, Related Issues) |
 | `ISSUE_TEMPLATE/config.yml` | Issue creation settings; blank issues disabled, links to docs |
 | `ISSUE_TEMPLATE/bug_report.md` | Bug report form template |

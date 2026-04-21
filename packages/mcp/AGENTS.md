@@ -4,13 +4,13 @@
 # MCP Package (@codeagora/mcp)
 
 ## Purpose
-MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code review pipeline as tools for Claude and other AI agents. Wraps the core pipeline with 7 specialized tools: quick review, full review, PR review, dry-run, explain, leaderboard, and stats. Runs as a CLI subprocess using stdio transport.
+MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code review pipeline as tools for Claude and other AI agents. Wraps the core pipeline with 9 specialized tools: quick review, full review, PR review, dry-run, explain, leaderboard, stats, and config get/set. Runs as a CLI subprocess using stdio transport.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
-| `src/index.ts` | MCP server setup — creates McpServer, registers all 7 tools, starts stdio transport |
+| `src/index.ts` | MCP server setup — creates McpServer, registers all 9 tools, starts stdio transport |
 | `src/helpers.ts` | Shared logic: `runReviewCompact()`, `runReviewRaw()`, `getStagedDiff()` — core review orchestration |
 | `src/tools/review-quick.ts` | `review_quick` tool — L1-only (parallel reviewers), no debate, no head verdict |
 | `src/tools/review-full.ts` | `review_full` tool — Full L0→L1→L2→L3 pipeline with debate and consensus |
@@ -19,12 +19,14 @@ MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code revi
 | `src/tools/explain.ts` | `explain` tool — Explain a finding or provide guidance on a code pattern |
 | `src/tools/leaderboard.ts` | `leaderboard` tool — Model performance ranking based on past reviews |
 | `src/tools/stats.ts` | `stats` tool — Session statistics and historical metrics |
+| `src/tools/config-get.ts` | `config_get` tool — Read current reviewer configuration |
+| `src/tools/config-set.ts` | `config_set` tool — Update reviewer configuration settings |
 
 ## Subdirectories
 
 | Directory | Purpose |
 |-----------|---------|
-| `src/tools/` | 7 tool implementations (one file per tool) |
+| `src/tools/` | 9 tool implementations (one file per tool) |
 
 ## For AI Agents
 
@@ -95,6 +97,8 @@ server.tool(
 | `explain` | code_snippet, context (optional) | Ask head agent to explain code or provide guidance | Clarification, learning |
 | `leaderboard` | metric (accuracy, speed, consensus) | Historical model performance ranking | Choose best reviewers |
 | `stats` | session_id (optional) | Review session statistics and metrics | Audit, reporting |
+| `config_get` | — | Read current reviewer config (model list, thresholds, etc.) | Inspect active config |
+| `config_set` | key, value | Update a config field for the current session | Tune without restarting |
 
 ### Dependencies
 #### Internal

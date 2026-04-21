@@ -25,7 +25,7 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 | Directory | Purpose |
 |-----------|---------|
 | `packages/` | Monorepo workspace packages — all source code (see `packages/AGENTS.md`) |
-| `src/` | Test suite — 131 files, 1880 tests (see `src/AGENTS.md`) |
+| `src/` | Test suite — 249 files, 3442+ tests (see `src/AGENTS.md`) |
 | `docs/` | Design documents, PRD, phase plans (see `docs/AGENTS.md`) |
 | `tools/` | Standalone utility scripts (see `tools/AGENTS.md`) |
 | `plugin/` | Claude Code plugin with MCP bridge (see `plugin/AGENTS.md`) |
@@ -44,12 +44,16 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 
 ### Architecture Overview
 ```
-CLI Layer → L0 (Model Intelligence) → L1 (Parallel Reviewers) → L2 (Discussion) → L3 (Head Verdict)
+CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewers)
+  → Rules & Learning Filter → Hallucination Filter → Confidence Computation
+  → Suggestion Verification → L2 (Discussion) → L3 (Head Verdict)
 ```
 - **L0**: Selects optimal models via multi-armed bandit + health monitoring
-- **L1**: Runs parallel independent reviews (API or CLI backends)
-- **L2**: Deduplicates findings, debates conflicting opinions via structured discussion
-- **L3**: Head agent synthesizes final verdict (ACCEPT / REJECT / NEEDS_HUMAN)
+- **Pre-Analysis**: 5 analyzers enrich context (semantic diff, TS diagnostics, impact, AI rules, artifact exclusion)
+- **L1**: Runs parallel independent reviews using specialist personas (API or CLI backends)
+- **Hallucination Filter**: 4-check false positive reduction (file existence, line range, quote fabrication, self-contradiction)
+- **L2**: Debates contested findings via supporter pool + devil's advocate; deduplicates across reviewers
+- **L3**: Head agent synthesizes final verdict (ACCEPT / REJECT / NEEDS_HUMAN) with triage digest
 
 ### Testing Requirements
 - Tests are in `src/tests/` (not colocated with source)
@@ -61,7 +65,7 @@ CLI Layer → L0 (Model Intelligence) → L1 (Parallel Reviewers) → L2 (Discus
 - TypeScript strict mode everywhere
 - Zod for all external input validation
 - Functional style preferred (pure functions, immutable data)
-- Shell args sanitized via `sanitizeShellArg()` + `spawn()` (never `exec`)
+- Shell args sanitized via `validateArg()` + `spawn()` (never `exec`)
 - Error handling: L1 try-catch, L2 Promise.allSettled, security boundaries use Result<T>
 
 ## Dependencies

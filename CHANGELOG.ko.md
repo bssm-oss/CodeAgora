@@ -1,5 +1,182 @@
 # 변경 이력
 
+## 2.3.3 (2026-04-16)
+
+### Web UX
+- Pipeline 페이지 WS 없이도 ReviewTrigger 폼 표시
+- ReviewTrigger 제출 후 폼 리셋 + 성공 메시지
+- Models/Costs empty state 안내 메시지
+- Toast auto-dismiss 3초 → 5초
+
+## 2.3.2 (2026-04-16)
+
+### Fallback/Retry 강화
+- **Error Classifier** — 에러를 rate-limited/auth/transient/permanent로 분류
+- **AI SDK maxRetries: 0** — 이중 재시도 제거 (앱 레벨 완전 제어)
+- **429 retry-after 인식** — 헤더 파싱 후 적절한 대기 시간 재시도
+- **429는 circuit breaker 미기록** — rate limit ≠ 모델 고장
+- **Fallback chain health check** — 죽은 모델 자동 skip
+- **L2 supporter / L3 head verdict 1회 재시도** — transient/rate-limited만
+- 리뷰어 응답률 2/5 → 5/5, 속도 196초 → 83초
+
+## 2.3.1 (2026-04-16)
+
+### Bug Fixes
+- SARIF 출력 포맷 지원 (`--output sarif`)
+- 빈 stdin 입력 시 exit 1 반환
+- agreement 커맨드 result.json 없을 때 reviews/ fallback
+- CI typecheck 에러 수정 (DiscussionVerdict, MockInstance, Dirent)
+- Node 20 AbortSignal 호환성 수정
+
+### 리팩터링 (10 PRs)
+- CLI index.ts 1,302줄 → 292줄 (8개 모듈 추출)
+- Core orchestrator 1,092줄 → 550줄 (4개 모듈 추출)
+- 테스트: TUI 0 → 37개, CLI review 64개, Web API 통합 46개
+
+## 2.3.0 (2026-04-13)
+
+### Web Dashboard — Production Hardening
+- **ErrorBoundary** — 모든 라우트에 크래시 복구 UI 적용
+- **httpOnly cookie 인증** — `POST /api/auth`, HMAC 파생 세션 토큰
+- **CORS origin pinning** — `CODEAGORA_CORS_ORIGINS` 환경 변수로 설정
+- **세션 페이지네이션** — 상태/검색/날짜 범위 서버사이드 필터링
+- **Pipeline state persistence** — `.ca/pipeline-state.json`, 크래시 복구
+- **Config revert UX** — 저장 실패 시 Revert 버튼
+- **WebSocket reconnect** — 재연결 시 sync 메시지로 상태 복구
+- **DiffViewer 구문 강조** — 키워드, 문자열, 주석, 숫자
+
+### Web Dashboard — Security (코드 리뷰 17건 반영)
+- WS 쿼리 파라미터 인증 경로 제거 (토큰 로그 노출 방지)
+- Cookie에 원본 토큰 대신 HMAC 파생 토큰 저장
+- `DELETE /api/auth` 인증 필수
+- `provider`/`model` 포맷 검증 추가
+
+### Hallucination Filter — 4-Check 완성
+- **Check 4 — 자기모순 감지**: "추가됨"이라 주장하나 실제 제거만 있는 경우 페널티
+- **uncertainty 라우팅**: confidence < 20% → `uncertain` 배열로 분류 (휴먼 리뷰)
+- 테스트 9 → 26개
+
+### Plugin System — 서드파티 지원
+- `.ca/plugins/` 디렉토리에서 동적 `import()`로 플러그인 로딩
+- `codeagora-plugin.json` / `package.json`으로 플러그인 매니페스트 탐색
+- AbortController 타임아웃 샌드박스 격리
+
+### Stats
+- 테스트: 226 files, 3,386 passing (+53)
+- 커버리지: 73.7% statements / 84.2% branches / 87.1% functions
+
+## 2.2.2 (2026-04-12)
+
+- Phase 1 정리: 데드 코드 제거, i18n 키 동기화, 버전 정렬
+- CLAUDE.md 정확도 수정 6건 (파이프라인 단계, 필터 레이어, 테스트 수, MCP 도구 수, 함수명, SSRF 방식)
+- MCP 테스트 TS2322 타입 수정
+
+## 2.2.1 (2026-04-02)
+
+### MCP — CLI 동등성 + 확장
+- 모든 리뷰 도구(review_quick/full/pr)에 13개 옵션 파라미터 추가 (provider, model, timeout 등)
+- **review_pr** — PR 번호만으로 owner/repo git remote 자동 감지
+- **staged review** — MCP에서 git staged 변경사항 직접 리뷰
+- 신규 **config_get** 도구 — dot-notation 키로 설정 값 읽기
+- 신규 **config_set** 도구 — Claude Code에서 설정 값 변경
+- MCP 테스트 49개 신규 (합계 94개)
+
+### Web Dashboard
+- **대시보드 랜딩 페이지** — 통계 카드, 최근 활동, 주간 추이 차트, 빠른 실행
+- **리뷰 트리거** — 웹 UI에서 리뷰 시작 (diff 텍스트, PR URL, staged 변경사항) + 실시간 WebSocket 진행
+- **YAML 설정 편집** — converter.ts를 통한 전체 읽기/쓰기 지원
+- **알림 센터** — 벨 아이콘, 드롭다운, 읽음/안읽음, REJECT/NEEDS_HUMAN 긴급 배지
+- **세션 비교 페이지** — verdict/config/이슈 나란히 비교
+
+### Stats
+- 테스트: 181 files, 2895 passing
+
+## 2.2.0 (2026-04-01)
+
+### 신규: 4-Layer Hallucination Filter
+- **Layer 1**: 사전 토론 환각 체크 — diff에 없는 파일/라인 참조 제거 (#428)
+- **Layer 2**: Corroboration scoring — 단독 리뷰어 ×0.5, 3명 이상 동의 ×1.2 (#432)
+- **Layer 3a**: HARSHLY_CRITICAL 토론 필수화 (#429)
+- **Layer 3b**: Adversarial supporter 프롬프트 — "반증해봐" 방식 (#430)
+- **Layer 3c**: 토론 컨텍스트에 정적 분석 증거 주입 (#431)
+- 자기모순 필터, Evidence-level 중복 제거, "이미 처리됨" 패턴 인식
+
+### 신규: Pre-Analysis Layer
+- 시맨틱 Diff 분류, TypeScript 진단, 변경 영향 분석, AI 규칙 파일 감지, 경로 기반 리뷰 규칙
+
+### 신규: Specialist Reviewer Personas
+- 4종 내장: builtin:security, builtin:logic, builtin:api-contract, builtin:general
+
+### 신규: Suggestion Verification
+- CRITICAL+ 코드 제안을 TypeScript 트랜스파일러로 검증
+
+### 신규: Triage Digest
+- `📋 Triage: N must-fix · N verify · N ignore` 한 줄 요약
+
+### 품질 결과
+- 거짓 양성률: 100% → <25% (테스트 diff 기준)
+- CRITICAL 거짓 양성: 9건 → 0건
+- 테스트: 180 files, 2846 passing
+
+## 2.1.1 (2026-04-01)
+
+### Bug Fixes (12건)
+- SUGGESTION 임계값 기본값 null (#287)
+- 세션 ID / MCP 임시 파일 race condition (#290, #282)
+- Webhook JSON.stringify 순환 참조 크래시 (#285)
+- BanditStore 경로 모듈 로드 시점에 고정 (#278)
+- 캐시 키에 전체 설정 포함 (#276)
+- PipelineTelemetry 스테이지 타이밍 연결 (#274)
+- 커스텀 프롬프트 `{{CONTEXT}}`, `{{PROJECT_CONTEXT}}` 플레이스홀더 (#312)
+
+## 2.1.0 (2026-04-01)
+
+### Security (7건)
+- **CRITICAL** — 속도 제한기 메모리 누수: requestCounts Map 미정리 (#388)
+- **CRITICAL** — X-Forwarded-For IP 스푸핑으로 속도 제한 우회 (#389)
+- **CRITICAL** — readSurroundingContext 경로 탐색: 레포 외부 파일 읽기 (#392)
+- **HIGH** — WebSocket 인증 토큰 URL 쿼리 문자열 노출 (#390)
+- **HIGH** — 서버 시작 시 auth 토큰 stdout 출력 (#391)
+- **HIGH** — checkFilePermissions stat 실패 시 true 반환 (fail-open) (#393)
+- **HIGH** — 크레덴셜 디렉토리 0o700 모드 미적용 (#394)
+
+### Pipeline Fixes (10건)
+- 알 수 없는 파일 경로에 대한 심각도 에스컬레이션 제거 (#248)
+- 혼합 심각도 그룹 다운그레이드 방지 (#249)
+- 빌드 아티팩트 기본 제외 (dist/, 잠금 파일, *.min.js) (#228)
+- L1 증거 내용(problem, evidence, suggestion)을 모더레이터 프롬프트에 주입 (#246)
+- 신뢰도 기반 verdict triage: 0% 신뢰도 CRITICAL → NEEDS_HUMAN (#229, #236)
+- Thompson Sampling: 탐색 슬롯 보장 + posterior 상한으로 단일 모델 독점 방지 (#232)
+
+### Stats
+- 테스트: 2702 → 2749 (174 files)
+
+### Contributors
+- **[@HuiNeng6](https://github.com/HuiNeng6)** — 파이프라인 수정, TUI 버그, 웹 대시보드 개선
+- **[@dagangtj](https://github.com/dagangtj)** — i18n 마이그레이션
+- **[@justn-hyeok](https://github.com/justn-hyeok)** — 보안 강화, 파이프라인 개편
+
+## 2.0.0 (2026-03-XX)
+
+### 주요 변경 사항 (Breaking Changes)
+- **패키지 구조** — web/tui/mcp/notifications가 선택적 패키지로 분리 (`npm i -g @codeagora/web` 등)
+- **프로바이더 티어** — Tier 1 (공식), Tier 2 (검증됨), Tier 3 (실험적)
+- **모노레포 마이그레이션** — 8개 pnpm 워크스페이스 패키지
+
+### 하이라이트
+- **보안 강화** — CRITICAL 5건 + HIGH 12건 수정 (경로 탐색, SSRF, 셸 인젝션, 크레덴셜 저장)
+- **테스트** — 1817 → 2671 (+854, 169 files)
+- **24+ API 프로바이더** — Groq, Anthropic, OpenAI, Google, DeepSeek, OpenRouter 등
+- **12개 CLI 백엔드** — Claude, Codex, Gemini, Copilot, Cursor, Aider, Goose, Cline 등
+- **models.dev 연동** — 외부 모델 카탈로그 (3875개 모델, 가격/컨텍스트 윈도우/기능 메타데이터)
+- **환경 자동 감지** — `agora init`이 API 키 + CLI 도구 감지 후 동적 프리셋 생성
+- **HTML & JUnit 출력** — `--output html`/`--output junit`
+- **MCP 서버** — 7개 도구 (이후 9개로 확장)
+- **웹 대시보드** — Hono.js + React SPA, 실시간 WebSocket, 8개 페이지
+- **GitHub Actions** — 인라인 PR 코멘트, commit status, SARIF 출력
+
+---
+
 ## 2.0.0-rc.1 (2026-03-19)
 
 ### 주요 변경 사항 (Breaking Changes)

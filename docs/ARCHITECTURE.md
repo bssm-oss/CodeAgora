@@ -1,6 +1,6 @@
 # Architecture
 
-## 6-Stage Pipeline
+## 10-Stage Pipeline
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -33,11 +33,11 @@
         └────────────┼────────────┘
                      │
 ┌────────────────────▼────────────────────────────┐
-│  Hallucination Filter (4-layer defense)          │
-│  ① File/line validation against actual diff      │
-│  ② Self-contradiction detection                  │
-│  ③ Evidence deduplication (merge duplicates)      │
-│  ④ Confidence scoring (0% → NEEDS_HUMAN)         │
+│  Hallucination Filter (4-check)                  │
+│  ① File existence — hard remove if not in diff   │
+│  ② Line range — hard remove if outside hunk ±10  │
+│  ③ Code quote fabrication → confidence × 0.5     │
+│  ④ Self-contradiction → confidence × 0.5         │
 └────────┬────────────────────────────────────────┘
          │ Validated issues + severity routing
 ┌────────▼────────────────────────────────────────┐
@@ -68,11 +68,13 @@
 
 **L1 — Parallel Specialist Reviewers**: Multiple LLMs review the diff independently using specialist personas (`builtin:security`, `builtin:logic`, `builtin:api-contract`, `builtin:general`). Severity-based thresholds determine which issues proceed to debate.
 
-**Hallucination Filter (4-Layer Defense)**: Reduces false positives from ~100% to <25%:
-1. **File/line validation**: Checks that referenced files and line numbers exist in the actual diff
-2. **Self-contradiction detection**: Flags issues where the problem description contradicts the evidence
-3. **Evidence deduplication**: Merges duplicate findings across reviewers before L2
-4. **Confidence-based verdict**: Issues with 0% confidence at CRITICAL+ severity route to NEEDS_HUMAN instead of REJECT
+**Hallucination Filter**: Reduces false positives from LLM reviewers (target: <25%). Applied before L2 debate:
+1. **File existence** (hard remove): `doc.filePath` must be in the actual diff file list
+2. **Line range** (hard remove): `doc.lineRange` must overlap a diff hunk (±10 lines)
+3. **Code quote verification**: Backtick-quoted code fabrication check — >50% fabricated → confidence × 0.5
+4. **Self-contradiction**: Claims "added" but only removals exist (or vice versa) → confidence × 0.5
+
+Note: Evidence deduplication is in L2 (`deduplication.ts`). Confidence-based triage (0–15% → NEEDS_HUMAN) is in L3 (`verdict.ts`).
 
 **L2 — Discussion**: A supporter pool and devil's advocate debate contested issues over multiple rounds. Static analysis evidence is included in debate context. The moderator enforces consensus or makes a forced decision.
 
@@ -90,7 +92,7 @@ packages/
 ├── cli/            # @codeagora/cli — CLI commands, formatters, options
 ├── web/            # @codeagora/web — Hono.js REST API + React SPA dashboard
 ├── tui/            # @codeagora/tui — interactive terminal UI (ink + React)
-├── mcp/            # @codeagora/mcp — MCP server (7 tools)
+├── mcp/            # @codeagora/mcp — MCP server (9 tools)
 └── notifications/  # @codeagora/notifications — Discord/Slack webhooks
 ```
 

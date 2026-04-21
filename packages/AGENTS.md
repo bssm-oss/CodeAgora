@@ -16,7 +16,7 @@ Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement 
 | `github/` | GitHub PR integration: diff parsing, SARIF generation, comment posting, deduplication, Actions support |
 | `notifications/` | Webhook integrations (Discord, Slack, generic), event streaming, live-update notifications |
 | `tui/` | Terminal UI (ink + React), interactive components, screens, theme system — uses `@codeagora/core` |
-| `mcp/` | MCP (Model Context Protocol) server with 7 tools exposing review pipeline to Claude and other MCP clients |
+| `mcp/` | MCP (Model Context Protocol) server with 9 tools exposing review pipeline to Claude and other MCP clients |
 | `web/` | Hono.js REST API server and React SPA dashboard; both share `@codeagora/core` for review orchestration |
 
 ## For AI Agents
@@ -61,7 +61,7 @@ Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement 
 
 **Shell Safety:**
 - CLI and github packages may execute shell commands
-- Always use `spawn()` with sanitized args via `sanitizeShellArg()` (never `exec`)
+- Always use `spawn()` with sanitized args via `validateArg()` (never `exec`)
 - Validate inputs with zod before shell execution
 
 **Async Patterns:**

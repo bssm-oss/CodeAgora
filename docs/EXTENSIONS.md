@@ -42,7 +42,7 @@ agora tui
 
 Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code, Cursor, Windsurf, and VS Code.
 
-**7 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`
+**9 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain`, `leaderboard`, `stats`, `config_get`, `config_set`
 
 ```json
 {
@@ -56,7 +56,7 @@ Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code
 }
 ```
 
-`review_quick` runs L1 only for fast feedback. `review_full` runs the complete L1 > L2 > L3 pipeline.
+`review_quick` runs L1 only for fast feedback. `review_full` runs the complete L1 > L2 > L3 pipeline. `config_get`/`config_set` manage reviewer configuration without leaving the MCP session.
 
 ## Notifications (`@codeagora/notifications`)
 
