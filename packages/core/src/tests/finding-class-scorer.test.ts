@@ -104,6 +104,37 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('zero-width');
   });
 
+  it('catches "missing null guard" (PR #499 self-review FP)', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Missing null guard for activeReviewers in computeL1Confidence',
+        problem: 'The function does not check whether activeReviewers is null before use.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-null-guard');
+    expect(match.multiplier).toBe(0.7);
+  });
+
+  it('catches "no null check" phrasing', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Null dereference risk',
+        problem: 'The code has no null check on the response object.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-null-guard');
+  });
+
+  it('catches "null/undefined check" phrasing', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential undefined reference in handler',
+        problem: 'A null/undefined check is missing before property access.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-null-guard');
+  });
+
   it('catches generic "potential security concern" phrasing (run 3 FP)', () => {
     const match = matchFindingClass(
       doc({

@@ -325,6 +325,7 @@ export const BUILT_IN_ARTIFACT_PATTERNS = [
   '**/*.ico',
   '**/*.bmp',
   '**/*.tiff',
+  '**/*.avif',
   '**/*.woff',
   '**/*.woff2',
   '**/*.ttf',
@@ -339,12 +340,27 @@ export const BUILT_IN_ARTIFACT_PATTERNS = [
   '**/*.tar',
   '**/*.gz',
   '**/*.tgz',
+  '**/*.bz2',
   '**/*.7z',
   '**/*.rar',
+  '**/*.wasm',
 
   // Test snapshots
   '**/*.snap',
   '**/__snapshots__/**',
+
+  // Additional ecosystem artifacts (Python / Go / Rust / Java / Ruby)
+  '**/*.pyc',
+  '**/__pycache__/**',
+  '**/*.whl',
+  '**/*.egg-info/**',
+  'vendor/**',
+  'target/debug/**',
+  'target/release/**',
+  '**/*.class',
+  '**/*.jar',
+  '**/*.war',
+  '.bundle/**',
 ];
 
 // ============================================================================

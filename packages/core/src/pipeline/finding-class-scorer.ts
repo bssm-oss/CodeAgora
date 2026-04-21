@@ -89,6 +89,17 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     ],
   },
   {
+    id: 'missing-null-guard',
+    label: 'missing null / undefined guard',
+    multiplier: 0.7,
+    patterns: [
+      /\bmissing\s+null(?:[/\-\s]?(?:undefined))?\s+(?:guard|check)\b/i,
+      /\b(?:no|without|lacks)\s+null(?:[/\-\s]?(?:undefined))?\s+(?:guard|check)\b/i,
+      /\bnull\s*\/\s*undefined\s+check\b/i,
+      /\bundefined\s+reference\b/i,
+    ],
+  },
+  {
     id: 'generic-potential',
     label: 'generic "potential" security concern',
     multiplier: 0.85,

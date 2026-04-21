@@ -46,17 +46,37 @@ Findings reference files not in the diff, lines outside diff hunks, or fabricate
 **Cost**: $0 (pure code, no model calls)
 **Blocks**: Path 3
 
-Programmatic validation of every evidence document:
+Programmatic validation of every evidence document. The filter has grown from 3 checks in the original design to **7 checks** as of 2026-04-20:
 
-1. **File existence**: `doc.filePath` must be in `extractFileListFromDiff(diffContent)`. If not → remove.
-2. **Line range**: `doc.lineRange` must overlap with at least one diff hunk for that file. If not → remove.
-3. **Code quote verification**: If `doc.problem` contains inline code quotes, check if they exist in the diff. If fabricated → confidence × 0.5.
+| # | Check | Effect |
+|---|-------|--------|
+| 1 | File existence | `doc.filePath` must be in diff file list → else hard-remove |
+| 2 | Line range | `doc.lineRange` must overlap a diff hunk ±10 lines → else hard-remove |
+| 3 | Code quote verification | Backtick-quoted code must appear in diff → fabricated > 50% → confidence × 0.5 |
+| 4 | Self-contradiction | Claim of "added" vs actual removals (or vice versa) → confidence × 0.5 |
+| 5 | Speculative language | Hedge markers ("may not exist", "potentially broken") → confidence × 0.7 |
+| 6 | Evidence quality (#468) | 0–1 score from evidence list length + problem length + specificity markers → multiplier 0.7 + 0.3 × score |
+| 7 | Finding-class prior (#468 follow-up) | Empirically FP-heavy categories (ReDoS, may-throw, missing-validation, missing-null-guard, zero-width) → per-class multiplier 0.5–0.85 |
+
+Checks 1–2 are hard removes. Checks 3–7 apply multiplicative penalties that compound — a finding that trips speculation (×0.7) + evidence (×0.7) + class prior (×0.7) ends at 0.34× its raw confidence.
 
 ```typescript
-function filterHallucinations(docs, diffContent): { filtered, removed }
+function filterHallucinations(docs, diffContent): { filtered, removed, uncertain }
 ```
 
-**Expected impact**: ~3-4 findings removed per review (files not in diff, fabricated code).
+**Expected impact**: with all seven checks active, the 2026-04-20 baseline showed the `fp-moderator-regex` fixture's phantom CRITICAL findings moved from must-fix (100% confidence) to verify/ignore (43% or below) across multiple runs.
+
+#### Finding-class priors table
+
+`packages/core/src/pipeline/finding-class-scorer.ts` exports `FINDING_CLASS_PRIORS` — the one place to tune per-class multipliers. Ordered so specific classes match before `generic-potential`. Each entry maps multiple regex patterns to a single id + multiplier. To add a new class when an FP pattern emerges empirically, append a new entry with patterns matched against `issueTitle + problem`.
+
+#### Witness-based corroboration echo dampener (#5)
+
+`computeL1Confidence` applies an additional ×0.75 dampener when:
+- 3+ co-located findings exist with non-empty evidence
+- Majority share the same fingerprint (first 80 normalised chars of joined `evidence[]`)
+
+This catches correlated-failure cascades where multiple reviewers latch onto the same superficial cue instead of corroborating independently.
 
 ### Layer 2: Corroboration Scoring
 
