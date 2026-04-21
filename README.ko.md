@@ -672,9 +672,9 @@ packages/
 +-- notifications/ # @codeagora/notifications — Discord/Slack 웹훅, 이벤트 스트림
 +-- cli/           # @codeagora/cli — CLI 명령어, 포맷터, 옵션
 +-- tui/           # @codeagora/tui — 인터랙티브 터미널 UI (실험적, ink + React)
-+-- mcp/           # @codeagora/mcp — MCP 서버 (7개 도구)
++-- mcp/           # @codeagora/mcp — MCP 서버 (9개 도구)
 +-- web/           # @codeagora/web — Hono.js REST API + React SPA 대시보드
-                   #   총 180 테스트 파일, 2846 테스트
+                   #   총 249 테스트 파일, 3442+ 테스트
 ```
 
 ---
@@ -683,7 +683,7 @@ packages/
 
 `@codeagora/mcp`은 CodeAgora 파이프라인 전체를 MCP 서버로 노출합니다. Claude Code, Cursor, Windsurf, VS Code와 호환됩니다.
 
-**7개 도구:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`
+**9개 도구:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain`, `leaderboard`, `stats`, `config_get`, `config_set`
 
 ```json
 {
@@ -762,7 +762,7 @@ pnpm cli review path/to/diff.patch
 | MCP | @modelcontextprotocol/sdk |
 | 검증 | zod |
 | 설정 | yaml / json |
-| 테스트 | vitest (180 파일, 2846 테스트) |
+| 테스트 | vitest (249 파일, 3442+ 테스트) |
 | 컴포넌트 테스트 | @testing-library/react |
 | 빌드 | tsup |
 | 프롬프트 / 위자드 | @clack/prompts |
