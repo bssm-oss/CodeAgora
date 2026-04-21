@@ -20,10 +20,20 @@ These documents guide both strategic decision-making and tactical implementation
 | File | Purpose | Audience |
 |------|---------|----------|
 | `1_PRD.md` | Product Requirements Document. Problem definition, solution hypothesis, target users, success metrics, v1 scope. Answered: "Why are we building this?" | Product owners, architects, team leads |
-| `3_V3_DESIGN.md` | Original v3 Architecture Design Document. For current architecture (v2.2.0 with Pre-Analysis, Hallucination Filter, Specialist Personas), see [ARCHITECTURE.md](ARCHITECTURE.md). | Engineers, architects |
-| `5_GITHUB_INTEGRATION.md` | GitHub Integration Specification. PR comment formatting, GitHub Actions workflow, SARIF output structure, UX mockups, API mappings. Answered: "How does the system integrate with GitHub?" | Backend/CLI engineers, DevOps |
-| `6_WEB_AND_UX_EXPANSION.md` | Web & UX Roadmap. Feature phases (GitHub enrichment → Discord → meme mode → web dashboard → MCP), difficulty matrix, execution order, TypeScript limitations. Answered: "What's next after v3 CLI?" | Product owners, frontend engineers, planners |
-| `MAD_RESEARCH_AND_IMPROVEMENTS.md` | Multi-Agent Debate Research & Roadmap. Academic foundations (NeurIPS 2025, X-MAS, Free-MAD), current state analysis, 4 priority improvements (87.5% debate cost reduction), implementation roadmap. Answered: "How do we improve debate quality?" | Architects, research engineers |
+| `ARCHITECTURE.md` | Current system architecture — 10-stage pipeline, component boundaries, data flow, tech stack. | Engineers, architects |
+| `5_GITHUB_INTEGRATION.md` | GitHub Integration Specification. PR comment formatting, GitHub Actions workflow, SARIF output structure, UX mockups, API mappings. | Backend/CLI engineers, DevOps |
+| `MAD_RESEARCH_AND_IMPROVEMENTS.md` | Multi-Agent Debate Research & Roadmap. Academic foundations (NeurIPS 2025, X-MAS, Free-MAD), current state analysis, improvement roadmap. | Architects, research engineers |
+
+## Archive
+
+Superseded documents are in `archive/` — kept for historical reference, not normative:
+
+| File | Notes |
+|------|-------|
+| `archive/v3-original-design.md` | Original v3 architecture design; superseded by `ARCHITECTURE.md` |
+| `archive/web-ux-expansion-roadmap.md` | Sprint 7 web/UX roadmap; features since implemented |
+| `archive/audit-2026-04.md` | April 2026 documentation audit; findings applied, now stale |
+| `archive/session-report-2026-04-01.md` | Development session log for 2026-04-01 |
 
 ## For AI Agents
 
@@ -31,10 +41,9 @@ These documents guide both strategic decision-making and tactical implementation
 
 **When exploring CodeAgora:**
 1. Start with `1_PRD.md` to understand the core problem and hypothesis
-2. Read `ARCHITECTURE.md` for the current architecture (note: `3_V3_DESIGN.md` is an archival design doc, not current)
+2. Read `ARCHITECTURE.md` for the current architecture
 3. Reference `5_GITHUB_INTEGRATION.md` when working on GitHub-related features
-4. Check `6_WEB_AND_UX_EXPANSION.md` for the feature roadmap and next phases
-5. Consult `MAD_RESEARCH_AND_IMPROVEMENTS.md` when optimizing debate logic or discussion protocols
+4. Consult `MAD_RESEARCH_AND_IMPROVEMENTS.md` when optimizing debate logic or discussion protocols
 
 **When implementing features:**
 - These documents are normative. They define the design contract.
@@ -42,16 +51,15 @@ These documents guide both strategic decision-making and tactical implementation
 - Use section numbers (e.g., "3_V3_DESIGN.md § 2.4") to reference specific design decisions in commit messages and PR descriptions.
 
 **When making architectural decisions:**
-- Check `3_V3_DESIGN.md § 2` (Architecture Overview) first
+- Check `ARCHITECTURE.md` first (current 10-stage pipeline)
 - Cross-reference `MAD_RESEARCH_AND_IMPROVEMENTS.md § 3` for debate-related decisions
-- Consult `6_WEB_AND_UX_EXPANSION.md § 6` (Dependency Graph) if your work affects roadmap sequencing
 
 **Documents are living but versioned:**
-- `1_PRD.md` is stable (v1 scope is fixed; post-v1 changes go in roadmap documents)
-- `3_V3_DESIGN.md` describes the original v3 design; for current architecture see `ARCHITECTURE.md`
+- `1_PRD.md` is stable (v1 scope is fixed)
+- `ARCHITECTURE.md` is the source of truth for current pipeline design
 - `5_GITHUB_INTEGRATION.md` is a complete spec; changes require team sign-off
-- `6_WEB_AND_UX_EXPANSION.md` is the source of truth for feature phases and priorities
 - `MAD_RESEARCH_AND_IMPROVEMENTS.md` is evergreen research; implementation status is tracked in git history and CHANGELOG.md
+- Superseded documents live in `archive/` — do not reference them as normative
 
 **When adding new documentation:**
 - Create focused documents (one purpose per file)
