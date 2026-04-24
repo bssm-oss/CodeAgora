@@ -1,15 +1,15 @@
 {
   "name": "@codeagora/tui",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "CodeAgora interactive terminal UI — ink-based review interface",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/justn-hyeok/CodeAgora.git",
+    "url": "git+https://github.com/bssm-oss/CodeAgora.git",
     "directory": "packages/tui"
   },
-  "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
+  "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
   "keywords": [
     "codeagora",
     "tui",

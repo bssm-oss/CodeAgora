@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
   <img src="https://img.shields.io/badge/tests-3442%20passing-%23191A51" alt="Tests">
-  <img src="https://img.shields.io/badge/version-2.3.3-%2305A6B9" alt="v2.3.3">
+  <img src="https://img.shields.io/badge/version-2.3.4-%2305A6B9" alt="v2.3.4">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
@@ -600,7 +600,7 @@ PR마다 자동으로 인라인 리뷰 코멘트와 commit status check를 받�
          - uses: actions/checkout@v4
            with:
              fetch-depth: 0
-         - uses: justn-hyeok/CodeAgora@v2
+         - uses: bssm-oss/CodeAgora@v2
            with:
              github-token: ${{ secrets.GITHUB_TOKEN }}
            env:

@@ -35,5 +35,5 @@ console.log(`    ${dim}npm i -g @codeagora/web${reset}   ${dim}→ agora dashboa
 console.log(`    ${dim}npm i -g @codeagora/tui${reset}   ${dim}→ agora tui${reset}`);
 console.log(`    ${dim}npm i -g @codeagora/mcp${reset}   ${dim}→ Claude Code / Cursor${reset}`);
 console.log('');
-console.log(`  ${dim}Docs: https://github.com/justn-hyeok/CodeAgora${reset}`);
+console.log(`  ${dim}Docs: https://github.com/bssm-oss/CodeAgora${reset}`);
 console.log('');

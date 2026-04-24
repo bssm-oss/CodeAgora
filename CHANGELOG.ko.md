@@ -1,5 +1,11 @@
 # 변경 이력
 
+## 2.3.4 (2026-04-24)
+
+### 메타데이터
+- npm 패키지 repository, homepage, docs, issue 링크를 `bssm-oss/CodeAgora`로 수정
+- GitHub Action 예시, init workflow 템플릿, SARIF 도구 메타데이터의 공개 repo URL 수정
+
 ## 2.3.3 (2026-04-16)
 
 ### Web UX

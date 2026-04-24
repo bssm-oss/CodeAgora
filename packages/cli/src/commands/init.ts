@@ -1168,7 +1168,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: CodeAgora Review
-        uses: justn-hyeok/CodeAgora@v2
+        uses: bssm-oss/CodeAgora@v2
         with:
           github-token: \${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'false'

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.4 (2026-04-24)
+
+### Metadata
+- Correct npm package repository, homepage, docs, and issue links to `bssm-oss/CodeAgora`.
+- Update GitHub Action examples, init workflow template, and SARIF tool metadata to the current public repository URL.
+
 ## 2.3.3 (2026-04-16)
 
 ### Web UX

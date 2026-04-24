@@ -168,7 +168,7 @@ export function buildSarifReport(
           driver: {
             name: 'CodeAgora',
             version,
-            informationUri: 'https://github.com/justn-hyeok/CodeAgora',
+            informationUri: 'https://github.com/bssm-oss/CodeAgora',
             rules: SARIF_RULES,
           },
         },

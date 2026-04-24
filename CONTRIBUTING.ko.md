@@ -5,7 +5,7 @@
 ## 시작하기
 
 ```bash
-git clone https://github.com/justn-hyeok/CodeAgora.git
+git clone https://github.com/bssm-oss/CodeAgora.git
 cd CodeAgora
 pnpm install
 pnpm build
@@ -38,7 +38,7 @@ pnpm test
 
 ## 이슈 보고
 
-[GitHub Issues](https://github.com/justn-hyeok/CodeAgora/issues)를 이용해주세요. 포함할 내용:
+[GitHub Issues](https://github.com/bssm-oss/CodeAgora/issues)를 이용해주세요. 포함할 내용:
 - 재현 단계
 - 기대 동작 vs 실제 동작
 - Node.js 버전 및 OS

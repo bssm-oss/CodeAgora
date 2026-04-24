@@ -1,17 +1,17 @@
 {
   "name": "codeagora",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "type": "module",
   "description": "Multi-LLM code review pipeline — parallel reviewers, structured debate, consensus verdict",
   "license": "MIT",
   "packageManager": "pnpm@10.30.3",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/justn-hyeok/CodeAgora.git"
+    "url": "git+https://github.com/bssm-oss/CodeAgora.git"
   },
-  "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
+  "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
   "bugs": {
-    "url": "https://github.com/justn-hyeok/CodeAgora/issues"
+    "url": "https://github.com/bssm-oss/CodeAgora/issues"
   },
   "keywords": [
     "code-review",

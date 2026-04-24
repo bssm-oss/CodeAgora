@@ -124,7 +124,7 @@ describe('GET /api/health', () => {
 
     const body = await res.json();
     expect(body.status).toBe('ok');
-    expect(body.version).toBe('2.3.3');
+    expect(body.version).toBe('2.3.4');
     expect(typeof body.uptime).toBe('number');
   });
 });

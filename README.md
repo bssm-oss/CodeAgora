@@ -191,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: justn-hyeok/CodeAgora@v2
+      - uses: bssm-oss/CodeAgora@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
