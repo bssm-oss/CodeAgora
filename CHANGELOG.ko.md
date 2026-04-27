@@ -1,5 +1,23 @@
 # 변경 이력
 
+## 2.x 마지막 레거시 릴리즈 (예정)
+
+### 패키지 라인 리셋
+- `codeagora@2.x`는 레거시 패키지 라인으로 취급합니다.
+- 이후 리뷰 중심 릴리즈는 `@codeagora/review@0.x`에서 다시 시작합니다.
+- CLI 바이너리 이름은 `codeagora`, `agora`를 유지하되, 향후 설치 경로는 `npm i -g @codeagora/review`가 됩니다.
+
+### 제거되는 표면
+- standalone web dashboard 패키지(`@codeagora/web`) 제거
+- standalone terminal TUI 패키지(`@codeagora/tui`) 제거
+- standalone webhook notifications 패키지(`@codeagora/notifications`) 제거
+- `agora dashboard`, `agora tui`, `agora notify`, `agora review --notify` 제거
+
+### 새 방향
+- CLI, GitHub Action, MCP, core, shared 패키지는 유지합니다.
+- 사람이 보는 로컬 UI는 향후 Tauri 데스크톱 앱 하나로 통합합니다.
+- npm 재시작 계획은 `docs/NPM_PACKAGE_RESTART.md`에 문서화했습니다.
+
 ## 2.3.4 (2026-04-24)
 
 ### 메타데이터

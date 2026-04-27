@@ -6,7 +6,7 @@ Reviewer models run parallel independent reviews → debate conflicting opinions
 
 ## Tech Stack
 - Runtime: Node.js + TypeScript (strict mode)
-- CLI Framework: commander + ink (React TUI)
+- CLI Framework: commander
 - Schema Validation: zod
 - AI SDK: Vercel AI SDK (`ai` package) — multi-provider support
 - Backends: API (direct AI SDK calls) + CLI (opencode, codex, gemini, claude, copilot)
@@ -52,11 +52,8 @@ packages/
 ├── shared/         # @codeagora/shared — types, utils, config, zod schemas
 ├── core/           # @codeagora/core — L0/L1/L2/L3 pipeline, session, pipeline orchestrator
 ├── github/         # @codeagora/github — PR review posting, SARIF, diff parsing, Actions
-├── notifications/  # @codeagora/notifications — Discord/Slack webhooks, event stream
 ├── cli/            # @codeagora/cli — CLI entrypoint, commands, formatters
-├── tui/            # @codeagora/tui — interactive terminal UI (experimental, ink + React)
-├── mcp/            # @codeagora/mcp — MCP server (9 tools, multi-platform)
-└── web/            # @codeagora/web — Hono.js REST API + React SPA dashboard
+└── mcp/            # @codeagora/mcp — MCP server (multi-platform)
 ```
 
 ## Development Conventions

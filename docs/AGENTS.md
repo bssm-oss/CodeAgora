@@ -9,7 +9,7 @@ Reference documentation for the CodeAgora multi-agent code review system. This d
 
 - **Product strategy & vision**: Why the system exists, target users, core hypothesis
 - **Architecture & design**: 10-stage pipeline (CLI → L0 → Pre-Analysis → L1 → Rules & Learning → Hallucination Filter → Confidence → Suggestion Verification → L2 → L3), component boundaries, data flow
-- **Integration patterns**: GitHub Actions, PR comments, SARIF output, webhooks
+- **Integration patterns**: GitHub Actions, PR comments, SARIF output, MCP adapters
 - **Research & roadmap**: Academic foundations (MAD), implementation phases, feature catalog
 - **Implementation guides**: Complete specifications for developers building new features
 

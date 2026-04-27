@@ -123,7 +123,7 @@ pnpm build
 | GitHub Models | `GITHUB_TOKEN` |
 | GitHub Copilot | `GITHUB_COPILOT_TOKEN` |
 
-API 키는 `~/.config/codeagora/credentials`에 안전하게 저장됩니다. TUI에서 설정하거나 직접 파일을 편집할 수 있습니다.
+API 키는 `~/.config/codeagora/credentials`에 안전하게 저장됩니다. CLI로 설정하거나 직접 파일을 편집할 수 있습니다.
 
 ```bash
 # 감지된 키 확인
@@ -165,7 +165,7 @@ agora review --pr https://github.com/owner/repo/pull/123 --post-review
 
 | 플래그 | 설명 | 기본값 |
 |--------|------|--------|
-| `--output <format>` | 출력 형식: `text`, `json`, `md`, `github`, `annotated` | `text` |
+| `--output <format>` | 출력 형식: `text`, `json`, `md`, `github`, `annotated`, `html`, `junit`, `sarif` | `text` |
 | `--provider <name>` | 모든 리뷰어의 프로바이더 오버라이드 | - |
 | `--model <name>` | 모든 리뷰어의 모델 오버라이드 | - |
 | `--reviewers <value>` | 리뷰어 수 또는 쉼표 구분 ID | - |
@@ -174,7 +174,7 @@ agora review --pr https://github.com/owner/repo/pull/123 --post-review
 | `--no-discussion` | L2 토론 건너뛰기 | - |
 | `--quick` | 빠른 리뷰 (L1만, 토론 없음) | - |
 | `--staged` | 스테이지된 변경 리뷰 (`git diff --staged`) | - |
-| `--json-stream` | NDJSON 스트리밍 출력 (한 줄에 객체 하나) | - |
+| `--json-stream` | 안정된 agent contract NDJSON 스트리밍 출력 (한 줄에 객체 하나) | - |
 | `--pr <url-or-number>` | GitHub PR URL 또는 번호 | - |
 | `--post-review` | PR에 리뷰 코멘트 게시 (`--pr` 필요) | - |
 | `--dry-run` | 설정 검증만 | - |
@@ -241,24 +241,6 @@ agora sessions stats                    # 리뷰 통계
 agora sessions prune --days 30          # 오래된 세션 삭제
 ```
 
-### `agora notify <session-id>`
-
-과거 리뷰 세션의 알림을 설정된 Discord/Slack 웹훅으로 전송합니다.
-
-```bash
-agora notify 2026-03-19/001
-```
-
-설정에 `notifications.discord.webhookUrl` 또는 `notifications.slack.webhookUrl`이 필요합니다.
-
-### `agora tui`
-
-인터랙티브 터미널 UI를 실행합니다 - 리뷰 설정 위자드, 실시간 파이프라인 진행, 토론 뷰어, 결과 드릴다운.
-
-```bash
-agora tui
-```
-
 ### `agora models`
 
 모델 리더보드를 출력합니다 — Thompson Sampling 점수, 사용 횟수, 승률, 상태.
@@ -300,23 +282,6 @@ agora replay 2026-03-16/001
 ```bash
 agora status
 ```
-
-### `agora dashboard`
-
-로컬 웹 대시보드를 실행합니다. Hono.js REST API + React SPA를 브라우저에서 엽니다.
-
-```bash
-agora dashboard              # 기본 포트로 시작
-agora dashboard --port 4000  # 포트 지정
-agora dashboard --open       # 브라우저 자동 열기
-```
-
-**옵션:**
-
-| 플래그 | 설명 | 기본값 |
-|--------|------|--------|
-| `--port <number>` | 대시보드 서버 포트 | `3141` |
-| `--open` | 기본 브라우저에서 대시보드 자동 열기 | - |
 
 ### `agora costs`
 
@@ -662,18 +627,15 @@ API 키: `~/.config/codeagora/credentials` (홈 디렉토리, git 밖)
 
 ### 소스 구조
 
-v2는 8개 패키지로 구성된 pnpm 모노레포입니다:
+현재 워크스페이스는 활성 제품 표면에 맞춘 pnpm 모노레포입니다:
 
 ```
 packages/
 +-- shared/        # @codeagora/shared — 타입, 유틸, zod 스키마, 설정
 +-- core/          # @codeagora/core — L0/L1/L2/L3 파이프라인, 세션 관리
 +-- github/        # @codeagora/github — PR 리뷰 게시, SARIF, diff 파싱
-+-- notifications/ # @codeagora/notifications — Discord/Slack 웹훅, 이벤트 스트림
 +-- cli/           # @codeagora/cli — CLI 명령어, 포맷터, 옵션
-+-- tui/           # @codeagora/tui — 인터랙티브 터미널 UI (실험적, ink + React)
-+-- mcp/           # @codeagora/mcp — MCP 서버 (9개 도구)
-+-- web/           # @codeagora/web — Hono.js REST API + React SPA 대시보드
++-- mcp/           # @codeagora/mcp — MCP 서버
                    #   총 249 테스트 파일, 3442+ 테스트
 ```
 
@@ -698,32 +660,6 @@ packages/
 ```
 
 `review_quick`은 L1만 실행(토론 없음)하여 빠른 피드백을 제공합니다. `review_full`은 전체 L1→L2→L3 파이프라인을 실행합니다.
-
----
-
-## 웹 대시보드
-
-`@codeagora/web`은 로컬 웹 대시보드를 제공합니다 — Hono.js REST API 백엔드 + 8개 페이지의 React SPA:
-
-- 어노테이션 diff 뷰어가 포함된 리뷰 결과
-- 실시간 파이프라인 진행 (WebSocket)
-- 모델 인텔리전스 (Thompson Sampling, 리더보드)
-- 세션 히스토리 브라우저
-- 비용 분석
-- 토론/디베이트 뷰어
-- 설정 관리 UI
-
-```bash
-# 대시보드 실행
-agora dashboard
-
-# 또는 독립 실행
-npx @codeagora/web
-```
-
-`127.0.0.1`(루프백 전용)에 바인딩됩니다. CORS는 localhost 출처로만 제한됩니다.
-
----
 
 ## 개발
 
@@ -756,14 +692,12 @@ pnpm cli review path/to/diff.patch
 |--------|------|
 | 런타임 | Node.js + TypeScript (strict) |
 | CLI 프레임워크 | commander |
-| TUI | ink + React |
 | LLM SDK | Vercel AI SDK (멀티 프로바이더) |
-| 웹 API | Hono.js |
 | MCP | @modelcontextprotocol/sdk |
+| 데스크톱 앱 | Tauri (계획) |
 | 검증 | zod |
 | 설정 | yaml / json |
-| 테스트 | vitest (249 파일, 3442+ 테스트) |
-| 컴포넌트 테스트 | @testing-library/react |
+| 테스트 | vitest |
 | 빌드 | tsup |
 | 프롬프트 / 위자드 | @clack/prompts |
 | 스피너 / 색상 | ora, picocolors |

@@ -3,7 +3,7 @@
 # CodeAgora
 
 ## Purpose
-Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Distributed as a CLI tool, GitHub Action, MCP server, and web dashboard.
+Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Distributed as a CLI tool, GitHub Action, MCP server, and future desktop app.
 
 ## Key Files
 
@@ -59,7 +59,7 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - Tests are in `src/tests/` (not colocated with source)
 - Run: `pnpm test` (root vitest) or `pnpm test:ws` (all workspaces)
 - E2E tests use `forks` pool; unit tests use default pool
-- Coverage excludes `packages/tui/`
+- Coverage targets the active workspace packages under `packages/*`
 
 ### Common Patterns
 - TypeScript strict mode everywhere
@@ -73,7 +73,7 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 ### External
 - `ai` (Vercel AI SDK) — multi-provider LLM abstraction
 - `@ai-sdk/*` — provider packages (OpenAI, Anthropic, Google, Groq, OpenRouter)
-- `commander` + `ink` — CLI framework + React TUI
+- `commander` — CLI framework
 - `zod` — schema validation
 - `@octokit/rest` — GitHub API
 - `@modelcontextprotocol/sdk` — MCP server
