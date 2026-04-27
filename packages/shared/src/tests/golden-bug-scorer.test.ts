@@ -254,6 +254,74 @@ describe('scoreCase — recall path', () => {
       actualFindings: 3,
     });
   });
+
+  it('suppresses same-root duplicates even when wording misses the expected keyword', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/db/users.ts',
+          lineRange: [5, 6],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'email is concatenated into the SQL string',
+          keyword: 'injection',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'SQL Injection Vulnerability',
+        problem: 'The email is concatenated into the SQL query string, creating SQL injection.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/db/users.ts',
+        lineRange: [5, 9],
+      }),
+      finding({
+        issueTitle: 'Insecure String Concatenation for SQL Query',
+        problem: 'The email parameter is inserted directly into the SQL query using string concatenation instead of proper parameter binding.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/db/users.ts',
+        lineRange: [7, 7],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses same-root duplicates attached to the wrong line after a true positive', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'packages/shared/src/utils/quota-manager.ts',
+          lineRange: [26, 28],
+          lineTolerance: 1,
+          minSeverity: 'CRITICAL',
+          rationale: 'slice(0, limit + 1) returns one extra quota entry',
+          keyword: 'off-by-one',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one quota pagination',
+        problem: 'The slice(0, limit + 1) call returns one extra quota record instead of respecting the limit.',
+        severity: 'CRITICAL',
+        filePath: 'packages/shared/src/utils/quota-manager.ts',
+        lineRange: [26, 28],
+      }),
+      finding({
+        issueTitle: 'Off-by-one quota check attached to comparator',
+        problem: 'The quota lookup reports the same off\u2011by\u2011one slice(0, limit + 1) defect but anchors it on the surrounding sort comparator.',
+        severity: 'CRITICAL',
+        filePath: 'packages/shared/src/utils/quota-manager.ts',
+        lineRange: [7, 7],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
 });
 
 describe('scoreCase — FP regression path', () => {
