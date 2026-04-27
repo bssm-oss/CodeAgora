@@ -42,6 +42,13 @@ export interface CaseResult {
   matched: CaseMatch[];
   missed: ExpectedFinding[];
   falsePositives: ActualFinding[];
+  metrics: {
+    truePositives: number;
+    falsePositives: number;
+    falseNegatives: number;
+    actualFindings: number;
+    expectedFindings: number;
+  };
   /** recall@k for several k values. For FP cases, recall is undefined. */
   recallAtK: Record<number, number | null>;
 }
@@ -126,6 +133,13 @@ export function scoreCase(
       matched: [],
       missed: [],
       falsePositives: [...actual],
+      metrics: {
+        truePositives: 0,
+        falsePositives: actual.length,
+        falseNegatives: 0,
+        actualFindings: actual.length,
+        expectedFindings: 0,
+      },
       recallAtK: Object.fromEntries(kValues.map((k) => [k, null])),
     };
   }
@@ -147,6 +161,7 @@ export function scoreCase(
 
   const matchedExpected = new Set(matched.map((m) => m.expected));
   const missed = fixture.expectedFindings.filter((e) => !matchedExpected.has(e));
+  const falsePositives = ranked.filter((_, i) => !claimedActualIdx.has(i));
 
   const recallAtK: Record<number, number | null> = {};
   for (const k of kValues) {
@@ -172,7 +187,14 @@ export function scoreCase(
     isFpRegression: false,
     matched,
     missed,
-    falsePositives: [],
+    falsePositives,
+    metrics: {
+      truePositives: matched.length,
+      falsePositives: falsePositives.length,
+      falseNegatives: missed.length,
+      actualFindings: actual.length,
+      expectedFindings: fixture.expectedFindings.length,
+    },
     recallAtK,
   };
 }
@@ -183,7 +205,22 @@ export interface AggregateReport {
   fpRegressionCases: number;
   meanRecallAtK: Record<number, number>;
   fpRegressionsTriggered: number;
+  metrics: {
+    truePositives: number;
+    falsePositives: number;
+    falseNegatives: number;
+    actualFindings: number;
+    expectedFindings: number;
+    precision: number | null;
+    recall: number | null;
+    f1: number | null;
+    fpCleanRate: number | null;
+  };
   perCase: CaseResult[];
+}
+
+function ratio(numerator: number, denominator: number): number | null {
+  return denominator === 0 ? null : numerator / denominator;
 }
 
 export function aggregate(
@@ -209,7 +246,37 @@ export function aggregate(
     fpRegressionCases: fpCases.length,
     meanRecallAtK,
     fpRegressionsTriggered: fpCases.filter((r) => r.falsePositives.length > 0).length,
+    metrics: aggregateMetrics(results, fpCases),
     perCase: results,
+  };
+}
+
+function aggregateMetrics(
+  results: CaseResult[],
+  fpCases: CaseResult[],
+): AggregateReport['metrics'] {
+  const truePositives = results.reduce((sum, r) => sum + r.metrics.truePositives, 0);
+  const falsePositives = results.reduce((sum, r) => sum + r.metrics.falsePositives, 0);
+  const falseNegatives = results.reduce((sum, r) => sum + r.metrics.falseNegatives, 0);
+  const actualFindings = results.reduce((sum, r) => sum + r.metrics.actualFindings, 0);
+  const expectedFindings = results.reduce((sum, r) => sum + r.metrics.expectedFindings, 0);
+  const precision = ratio(truePositives, truePositives + falsePositives);
+  const recall = ratio(truePositives, truePositives + falseNegatives);
+  const f1 = precision === null || recall === null || precision + recall === 0
+    ? null
+    : (2 * precision * recall) / (precision + recall);
+  const cleanFpCases = fpCases.filter((r) => r.metrics.falsePositives === 0).length;
+
+  return {
+    truePositives,
+    falsePositives,
+    falseNegatives,
+    actualFindings,
+    expectedFindings,
+    precision,
+    recall,
+    f1,
+    fpCleanRate: ratio(cleanFpCases, fpCases.length),
   };
 }
 

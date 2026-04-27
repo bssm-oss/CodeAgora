@@ -115,6 +115,12 @@ function printHumanReport(report: AggregateReport, opts: { hadAnyResults: boolea
     console.log(
       `mean recall@3: ${pct(report.meanRecallAtK[3])}  @5: ${pct(report.meanRecallAtK[5])}  @10: ${pct(report.meanRecallAtK[10])}`,
     );
+    console.log(
+      `TP: ${report.metrics.truePositives}  FP: ${report.metrics.falsePositives}  FN: ${report.metrics.falseNegatives}  actual: ${report.metrics.actualFindings}  expected: ${report.metrics.expectedFindings}`,
+    );
+    console.log(
+      `precision: ${pct(report.metrics.precision)}  recall: ${pct(report.metrics.recall)}  F1: ${pct(report.metrics.f1)}  FP clean-rate: ${pct(report.metrics.fpCleanRate)}`,
+    );
     console.log(`FP regressions triggered: ${report.fpRegressionsTriggered}/${report.fpRegressionCases}`);
   } else {
     console.log('no --results supplied — fixture validation only');
@@ -128,7 +134,7 @@ function printHumanReport(report: AggregateReport, opts: { hadAnyResults: boolea
       const hits = r.matched.length;
       const total = r.matched.length + r.missed.length;
       console.log(
-        `  [rec] ${r.fixtureId.padEnd(32)} ${hits}/${total}  r@3=${pct(r.recallAtK[3])} r@5=${pct(r.recallAtK[5])} r@10=${pct(r.recallAtK[10])}`,
+        `  [rec] ${r.fixtureId.padEnd(32)} ${hits}/${total}  fp=${r.metrics.falsePositives}  r@3=${pct(r.recallAtK[3])} r@5=${pct(r.recallAtK[5])} r@10=${pct(r.recallAtK[10])}`,
       );
     }
   }
