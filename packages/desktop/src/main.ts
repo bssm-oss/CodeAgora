@@ -1,4 +1,5 @@
 import {
+  getRepoInfo,
   getSessionDetail,
   listSessions,
   readConfig,
@@ -14,6 +15,9 @@ interface AppState {
   view: View;
   sessions: SessionSummary[];
   selected?: SessionDetail;
+  repoPath: string;
+  sessionSearch: string;
+  sessionStatus: 'all' | SessionSummary['status'];
   configRaw: string;
   configPath: string;
   notice?: string;
@@ -23,6 +27,9 @@ interface AppState {
 const state: AppState = {
   view: 'sessions',
   sessions: [],
+  repoPath: '',
+  sessionSearch: '',
+  sessionStatus: 'all',
   configRaw: '',
   configPath: '.ca/config.json',
   busy: false,
@@ -35,6 +42,23 @@ const appRoot = app;
 function severityTotal(session: SessionSummary): number {
   const counts = session.severityCounts ?? {};
   return Object.values(counts).reduce((sum, value) => sum + (value ?? 0), 0);
+}
+
+function filteredSessions(): SessionSummary[] {
+  const query = state.sessionSearch.trim().toLowerCase();
+  return state.sessions.filter((session) => {
+    if (state.sessionStatus !== 'all' && session.status !== state.sessionStatus) return false;
+    if (!query) return true;
+    const haystack = [
+      session.id,
+      session.status,
+      session.decision,
+      session.reasoning,
+      session.dirPath,
+      ...(session.topIssues ?? []).flatMap((issue) => [issue.title, issue.filePath, issue.severity]),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
 }
 
 function decisionClass(decision?: string): string {
@@ -58,6 +82,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function button(label: string, onClick: () => void, className = 'button'): HTMLButtonElement {
   const node = el('button', className, label);
   node.type = 'button';
+  node.disabled = state.busy;
   node.addEventListener('click', onClick);
   return node;
 }
@@ -81,6 +106,15 @@ async function refreshSessions(selectFirst = false): Promise<void> {
     state.busy = false;
     render();
   }
+}
+
+async function loadRepoInfo(): Promise<void> {
+  try {
+    state.repoPath = (await getRepoInfo()).path;
+  } catch (error) {
+    state.repoPath = error instanceof Error ? error.message : String(error);
+  }
+  render();
 }
 
 async function selectSession(id: string): Promise<void> {
@@ -180,7 +214,7 @@ function renderToolbar(): HTMLElement {
   const toolbar = el('header', 'toolbar');
   const title = el('div');
   title.append(el('h1', '', state.view === 'sessions' ? 'Review Sessions' : state.view === 'run' ? 'Run Review' : 'Configuration'));
-  title.append(el('p', '', 'Local UI for CodeAgora reviews, backed by CLI/core session data.'));
+  title.append(el('p', '', state.repoPath || 'Loading repository...'));
   toolbar.append(title);
 
   const actions = el('div', 'toolbar-actions');
@@ -210,22 +244,57 @@ function renderContent(): HTMLElement {
 
 function renderSessions(): HTMLElement {
   const layout = el('div', 'sessions-layout');
-  const list = el('div', 'session-list');
-  if (state.sessions.length === 0) {
-    list.append(el('p', 'empty', 'No sessions found yet.'));
+  const listPanel = el('div', 'session-list');
+  const controls = el('div', 'session-controls');
+  const search = el('input', 'filter-input') as HTMLInputElement;
+  search.type = 'search';
+  search.placeholder = 'Filter sessions';
+  search.value = state.sessionSearch;
+  search.addEventListener('input', () => {
+    state.sessionSearch = search.value;
+    render();
+  });
+  const status = el('select', 'filter-select') as HTMLSelectElement;
+  for (const option of ['all', 'completed', 'failed', 'interrupted', 'in_progress', 'unknown'] as const) {
+    const node = el('option') as HTMLOptionElement;
+    node.value = option;
+    node.textContent = option === 'all' ? 'All statuses' : option.replace('_', ' ');
+    node.selected = state.sessionStatus === option;
+    status.append(node);
   }
-  for (const session of state.sessions) {
+  status.addEventListener('change', () => {
+    state.sessionStatus = status.value as AppState['sessionStatus'];
+    render();
+  });
+  controls.append(search, status);
+  listPanel.append(controls);
+
+  const sessions = filteredSessions();
+  const summary = el('div', 'list-summary', `${sessions.length} of ${state.sessions.length} sessions`);
+  listPanel.append(summary);
+  if (state.sessions.length === 0) {
+    listPanel.append(el('p', 'empty padded', 'No sessions found yet.'));
+  } else if (sessions.length === 0) {
+    listPanel.append(el('p', 'empty padded', 'No sessions match the current filter.'));
+  }
+  for (const session of sessions) {
     const item = button('', () => void selectSession(session.id), state.selected?.id === session.id ? 'session-row selected' : 'session-row');
     const top = el('div', 'session-row-top');
     top.append(el('strong', '', session.id));
     top.append(el('span', decisionClass(session.decision), session.decision ?? session.status));
     item.append(top);
-    item.append(el('span', 'session-meta', `${severityTotal(session)} issues · ${session.updatedAt ?? 'no timestamp'}`));
-    list.append(item);
+    item.append(el('span', 'session-meta', `${severityTotal(session)} issues · ${formatTimestamp(session.updatedAt)}`));
+    listPanel.append(item);
   }
-  layout.append(list);
+  layout.append(listPanel);
   layout.append(renderSessionDetail());
   return layout;
+}
+
+function formatTimestamp(value?: string): string {
+  if (!value) return 'no timestamp';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function renderSessionDetail(): HTMLElement {
@@ -240,6 +309,12 @@ function renderSessionDetail(): HTMLElement {
   head.append(el('div', decisionClass(selected.decision), selected.decision ?? selected.status));
   head.append(el('h2', '', selected.id));
   detail.append(head);
+  const meta = el('div', 'detail-meta');
+  meta.append(el('span', '', selected.dirPath ?? '.ca/sessions'));
+  meta.append(el('span', '', `Updated ${formatTimestamp(selected.updatedAt)}`));
+  meta.append(el('span', '', `${selected.evidenceCount ?? 0} evidence docs`));
+  meta.append(el('span', '', `${selected.discussionsCount ?? 0} discussion files`));
+  detail.append(meta);
   detail.append(el('p', 'reasoning', selected.reasoning ?? 'No reasoning recorded.'));
 
   const counts = selected.severityCounts ?? {};
@@ -260,7 +335,8 @@ function renderSessionDetail(): HTMLElement {
     for (const issue of selected.topIssues) {
       const row = el('div', 'issue-row');
       row.append(el('strong', '', issue.title));
-      row.append(el('span', '', `${issue.severity} · ${issue.filePath}:${issue.lineRange[0]}`));
+      const confidence = issue.confidence === undefined ? '' : ` · ${Math.round(issue.confidence)}%`;
+      row.append(el('span', '', `${issue.severity} · ${issue.filePath}:${issue.lineRange[0]}${confidence}`));
       issues.append(row);
     }
   }
@@ -277,7 +353,7 @@ function renderSessionDetail(): HTMLElement {
 function renderRunReview(): HTMLElement {
   const panel = el('div', 'run-panel');
   panel.append(el('h2', '', 'Start a Local Review'));
-  panel.append(el('p', '', 'The desktop shell calls the CLI bridge so review behavior stays identical to terminal and agent workflows.'));
+  panel.append(el('p', '', state.repoPath || 'Current repository'));
   const actions = el('div', 'run-actions');
   actions.append(button('Review Staged Changes', () => void startReview(true), 'button primary'));
   actions.append(button('Review Working Tree', () => void startReview(false)));
@@ -288,6 +364,7 @@ function renderRunReview(): HTMLElement {
 function renderConfig(): HTMLElement {
   const panel = el('div', 'config-panel');
   panel.append(el('h2', '', state.configPath));
+  panel.append(renderConfigFacts());
   const textarea = el('textarea', 'config-editor') as HTMLTextAreaElement;
   textarea.value = state.configRaw;
   panel.append(textarea);
@@ -295,8 +372,27 @@ function renderConfig(): HTMLElement {
   return panel;
 }
 
+function renderConfigFacts(): HTMLElement {
+  const facts = el('div', 'config-facts');
+  let parsed: Record<string, unknown> | undefined;
+  try {
+    parsed = JSON.parse(state.configRaw) as Record<string, unknown>;
+  } catch {
+    facts.append(el('span', 'fact warn', 'Invalid JSON'));
+    return facts;
+  }
+  const language = typeof parsed.language === 'string' ? parsed.language : 'unset';
+  const reviewers = Array.isArray(parsed.reviewers) ? parsed.reviewers.length : 0;
+  const providers = Array.isArray(parsed.providers) ? parsed.providers.length : 0;
+  facts.append(el('span', 'fact', `Language ${language}`));
+  facts.append(el('span', 'fact', `${reviewers} reviewers`));
+  facts.append(el('span', 'fact', `${providers} providers`));
+  return facts;
+}
+
 function render(): void {
   appRoot.replaceChildren(renderShell());
 }
 
 void refreshSessions(true);
+void loadRepoInfo();

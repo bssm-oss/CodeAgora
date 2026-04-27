@@ -20,6 +20,7 @@ export interface SessionSummary {
   date: string;
   sessionId: string;
   status: 'completed' | 'failed' | 'interrupted' | 'in_progress' | 'unknown';
+  dirPath?: string;
   decision?: ReviewDecision;
   reasoning?: string;
   severityCounts?: SeverityCounts;
@@ -44,6 +45,10 @@ export interface DesktopConfig {
   path: string;
 }
 
+export interface RepoInfo {
+  path: string;
+}
+
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 type JsonObject = Record<string, unknown>;
 
@@ -56,12 +61,21 @@ interface CliSessionEntry {
   date?: unknown;
   sessionId?: unknown;
   status?: unknown;
+  dirPath?: unknown;
+  decision?: unknown;
+  reasoning?: unknown;
+  severityCounts?: unknown;
+  topIssues?: unknown;
+  updatedAt?: unknown;
 }
 
 interface CliSessionDetail {
   entry?: CliSessionEntry;
   metadata?: JsonObject;
   verdict?: JsonObject;
+  markdown?: unknown;
+  evidenceCount?: unknown;
+  discussionsCount?: unknown;
 }
 
 declare global {
@@ -120,6 +134,14 @@ function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function asObject(value: unknown): JsonObject | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as JsonObject : undefined;
+}
+
 function severityCountsFromVerdict(verdict?: JsonObject): SeverityCounts {
   const counts: SeverityCounts = {};
   for (const issue of extractIssues(verdict)) {
@@ -138,15 +160,64 @@ function extractIssues(verdict?: JsonObject): JsonObject[] {
   return [];
 }
 
+function severityCountsFromValue(value: unknown, verdict?: JsonObject): SeverityCounts {
+  const raw = asObject(value);
+  if (!raw) return severityCountsFromVerdict(verdict);
+  const counts: SeverityCounts = {};
+  for (const key of ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'] as const) {
+    const count = raw[key];
+    if (typeof count === 'number') counts[key] = count;
+  }
+  return counts;
+}
+
+function normalizeIssue(issue: JsonObject): TopIssue {
+  return {
+    severity: asString(issue['severity'], 'SUGGESTION'),
+    filePath: asString(issue['filePath'] ?? issue['file'] ?? issue['path'], 'unknown'),
+    lineRange: Array.isArray(issue['lineRange'])
+      ? [Number(issue['lineRange'][0] ?? 0), Number(issue['lineRange'][1] ?? issue['lineRange'][0] ?? 0)]
+      : [Number(issue['line'] ?? issue['lineNumber'] ?? 0), Number(issue['line'] ?? issue['lineNumber'] ?? 0)],
+    title: asString(issue['title'] ?? issue['description'] ?? issue['message'], JSON.stringify(issue)),
+    confidence: asNumber(issue['confidence']),
+  };
+}
+
+function normalizeTopIssues(value: unknown, verdict?: JsonObject): TopIssue[] {
+  const issues = Array.isArray(value)
+    ? value.filter((item): item is JsonObject => typeof item === 'object' && item !== null)
+    : extractIssues(verdict).slice(0, 5);
+  return issues.map(normalizeIssue);
+}
+
+function timestampFromValue(raw: unknown): string | undefined {
+  if (typeof raw === 'number') return new Date(raw).toISOString();
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) return new Date(Number(raw)).toISOString();
+  return typeof raw === 'string' ? raw : undefined;
+}
+
+function timestampFromMetadata(metadata?: JsonObject): string | undefined {
+  const raw = metadata?.['completedAt'] ?? metadata?.['startedAt'] ?? metadata?.['timestamp'];
+  return timestampFromValue(raw);
+}
+
 function normalizeEntry(entry: CliSessionEntry): SessionSummary {
   const date = asString(entry.date);
   const sessionId = asString(entry.sessionId);
   const id = asString(entry.id, date && sessionId ? `${date}/${sessionId}` : 'unknown');
+  const verdict = asObject((entry as JsonObject)['verdict']);
+  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as ReviewDecision | '';
   return {
     id,
     date,
     sessionId,
     status: asString(entry.status, 'unknown') as SessionSummary['status'],
+    dirPath: asString(entry.dirPath) || undefined,
+    decision: decision || undefined,
+    reasoning: asString(entry.reasoning ?? verdict?.['reasoning'] ?? verdict?.['summary']) || undefined,
+    severityCounts: severityCountsFromValue(entry.severityCounts, verdict),
+    topIssues: normalizeTopIssues(entry.topIssues, verdict),
+    updatedAt: timestampFromValue(entry.updatedAt),
   };
 }
 
@@ -155,30 +226,18 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
   const verdict = detail.verdict;
   const metadata = detail.metadata;
   const issues = extractIssues(verdict);
-  const decision = asString(verdict?.['decision'] ?? verdict?.['verdict']) as ReviewDecision | '';
-  const reasoning = asString(verdict?.['reasoning'] ?? verdict?.['summary']);
+  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as ReviewDecision | '';
+  const reasoning = asString(entry.reasoning ?? verdict?.['reasoning'] ?? verdict?.['summary']);
   return {
     ...entry,
     decision: decision || undefined,
     reasoning,
-    severityCounts: severityCountsFromVerdict(verdict),
-    topIssues: issues.slice(0, 5).map((issue) => ({
-      severity: asString(issue['severity'], 'SUGGESTION'),
-      filePath: asString(issue['filePath'] ?? issue['file'] ?? issue['path'], 'unknown'),
-      lineRange: Array.isArray(issue['lineRange'])
-        ? [Number(issue['lineRange'][0] ?? 0), Number(issue['lineRange'][1] ?? issue['lineRange'][0] ?? 0)]
-        : [Number(issue['line'] ?? 0), Number(issue['line'] ?? 0)],
-      title: asString(issue['title'] ?? issue['description'] ?? issue['message'], JSON.stringify(issue)),
-      confidence: typeof issue['confidence'] === 'number' ? issue['confidence'] : undefined,
-    })),
-    updatedAt: typeof metadata?.['completedAt'] === 'number'
-      ? new Date(metadata['completedAt']).toISOString()
-      : typeof metadata?.['timestamp'] === 'number'
-        ? new Date(metadata['timestamp']).toISOString()
-        : undefined,
-    evidenceCount: issues.length,
-    discussionsCount: Array.isArray(verdict?.['discussions']) ? verdict['discussions'].length : undefined,
-    markdown: [
+    severityCounts: entry.severityCounts ?? severityCountsFromVerdict(verdict),
+    topIssues: entry.topIssues?.length ? entry.topIssues : normalizeTopIssues(undefined, verdict),
+    updatedAt: entry.updatedAt ?? timestampFromMetadata(metadata),
+    evidenceCount: asNumber(detail.evidenceCount) ?? issues.length,
+    discussionsCount: asNumber(detail.discussionsCount) ?? (Array.isArray(verdict?.['discussions']) ? verdict['discussions'].length : undefined),
+    markdown: asString(detail.markdown) || [
       `# Review ${entry.id}`,
       '',
       `Decision: ${decision || entry.status}`,
@@ -243,4 +302,10 @@ export async function writeConfig(raw: string): Promise<DesktopConfig> {
   if (invoke) return invoke<DesktopConfig>('write_config', { raw });
   window.localStorage.setItem('codeagora.desktop.config', raw);
   return { path: '.ca/config.json', raw };
+}
+
+export async function getRepoInfo(): Promise<RepoInfo> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<RepoInfo>('get_repo_info');
+  return { path: window.location.pathname.includes('/packages/desktop/') ? 'browser preview' : window.location.pathname };
 }
