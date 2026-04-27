@@ -135,6 +135,40 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('missing-null-guard');
   });
 
+  it('catches undeclared type / missing import compile-error claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Return type annotation uses undeclared `Severity` type',
+        problem:
+          'The return type is annotated as `{ severity: Severity; reasoning: string }` but Severity is not imported or defined. This will cause a TypeScript compilation error.',
+      }),
+    )!;
+    expect(match.id).toBe('undeclared-type');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches cannot-find-name phrasing', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Cannot find name UserRecord',
+        problem: 'TypeScript reports cannot find name UserRecord in this module.',
+      }),
+    )!;
+    expect(match.id).toBe('undeclared-type');
+  });
+
+  it('catches generic incorrect sorting comparator claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incorrect sorting in findExceededUsers when daily limits differ',
+        problem:
+          'The sorting logic is flawed and could return the wrong top users when limits vary.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches generic "potential security concern" phrasing (run 3 FP)', () => {
     const match = matchFindingClass(
       doc({

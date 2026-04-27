@@ -8,6 +8,7 @@
 
 import type { EvidenceDocument } from '../types/evidence.js';
 import type { ActualFinding } from './golden-bug-scorer.js';
+import { classifyTriage } from './triage.js';
 
 /**
  * Convert a pipeline evidence document into the shape the golden-bug
@@ -30,5 +31,7 @@ export function evidenceToActualFinding(doc: EvidenceDocument): ActualFinding {
 export function evidenceListToActualFindings(
   docs: readonly EvidenceDocument[],
 ): ActualFinding[] {
-  return docs.map(evidenceToActualFinding);
+  return docs
+    .filter((doc) => classifyTriage(doc) !== 'ignore')
+    .map(evidenceToActualFinding);
 }
