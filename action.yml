@@ -45,13 +45,30 @@ runs:
     - name: Fetch PR diff
       shell: bash
       run: |
-        gh pr diff "$PR_NUMBER" \
-          --repo "$REPO" \
-          > /tmp/codeagora-pr.diff
+        set -euo pipefail
+
+        if ! gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/codeagora-pr.diff; then
+          echo "::warning::GitHub API diff retrieval failed; falling back to local git diff."
+          if [ -z "$PR_NUMBER" ] || [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "::error::Local diff fallback requires a pull_request event with base and head SHAs."
+            exit 1
+          fi
+          if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "::error::Local diff fallback requires actions/checkout to run before CodeAgora Review."
+            exit 1
+          fi
+          git cat-file -e "$BASE_SHA^{commit}" || git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git cat-file -e "$HEAD_SHA^{commit}" || git fetch --no-tags --depth=1 origin "pull/$PR_NUMBER/head"
+          git cat-file -e "$HEAD_SHA^{commit}" || git fetch --no-tags --depth=1 "https://github.com/$HEAD_REPO.git" "$HEAD_SHA"
+          git diff --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$BASE_SHA...$HEAD_SHA" > /tmp/codeagora-pr.diff
+        fi
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO: ${{ github.repository }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
 
     - name: Run CodeAgora review
       id: review
