@@ -224,6 +224,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('missing-size-limit');
   });
 
+  it('catches speculative broad-catch JSON parse masking claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Improper Error Handling in JSON Parsing',
+        problem:
+          'The parseForcedDecisionJson function catches all exceptions during JSON.parse, but this broad catch is potentially masking memory exhaustion attacks or other parser-related problems.',
+      }),
+    )!;
+    expect(match.id).toBe('json-parse-catch-masking');
+    expect(match.multiplier).toBe(0.5);
+  });
+
   it('catches "missing null guard" (PR #499 self-review FP)', () => {
     const match = matchFindingClass(
       doc({

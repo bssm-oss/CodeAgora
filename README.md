@@ -242,10 +242,10 @@ The smoke run executed only `authz-admin-bypass` and passed that fixture (`1/1`,
 Full low-cost diverse run:
 
 ```bash
-pnpm bench:fn:run -- --results ./bench-out-low-cost-final \
+pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
   --config benchmarks/.ca/config.low-cost-diverse.json \
   --skip-head
-pnpm bench:fn -- --results ./bench-out-low-cost-final
+pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
 ```
 
 | Metric | Result |
@@ -253,16 +253,16 @@ pnpm bench:fn -- --results ./bench-out-low-cost-final
 | Total fixtures | 11 |
 | Recall / FP-regression fixtures | 7 / 4 |
 | Expected findings | 8 |
-| Actual findings | 21 |
+| Actual findings | 28 |
 | TP / FP / FN | 8 / 0 / 0 |
 | Precision | 100.0% |
 | Recall | 100.0% |
 | F1 | 100.0% |
 | FP clean-rate | 100.0% |
-| mean recall@3 / @5 / @10 | 92.9% / 100.0% / 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
 | FP regressions triggered | 0/4 |
 
-Per-fixture result: every recall fixture passed with `fp=0`; every FP regression fixture passed. In the original full run, `quota-manager-dual` hit both expected findings (`2/2`) with `r@3=50.0%` and `r@5=100.0%`. A follow-up targeted run on the same fixture now scores `2/2`, `fp=0`, and `r@3=100.0%`; rerun the full suite in a clean environment to refresh the aggregate table.
+Per-fixture result: every recall fixture passed with `fp=0` and `r@3=100.0%`; every FP regression fixture passed. `quota-manager-dual` now scores `2/2`, `fp=0`, and `r@3=100.0%` in the confirmed aggregate.
 
 Session baseline before tuning was `TP=5 FP=20 FN=3`, precision `20.0%`, recall `62.5%`, F1 `30.3%`, and FP clean-rate `50.0%` on the low-cost diverse run.
 

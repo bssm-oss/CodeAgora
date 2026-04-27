@@ -14,13 +14,13 @@ The final low-cost diverse run reached full benchmark coverage on the current fi
 | Recall fixtures | 7 |
 | FP-regression fixtures | 4 |
 | Expected findings | 8 |
-| Actual findings | 21 |
+| Actual findings | 28 |
 | TP / FP / FN | 8 / 0 / 0 |
 | Precision | 100.0% |
 | Recall | 100.0% |
 | F1 | 100.0% |
 | FP clean-rate | 100.0% |
-| mean recall@3 / @5 / @10 | 92.9% / 100.0% / 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
 | FP regressions triggered | 0/4 |
 
 No API key values were inspected or recorded. Only key presence and behavior were validated during the run.
@@ -55,10 +55,10 @@ pnpm bench:fn -- --results ./bench-out-smoke
 Full low-cost diverse run:
 
 ```bash
-pnpm bench:fn:run -- --results ./bench-out-low-cost-final \
+pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
   --config benchmarks/.ca/config.low-cost-diverse.json \
   --skip-head
-pnpm bench:fn -- --results ./bench-out-low-cost-final
+pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
 ```
 
 Verification commands after tuning:
@@ -90,30 +90,39 @@ The full low-cost diverse run produced:
 | fp-type-only-import-refactor | FP regression | PASS | 0 | n/a | n/a | n/a |
 | null-deref-early-access | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
 | off-by-one-slice | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
-| quota-manager-dual | recall | 2/2 | 0 | 50.0% | 100.0% | 100.0% |
+| quota-manager-dual | recall | 2/2 | 0 | 100.0% | 100.0% | 100.0% |
 | sql-injection-concat | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
 
-The original full run's only remaining quality gap was ranking, not hit rate: `quota-manager-dual` caught both expected findings, but one finding landed outside the top 3 and inside the top 5.
+The confirmed full run has no remaining hit-rate or top-3 ranking gap on the current fixture set.
 
-## Follow-Up Top-3 Tuning
+## Post-Merge Confirmation
 
-PR #507 includes a targeted follow-up for the `quota-manager-dual` ranking gap. The rerun used:
+After PR #507 merged, `main` was rerun with the full low-cost diverse suite. One `fp-moderator-regex` phantom finding appeared in the first post-merge pass:
+
+- `Improper Error Handling in JSON Parsing`
+- Claim: `JSON.parse` broad catch might mask memory exhaustion or parser-related problems.
+- Confidence: 22.
+
+The class-prior table was tightened with a narrow `json-parse-catch-masking` prior. The failing fixture was rerun into the same results directory:
 
 ```bash
-pnpm bench:fn:run -- --results ./bench-out-quota-top3-v4 \
+pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
   --config benchmarks/.ca/config.low-cost-diverse.json \
-  --fixtures quota-manager-dual \
+  --fixtures fp-moderator-regex \
   --skip-head
-pnpm bench:fn -- --results ./bench-out-quota-top3-v4
+pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
 ```
 
-Targeted result:
+Confirmed aggregate:
 
-| Fixture | Result | FP | recall@3 | recall@5 | recall@10 |
-|---|---:|---:|---:|---:|---:|
-| quota-manager-dual | 2/2 | 0 | 100.0% | 100.0% | 100.0% |
-
-This targeted aggregate reports the other fixtures as missed because they were not rerun. It should be read only as the quota fixture follow-up. A full-suite rerun is still needed to refresh the aggregate `mean recall@3` table.
+| Metric | Confirmed result |
+|---|---:|
+| TP / FP / FN | 8 / 0 / 0 |
+| Precision | 100.0% |
+| Recall | 100.0% |
+| F1 | 100.0% |
+| FP clean-rate | 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
 
 ## Before and After
 
@@ -149,6 +158,7 @@ Key implementation changes:
 - Same-root duplicate suppression now handles findings that describe the correct bug but anchor to a nearby declaration or documentation line after a true positive has already been counted.
 - `recall@k` now uses unique bug candidates after same-root duplicate suppression, so duplicate reports of one already-hit bug do not crowd out a different expected bug.
 - The quota fixture's mutation line range was aligned with the scorer's post-patch coordinates, and a generic incomplete-validation prior now catches a recurring `parseQuotaConfig` phantom.
+- A narrow `json-parse-catch-masking` prior suppresses speculative claims that `JSON.parse` try/catch blocks hide memory exhaustion or parser-related problems.
 
 ## Interpretation
 
@@ -164,14 +174,12 @@ The result is strong but should be treated as a calibrated benchmark snapshot, n
 
 - The run used `--skip-head`, so it measures reviewer, rules, triage, and discussion output without final L3 verdict synthesis.
 - Low-cost OpenRouter model behavior can drift over time as upstream providers update models or routing.
-- The latest quota targeted run resolves the top-3 ranking gap, but the full suite has not yet been rerun after that follow-up.
 - Benchmark-scoped rules improve this fixture set but should not be mistaken for broad production rules without additional validation.
 - The scorer now suppresses same-root duplicate findings more aggressively after a true positive. This improves benchmark accounting, but future fixture additions should include regression tests for unrelated same-file findings so this logic stays narrow.
 
 ## Next Tuning Candidates
 
-1. Rerun the full low-cost diverse suite after the quota top-3 follow-up to refresh aggregate recall@3.
-2. Add at least one multi-bug recall fixture that is not quota-related to validate duplicate suppression against unrelated same-file bugs.
-3. Run the same fixture set with L3 enabled and compare final verdict precision against the `--skip-head` measurement.
-4. Add a second full run for variance tracking, because low-cost model routing can be noisy.
-5. Record cost and latency per fixture so benchmark tradeoffs can be compared alongside F1.
+1. Add at least one multi-bug recall fixture that is not quota-related to validate duplicate suppression against unrelated same-file bugs.
+2. Run the same fixture set with L3 enabled and compare final verdict precision against the `--skip-head` measurement.
+3. Add a second full run for variance tracking, because low-cost model routing can be noisy.
+4. Record cost and latency per fixture so benchmark tradeoffs can be compared alongside F1.

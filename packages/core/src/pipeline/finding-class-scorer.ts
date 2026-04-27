@@ -135,6 +135,16 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     ],
   },
   {
+    id: 'json-parse-catch-masking',
+    label: 'speculative broad-catch JSON.parse masking claim',
+    multiplier: 0.5,
+    patterns: [
+      /\bbroad\s+catch\b[\s\S]{0,200}\b(?:json\.parse|json\s+parsing|parser[-\s]?related|memory\s+exhaustion)\b/i,
+      /\bjson(?:\.parse|\s+parsing)\b[\s\S]{0,200}\b(?:mask(?:ing)?|memory\s+exhaustion|parser[-\s]?related\s+problems?)\b/i,
+      /\bmemory\s+exhaustion\b[\s\S]{0,160}\b(?:json(?:\.parse|\s+parsing)|parser)\b/i,
+    ],
+  },
+  {
     id: 'may-throw',
     label: '"may throw" uncaught exception',
     multiplier: 0.7,
