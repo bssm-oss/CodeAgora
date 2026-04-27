@@ -58,7 +58,7 @@ export function groupDiff(diffContent: string): FileGroup[] {
  */
 function splitDiffByFile(diff: string): Map<string, string> {
   const result = new Map<string, string>();
-  const sections = diff.split(/(?=diff --git)/);
+  const sections = diff.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
     const match = section.match(/diff --git a\/(.+?) b\/(.+)/);

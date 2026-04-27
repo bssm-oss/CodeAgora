@@ -76,6 +76,23 @@ describe('groupDiff()', () => {
       expect(result[0].diffContent).toContain('diff --git a/src/auth.ts b/src/auth.ts');
     });
 
+    it('does not create groups for diff headers embedded in added file content', () => {
+      const diff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+new file mode 100644
+--- /dev/null
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -0,0 +1,4 @@
++diff --git a/src/admin.ts b/src/admin.ts
++--- a/src/admin.ts
+++++ b/src/admin.ts
++@@ -1 +1 @@
+`;
+      const result = groupDiff(diff);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].files).toEqual(['benchmarks/golden-bugs/example/diff.patch']);
+    });
+
     it('group prSummary mentions the directory and file count', () => {
       const diff = makeDiffSection('src/auth.ts');
       const result = groupDiff(diff);

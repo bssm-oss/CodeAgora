@@ -66,6 +66,26 @@ describe('matchRules', () => {
     expect(doc.lineRange[0]).toBe(doc.lineRange[1]); // single line
   });
 
+  it('does not treat embedded diff headers in added content as real files', () => {
+    const diff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+new file mode 100644
+--- /dev/null
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -0,0 +1,7 @@
++diff --git a/src/index.ts b/src/index.ts
++--- a/src/index.ts
+++++ b/src/index.ts
++@@ -1,2 +1,3 @@
++ const x = 1;
+++console.log(x);
++ export default x;
+`;
+    const results = matchRules(diff, [makeRule()]);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].filePath).toBe('benchmarks/golden-bugs/example/diff.patch');
+  });
+
   it('sets source="rule" on all returned documents', () => {
     const diff = `diff --git a/src/app.ts b/src/app.ts
 --- a/src/app.ts
