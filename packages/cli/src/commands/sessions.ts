@@ -28,6 +28,7 @@ import type {
   SessionDiff,
   SessionStats,
 } from '@codeagora/core/session/queries.js';
+import { AGENT_CONTRACT_VERSION } from '../utils/agent-contract.js';
 
 import fs from 'fs/promises';
 import path from 'path';
@@ -72,7 +73,7 @@ function extractIssueObjects(verdict: Record<string, unknown>): Array<{ title: s
 }
 
 // ============================================================================
-// Prune (CLI-only, not needed by MCP/TUI)
+// Prune (CLI-only, not needed by MCP)
 // ============================================================================
 
 /**
@@ -167,6 +168,10 @@ export function formatSessionList(sessions: SessionEntry[]): string {
   return [header, divider, ...rows].join('\n');
 }
 
+export function formatSessionListJson(sessions: SessionEntry[]): string {
+  return JSON.stringify({ schemaVersion: AGENT_CONTRACT_VERSION, sessions }, null, 2);
+}
+
 export function formatSessionDetail(detail: SessionDetail): string {
   const lines: string[] = [];
   lines.push(`Session: ${detail.entry.id}`);
@@ -205,6 +210,10 @@ export function formatSessionDetail(detail: SessionDetail): string {
   }
 
   return lines.join('\n');
+}
+
+export function formatSessionDetailJson(detail: SessionDetail): string {
+  return JSON.stringify({ schemaVersion: AGENT_CONTRACT_VERSION, ...detail }, null, 2);
 }
 
 export function formatSessionDiff(diff: SessionDiff): string {

@@ -57,7 +57,7 @@ export const ConfidenceTraceSchema = z.object({
    * Final confidence after L2 discussion adjustment.
    * Set by: packages/core/src/pipeline/stage-executors.ts adjustConfidenceFromDiscussion
    * This is the authoritative value for downstream consumers (triage, formatter,
-   * GitHub mapper, TUI, web). For docs that did not enter L2, this mirrors
+   * GitHub mapper, CLI, MCP). For docs that did not enter L2, this mirrors
    * `verified ?? corroborated`.
    */
   final: z.number().min(0).max(100).optional(),

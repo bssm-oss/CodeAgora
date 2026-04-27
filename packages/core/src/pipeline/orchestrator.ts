@@ -13,7 +13,7 @@ import { estimateTokens } from './chunker.js';
 import { createLogger } from '@codeagora/shared/utils/logger.js';
 import { writeHeadVerdict } from '../l3/writer.js';
 import { QualityTracker } from '../l0/quality-tracker.js';
-import type { EvidenceDocument, ReviewOutput, DiscussionVerdict } from '../types/core.js';
+import type { EvidenceDocument, DiscussionVerdict } from '../types/core.js';
 import { SEVERITY_ORDER } from '../types/core.js';
 import type { ProgressEmitter } from './progress.js';
 import { chunkDiff } from './chunker.js';
@@ -32,7 +32,6 @@ import { detectProjectContext } from './session-recovery.js';
 import { buildReviewerMap, buildReviewerOpinions, buildSupporterModelMap, mergeReviewOutputsByReviewer, trackDA, generatePerformanceText } from './pipeline-helpers.js';
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
 import fs from 'fs/promises';
-import type { Config } from '../types/config.js';
 import type { ModeratorReport } from '../types/core.js';
 
 // ============================================================================

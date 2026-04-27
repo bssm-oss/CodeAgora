@@ -20,8 +20,9 @@ import { createAppOctokit } from '@codeagora/github/client.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { formatOutput, type OutputFormat } from '../formatters/review-output.js';
 import { parseReviewerOption, readStdin } from '../options/review-options.js';
-import { formatError } from '../utils/errors.js';
+import { classifyCliErrorExitCode, formatError } from '../utils/errors.js';
 import { dim } from '../utils/colors.js';
+import { formatProgressNdjsonEvent, formatResultNdjsonEvent } from '../utils/agent-contract.js';
 
 // ============================================================================
 // Types
@@ -38,7 +39,6 @@ interface ReviewOptions {
   reviewerTimeout?: number;
   discussion: boolean;
   quiet: boolean;
-  notify: boolean;
   pr?: string;
   postReview: boolean;
   quick?: boolean;
@@ -77,13 +77,13 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit', 'sarif'];
     if (!validFormats.includes(options.output)) {
       console.error(`Invalid output format: "${options.output}". Valid formats: ${validFormats.join(', ')}`);
-      process.exit(1);
+      process.exit(2);
     }
     const outputFormat = options.output as OutputFormat;
 
     if (options.postReview && !options.pr) {
       console.error('--post-review requires --pr to specify the target PR');
-      process.exit(1);
+      process.exit(2);
     }
 
     // Handle --staged: run git diff --staged and use as input
@@ -94,11 +94,11 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
         stagedDiff = execFileSync('git', ['diff', '--staged'], { encoding: 'utf-8' });
       } catch {
         console.error(t('cli.error.gitStagedFailed'));
-        process.exit(1);
+        process.exit(2);
       }
       if (!stagedDiff.trim()) {
         console.error(t('cli.staged.empty'));
-        process.exit(1);
+        process.exit(2);
       }
       const tmpDir = path.join(process.cwd(), '.ca', 'tmp');
       await fs.mkdir(tmpDir, { recursive: true });
@@ -121,7 +121,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
         const prNum = parseInt(options.pr, 10);
         if (isNaN(prNum)) {
           console.error(t('cli.error.prFormat'));
-          process.exit(1);
+          process.exit(2);
         }
         const { execFile } = await import('child_process');
         const { promisify } = await import('util');
@@ -160,7 +160,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       const stdinContent = await readStdin();
       if (!stdinContent.trim()) {
         console.error(t('cli.error.emptyDiff'));
-        process.exit(1);
+        process.exit(2);
       }
       stdinTmpPath = path.join(process.cwd(), '.ca', `tmp-stdin-${Date.now()}.patch`);
       await fs.mkdir(path.dirname(stdinTmpPath), { recursive: true });
@@ -170,7 +170,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       resolvedPath = path.resolve(diffPath);
     } else {
       console.error(t('cli.error.diffPathRequired'));
-      process.exit(1);
+      process.exit(2);
     }
 
     // Check diff file exists
@@ -178,7 +178,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       await fs.access(resolvedPath);
     } catch {
       console.error(t('cli.error.diffFileNotFound', { path: resolvedPath }));
-      process.exit(1);
+      process.exit(2);
     }
 
     // Zero-config: if no config exists, try inline setup
@@ -201,7 +201,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
         // No config, no keys — run inline setup
         if (!process.stdin.isTTY) {
           console.error('No config and no API keys found. Run `agora init` to set up.');
-          process.exit(1);
+          process.exit(2);
         }
         await runInlineSetup(process.cwd());
       }
@@ -293,7 +293,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     if (options.jsonStream) {
       progress = progress ?? new ProgressEmitter();
       progress.onProgress((event) => {
-        process.stdout.write(JSON.stringify(event) + '\n');
+        process.stdout.write(formatProgressNdjsonEvent(event) + '\n');
       });
     }
 
@@ -354,11 +354,10 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
         // If we can't read the diff, formatAnnotated will show "(no diff content)"
       }
     }
-    console.log(formatOutput(result, outputFormat, formatOpts));
-
-    // Emit final result as NDJSON for --json-stream consumers
     if (options.jsonStream) {
-      process.stdout.write(JSON.stringify({ type: 'result', ...result }) + '\n');
+      process.stdout.write(formatResultNdjsonEvent(result) + '\n');
+    } else {
+      console.log(formatOutput(result, outputFormat, formatOpts));
     }
 
     // Post review to GitHub if --post-review and --pr were used
@@ -392,36 +391,6 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       if (!options.quiet) console.error(t('cli.info.reviewPosted', { url: postResult.reviewUrl }));
     }
 
-    // Send notifications if requested and pipeline succeeded with a summary
-    if (result.status === 'success' && result.summary) {
-      const config = await loadConfig().catch(() => null);
-      const shouldNotify = options.notify || config?.notifications?.autoNotify === true;
-      if (shouldNotify && config?.notifications) {
-        try {
-          const { sendNotifications } = await import('@codeagora/notifications/webhook.js');
-          const s = result.summary;
-          await sendNotifications(config.notifications, {
-            decision: s.decision,
-            reasoning: s.reasoning,
-            severityCounts: s.severityCounts,
-            topIssues: s.topIssues.map((i) => ({
-              severity: i.severity,
-              filePath: i.filePath,
-              title: i.title,
-            })),
-            sessionId: result.sessionId,
-            date: result.date,
-            totalDiscussions: s.totalDiscussions,
-            resolved: s.resolved,
-            escalated: s.escalated,
-          });
-        } catch {
-          console.error(t('cli.error.notificationsNotInstalled'));
-          console.error(t('cli.error.notificationsInstall'));
-        }
-      }
-    }
-
     if (result.summary?.decision === 'REJECT' && options.failOnReject) {
       process.exit(1);
     }
@@ -441,12 +410,12 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     }
 
     if (result.status !== 'success') {
-      process.exit(1);
+      process.exit(3);
     }
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
     console.error(formatError(error, options.verbose));
-    process.exit(1);
+    process.exit(classifyCliErrorExitCode(error));
   } finally {
     // Clean up stdin/PR temp file — guaranteed even on error (#77)
     if (stdinTmpPath) {
@@ -465,7 +434,7 @@ export function registerReviewCommand(program: Command): void {
     .description('Run code review pipeline on a diff file')
     .argument('[diff-path]', 'Path to the diff file (use - for stdin)')
     .option('--dry-run', 'Validate config without running review')
-    .option('--output <format>', 'Output format: text, json, md, github, annotated, html, junit', 'text')
+    .option('--output <format>', 'Output format: text, json, md, github, annotated, html, junit, sarif', 'text')
     .option('--provider <name>', 'Override provider for auto reviewers')
     .option('--model <name>', 'Override model for auto reviewers')
     .option('-v, --verbose', 'Show detailed issue info and fix suggestions', false)
@@ -474,7 +443,6 @@ export function registerReviewCommand(program: Command): void {
     .option('--reviewer-timeout <seconds>', 'Per-reviewer timeout in seconds', parseInt)
     .option('--no-discussion', 'Skip L2 discussion phase')
     .option('--quiet', 'Suppress progress output', false)
-    .option('--notify', 'send notification after review', false)
     .option('--pr <url-or-number>', 'GitHub PR URL or number (fetches diff from GitHub)')
     .option('--post-review', 'Post review comments back to the PR (requires --pr)', false)
     .option('--quick', 'Quick review (L1 only, skip discussion and verdict)')
@@ -484,6 +452,6 @@ export function registerReviewCommand(program: Command): void {
     .option('--no-cache', 'Skip result caching — always run a fresh review')
     .option('--fail-on-reject', 'Exit 1 on REJECT verdict (default: false)', false)
     .option('--fail-on-severity <level>', 'Exit 1 if any issue at or above this severity (SUGGESTION|WARNING|CRITICAL|HARSHLY_CRITICAL)')
-    .option('--scope <paths>', 'Only review changes in these paths (comma-separated, e.g. "packages/web,packages/core")')
+    .option('--scope <paths>', 'Only review changes in these paths (comma-separated, e.g. "packages/github,packages/core")')
     .action(reviewAction);
 }

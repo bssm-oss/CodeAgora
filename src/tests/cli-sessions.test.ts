@@ -12,7 +12,9 @@ import {
   showSession,
   diffSessions,
   formatSessionList,
+  formatSessionListJson,
   formatSessionDetail,
+  formatSessionDetailJson,
   formatSessionDiff,
   type SessionEntry,
   type SessionDetail,
@@ -209,6 +211,46 @@ describe('showSession()', () => {
 
   it('throws for invalid session path format', async () => {
     await expect(showSession(tmpDir, 'invalid')).rejects.toThrow();
+  });
+});
+
+// ============================================================================
+// JSON formatters
+// ============================================================================
+
+describe('session JSON formatters', () => {
+  it('formats list output with the agent contract version', () => {
+    const sessions: SessionEntry[] = [{
+      id: '2026-03-13/001',
+      date: '2026-03-13',
+      sessionId: '001',
+      status: 'completed',
+      dirPath: '/tmp/session',
+    }];
+
+    const parsed = JSON.parse(formatSessionListJson(sessions)) as Record<string, unknown>;
+    expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
+    expect(parsed['sessions']).toEqual(sessions);
+  });
+
+  it('formats detail output with entry, metadata, and verdict', () => {
+    const detail: SessionDetail = {
+      entry: {
+        id: '2026-03-13/001',
+        date: '2026-03-13',
+        sessionId: '001',
+        status: 'completed',
+        dirPath: '/tmp/session',
+      },
+      metadata: { status: 'completed' },
+      verdict: { issues: [{ title: 'Missing null check', severity: 'CRITICAL' }] },
+    };
+
+    const parsed = JSON.parse(formatSessionDetailJson(detail)) as Record<string, unknown>;
+    expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
+    expect(parsed['entry']).toEqual(detail.entry);
+    expect(parsed['metadata']).toEqual(detail.metadata);
+    expect(parsed['verdict']).toEqual(detail.verdict);
   });
 });
 

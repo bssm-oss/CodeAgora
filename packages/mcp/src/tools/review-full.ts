@@ -5,7 +5,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { runReviewCompact, runReviewRaw, getStagedDiff, type ReviewOptions } from '../helpers.js';
-import { formatReviewResult, sendReviewNotification, type OutputFormat } from '../post-actions.js';
+import { formatReviewResult, type OutputFormat } from '../post-actions.js';
 import { reviewOptionsSchema, stagedSchema } from './shared-schema.js';
 
 export function registerReviewFull(server: McpServer): void {
@@ -39,17 +39,11 @@ export function registerReviewFull(server: McpServer): void {
           ...(params.context_lines != null && { contextLines: params.context_lines }),
         };
 
-        if ((params.output_format && params.output_format !== 'compact') || params.notify) {
+        if (params.output_format && params.output_format !== 'compact') {
           const rawResult = await runReviewRaw(diff, options);
 
-          if (params.notify) {
-            await sendReviewNotification(rawResult).catch(() => {});
-          }
-
-          if (params.output_format && params.output_format !== 'compact') {
-            const formatted = await formatReviewResult(rawResult, params.output_format as OutputFormat);
-            return { content: [{ type: 'text' as const, text: formatted }] };
-          }
+          const formatted = await formatReviewResult(rawResult, params.output_format as OutputFormat);
+          return { content: [{ type: 'text' as const, text: formatted }] };
         }
 
         const result = await runReviewCompact(diff, options);

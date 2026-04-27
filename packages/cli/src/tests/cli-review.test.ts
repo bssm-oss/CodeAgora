@@ -421,7 +421,7 @@ describe('review command — action handler', () => {
   // --------------------------------------------------------------------------
 
   describe('output formats', () => {
-    const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit'];
+    const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit', 'sarif'];
 
     it.each(validFormats)('format "%s" is accepted as valid', (format) => {
       expect(validFormats.includes(format)).toBe(true);
@@ -642,9 +642,9 @@ describe('review command — action handler', () => {
         '@@ -1,3 +1,3 @@',
         '-old line',
         '+new line',
-        'diff --git a/packages/web/bar.ts b/packages/web/bar.ts',
-        '--- a/packages/web/bar.ts',
-        '+++ b/packages/web/bar.ts',
+        'diff --git a/packages/github/bar.ts b/packages/github/bar.ts',
+        '--- a/packages/github/bar.ts',
+        '+++ b/packages/github/bar.ts',
         '@@ -1,3 +1,3 @@',
         '-old web line',
         '+new web line',
@@ -662,11 +662,11 @@ describe('review command — action handler', () => {
 
       expect(filteredLines.length).toBe(6);
       expect(filteredLines[0]).toContain('packages/core');
-      expect(filteredLines.join('\n')).not.toContain('packages/web');
+      expect(filteredLines.join('\n')).not.toContain('packages/github');
     });
 
     it('returns empty when no changes match scope', () => {
-      const diffContent = 'diff --git a/packages/web/bar.ts b/packages/web/bar.ts\n+new line\n';
+      const diffContent = 'diff --git a/packages/github/bar.ts b/packages/github/bar.ts\n+new line\n';
       const scopes = ['packages/core'];
       const filteredLines: string[] = [];
       let include = false;
@@ -715,9 +715,14 @@ describe('review command — action handler', () => {
   describe('--json-stream option', () => {
     it('emits final result as NDJSON when jsonStream is true', () => {
       const result = makeSuccessResult();
-      const ndjsonLine = JSON.stringify({ type: 'result', ...result }) + '\n';
+      const ndjsonLine = JSON.stringify({
+        type: 'result',
+        schemaVersion: 'codeagora.review.v1',
+        ...result,
+      }) + '\n';
       const parsed = JSON.parse(ndjsonLine.trim());
       expect(parsed.type).toBe('result');
+      expect(parsed.schemaVersion).toBe('codeagora.review.v1');
       expect(parsed.status).toBe('success');
     });
   });
@@ -874,14 +879,13 @@ describe('review command — action handler', () => {
 
   describe('output format validation', () => {
     it('rejects invalid format strings', () => {
-      const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit'];
+      const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit', 'sarif'];
       expect(validFormats.includes('xml')).toBe(false);
       expect(validFormats.includes('csv')).toBe(false);
-      expect(validFormats.includes('sarif')).toBe(false);
     });
 
     it('accepts all valid formats', () => {
-      const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit'];
+      const validFormats = ['text', 'json', 'md', 'github', 'annotated', 'html', 'junit', 'sarif'];
       for (const fmt of validFormats) {
         expect(validFormats.includes(fmt)).toBe(true);
       }
