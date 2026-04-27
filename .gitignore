@@ -45,6 +45,7 @@ yarn-error.log*
 # Review results & cache
 .reviews/
 reviews/
+bench-out*/
 .cache/
 .review-cache/
 
