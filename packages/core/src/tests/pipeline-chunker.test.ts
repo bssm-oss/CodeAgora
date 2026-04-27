@@ -76,6 +76,26 @@ diff --git a/src/b.ts b/src/b.ts
     expect(files).toHaveLength(2);
     expect(files.map((f) => f.filePath)).toEqual(['src/a.ts', 'src/b.ts']);
   });
+
+  it('does not split on diff headers embedded in added file content', () => {
+    const diff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+new file mode 100644
+--- /dev/null
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -0,0 +1,7 @@
++diff --git a/src/admin.ts b/src/admin.ts
++--- a/src/admin.ts
+++++ b/src/admin.ts
++@@ -1,3 +1,2 @@
++ const user = getUser(req);
++-requireAdmin(user);
++ deleteAccount(user.id);
+`;
+    const files = parseDiffFiles(diff);
+    expect(files).toHaveLength(1);
+    expect(files[0].filePath).toBe('benchmarks/golden-bugs/example/diff.patch');
+    expect(files[0].content).toContain('+diff --git a/src/admin.ts b/src/admin.ts');
+  });
 });
 
 // ============================================================================

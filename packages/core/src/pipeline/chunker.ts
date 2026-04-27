@@ -53,7 +53,7 @@ export function estimateTokens(text: string): number {
 export function parseDiffFiles(diff: string): ParsedDiffFile[] {
   if (!diff.trim()) return [];
 
-  const sections = diff.split(/(?=diff --git )/);
+  const sections = diff.split(/(?=^diff --git )/m);
   const files: ParsedDiffFile[] = [];
 
   for (const section of sections) {
