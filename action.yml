@@ -45,13 +45,18 @@ runs:
     - name: Fetch PR diff
       shell: bash
       run: |
-        gh pr diff "$PR_NUMBER" \
-          --repo "$REPO" \
-          > /tmp/codeagora-pr.diff
+        set -euo pipefail
+
+        if ! gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/codeagora-pr.diff; then
+          echo "::warning::GitHub API diff retrieval failed; falling back to local git diff."
+          git diff --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$BASE_SHA...$HEAD_SHA" > /tmp/codeagora-pr.diff
+        fi
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         REPO: ${{ github.repository }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
     - name: Run CodeAgora review
       id: review
