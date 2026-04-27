@@ -382,6 +382,59 @@ describe('scoreCase — recall path', () => {
     expect(result.recallAtK[3]).toBe(1);
   });
 
+  it('keeps unrelated same-file bugs distinct after duplicate suppression', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/api/security-actions.ts',
+          lineRange: [19, 19],
+          lineTolerance: 5,
+          minSeverity: 'CRITICAL',
+          rationale: 'destructive audit-log purge does not require an admin role',
+          keyword: 'role',
+        },
+        {
+          filePath: 'src/api/security-actions.ts',
+          lineRange: [24, 24],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'SERVICE_TOKEN_SECRET falls back to a hard-coded signing secret',
+          keyword: 'secret',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Missing admin authorization for audit-log purge',
+        problem: 'purgeAuditLogsHandler purges audit logs after authentication but never checks for an admin role.',
+        severity: 'CRITICAL',
+        confidence: 100,
+        filePath: 'src/api/security-actions.ts',
+        lineRange: [19, 19],
+      }),
+      finding({
+        issueTitle: 'Duplicate admin authorization report',
+        problem: 'The same admin role bypass lets non-admin users reach purgeAuditLogs.',
+        severity: 'CRITICAL',
+        confidence: 90,
+        filePath: 'src/api/security-actions.ts',
+        lineRange: [18, 19],
+      }),
+      finding({
+        issueTitle: 'Hard-coded service-token secret fallback',
+        problem: 'SERVICE_TOKEN_SECRET falls back to dev-service-token-secret, so missing configuration signs service tokens with a public secret.',
+        severity: 'CRITICAL',
+        confidence: 80,
+        filePath: 'src/api/security-actions.ts',
+        lineRange: [24, 24],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(2);
+    expect(result.falsePositives).toHaveLength(0);
+    expect(result.recallAtK[3]).toBe(1);
+  });
+
   it('suppresses detailed duplicates when the matched rule finding is terse', () => {
     const fx = fixture({
       expectedFindings: [

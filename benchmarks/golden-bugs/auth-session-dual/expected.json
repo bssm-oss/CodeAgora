@@ -1,0 +1,25 @@
+{
+  "id": "auth-session-dual",
+  "title": "security-actions: missing admin authorization + hard-coded service-token secret fallback",
+  "source": "synthetic — non-quota same-file multi-bug recall fixture",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "src/api/security-actions.ts",
+      "lineRange": [19, 19],
+      "lineTolerance": 5,
+      "minSeverity": "CRITICAL",
+      "rationale": "purgeAuditLogsHandler performs a destructive audit-log purge after authentication but never checks actor.role or calls requireAdmin, so any signed-in user can purge audit logs.",
+      "keyword": "role"
+    },
+    {
+      "filePath": "src/api/security-actions.ts",
+      "lineRange": [24, 24],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "createServiceToken falls back to a public hard-coded service-token secret when SERVICE_TOKEN_SECRET is missing, allowing predictable service-token signatures instead of failing closed.",
+      "keyword": "secret"
+    }
+  ],
+  "notes": "Recall fixture for duplicate-suppression hardening outside quota-manager. The two expected findings live in the same file but are unrelated root causes, so same-root duplicate suppression must not collapse one into the other."
+}

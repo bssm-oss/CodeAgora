@@ -10,7 +10,7 @@ Two kinds of fixture:
 - **Recall case** — `expectedFindings` is non-empty. The review must catch every listed bug. Misses count as FN.
 - **FP regression case** — `expectedFindings` is empty. The review must report *nothing*. Any finding is a regression.
 
-See `scripts/bench-fn.ts` (scorer) and `scripts/bench-fn-run.ts` (live-pipeline driver). Matching semantics live in `packages/shared/src/utils/golden-bug-scorer.ts`.
+See `scripts/bench-fn.ts` (scorer) and `scripts/bench-fn-run.ts` (live-pipeline driver). Matching semantics live in `packages/shared/src/utils/golden-bug-scorer.ts`. Live runs write scored findings to `<results>/<fixture-id>.json` and runtime metadata to `<results>/_meta/<fixture-id>.json`.
 
 ## Adding a fixture
 

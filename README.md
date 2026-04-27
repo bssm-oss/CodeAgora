@@ -221,9 +221,9 @@ Two fixture kinds live side by side:
 - **Recall cases** (`expectedFindings` non-empty) — review must surface each listed bug. Misses count as FN.
 - **FP regression cases** (`expectedFindings` is `[]`) — review must report nothing. Any finding is a regression.
 
-Current seed fixtures: 7 recall cases (8 expected findings total) + 4 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format.
+Current seed fixtures: 8 recall cases (10 expected findings total) + 4 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format.
 
-### Latest low-cost diverse run (2026-04-27)
+### Latest low-cost diverse aggregate (2026-04-28 KST)
 
 Full report: [`docs/golden-bug-benchmark-report-2026-04-27.md`](docs/golden-bug-benchmark-report-2026-04-27.md).
 
@@ -248,13 +248,23 @@ pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
 pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
 ```
 
+The 2026-04-28 follow-up added `auth-session-dual` as a non-quota same-file multi-bug recall fixture, then reran that fixture into the same results directory:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures auth-session-dual \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
+```
+
 | Metric | Result |
 |---|---:|
-| Total fixtures | 11 |
-| Recall / FP-regression fixtures | 7 / 4 |
-| Expected findings | 8 |
-| Actual findings | 28 |
-| TP / FP / FN | 8 / 0 / 0 |
+| Total fixtures | 12 |
+| Recall / FP-regression fixtures | 8 / 4 |
+| Expected findings | 10 |
+| Actual findings | 32 |
+| TP / FP / FN | 10 / 0 / 0 |
 | Precision | 100.0% |
 | Recall | 100.0% |
 | F1 | 100.0% |
@@ -262,7 +272,9 @@ pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
 | mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
 | FP regressions triggered | 0/4 |
 
-Per-fixture result: every recall fixture passed with `fp=0` and `r@3=100.0%`; every FP regression fixture passed. `quota-manager-dual` now scores `2/2`, `fp=0`, and `r@3=100.0%` in the confirmed aggregate.
+Per-fixture result: every recall fixture passed with `fp=0` and `r@3=100.0%`; every FP regression fixture passed. `quota-manager-dual` and `auth-session-dual` both score `2/2`, `fp=0`, and `r@3=100.0%` in the confirmed aggregate.
+
+`bench:fn:run` also writes per-fixture runtime metadata under `<results>/_meta/`. For the targeted `auth-session-dual` run, `_meta/auth-session-dual.json` recorded `4` backend calls, `31,504ms` total backend latency, `32,636ms` wall time, and cost `N/A` because no token usage was returned for those calls.
 
 Session baseline before tuning was `TP=5 FP=20 FN=3`, precision `20.0%`, recall `62.5%`, F1 `30.3%`, and FP clean-rate `50.0%` on the low-cost diverse run.
 

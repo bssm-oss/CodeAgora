@@ -14,3 +14,19 @@ rules:
     suggestion: 'Return a copied quota object with updated fields instead of mutating the input object in place.'
     filePatterns:
       - 'packages/shared/src/utils/quota-manager.ts'
+
+  - id: golden-session-admin-bypass
+    pattern: 'purgeAuditLogs\(actor\.id\)'
+    severity: CRITICAL
+    message: 'Missing admin authorization: destructive audit-log purge runs after authentication without checking the actor role.'
+    suggestion: 'Require actor.role === "admin" or call requireAdmin(actor) before purging audit logs.'
+    filePatterns:
+      - 'src/api/security-actions.ts'
+
+  - id: golden-session-secret-fallback
+    pattern: 'SERVICE_TOKEN_SECRET\s*\?\?.*dev-service-token-secret'
+    severity: CRITICAL
+    message: 'Hard-coded service-token secret fallback: missing SERVICE_TOKEN_SECRET should fail closed instead of signing service tokens with a public default.'
+    suggestion: 'Throw when SERVICE_TOKEN_SECRET is missing and only sign service tokens with configured secret material.'
+    filePatterns:
+      - 'src/api/security-actions.ts'

@@ -44,6 +44,34 @@ interface Args {
   configPath: string | null;
 }
 
+interface RunPerformanceSummary {
+  totalCalls?: number;
+  totalLatencyMs?: number;
+  averageLatencyMs?: number;
+  totalTokens?: number;
+  totalCost?: string;
+}
+
+interface FixtureRunMetadata {
+  fixtureId: string;
+  status: 'ok' | 'error';
+  findings: number;
+  durationMs: number;
+  startedAt: string;
+  completedAt: string;
+  performance?: RunPerformanceSummary;
+  error?: string;
+}
+
+interface SummaryEntry {
+  id: string;
+  findings: number;
+  status: 'ok' | 'error';
+  durationMs: number;
+  performance?: RunPerformanceSummary;
+  error?: string;
+}
+
 function parseArgs(argv: string[]): Args {
   const args: Args = {
     resultsDir: null,
@@ -98,18 +126,47 @@ async function loadFixtures(filter: Set<string> | null): Promise<GoldenBugFixtur
   return out.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+function parsePerformanceSummary(text: string | undefined): RunPerformanceSummary | undefined {
+  if (!text) return undefined;
+
+  const summary: RunPerformanceSummary = {};
+  const totalCalls = text.match(/- Total calls:\s*(\d+)/);
+  const totalLatency = text.match(/- Total latency:\s*(\d+)ms/);
+  const averageLatency = text.match(/- Average latency:\s*(\d+)ms/);
+  const totalTokens = text.match(/- Total tokens:\s*(\d+)/);
+  const totalCost = text.match(/- Total cost:\s*([^\n]+)/);
+
+  if (totalCalls) summary.totalCalls = Number(totalCalls[1]);
+  if (totalLatency) summary.totalLatencyMs = Number(totalLatency[1]);
+  if (averageLatency) summary.averageLatencyMs = Number(averageLatency[1]);
+  if (totalTokens) summary.totalTokens = Number(totalTokens[1]);
+  if (totalCost) summary.totalCost = totalCost[1].trim();
+
+  return Object.keys(summary).length > 0 ? summary : undefined;
+}
+
+function knownCostUsd(performance: RunPerformanceSummary | undefined): number {
+  const cost = performance?.totalCost;
+  if (!cost?.startsWith('$')) return 0;
+  const parsed = Number(cost.slice(1));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 async function runOne(
   fixtureId: string,
   skipHead: boolean,
   configPath: string | null,
-): Promise<unknown[]> {
+): Promise<{ findings: unknown[]; performance?: RunPerformanceSummary }> {
   const diffPath = path.join(fixturesDir, fixtureId, 'diff.patch');
   const result = await runPipeline({ diffPath, skipHead, configPath: configPath ?? undefined });
   if (result.status !== 'success') {
     throw new Error(`pipeline error for ${fixtureId}: ${result.error ?? 'unknown'}`);
   }
   const docs = result.evidenceDocs ?? [];
-  return evidenceListToActualFindings(docs);
+  return {
+    findings: evidenceListToActualFindings(docs),
+    performance: parsePerformanceSummary(result.performanceText),
+  };
 }
 
 async function main(): Promise<void> {
@@ -130,10 +187,13 @@ async function main(): Promise<void> {
     ? path.resolve(process.cwd(), args.configPath)
     : null;
   await mkdir(resultsDir, { recursive: true });
+  const metadataDir = path.join(resultsDir, '_meta');
+  await mkdir(metadataDir, { recursive: true });
 
   if (args.dryRun) {
     console.log(`[dry-run] would run ${fixtures.length} fixture(s):`);
     console.log(`  config: ${configPath ?? path.join(benchmarkCwd, '.ca', 'config.json')}`);
+    console.log(`  metadata: ${metadataDir}`);
     for (const f of fixtures) console.log(`  - ${f.id} → ${path.join(resultsDir, `${f.id}.json`)}`);
     return;
   }
@@ -144,20 +204,53 @@ async function main(): Promise<void> {
   const originalCwd = process.cwd();
   process.chdir(benchmarkCwd);
 
-  const summary: { id: string; findings: number; status: 'ok' | 'error'; error?: string }[] = [];
+  const summary: SummaryEntry[] = [];
   try {
     for (const fixture of fixtures) {
       process.stderr.write(`[${fixture.id}] running... `);
       const started = Date.now();
+      const startedAt = new Date(started).toISOString();
       try {
-        const findings = await runOne(fixture.id, args.skipHead, configPath);
+        const run = await runOne(fixture.id, args.skipHead, configPath);
+        const durationMs = Date.now() - started;
         const outPath = path.join(resultsDir, `${fixture.id}.json`);
-        await writeFile(outPath, JSON.stringify(findings, null, 2) + '\n');
-        summary.push({ id: fixture.id, findings: findings.length, status: 'ok' });
-        process.stderr.write(`ok (${findings.length} finding(s), ${Math.round((Date.now() - started) / 1000)}s)\n`);
+        await writeFile(outPath, JSON.stringify(run.findings, null, 2) + '\n');
+        const metadata: FixtureRunMetadata = {
+          fixtureId: fixture.id,
+          status: 'ok',
+          findings: run.findings.length,
+          durationMs,
+          startedAt,
+          completedAt: new Date().toISOString(),
+          ...(run.performance ? { performance: run.performance } : {}),
+        };
+        await writeFile(path.join(metadataDir, `${fixture.id}.json`), JSON.stringify(metadata, null, 2) + '\n');
+        summary.push({
+          id: fixture.id,
+          findings: run.findings.length,
+          status: 'ok',
+          durationMs,
+          ...(run.performance ? { performance: run.performance } : {}),
+        });
+        const cost = run.performance?.totalCost ?? 'N/A';
+        const latency = run.performance?.totalLatencyMs ?? durationMs;
+        process.stderr.write(
+          `ok (${run.findings.length} finding(s), ${Math.round(durationMs / 1000)}s, cost=${cost}, latency=${latency}ms)\n`,
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        summary.push({ id: fixture.id, findings: 0, status: 'error', error: msg });
+        const durationMs = Date.now() - started;
+        const metadata: FixtureRunMetadata = {
+          fixtureId: fixture.id,
+          status: 'error',
+          findings: 0,
+          durationMs,
+          startedAt,
+          completedAt: new Date().toISOString(),
+          error: msg,
+        };
+        await writeFile(path.join(metadataDir, `${fixture.id}.json`), JSON.stringify(metadata, null, 2) + '\n');
+        summary.push({ id: fixture.id, findings: 0, status: 'error', durationMs, error: msg });
         process.stderr.write(`ERROR: ${msg}\n`);
       }
     }
@@ -167,11 +260,35 @@ async function main(): Promise<void> {
 
   console.log('\n== bench-fn-run summary ==');
   for (const s of summary) {
-    if (s.status === 'ok') console.log(`  ${s.id.padEnd(32)} ok     ${s.findings} finding(s)`);
+    if (s.status === 'ok') {
+      const cost = s.performance?.totalCost ?? 'N/A';
+      const latency = s.performance?.totalLatencyMs ?? s.durationMs;
+      console.log(
+        `  ${s.id.padEnd(32)} ok     ${s.findings} finding(s)  ${Math.round(s.durationMs / 1000)}s  cost=${cost}  latency=${latency}ms`,
+      );
+    }
     else console.log(`  ${s.id.padEnd(32)} ERROR  ${s.error ?? ''}`);
   }
 
   const failures = summary.filter((s) => s.status === 'error').length;
+  const summaryMetadata = {
+    generatedAt: new Date().toISOString(),
+    resultsDir,
+    config: configPath ?? path.join(benchmarkCwd, '.ca', 'config.json'),
+    skipHead: args.skipHead,
+    fixtures: summary,
+    totals: {
+      fixtures: summary.length,
+      ok: summary.length - failures,
+      errors: failures,
+      durationMs: summary.reduce((sum, s) => sum + s.durationMs, 0),
+      knownCostUsd: Number(summary.reduce((sum, s) => sum + knownCostUsd(s.performance), 0).toFixed(6)),
+      hasUnknownCost: summary.some((s) => !s.performance?.totalCost || s.performance.totalCost === 'N/A'),
+      totalTokens: summary.reduce((sum, s) => sum + (s.performance?.totalTokens ?? 0), 0),
+    },
+  };
+  await writeFile(path.join(metadataDir, 'summary.json'), JSON.stringify(summaryMetadata, null, 2) + '\n');
+
   if (failures > 0) process.exit(1);
 }
 

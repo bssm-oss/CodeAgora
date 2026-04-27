@@ -10,6 +10,7 @@
  *   - "may throw" / uncaught exception (against code with try/catch)
  *   - "missing input validation" (against typed internal helpers)
  *   - zero-width / invisible character in string literal
+ *   - hand-rolled session cookie / JWT-library preference claims
  *   - generic "potential" security concern phrasing
  *
  * Each class gets a single multiplier applied once to the filtered
@@ -110,6 +111,28 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     ],
   },
   {
+    id: 'hand-rolled-session-cookie',
+    label: 'hand-rolled session cookie / JWT-library preference claim',
+    multiplier: 0.5,
+    patterns: [
+      /\binsecure\s+session\s+cookie\s+implementation\b/i,
+      /\bproper\s+jwt\s+library\b/i,
+      /\bbase64url\b[\s\S]{0,200}\b(?:proper\s+jwt|secure\s+encoding|session\s+management|cookie\s+parsing)\b/i,
+      /\bconstructs?\s+session\s+cookies?\b[\s\S]{0,200}\b(?:directly|manually|proper\s+jwt\s+library)\b/i,
+    ],
+  },
+  {
+    id: 'speculative-error-handling',
+    label: 'speculative internal-failure error handling claim',
+    multiplier: 0.5,
+    patterns: [
+      /\bpotential\s+information\s+disclosure\b[\s\S]{0,200}\berror\s+handling\b/i,
+      /\bif\s+[\w.]+\(\)\s+fails\s+internally\b/i,
+      /\bmalformed\s+request\s+or\s+system\s+error\b[\s\S]{0,160}\bleak(?:ing)?\s+internal\s+state\b/i,
+      /\berrors?\s+(?:are\s+not|aren't)\s+handled\s+explicitly\b[\s\S]{0,160}\bleak(?:ing)?\s+internal\s+state\b/i,
+    ],
+  },
+  {
     id: 'internal-enum-mismatch',
     label: 'internal enum mismatch / compatibility claim',
     multiplier: 0.5,
@@ -165,6 +188,7 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\bmissing\s+(?:input\s+)?(?:validation|sanitization|sanitisation)\b/i,
       /\b(?:no|without|lacks)\s+(?:input\s+)?(?:validation|sanitization|sanitisation)\b/i,
       /\bdoes\s+not\s+verify\b[\s\S]{0,120}\brequired\s+\w+\s+property\b/i,
+      /\bdoes\s+not\s+validate\b[\s\S]{0,160}\b(?:required\s+fields?|valid\s+types?|input\s+parameters?|actor\s+object)\b/i,
       /\bunsanitized\s+(?:input|parameter|argument)\b/i,
       /\bunvalidated\s+(?:input|parameter|argument|user\s+input)\b/i,
     ],

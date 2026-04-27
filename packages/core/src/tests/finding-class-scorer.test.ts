@@ -93,6 +93,17 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('missing-validation');
   });
 
+  it('catches typed-object required-field validation claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Session Signing Does Not Validate Input Parameters',
+        problem:
+          'The buildSessionCookie function does not validate the actor object for required fields or valid types, potentially leading to invalid session cookies.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-validation');
+  });
+
   it('catches zero-width-space claim against pure-ASCII code (PR #490 FP)', () => {
     const match = matchFindingClass(
       doc({
@@ -179,6 +190,30 @@ describe('matchFindingClass — positive matches', () => {
       }),
     )!;
     expect(match.id).toBe('speculative-rendered-xss');
+  });
+
+  it('catches hand-rolled session cookie / JWT-library preference claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Insecure Session Cookie Implementation',
+        problem:
+          'The buildSessionCookie function constructs session cookies by directly encoding the payload as base64url without using a proper JWT library or secure encoding method.',
+      }),
+    )!;
+    expect(match.id).toBe('hand-rolled-session-cookie');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches speculative internal-failure error handling claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Information Disclosure Through Error Handling',
+        problem:
+          "If getUser() fails internally due to malformed request or system error, those failures aren't handled explicitly, potentially leaking internal state.",
+      }),
+    )!;
+    expect(match.id).toBe('speculative-error-handling');
+    expect(match.multiplier).toBe(0.5);
   });
 
   it('catches internal enum mismatch compatibility claims', () => {
@@ -369,6 +404,17 @@ describe('matchFindingClass — negative cases (real bugs must pass)', () => {
       doc({
         issueTitle: 'Null reference at getDisplayName line 4',
         problem: 'user.displayName is accessed before the `user === null` check.',
+      }),
+    );
+    expect(match).toBeNull();
+  });
+
+  it('hard-coded session secret claims do not match the hand-rolled cookie prior', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Hard-coded session secret fallback',
+        problem:
+          'SESSION_SECRET falls back to dev-session-secret, so missing configuration signs cookies with a public secret.',
       }),
     );
     expect(match).toBeNull();

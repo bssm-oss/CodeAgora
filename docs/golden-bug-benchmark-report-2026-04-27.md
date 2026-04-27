@@ -6,16 +6,16 @@
 
 This report records the 2026-04-27 golden-bug benchmark tuning session for CodeAgora. The goal was to quantify the golden-bug benchmark after PR #505 and PR #506 had landed on `main`, then tune the low-cost diverse benchmark run until recall and false-positive behavior were both acceptable.
 
-The final low-cost diverse run reached full benchmark coverage on the current fixture set:
+The final confirmed low-cost diverse aggregate reached full benchmark coverage on the current fixture set. The original 2026-04-27 full run covered 11 fixtures; the 2026-04-28 KST follow-up added and targeted-reran `auth-session-dual` into the same results directory.
 
 | Metric | Final result |
 |---|---:|
-| Total fixtures | 11 |
-| Recall fixtures | 7 |
+| Total fixtures | 12 |
+| Recall fixtures | 8 |
 | FP-regression fixtures | 4 |
-| Expected findings | 8 |
-| Actual findings | 28 |
-| TP / FP / FN | 8 / 0 / 0 |
+| Expected findings | 10 |
+| Actual findings | 32 |
+| TP / FP / FN | 10 / 0 / 0 |
 | Precision | 100.0% |
 | Recall | 100.0% |
 | F1 | 100.0% |
@@ -29,10 +29,10 @@ No API key values were inspected or recorded. Only key presence and behavior wer
 
 The benchmark used the fixtures in `benchmarks/golden-bugs/`:
 
-- 7 recall fixtures with 8 expected findings total.
+- 8 recall fixtures with 10 expected findings total.
 - 4 FP-regression fixtures where a clean review must emit no findings.
 
-The final live run used `benchmarks/.ca/config.low-cost-diverse.json` with:
+The low-cost aggregate used `benchmarks/.ca/config.low-cost-diverse.json` with:
 
 - 3 OpenRouter API reviewers: Qwen Coder, Xiaomi MiMo, and NVIDIA Nemotron.
 - 1 supporter selected from the configured pool.
@@ -61,10 +61,22 @@ pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
 pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
 ```
 
+Follow-up targeted fixture run:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures auth-session-dual \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
+```
+
 Verification commands after tuning:
 
 ```bash
 pnpm exec vitest run packages/shared/src/tests/golden-bug-scorer.test.ts src/tests/rules-integration.test.ts
+pnpm exec vitest run packages/core/src/tests/finding-class-scorer.test.ts packages/shared/src/tests/golden-bug-scorer.test.ts
+pnpm bench:fn -- --validate-only
 pnpm exec tsc --noEmit --pretty false
 git diff --check
 ```
@@ -77,11 +89,12 @@ The smoke gate executed only `authz-admin-bypass` and passed that fixture:
 |---|---:|---:|
 | authz-admin-bypass | 1/1 | 0 |
 
-The full low-cost diverse run produced:
+The confirmed low-cost diverse aggregate produced:
 
 | Fixture | Kind | Result | FP | recall@3 | recall@5 | recall@10 |
 |---|---|---:|---:|---:|---:|---:|
 | async-stale-profile-cache | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
+| auth-session-dual | recall | 2/2 | 0 | 100.0% | 100.0% | 100.0% |
 | authz-admin-bypass | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
 | env-secret-fallback | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
 | fp-docs-only-runbook | FP regression | PASS | 0 | n/a | n/a | n/a |
@@ -93,7 +106,7 @@ The full low-cost diverse run produced:
 | quota-manager-dual | recall | 2/2 | 0 | 100.0% | 100.0% | 100.0% |
 | sql-injection-concat | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
 
-The confirmed full run has no remaining hit-rate or top-3 ranking gap on the current fixture set.
+The confirmed aggregate has no remaining hit-rate or top-3 ranking gap on the current fixture set.
 
 ## Post-Merge Confirmation
 
@@ -124,19 +137,53 @@ Confirmed aggregate:
 | FP clean-rate | 100.0% |
 | mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
 
+## Follow-Up Hardening
+
+On 2026-04-28 KST, `auth-session-dual` was added as a non-quota same-file multi-bug recall fixture. It plants two unrelated bugs in `src/api/security-actions.ts`:
+
+- A destructive audit-log purge after authentication with no server-side role/admin check.
+- A service-token signer that falls back to a public hard-coded secret when `SERVICE_TOKEN_SECRET` is missing.
+
+The first live attempts exposed three new FP-heavy claim shapes: hand-rolled session cookie/JWT-library preference claims, typed-object "does not validate required fields" claims, and speculative internal-failure error-handling claims. The class-prior table was tightened narrowly for those shapes, and the fixture was simplified to avoid unrelated cookie/JWT expiration noise. The final targeted run produced `2/2`, `fp=0`, and `r@3=100.0%`.
+
+The runner now records per-fixture runtime metadata under `<results>/_meta/`. For the final `auth-session-dual` run:
+
+| Metadata | Value |
+|---|---:|
+| Backend calls | 4 |
+| Backend latency | 31,504ms |
+| Wall time | 32,636ms |
+| Tokens | 0 |
+| Cost | N/A |
+
+Cost is `N/A` because token usage was not returned for these calls; the metadata path is now present so future provider usage capture can flow into the benchmark report without changing result scoring.
+
+Extended confirmed aggregate:
+
+| Metric | Confirmed result |
+|---|---:|
+| TP / FP / FN | 10 / 0 / 0 |
+| Precision | 100.0% |
+| Recall | 100.0% |
+| F1 | 100.0% |
+| FP clean-rate | 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
+
 ## Before and After
 
 The first low-cost diverse full run in this session produced:
 
 | Metric | Before tuning | Final |
 |---|---:|---:|
-| TP | 5 | 8 |
+| TP | 5 | 10 |
 | FP | 20 | 0 |
 | FN | 3 | 0 |
 | Precision | 20.0% | 100.0% |
 | Recall | 62.5% | 100.0% |
 | F1 | 30.3% | 100.0% |
 | FP clean-rate | 50.0% | 100.0% |
+
+The final column includes the 2026-04-28 `auth-session-dual` extension, so the TP count increases with the fixture set from 8 to 10 expected findings.
 
 ## Tuning Changes
 
@@ -159,6 +206,9 @@ Key implementation changes:
 - `recall@k` now uses unique bug candidates after same-root duplicate suppression, so duplicate reports of one already-hit bug do not crowd out a different expected bug.
 - The quota fixture's mutation line range was aligned with the scorer's post-patch coordinates, and a generic incomplete-validation prior now catches a recurring `parseQuotaConfig` phantom.
 - A narrow `json-parse-catch-masking` prior suppresses speculative claims that `JSON.parse` try/catch blocks hide memory exhaustion or parser-related problems.
+- A non-quota same-file dual-bug fixture (`auth-session-dual`) now validates duplicate suppression against unrelated same-file findings.
+- `bench:fn:run` now writes per-fixture runtime metadata under `<results>/_meta/`, including wall time, backend latency, token count, and cost when available.
+- Narrow priors now dampen observed hand-rolled session/JWT-library preference, typed-object validation, and speculative internal-failure error-handling FPs.
 
 ## Interpretation
 
@@ -177,9 +227,8 @@ The result is strong but should be treated as a calibrated benchmark snapshot, n
 - Benchmark-scoped rules improve this fixture set but should not be mistaken for broad production rules without additional validation.
 - The scorer now suppresses same-root duplicate findings more aggressively after a true positive. This improves benchmark accounting, but future fixture additions should include regression tests for unrelated same-file findings so this logic stays narrow.
 
-## Next Tuning Candidates
+## Remaining Tuning Candidates
 
-1. Add at least one multi-bug recall fixture that is not quota-related to validate duplicate suppression against unrelated same-file bugs.
-2. Run the same fixture set with L3 enabled and compare final verdict precision against the `--skip-head` measurement.
-3. Add a second full run for variance tracking, because low-cost model routing can be noisy.
-4. Record cost and latency per fixture so benchmark tradeoffs can be compared alongside F1.
+1. Run the same fixture set with L3 enabled and compare final verdict precision against the `--skip-head` measurement.
+2. Add a second full 12-fixture run for variance tracking, because low-cost model routing can be noisy.
+3. Capture provider token usage for OpenRouter calls so recorded per-fixture cost moves from `N/A` to numeric values.
