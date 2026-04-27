@@ -25,8 +25,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test --no-file-parallelism
-      - name: Web package tests
-        run: pnpm test:web
 
       # Smoke test: pack and verify CLI works
       - name: Smoke test
@@ -35,30 +33,15 @@ jobs:
           SMOKE_DIR="$(mktemp -d)"
           cd "$SMOKE_DIR"
           npm init -y
-          npm i $GITHUB_WORKSPACE/codeagora-*.tgz
+          npm i $GITHUB_WORKSPACE/codeagora-review-*.tgz
           npx agora --version
           npx agora doctor || echo "::warning::doctor check failed (expected without API keys)"
 
-      # Publish core package
-      - name: Publish codeagora
+      # Publish review package
+      - name: Publish @codeagora/review
         id: publish-core
         continue-on-error: true
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # Publish optional packages
-      - name: Publish @codeagora/web
-        id: publish-web
-        continue-on-error: true
-        run: cd packages/web && npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @codeagora/tui
-        id: publish-tui
-        continue-on-error: true
-        run: cd packages/tui && npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -69,23 +52,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @codeagora/notifications
-        id: publish-notifications
-        continue-on-error: true
-        run: cd packages/notifications && npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish summary
         if: always()
         run: |
           failed=0
           for result in \
             "${{ steps.publish-core.outcome }}" \
-            "${{ steps.publish-web.outcome }}" \
-            "${{ steps.publish-tui.outcome }}" \
-            "${{ steps.publish-mcp.outcome }}" \
-            "${{ steps.publish-notifications.outcome }}"; do
+            "${{ steps.publish-mcp.outcome }}"; do
             if [ "$result" = "failure" ]; then
               failed=$((failed + 1))
             fi

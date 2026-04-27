@@ -70,10 +70,6 @@ describe('post-actions exports', () => {
     expect(typeof mod.postToGitHub).toBe('function');
   });
 
-  it('exports sendReviewNotification', async () => {
-    const mod = await import('../post-actions.js');
-    expect(typeof mod.sendReviewNotification).toBe('function');
-  });
 });
 
 // ============================================================================
@@ -139,7 +135,7 @@ describe('reviewOptionsSchema validation', () => {
   });
 
   it('accepts valid output_format values', () => {
-    for (const fmt of ['compact', 'text', 'json', 'md', 'github', 'html', 'junit']) {
+    for (const fmt of ['compact', 'text', 'json', 'md', 'github', 'html', 'junit', 'sarif']) {
       expect(schema.safeParse({ output_format: fmt }).success).toBe(true);
     }
   });
@@ -157,7 +153,6 @@ describe('reviewOptionsSchema validation', () => {
       no_cache: true,
       context_lines: 10,
       output_format: 'json',
-      notify: true,
     });
     expect(result.success).toBe(true);
   });

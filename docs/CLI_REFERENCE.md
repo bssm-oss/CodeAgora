@@ -20,7 +20,7 @@ agora review --post-review --pr 123          # Post back to PR
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--output <format>` | `text`, `json`, `md`, `github`, `annotated`, `html`, `junit` | `text` |
+| `--output <format>` | `text`, `json`, `md`, `github`, `annotated`, `html`, `junit`, `sarif` | `text` |
 | `--provider <name>` | Override provider for all reviewers | — |
 | `--model <name>` | Override model for all reviewers | — |
 | `--reviewers <value>` | Number of reviewers or comma-separated IDs | — |
@@ -34,12 +34,13 @@ agora review --post-review --pr 123          # Post back to PR
 | `--no-cache` | Skip result caching | — |
 | `--pr <url-or-number>` | GitHub PR URL or number | — |
 | `--post-review` | Post comments back to PR (requires `--pr`) | — |
-| `--notify` | Send notification after review | — |
 | `--dry-run` | Validate config only | — |
 | `--quiet` | Suppress progress output | — |
 | `--verbose` | Show detailed info | — |
 
-**Exit codes:** `0` = passed, `1` = REJECT, `2` = config error, `3` = runtime error
+**Exit codes:** `0` = command completed and no failure gate tripped, `1` = `--fail-on-reject` or `--fail-on-severity` tripped, `2` = setup/input/config error, `3` = runtime or pipeline failure.
+
+`--output json` and `--json-stream` use the stable agent contract documented in [Agent Contract](AGENT_CONTRACT.md). JSON objects include `schemaVersion: "codeagora.review.v1"`.
 
 ## `agora init`
 
@@ -70,17 +71,17 @@ List all supported providers with tier, API key status, and model counts.
 
 ```bash
 agora sessions list                          # List recent
+agora sessions list --json                   # List recent as JSON
 agora sessions list --status completed       # Filter by status
 agora sessions list --search "null"          # Search by keyword
 agora sessions show 2026-03-13/001           # Show details
+agora sessions show 2026-03-13/001 --json    # Show details as JSON
 agora sessions diff 001 002                  # Compare two
 agora sessions stats                         # Aggregate stats
 agora sessions prune --days 30               # Delete old
 ```
 
-## `agora notify <session-id>`
-
-Send notification for a past session to Discord/Slack webhooks.
+`sessions list --json` and `sessions show --json` include `schemaVersion: "codeagora.review.v1"` so desktop and agent callers can branch on a stable contract marker.
 
 ## `agora models`
 
@@ -107,20 +108,6 @@ agora costs --by reviewer    # By reviewer model
 agora costs --by provider    # By provider
 ```
 
-## `agora dashboard`
-
-Launch web dashboard (requires `@codeagora/web`).
-
-```bash
-agora dashboard              # Default port 6274
-agora dashboard --port 4000  # Custom port
-agora dashboard --open       # Auto-open browser
-```
-
-## `agora tui` (experimental)
-
-Launch interactive terminal UI (requires `@codeagora/tui`). This feature is experimental and may have known issues.
-
 ## Other Commands
 
 | Command | Description |
@@ -145,3 +132,4 @@ Launch interactive terminal UI (requires `@codeagora/tui`). This feature is expe
 | `annotated` | Inline annotations on diff |
 | `html` | HTML report |
 | `junit` | JUnit XML for CI |
+| `sarif` | SARIF JSON for code scanning |

@@ -6,7 +6,7 @@
 <p align="center"><strong>Where LLMs Debate Your Code</strong></p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
+  <a href="https://www.npmjs.com/package/@codeagora/review"><img src="https://img.shields.io/npm/v/@codeagora/review?color=%2305A6B9" alt="Version"></a>
   <img src="https://img.shields.io/badge/tests-3168%20passing-%23191A51" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
@@ -22,10 +22,12 @@ Multiple LLMs review your code in parallel, debate conflicting opinions, then a 
 ## Quick Start
 
 ```bash
-npm i -g codeagora
+npm i -g @codeagora/review
 agora init
 git diff | agora review
 ```
+
+> Package line note: `codeagora@2.x` is now the legacy package line. Review-focused releases restart as `@codeagora/review@0.x` while keeping the `codeagora` and `agora` CLI binaries.
 
 `agora init` auto-detects your API keys and CLI tools, then generates a config.
 
@@ -72,35 +74,13 @@ git diff | agora review
 
 ---
 
-## Web Dashboard
+## Desktop App
 
-Real-time web UI for monitoring reviews, browsing sessions, and managing configuration.
+The old web dashboard and terminal TUI are being consolidated into a single cross-platform Tauri desktop app.
 
-```bash
-agora dashboard          # Start on http://localhost:6274
-agora dashboard -p 8080  # Custom port
-```
+The CLI remains the primary automation surface for LLM agents and CI. The desktop app will become the human-facing local UI for review history, configuration, progress, costs, and result exploration.
 
-Features:
-- **9 pages** — Dashboard, Sessions, Models, Costs, Discussions, Config, Pipeline, Compare, Review Detail
-- **Live pipeline** — WebSocket-powered real-time stage progression and discussion updates
-- **Model intelligence** — Leaderboard, quality trends, selection frequency charts
-- **httpOnly cookie auth** — Secure token exchange via `POST /api/auth`
-- **Server-side pagination** — Filterable by status, search, date range
-
-The dashboard token is printed on startup and persisted to `.ca/dashboard-token`.
-
----
-
-## Interactive TUI
-
-Terminal UI for running reviews without leaving the terminal.
-
-```bash
-agora tui
-```
-
-8 screens: Review Setup, Pipeline Progress, Results, Diff Viewer, Debate, Config, Model Selector, Provider Status. Navigate with arrow keys, `Enter` to select, `q` to quit.
+An initial private scaffold lives in `packages/desktop` while the desktop MVP takes shape.
 
 ---
 
@@ -124,33 +104,15 @@ Tools: `review_diff`, `review_pr`, `review_staged`, `session_list`, `session_det
 
 ---
 
-## Notifications
-
-```bash
-agora notify 2026-03-27/001  # Send notification for a past session
-```
-
-Supported channels:
-- **Discord** — Real-time thread updates + summary (webhook URL in config)
-- **Slack** — Summary notification (webhook URL in config)
-- **Generic webhook** — HMAC-SHA256 signed payloads over HTTPS
-
-Configure in `.ca/config.json` under `notifications`.
-
----
-
 ## Extensions
 
 All extensions are optional — install only what you need.
 
 | Package | Install | What it does |
 |---------|---------|-------------|
-| [@codeagora/web](https://www.npmjs.com/package/@codeagora/web) | `npm i -g @codeagora/web` | Web dashboard — 9-page SPA with real-time pipeline monitoring, session history, model leaderboard, cost tracking |
-| [@codeagora/tui](https://www.npmjs.com/package/@codeagora/tui) | `npm i -g @codeagora/tui` | Interactive terminal UI — run reviews, browse sessions, edit config, watch debates in real-time |
 | [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp` | MCP server (9 tools) — integrates with Claude Code, Cursor, and any MCP-compatible IDE |
-| [@codeagora/notifications](https://www.npmjs.com/package/@codeagora/notifications) | `npm i -g @codeagora/notifications` | Webhooks — Discord (real-time threads + summary), Slack (summary), generic (HMAC-SHA256 signed) |
 
-Each extension works standalone or together. The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions.
+The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions. Human-facing UI work is moving into the desktop app.
 
 [Extension guide ->](docs/EXTENSIONS.md)
 
@@ -212,7 +174,9 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 | [Configuration](docs/CONFIGURATION.md) | Config file guide |
 | [Providers](docs/PROVIDERS.md) | Full provider list with tiers |
 | [Architecture](docs/ARCHITECTURE.md) | Pipeline design and project structure |
-| [Extensions](docs/EXTENSIONS.md) | Web, TUI, MCP, Notifications |
+| [Extensions](docs/EXTENSIONS.md) | MCP and desktop direction |
+| [Product Surface Plan](docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md) | Current surfaces and lightweight roadmap |
+| [Agent Contract](docs/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
 | [FAQ](docs/FAQ.md) | Frequently asked questions |
 

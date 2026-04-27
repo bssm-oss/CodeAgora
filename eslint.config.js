@@ -1,14 +1,10 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    plugins: {
-      'react-hooks': reactHooks,
-    },
     rules: {
       // Unused vars: error in src, but allow _-prefixed ignores
       '@typescript-eslint/no-unused-vars': ['error', {
@@ -22,8 +18,6 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       // Allow require imports (CommonJS interop)
       '@typescript-eslint/no-require-imports': 'off',
-      // React hooks rules (plugin installed)
-      'react-hooks/exhaustive-deps': 'warn',
       // Turn off noisy builtins that produce false positives in this codebase
       'preserve-caught-error': 'off',
       'no-useless-assignment': 'off',
@@ -33,7 +27,7 @@ export default tseslint.config(
   },
   {
     // Test files: relax unused-vars to warn (many intentional unused imports)
-    files: ['src/tests/**/*.ts', 'src/tests/**/*.tsx'],
+    files: ['src/tests/**/*.ts', 'packages/*/src/tests/**/*.ts', 'tools/tests/**/*.ts'],
     rules: {
       '@typescript-eslint/no-unused-vars': 'warn',
       'no-empty': 'off',

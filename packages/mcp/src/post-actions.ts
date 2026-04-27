@@ -1,6 +1,6 @@
 /**
  * MCP Post-Pipeline Actions
- * Formatting, GitHub posting, and notification helpers.
+ * Formatting and GitHub posting helpers.
  */
 
 import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
@@ -9,7 +9,7 @@ import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
 // Output Formatting
 // ============================================================================
 
-export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'html' | 'junit';
+export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'html' | 'junit' | 'sarif';
 
 /**
  * Format a PipelineResult using the CLI formatter.
@@ -101,46 +101,4 @@ export async function postToGitHub(
   await setCommitStatus(ghConfig, headSha, postResult.verdict, postResult.reviewUrl);
 
   return { reviewUrl: postResult.reviewUrl };
-}
-
-// ============================================================================
-// Notifications
-// ============================================================================
-
-/**
- * Send Discord/Slack notification for a completed review.
- * Reads notification config from .ca/config.json.
- */
-export async function sendReviewNotification(
-  result: PipelineResult,
-): Promise<void> {
-  if (result.status !== 'success' || !result.summary) {
-    return;
-  }
-
-  const { loadConfig } = await import('@codeagora/core/config/loader.js');
-  const config = await loadConfig().catch(() => null);
-
-  if (!config?.notifications) {
-    throw new Error('No notification configuration found in .ca/config');
-  }
-
-  const { sendNotifications } = await import('@codeagora/notifications/webhook.js');
-  const s = result.summary;
-
-  await sendNotifications(config.notifications, {
-    decision: s.decision,
-    reasoning: s.reasoning,
-    severityCounts: s.severityCounts,
-    topIssues: s.topIssues.map((issue: { severity: string; filePath: string; title: string }) => ({
-      severity: issue.severity,
-      filePath: issue.filePath,
-      title: issue.title,
-    })),
-    sessionId: result.sessionId,
-    date: result.date,
-    totalDiscussions: s.totalDiscussions,
-    resolved: s.resolved,
-    escalated: s.escalated,
-  });
 }

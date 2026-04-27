@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Centralized test suite for CodeAgora — 102 test files covering all packages and pipeline layers (L0–L3), configuration, CLI, GitHub integration, notifications, and UI components. Tests are **not colocated** with source code; they import from `@codeagora/*` package aliases.
+Centralized test suite for CodeAgora covering all packages and pipeline layers (L0–L3), configuration, CLI, GitHub integration, and MCP behavior. Tests are **not colocated** with source code; they import from `@codeagora/*` package aliases.
 
 Vitest is configured at the root with adaptive pooling: unit tests use the default shared pool; E2E tests (`e2e-*.test.ts`) use forks for isolation.
 
@@ -21,10 +21,9 @@ Vitest is configured at the root with adaptive pooling: unit tests use the defau
 | **CLI** | 10 | `cli-binary-name`, `cli-commands`, `cli-doctor-live`, `cli-error-handling`, `cli-init-ci`, `cli-init-wizard`, `cli-review-options`, `cli-sessions`, `cli-sessions-filter` |
 | **GitHub Integration** | 8 | `github-action-parse-args`, `github-action-sarif-path`, `github-dedup`, `github-diff-parser`, `github-integration`, `github-mapper`, `github-pr-diff`, `github-sarif` |
 | **Pipeline Orchestration** | 8 | `pipeline-chunker`, `pipeline-chunk-parallel`, `pipeline-cost`, `pipeline-dryrun`, `pipeline-dsl`, `pipeline-progress`, `pipeline-report`, `pipeline-telemetry`, `orchestrator-branches` |
-| **TUI Components** | 10 | `tui-components`, `tui-config`, `tui-debate`, `tui-diff-viewer`, `tui-model-selector`, `tui-pipeline-progress`, `tui-provider-status`, `tui-results`, `tui-review-setup`, `tui-shared-components`, `tui-theme` |
 | **Utilities** | 6 | `utils-ca-root-permissions`, `utils-diff`, `utils-logger`, `utils-path-validation`, `utils-recovery` |
 | **Integration & E2E** | 1 | `e2e-pipeline` |
-| **Other** | 19 | `annotated-output`, `auto-approve`, `concurrency`, `confidence`, `i18n`, `issue-mapper`, `learning-filter`, `learning-store`, `mock-llm-backend`, `notifications`, `plugin-providers`, `plugin-system`, `providers-env-vars`, `scope-detector`, `session`, `slice5`, `sprint3-5-modules`, `sprint6-mcp` |
+| **Other** | 19 | `annotated-output`, `auto-approve`, `concurrency`, `confidence`, `i18n`, `issue-mapper`, `learning-filter`, `learning-store`, `mock-llm-backend`, `plugin-providers`, `plugin-system`, `providers-env-vars`, `scope-detector`, `session`, `slice5`, `sprint3-5-modules`, `sprint6-mcp` |
 
 ## Subdirectories
 
@@ -51,7 +50,6 @@ Tests are **centralized**, not colocated with source. This enables:
 - `cli-*.test.ts` — CLI commands and options tests
 - `github-*.test.ts` — GitHub integration (PR parsing, Actions, SARIF) tests
 - `pipeline-*.test.ts` — pipeline orchestration, chunking, concurrency tests
-- `tui-*.test.tsx` — terminal UI components (React/Ink)
 - `utils-*.test.ts` — utility function tests
 - `e2e-*.test.ts` — end-to-end pipeline tests (run in forks pool)
 - `sprint*.test.ts`, `slice*.test.ts` — legacy integration/milestone tests
@@ -70,11 +68,11 @@ pnpm test:ws        # Run tests across all workspaces
 - **Pool strategy**:
   - Default: unit tests use shared process (faster)
   - E2E tests (`e2e-*.test.ts`): use `forks` pool for isolation (prevents state leakage)
-- **Coverage**: v8 provider, includes `packages/*/src/**/*.ts`, excludes `packages/tui/`
+- **Coverage**: v8 provider, includes `packages/*/src/**/*.ts`
 - **Module resolution**:
   - Package aliases: `@codeagora/core` → `packages/core/src`
   - Dependencies pinned to real pnpm store paths (prevents `vi.mock` conflicts)
-  - Deduplication: React, Ink, Zod, yaml pinned to single instances
+  - Deduplication: Zod and yaml pinned to single instances
 
 ### Common Patterns
 
@@ -126,17 +124,6 @@ it('should handle promises', () => {
   return promiseFunction().then((result) => {
     expect(result).toEqual(expected);
   });
-});
-```
-
-**TUI component testing** (using `ink-testing-library`):
-```typescript
-import { render } from 'ink-testing-library';
-import { Header } from '@codeagora/tui/components/Header.js';
-
-it('renders component', () => {
-  const { lastFrame } = render(<Header />);
-  expect(lastFrame()).toContain('CodeAgora');
 });
 ```
 
@@ -236,12 +223,6 @@ it('throws on validation error', () => {
 - Parallel execution (concurrency limits)
 - Cost tracking (tokens, API calls)
 - Progress reporting
-
-**TUI (Terminal UI):**
-- Component rendering (React/Ink)
-- User input handling
-- State management
-- Theme and styling
 
 ### Helper Module: `mock-backend.ts`
 

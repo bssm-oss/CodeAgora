@@ -6,7 +6,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { runReviewCompact, runReviewRaw, type ReviewOptions } from '../helpers.js';
-import { formatReviewResult, postToGitHub, sendReviewNotification, type OutputFormat } from '../post-actions.js';
+import { formatReviewResult, postToGitHub, type OutputFormat } from '../post-actions.js';
 import { reviewOptionsSchema, postReviewSchema } from './shared-schema.js';
 
 /**
@@ -79,14 +79,11 @@ export function registerReviewPr(server: McpServer): void {
         };
 
         // Post-pipeline actions need raw result
-        if (params.post_review || params.notify || (params.output_format && params.output_format !== 'compact')) {
+        if (params.post_review || (params.output_format && params.output_format !== 'compact')) {
           const rawResult = await runReviewRaw(diff, options);
 
           if (params.post_review) {
             await postToGitHub(rawResult, prUrl).catch(() => {});
-          }
-          if (params.notify) {
-            await sendReviewNotification(rawResult).catch(() => {});
           }
           if (params.output_format && params.output_format !== 'compact') {
             const formatted = await formatReviewResult(rawResult, params.output_format as OutputFormat);

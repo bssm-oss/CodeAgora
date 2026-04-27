@@ -1,6 +1,6 @@
 /**
  * Session query functions — pure data access, no CLI formatting.
- * Extracted from @codeagora/cli so that core consumers (MCP, TUI) can import
+ * Extracted from @codeagora/cli so that core consumers like MCP can import
  * without depending on the presentation layer.
  */
 

@@ -12,6 +12,7 @@ import { formatAnnotated } from './annotated-output.js';
 import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
 import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
 import { lookupCwe } from '@codeagora/shared/data/cwe-mapping.js';
+import { formatAgentJson } from '../utils/agent-contract.js';
 
 export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'annotated' | 'html' | 'junit' | 'sarif';
 
@@ -219,7 +220,7 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
  * Format a PipelineResult as JSON.
  */
 export function formatJson(result: PipelineResult): string {
-  return JSON.stringify(result, null, 2);
+  return formatAgentJson(result);
 }
 
 // ============================================================================

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CodeAgora",
+  "version": "0.1.0-alpha.0",
+  "identifier": "dev.codeagora.desktop",
+  "build": {
+    "beforeBuildCommand": "pnpm --filter @codeagora/desktop build",
+    "beforeDevCommand": "pnpm --filter @codeagora/desktop build",
+    "frontendDist": "../dist",
+    "devUrl": null
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "CodeAgora",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 960,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

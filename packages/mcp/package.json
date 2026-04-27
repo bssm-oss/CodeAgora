@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/mcp",
-  "version": "2.3.4",
+  "version": "0.1.0-alpha.0",
   "description": "CodeAgora MCP server — Claude Code integration for AI-powered code review",
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,7 @@
   "main": "./dist/index.js",
   "exports": {
     ".": {
+      "development": "./src/index.ts",
       "import": "./dist/index.js"
     }
   },

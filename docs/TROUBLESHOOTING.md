@@ -79,21 +79,11 @@ The PR diff exceeds the configured limit (default: 5000 lines). Options:
 2. Restart Claude Code
 3. Check that `npx @codeagora/mcp` runs without errors
 
-## Web Dashboard
-
-### "WebSocket disconnected"
-The dashboard lost its real-time connection. This is usually transient:
-- Refresh the page
-- Check that the server is still running (`agora dashboard`)
-
-### Dashboard shows no data
-Sessions are stored in `.ca/sessions/`. If you haven't run any reviews yet, start one from the Pipeline page or via `agora review`.
-
 ## Exit Codes
 
 | Code | Meaning | CI Action |
 |------|---------|-----------|
-| 0 | Review completed, verdict = ACCEPT | Pipeline continues |
-| 1 | Review completed, verdict = REJECT (with `--fail-on-reject`) | Pipeline fails |
-| 2 | Config error (missing file, invalid syntax) | Fix setup |
-| 3 | Runtime error (API timeout, network error) | May be transient, retry |
+| 0 | Review command completed and no requested failure gate tripped | Pipeline continues |
+| 1 | `--fail-on-reject` or `--fail-on-severity` tripped | Pipeline fails |
+| 2 | Setup/input/config error | Fix setup or command arguments |
+| 3 | Runtime or pipeline failure | May be transient, retry |

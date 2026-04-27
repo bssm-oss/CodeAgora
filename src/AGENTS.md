@@ -4,7 +4,7 @@
 # src
 
 ## Purpose
-This directory contains the centralized test suite for CodeAgora — 102 test files covering all layers of the pipeline (L0–L3), configuration, CLI, GitHub integration, and UI components. Tests use vitest with adaptive pooling: unit tests run in default pool, E2E tests use forks for isolation.
+This directory contains the centralized test suite for CodeAgora, covering all layers of the pipeline (L0–L3), configuration, CLI, GitHub integration, and MCP behavior. Tests use vitest with adaptive pooling: unit tests run in default pool, E2E tests use forks for isolation.
 
 ## Subdirectories
 
@@ -21,7 +21,6 @@ This directory contains the centralized test suite for CodeAgora — 102 test fi
 | Pipeline Layers (`l[0-3]-*.test.ts`) | 30 | Model registry, parallel reviewers, deduplication, objection handling, moderator logic |
 | GitHub Integration (`github-*.test.ts`) | 8 | PR parsing, SARIF mapping, diff parsing, Action integration |
 | Pipeline Orchestration (`pipeline-*.test.ts`, `orchestrator-*.test.ts`) | 8 | Chunking, concurrency, branch handling |
-| TUI Components (`tui-*.test.ts[x]`) | 15 | Terminal UI (React/Ink) — config, debate, diff viewer, model selector, results, themes |
 | Utilities (`utils-*.test.ts`) | 5 | Diff parsing, logging, path validation, recovery, permissions |
 | Integration & E2E (`e2e-*.test.ts`, `sprint*.test.ts`) | 1+ | Full pipeline execution, multi-package module tests |
 | Other (`*-remaining`) | ~16 | Provider environment, concurrency limits, annotations, confidence scoring |
@@ -39,7 +38,6 @@ Tests are **centralized** (not colocated with source). This enables:
 - `cli-*.test.ts` → command-line interface
 - `l0-*, l1-*, l2-*, l3-*.test.ts` → pipeline layers 0–3
 - `github-*.test.ts` → GitHub integration (PR parsing, Actions)
-- `tui-*.test.tsx` → terminal UI components (Ink/React)
 - `pipeline-*.test.ts` → orchestration and chunking
 - `utils-*.test.ts` → utility functions
 - `e2e-*.test.ts` → end-to-end pipeline tests
@@ -59,18 +57,17 @@ pnpm test:ws        # Run tests across all workspaces
 - **Pool Strategy**:
   - Default: unit tests use default pool (shared process)
   - E2E tests (`e2e-*.test.ts`): use `forks` pool for isolation
-- Coverage: v8 provider, includes `packages/*/src/**/*.ts`, excludes `packages/tui/`
+- Coverage: v8 provider, includes `packages/*/src/**/*.ts`
 
 **Module Resolution**:
 - Package aliases resolve to source (not dist): `@codeagora/core` → `packages/core/src`
 - Dependencies aliased to real pnpm store paths (prevents vi.mock conflicts)
-- Deduplication: React, Ink, Zod pinned to single instances
+- Deduplication: Zod and YAML pinned to single instances
 
 **Key Patterns**:
 - Use `describe()` and `it()` for organization
 - Mock external services with `vi.mock()`
 - Async tests: use `async` or return Promise
-- TUI tests: use `ink-testing-library` for component testing
 - Configuration tests: validate zod schemas, file I/O, migrations
 - Pipeline tests: verify parallel execution, error handling, graceful degradation
 
@@ -79,7 +76,6 @@ pnpm test:ws        # Run tests across all workspaces
 - **Parallel execution**: verify concurrency limits, timeouts, Promise.allSettled patterns
 - **CLI**: test command parsing, option validation, output formatting
 - **Parser**: test diverse reviewer response formats, fuzzy file matching, fallback behaviors
-- **TUI**: test component rendering, user input, state updates
 - **Integration**: run full pipeline end-to-end with mock backends
 
 <!-- MANUAL: -->

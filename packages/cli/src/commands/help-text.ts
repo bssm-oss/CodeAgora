@@ -81,14 +81,6 @@ Examples:
   ${displayName} learn clear                       Clear all patterns
 `);
         break;
-      case 'dashboard':
-        cmd.addHelpText('after', `
-Examples:
-  ${displayName} dashboard                         Start on default port 6274
-  ${displayName} dashboard --port 8080             Start on custom port
-  ${displayName} dashboard --open                  Start and open browser
-`);
-        break;
       case 'language':
         cmd.addHelpText('after', `
 Examples:

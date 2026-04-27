@@ -21,7 +21,6 @@ import { detectCliBackends } from '@codeagora/shared/utils/cli-detect.js';
 import { registerReviewCommand } from './commands/review.js';
 import { registerInitCommand } from './commands/register-init.js';
 import { registerSessionsCommand } from './commands/register-sessions.js';
-import { registerNotifyCommand } from './commands/notify.js';
 import { registerLanguageCommand } from './commands/language.js';
 import { registerConfigGetCommand } from './commands/config-get.js';
 import { registerCheckUpdateCommand } from './commands/check-update.js';
@@ -36,7 +35,6 @@ import { explainSession } from './commands/explain.js';
 import { traceSession } from './commands/trace.js';
 import { computeAgreementMatrix, formatAgreementMatrix } from './commands/agreement.js';
 import { loadSessionForReplay } from './commands/replay.js';
-import { startDashboard } from './commands/dashboard.js';
 import { getCostSummary } from './commands/costs.js';
 import { getStatus } from './commands/status.js';
 import { setConfigValue, editConfig } from './commands/config-set.js';
@@ -72,7 +70,6 @@ program
 registerReviewCommand(program);
 registerInitCommand(program);
 registerSessionsCommand(program);
-registerNotifyCommand(program);
 registerLearnCommand(program);
 registerLanguageCommand(program, displayName);
 registerConfigGetCommand(program);
@@ -118,17 +115,6 @@ program.command('providers').description('List supported providers and API key s
   let cliBackends;
   try { cliBackends = await detectCliBackends(); } catch { /* optional */ }
   console.log(formatProviderList(listProviders(catalog), cliBackends));
-});
-
-program.command('tui').description('Launch interactive TUI mode').action(async () => {
-  try {
-    const { startTui } = await import('@codeagora/tui/index.js');
-    startTui();
-  } catch {
-    console.error(t('cli.error.tuiNotInstalled'));
-    console.error(t('cli.error.tuiInstall'));
-    process.exit(1);
-  }
 });
 
 program.command('models').description('Show model performance leaderboard').action(async () => {
@@ -226,18 +212,6 @@ program.command('replay <session>').description('Re-render a past review session
     process.exit(1);
   }
 });
-
-program.command('dashboard').description('Launch web dashboard')
-  .option('--port <port>', 'Port number', '6274')
-  .option('--open', 'Open browser')
-  .action(async (options: { port: string; open?: boolean }) => {
-    try {
-      await startDashboard({ port: parseInt(options.port, 10), open: options.open });
-    } catch (error) {
-      console.error('Dashboard failed:', error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
-  });
 
 program.command('costs').description('Show cost analytics')
   .option('--last <days>', 'Last N days', parseInt)

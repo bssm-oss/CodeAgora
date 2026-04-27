@@ -20,7 +20,7 @@ function claimFingerprint(doc: EvidenceDocument): string {
   if (evidenceText.length === 0) return '';
   return evidenceText
     .toLowerCase()
-    .replace(/[`*_#\-]+/g, '')
+    .replace(/[`*_#-]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80);

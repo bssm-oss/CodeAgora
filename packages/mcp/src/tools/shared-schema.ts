@@ -19,9 +19,8 @@ export const reviewOptionsSchema = {
   no_cache: z.boolean().optional().describe('Skip result caching, always run fresh'),
   repo_path: z.string().optional().describe('Git repo root path for surrounding code context'),
   context_lines: z.number().min(0).optional().describe('Context lines around changes (default 20, 0 = disabled)'),
-  output_format: z.enum(['compact', 'text', 'json', 'md', 'github', 'html', 'junit']).optional()
+  output_format: z.enum(['compact', 'text', 'json', 'md', 'github', 'html', 'junit', 'sarif']).optional()
     .describe('Result format (default: compact)'),
-  notify: z.boolean().optional().describe('Send Discord/Slack notification after review'),
 };
 
 /**

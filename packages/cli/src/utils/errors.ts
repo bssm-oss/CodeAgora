@@ -5,6 +5,8 @@
 import { statusColor, dim } from './colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 
+export type CliExitCode = 1 | 2 | 3;
+
 /**
  * Match an error message to a user-friendly hint.
  */
@@ -39,4 +41,30 @@ export function formatError(error: Error, verbose: boolean): string {
     lines.push(dim(error.stack ?? ''));
   }
   return lines.join('\n');
+}
+
+/**
+ * Deterministic CLI exit code classification for agent/CI consumers.
+ *
+ * 1: review completed but policy gate failed
+ * 2: setup/input/config problem that requires user action
+ * 3: runtime failure that may be transient
+ */
+export function classifyCliErrorExitCode(error: Error): CliExitCode {
+  const msg = error.message.toLowerCase();
+  if (
+    msg.includes('config') ||
+    msg.includes('invalid output format') ||
+    msg.includes('requires --pr') ||
+    msg.includes('diff') ||
+    msg.includes('path') ||
+    msg.includes('not found') ||
+    msg.includes('empty') ||
+    msg.includes('syntax') ||
+    msg.includes('json') ||
+    msg.includes('yaml')
+  ) {
+    return 2;
+  }
+  return 3;
 }

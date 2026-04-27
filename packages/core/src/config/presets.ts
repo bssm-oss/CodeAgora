@@ -1,7 +1,7 @@
 /**
  * Shared Preset Builder
  * Generates complete Config objects from provider/model selections.
- * Used by both CLI init wizard and TUI PresetsTab.
+ * Used by CLI init wizard and downstream adapters.
  */
 
 import type { Config } from '../types/config.js';

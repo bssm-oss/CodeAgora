@@ -8,10 +8,12 @@
  *   - Input: examples/vulnerable-api/server.ts (intentionally vulnerable code)
  *
  * Requirements:
+ *   - CODEAGORA_RUN_LIVE_E2E=1
  *   - GROQ_API_KEY env var set
  *   - `claude` CLI available in PATH (Claude Code)
  *
- * When GROQ_API_KEY is missing or claude CLI not found, the entire suite is skipped.
+ * Unless CODEAGORA_RUN_LIVE_E2E=1 is set, or when GROQ_API_KEY is missing
+ * or claude CLI is not found, the entire suite is skipped.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -25,11 +27,12 @@ import { tmpdir } from 'os';
 
 import { execFileSync } from 'child_process';
 
+const liveE2EEnabled = process.env['CODEAGORA_RUN_LIVE_E2E'] === '1';
 const hasGroq = !!process.env['GROQ_API_KEY'];
 const hasClaude = (() => {
   try { execFileSync('which', ['claude'], { stdio: 'pipe' }); return true; } catch { return false; }
 })();
-const canRun = hasGroq && hasClaude;
+const canRun = liveE2EEnabled && hasGroq && hasClaude;
 
 const describeFn = canRun ? describe : describe.skip;
 
@@ -568,50 +571,4 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
     });
   });
 
-  // ==========================================================================
-  // Phase 10: Web Server API
-  // ==========================================================================
-
-  describe('Phase 10: Web Server API', () => {
-    let app: Awaited<ReturnType<typeof import('@codeagora/web/server/index.js').createApp>>;
-    let authToken: string;
-
-    beforeAll(async () => {
-      process.chdir(tmpDir);
-      const { createApp } = await import('@codeagora/web/server/index.js');
-      const { getAuthToken } = await import('@codeagora/web/server/middleware.js');
-      app = createApp();
-      authToken = getAuthToken();
-    });
-
-    it('GET /api/health returns 200 with ok status', async () => {
-      const res = await app.request('/api/health');
-      expect(res.status).toBe(200);
-
-      const body = await res.json() as Record<string, unknown>;
-      expect(body['status']).toBe('ok');
-      expect(typeof body['version']).toBe('string');
-      expect(typeof body['uptime']).toBe('number');
-    }, 10_000);
-
-    it('GET /api/sessions returns paginated session list', async () => {
-      const res = await app.request('/api/sessions', { headers: { Authorization: `Bearer ${authToken}` } });
-      expect(res.status).toBe(200);
-
-      const body = await res.json() as { items: unknown[]; total: number; page: number; limit: number };
-      expect(Array.isArray(body.items)).toBe(true);
-      expect(body.total).toBeGreaterThanOrEqual(1);
-      expect(body.page).toBe(1);
-      expect(body.limit).toBe(50);
-    }, 10_000);
-
-    it('GET /api/config returns configuration', async () => {
-      const res = await app.request('/api/config', { headers: { Authorization: `Bearer ${authToken}` } });
-      expect(res.status).toBe(200);
-
-      const body = await res.json() as Record<string, unknown>;
-      // Should have reviewers key
-      expect(body['reviewers']).toBeDefined();
-    }, 10_000);
-  });
 }, { timeout: 600_000 });

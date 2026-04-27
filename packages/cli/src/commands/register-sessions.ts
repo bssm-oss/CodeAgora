@@ -6,7 +6,8 @@
 import type { Command } from 'commander';
 import {
   listSessions, showSession, diffSessions, getSessionStats, pruneSessions,
-  formatSessionList, formatSessionDetail, formatSessionDiff, formatSessionStats,
+  formatSessionList, formatSessionListJson, formatSessionDetail, formatSessionDetailJson,
+  formatSessionDiff, formatSessionStats,
 } from './sessions.js';
 
 export function registerSessionsCommand(program: Command): void {
@@ -21,13 +22,18 @@ export function registerSessionsCommand(program: Command): void {
     .option('--before <date>', 'Sessions before date (YYYY-MM-DD)')
     .option('--sort <field>', 'Sort by (date/status/issues)', 'date')
     .option('--search <keyword>', 'Search sessions by keyword (case-insensitive)')
-    .action(async (opts: { limit?: number; status?: string; after?: string; before?: string; sort?: string; search?: string }) => {
+    .option('--json', 'Output machine-readable JSON')
+    .action(async (opts: { limit?: number; status?: string; after?: string; before?: string; sort?: string; search?: string; json?: boolean }) => {
       try {
         const sessions = await listSessions(process.cwd(), {
           limit: opts.limit, status: opts.status, after: opts.after,
           before: opts.before, sort: opts.sort, keyword: opts.search,
         });
-        console.log(formatSessionList(sessions));
+        if (opts.json) {
+          console.log(formatSessionListJson(sessions));
+        } else {
+          console.log(formatSessionList(sessions));
+        }
       } catch (error) {
         console.error('Error:', error instanceof Error ? error.message : error);
         process.exit(1);
@@ -43,14 +49,22 @@ export function registerSessionsCommand(program: Command): void {
     }
   });
 
-  sessionsCmd.command('show <session>').description('Show details for a session (e.g. 2026-03-13/001)').action(async (session: string) => {
-    try {
-      console.log(formatSessionDetail(await showSession(process.cwd(), session)));
-    } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
-  });
+  sessionsCmd.command('show <session>')
+    .description('Show details for a session (e.g. 2026-03-13/001)')
+    .option('--json', 'Output machine-readable JSON')
+    .action(async (session: string, opts: { json?: boolean }) => {
+      try {
+        const detail = await showSession(process.cwd(), session);
+        if (opts.json) {
+          console.log(formatSessionDetailJson(detail));
+        } else {
+          console.log(formatSessionDetail(detail));
+        }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    });
 
   sessionsCmd.command('diff <session1> <session2>').description('Compare issues between two sessions').action(async (session1: string, session2: string) => {
     try {

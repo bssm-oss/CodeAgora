@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.x Final Legacy Release (planned)
+
+### Package Line Reset
+- `codeagora@2.x` is now treated as the legacy package line.
+- Future review-focused releases should restart under `@codeagora/review@0.x`.
+- CLI binary names remain `codeagora` and `agora`, but the future install path becomes `npm i -g @codeagora/review`.
+
+### Retired Surfaces
+- Remove the standalone web dashboard package (`@codeagora/web`).
+- Remove the standalone terminal TUI package (`@codeagora/tui`).
+- Remove the standalone webhook notifications package (`@codeagora/notifications`).
+- Remove `agora dashboard`, `agora tui`, `agora notify`, and `agora review --notify`.
+
+### New Direction
+- Keep CLI, GitHub Action, MCP, core, and shared packages.
+- Consolidate human-facing local UI work into a future Tauri desktop app.
+- Document the npm restart plan in `docs/NPM_PACKAGE_RESTART.md`.
+
 ## 2.3.4 (2026-04-24)
 
 ### Metadata

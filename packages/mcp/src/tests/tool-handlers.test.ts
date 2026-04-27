@@ -63,7 +63,6 @@ vi.mock('../helpers.js', () => ({
 
 vi.mock('../post-actions.js', () => ({
   formatReviewResult: vi.fn(),
-  sendReviewNotification: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -371,26 +370,6 @@ describe('review_full handler', () => {
     const result = await getHandler('review_full')({ diff: '+x', output_format: 'md' });
     expect(result.content[0].text).toBe('# Markdown Report');
     expect(formatReviewResult).toHaveBeenCalledWith(expect.anything(), 'md');
-  });
-
-  it('sends notification when notify=true', async () => {
-    const { runReviewRaw } = await import('../helpers.js');
-    const { sendReviewNotification } = await import('../post-actions.js');
-    vi.mocked(runReviewRaw).mockResolvedValue({ status: 'success' } as never);
-    vi.mocked(sendReviewNotification).mockResolvedValue(undefined);
-
-    const { registerReviewFull } = await import('../tools/review-full.js');
-    const { server, getHandler } = createServerStub();
-    registerReviewFull(server as never);
-
-    // notify triggers raw path but no output_format → falls through to compact
-    const { runReviewCompact } = await import('../helpers.js');
-    vi.mocked(runReviewCompact).mockResolvedValue({
-      decision: 'ACCEPT', reasoning: 'OK', issues: [], summary: 'ok', sessionId: '001',
-    });
-
-    await getHandler('review_full')({ diff: '+x', notify: true });
-    expect(sendReviewNotification).toHaveBeenCalled();
   });
 
   it('returns error on pipeline failure', async () => {

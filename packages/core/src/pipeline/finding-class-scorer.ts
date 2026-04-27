@@ -74,7 +74,7 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\bmight\s+throw\b/i,
       /\buncaught\s+(?:exception|error|syntaxerror|typeerror)\b/i,
       /\bunhandled\s+(?:exception|error|rejection|promise)\b/i,
-      /\bwithout\s+(?:any\s+)?(?:try[/\-]?catch|error\s+handling)\b/i,
+      /\bwithout\s+(?:any\s+)?(?:try[/-]?catch|error\s+handling)\b/i,
     ],
   },
   {

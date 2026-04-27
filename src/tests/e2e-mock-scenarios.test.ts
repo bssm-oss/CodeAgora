@@ -1,7 +1,7 @@
 /**
  * E2E Mock Scenario Tests
  * Tests gap scenarios: error paths, cache, chunking, circuit breaker,
- * auto-approve, YAML config, notifications, GitHub integration, and SARIF.
+ * auto-approve, YAML config, GitHub integration, and SARIF.
  * All external dependencies mocked — no API keys required.
  */
 
@@ -197,11 +197,10 @@ import { loadLearnedPatterns } from '@codeagora/core/learning/store.js';
 import { applyLearnedPatterns } from '@codeagora/core/learning/filter.js';
 import fs from 'fs/promises';
 
-// GitHub / notifications (not orchestrator deps — imported directly in scenario tests)
+// GitHub integration (not orchestrator deps — imported directly in scenario tests)
 import { mapToGitHubReview } from '@codeagora/github/mapper.js';
 import { postReview } from '@codeagora/github/poster.js';
 import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
-import { sendDiscordNotification, sendSlackNotification } from '@codeagora/notifications/webhook.js';
 
 // ============================================================================
 // Shared test fixtures
@@ -619,69 +618,8 @@ describe('P1: Integration scenarios (mock)', () => {
     );
   });
 
-  // Scenario 11: Discord notification — mock fetch
-  it('11. Discord notification: pipeline result → sendDiscordNotification → fetch called', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const payload = {
-      decision: 'ACCEPT',
-      reasoning: 'All issues resolved',
-      severityCounts: {},
-      topIssues: [],
-      sessionId: '001',
-      date: '2026-01-15',
-      totalDiscussions: 0,
-      resolved: 0,
-      escalated: 0,
-    };
-
-    await sendDiscordNotification('https://discord.com/api/webhooks/test/token', payload);
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://discord.com/api/webhooks/test/token');
-    expect(options.method).toBe('POST');
-    const body = JSON.parse(options.body as string);
-    expect(body).toHaveProperty('embeds');
-    expect(body.embeds[0].title).toContain('ACCEPT');
-
-    vi.unstubAllGlobals();
-  });
-
-  // Scenario 12: Slack notification — mock fetch
-  it('12. Slack notification: pipeline result → sendSlackNotification → fetch called with blocks', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    vi.stubGlobal('fetch', mockFetch);
-
-    const payload = {
-      decision: 'REJECT',
-      reasoning: 'Blocking issues found',
-      severityCounts: { CRITICAL: 2 },
-      topIssues: [{ severity: 'CRITICAL', filePath: 'src/auth.ts', title: 'SQL Injection' }],
-      sessionId: '002',
-      date: '2026-01-15',
-      totalDiscussions: 1,
-      resolved: 0,
-      escalated: 1,
-    };
-
-    await sendSlackNotification('https://hooks.slack.com/services/T00/B00/token', payload);
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://hooks.slack.com/services/T00/B00/token');
-    const body = JSON.parse(options.body as string);
-    expect(body).toHaveProperty('blocks');
-    const headerBlock = body.blocks[0];
-    expect(headerBlock.type).toBe('header');
-    expect(headerBlock.text.text).toContain('REJECT');
-
-    vi.unstubAllGlobals();
-  });
-
-  // Scenario 13: SARIF output — pipeline result → SARIF JSON structure
-  it('13. SARIF output: evidenceDocs → buildSarifReport → valid SARIF 2.1.0 structure', () => {
+  // Scenario 11: SARIF output — pipeline result → SARIF JSON structure
+  it('11. SARIF output: evidenceDocs → buildSarifReport → valid SARIF 2.1.0 structure', () => {
     const evidenceDocs = [
       {
         issueTitle: 'SQL Injection',

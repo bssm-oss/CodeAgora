@@ -82,7 +82,7 @@ Note: Evidence deduplication is in L2 (`deduplication.ts`). Confidence-based tri
 
 ## Project Structure
 
-pnpm monorepo with 8 packages:
+pnpm monorepo with four supported product surfaces: CLI, MCP, GitHub Actions, and the upcoming desktop app.
 
 ```
 packages/
@@ -90,14 +90,10 @@ packages/
 ├── core/           # @codeagora/core — L0/L1/L2/L3 pipeline, session management
 ├── github/         # @codeagora/github — PR review posting, SARIF, diff parsing
 ├── cli/            # @codeagora/cli — CLI commands, formatters, options
-├── web/            # @codeagora/web — Hono.js REST API + React SPA dashboard
-├── tui/            # @codeagora/tui — interactive terminal UI (ink + React)
-├── mcp/            # @codeagora/mcp — MCP server (9 tools)
-└── notifications/  # @codeagora/notifications — Discord/Slack webhooks
+└── mcp/            # @codeagora/mcp — MCP server (9 tools)
 ```
 
-Core packages (`shared`, `core`, `cli`, `github`) ship with `codeagora`.
-Optional packages (`web`, `tui`, `mcp`, `notifications`) are installed separately.
+The former web, TUI, and notifications packages are retired as first-class surfaces. Their human-facing responsibilities move into the upcoming Tauri desktop app.
 
 ## Session Storage
 
@@ -123,10 +119,9 @@ Every review run is saved under `.ca/sessions/`:
 |-------|-----------|
 | Runtime | Node.js + TypeScript (strict) |
 | CLI | commander |
-| TUI | ink + React |
 | LLM SDK | Vercel AI SDK (multi-provider) |
-| Web API | Hono.js |
 | MCP | @modelcontextprotocol/sdk |
+| Desktop App | Tauri (private scaffold) |
 | Validation | zod |
 | Testing | vitest |
 | Build | tsup |

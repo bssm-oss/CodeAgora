@@ -19,7 +19,6 @@ import { createAppOctokit } from './client.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
 import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
-import { sendNotifications } from '@codeagora/notifications/webhook.js';
 
 // ============================================================================
 // Input Parsing
@@ -86,7 +85,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // Load config early — used for pipeline, mapper options, and notifications (#256)
+  // Load config early — used for pipeline and mapper options.
   const configPath = process.env['CONFIG_PATH'] || '.ca/config.json';
   const configBaseDir = path.resolve(process.cwd(), path.dirname(path.dirname(configPath)));
   const config = await loadConfigFrom(configBaseDir).catch(() => null);
@@ -175,28 +174,6 @@ async function main(): Promise<void> {
   }
 
   console.log('::endgroup::');
-
-  // Send Discord/Slack notifications if configured (#261)
-  if (config?.notifications) {
-    const s = result.summary;
-    await sendNotifications(config.notifications, {
-      decision: s.decision,
-      reasoning: s.reasoning,
-      severityCounts: s.severityCounts,
-      topIssues: s.topIssues.map((i) => ({
-        severity: i.severity,
-        filePath: i.filePath,
-        title: i.title,
-      })),
-      sessionId: result.sessionId,
-      date: result.date,
-      totalDiscussions: discussions.length,
-      resolved: discussions.filter((d) => d.consensusReached).length,
-      escalated: discussions.filter((d) => !d.consensusReached).length,
-    }).catch((err) => {
-      console.error(`::warning::Failed to send notifications: ${err instanceof Error ? err.message : String(err)}`);
-    });
-  }
 
   // Set outputs
   setActionOutput('verdict', result.summary.decision);

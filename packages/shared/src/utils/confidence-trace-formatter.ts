@@ -1,9 +1,9 @@
 /**
  * Formatter for ConfidenceTrace — renders a finding's per-stage confidence
- * breakdown for debug output (CLI `agora trace` + TUI detail pane).
+ * breakdown for debug output (CLI `agora trace` and downstream adapters).
  *
- * Shared across CLI and TUI so the penalty labels stay consistent across
- * surfaces. Pure function: takes an EvidenceDocument, returns formatted lines.
+ * Shared so the penalty labels stay consistent across surfaces. Pure function:
+ * takes an EvidenceDocument, returns formatted lines.
  */
 
 import type { ConfidenceTrace } from '../types/confidence-trace.js';

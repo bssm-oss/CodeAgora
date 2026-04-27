@@ -22,7 +22,6 @@ Command implementations for CodeAgora CLI. Each file exports a public function t
 | `status.ts` | CodeAgora status overview |
 | `config-set.ts` | Mutate config values |
 | `learn.ts` | Pattern learning |
-| `dashboard.ts` | Web dashboard launcher |
 
 ## Subdirectories
 None — all commands are flat in this directory.
