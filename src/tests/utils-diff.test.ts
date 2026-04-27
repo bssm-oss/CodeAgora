@@ -97,6 +97,21 @@ describe('extractFileListFromDiff', () => {
     expect(result).toEqual(['src/parser.ts', 'src/validator.ts']);
   });
 
+  it('ignores embedded diff headers inside added fixture lines', () => {
+    const fixtureDiff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+--- a/benchmarks/golden-bugs/example/diff.patch
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -1,2 +1,4 @@
++diff --git a/src/admin.ts b/src/admin.ts
++--- a/src/admin.ts
++++ b/src/admin.ts
+++export function adminOnly(user) { return true; }
+`;
+
+    const result = extractFileListFromDiff(fixtureDiff);
+    expect(result).toEqual(['benchmarks/golden-bugs/example/diff.patch']);
+  });
+
   it('extracts the "a/" path from a renamed-file diff header', () => {
     // The regex captures the a/ side: a/src/old-name.ts
     const result = extractFileListFromDiff(RENAMED_FILE_DIFF);
@@ -151,6 +166,20 @@ describe('extractCodeSnippet', () => {
   it('returns null when the file is not in the diff', () => {
     const result = extractCodeSnippet(SINGLE_FILE_DIFF, 'src/missing.ts', [1, 3]);
     expect(result).toBeNull();
+  });
+
+  it('does not extract snippets from embedded fixture diff headers as real files', () => {
+    const fixtureDiff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+--- a/benchmarks/golden-bugs/example/diff.patch
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -1,2 +1,4 @@
++diff --git a/src/admin.ts b/src/admin.ts
++--- a/src/admin.ts
++++ b/src/admin.ts
+++export function adminOnly(user) { return true; }
+`;
+
+    expect(extractCodeSnippet(fixtureDiff, 'src/admin.ts', [1, 1])).toBeNull();
   });
 
   it('returns null when the line range falls entirely outside diff content', () => {

@@ -87,6 +87,27 @@ describe('findDuplicates', () => {
     expect(map.get('d001')).toContain('d002');
     expect(map.get('d001')).toContain('d003');
   });
+
+  it('groups same root-cause security findings with different wording', () => {
+    const d1 = makeDiscussion({
+      id: 'd001',
+      filePath: 'src/admin.ts',
+      lineRange: [42, 48],
+      issueTitle: 'Admin endpoint bypasses authorization',
+      codeSnippet: '42 | router.post("/admin", async (req) => deleteUser(req.body.id));',
+    });
+    const d2 = makeDiscussion({
+      id: 'd002',
+      filePath: 'src/admin.ts',
+      lineRange: [43, 47],
+      issueTitle: 'Missing permission check before destructive route',
+      codeSnippet: '43 | router.post("/admin", async (req) => deleteUser(req.body.id));',
+    });
+
+    const map = findDuplicates([d1, d2]);
+
+    expect(map.get('d001')).toContain('d002');
+  });
 });
 
 // ============================================================================

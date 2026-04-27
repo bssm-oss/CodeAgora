@@ -17,7 +17,9 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input,
+select {
   font: inherit;
 }
 
@@ -69,6 +71,11 @@ textarea {
 .session-row {
   border: 0;
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.64;
 }
 
 .nav-button {
@@ -126,6 +133,13 @@ h3 {
 .reasoning,
 .empty {
   color: #64747b;
+}
+
+.toolbar p {
+  max-width: 72ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolbar-actions,
@@ -197,6 +211,40 @@ h3 {
   overflow: hidden;
 }
 
+.session-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #e6ecef;
+}
+
+.filter-input,
+.filter-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #cbd6da;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172026;
+}
+
+.list-summary {
+  padding: 8px 14px;
+  color: #64747b;
+  background: #f8fbfb;
+  border-bottom: 1px solid #e6ecef;
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.padded {
+  padding: 14px;
+}
+
 .session-row {
   display: grid;
   gap: 4px;
@@ -221,7 +269,8 @@ h3 {
 }
 
 .session-meta,
-.issue-row span {
+.issue-row span,
+.detail-meta {
   color: #64747b;
   font-size: 13px;
 }
@@ -259,6 +308,28 @@ h3 {
   display: grid;
   gap: 16px;
   padding: 18px;
+}
+
+.detail-meta,
+.config-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detail-meta span,
+.fact {
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #dbe3e6;
+  border-radius: 999px;
+  background: #f8fbfb;
+}
+
+.fact.warn {
+  border-color: #f1c44e;
+  background: #fff8e1;
+  color: #92400e;
 }
 
 .count-grid {

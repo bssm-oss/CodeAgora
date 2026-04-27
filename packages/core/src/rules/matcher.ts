@@ -26,7 +26,7 @@ interface DiffFile {
 function parseDiffFiles(diffContent: string): DiffFile[] {
   const files: DiffFile[] = [];
   // Split on file headers
-  const sections = diffContent.split(/(?=diff --git )/);
+  const sections = diffContent.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
     if (!section.trim()) continue;

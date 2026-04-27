@@ -1,0 +1,23 @@
+diff --git a/src/search/sort.ts b/src/search/sort.ts
+index ddddddd..eeeeeee 100644
+--- a/src/search/sort.ts
++++ b/src/search/sort.ts
+@@ -1,12 +1,16 @@
+ export interface SearchResult {
+   id: string;
+   title: string;
+   score: number;
+ }
+
+ export function sortResults(results: readonly SearchResult[]): SearchResult[] {
+-  return [...results].sort((a, b) => b.score - a.score);
++  return [...results].sort((a, b) => {
++    const scoreOrder = b.score - a.score;
++    if (scoreOrder !== 0) return scoreOrder;
++    return a.title.localeCompare(b.title);
++  });
+ }
+
+ export function topResult(results: readonly SearchResult[]): SearchResult | undefined {
+   return sortResults(results)[0];
+ }

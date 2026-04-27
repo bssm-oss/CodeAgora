@@ -1,0 +1,17 @@
+{
+  "id": "env-secret-fallback",
+  "title": "loadAuthConfig silently falls back to a hard-coded JWT secret",
+  "source": "synthetic — API contract/config/env regression",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "src/config/auth.ts",
+      "lineRange": [7, 7],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "Missing JWT_SECRET no longer fails closed; production can sign tokens with a public hard-coded secret.",
+      "keyword": "secret"
+    }
+  ],
+  "notes": "Recall fixture for config/env contract regressions where fail-closed validation is replaced with an unsafe default."
+}

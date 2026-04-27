@@ -20,7 +20,7 @@ export const reviewOptionsSchema = {
   repo_path: z.string().optional().describe('Git repo root path for surrounding code context'),
   context_lines: z.number().min(0).optional().describe('Context lines around changes (default 20, 0 = disabled)'),
   output_format: z.enum(['compact', 'text', 'json', 'md', 'github', 'html', 'junit', 'sarif']).optional()
-    .describe('Result format (default: compact)'),
+    .describe('Result format (default: compact; json returns the versioned codeagora.review.v1 agent contract)'),
 };
 
 /**

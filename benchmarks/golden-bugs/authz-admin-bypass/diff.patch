@@ -1,0 +1,26 @@
+diff --git a/src/api/admin.ts b/src/api/admin.ts
+index 1111111..2222222 100644
+--- a/src/api/admin.ts
++++ b/src/api/admin.ts
+@@ -1,18 +1,17 @@
+ import { getUser, requireAdmin } from '../auth/session.js';
+ import { deleteUserAccount } from '../users/delete.js';
+
+ export async function deleteAccountHandler(req: Request): Promise<Response> {
+   const actor = await getUser(req);
+   if (!actor) {
+     return new Response('Unauthorized', { status: 401 });
+   }
+-  if (!requireAdmin(actor)) {
+-    return new Response('Forbidden', { status: 403 });
+-  }
+
+   const body = await req.json() as { userId?: string };
+   if (!body.userId) {
+     return new Response('Missing userId', { status: 400 });
+   }
+
++  // Admin UI already hides this action for regular users.
+   await deleteUserAccount(body.userId, actor.id);
+   return new Response(null, { status: 204 });
+ }

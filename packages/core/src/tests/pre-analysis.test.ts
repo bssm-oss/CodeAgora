@@ -192,6 +192,23 @@ diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
     expect(result.get('README.md')).toBe('docs');
     expect(result.get('pnpm-lock.yaml')).toBe('dependency');
   });
+
+  it('should not classify embedded diff headers as separate files', () => {
+    const diff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+--- a/benchmarks/golden-bugs/example/diff.patch
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -1,2 +1,5 @@
++diff --git a/src/admin.ts b/src/admin.ts
++--- a/src/admin.ts
++++ b/src/admin.ts
+++export function adminOnly(user) { return true; }
+`;
+
+    const result = classifyDiffFiles(diff);
+
+    expect([...result.keys()]).toEqual(['benchmarks/golden-bugs/example/diff.patch']);
+    expect(result.get('benchmarks/golden-bugs/example/diff.patch')).toBe('logic');
+  });
 });
 
 // ============================================================================

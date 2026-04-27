@@ -6,6 +6,8 @@ import {
   formatAgentJson,
   formatProgressNdjsonEvent,
   formatResultNdjsonEvent,
+  getAgentReviewExitCode,
+  shouldFailOnSeverity,
   withAgentContract,
 } from '../utils/agent-contract.js';
 import { classifyCliErrorExitCode } from '../utils/errors.js';
@@ -44,6 +46,23 @@ describe('agent contract helpers', () => {
     const parsed = JSON.parse(formatAgentJson(makeResult())) as Record<string, unknown>;
     expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
     expect(parsed['sessionId']).toBe('001');
+    expect(parsed['type']).toBeUndefined();
+  });
+
+  it('keeps the required JSON result fields at the top level', () => {
+    const parsed = JSON.parse(formatAgentJson(makeResult())) as Record<string, unknown>;
+    expect(parsed).toEqual(expect.objectContaining({
+      schemaVersion: 'codeagora.review.v1',
+      status: 'success',
+      date: '2026-04-27',
+      sessionId: '001',
+      summary: expect.objectContaining({
+        decision: 'ACCEPT',
+        reasoning: 'No blocking issues.',
+      }),
+      evidenceDocs: [],
+      discussions: [],
+    }));
   });
 
   it('formats progress NDJSON events with type=progress', () => {
@@ -59,6 +78,9 @@ describe('agent contract helpers', () => {
     expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
     expect(parsed['type']).toBe('progress');
     expect(parsed['stage']).toBe('review');
+    expect(parsed['event']).toBe('stage-update');
+    expect(parsed['timestamp']).toBe(1777248000000);
+    expect(formatProgressNdjsonEvent(event)).not.toContain('\n');
   });
 
   it('formats result NDJSON events with type=result', () => {
@@ -66,6 +88,7 @@ describe('agent contract helpers', () => {
     expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
     expect(parsed['type']).toBe('result');
     expect(parsed['sessionId']).toBe('001');
+    expect(formatResultNdjsonEvent(makeResult())).not.toContain('\n');
   });
 });
 
@@ -79,5 +102,52 @@ describe('CLI exit code classification', () => {
   it('classifies runtime errors as exit code 3', () => {
     expect(classifyCliErrorExitCode(new Error('Groq rate limit exceeded'))).toBe(3);
     expect(classifyCliErrorExitCode(new Error('Reviewer timed out'))).toBe(3);
+  });
+
+  it('keeps successful reviews at exit code 0 without failure gates', () => {
+    expect(getAgentReviewExitCode(makeResult({
+      summary: {
+        ...makeResult().summary!,
+        decision: 'REJECT',
+      },
+    }))).toBe(0);
+  });
+
+  it('returns exit code 1 when fail-on-reject trips', () => {
+    expect(getAgentReviewExitCode(makeResult({
+      summary: {
+        ...makeResult().summary!,
+        decision: 'REJECT',
+      },
+    }), { failOnReject: true })).toBe(1);
+  });
+
+  it('returns exit code 1 when fail-on-severity trips', () => {
+    expect(shouldFailOnSeverity({
+      SUGGESTION: 2,
+      WARNING: 0,
+      CRITICAL: 1,
+      HARSHLY_CRITICAL: 0,
+    }, 'CRITICAL')).toBe(true);
+
+    expect(getAgentReviewExitCode(makeResult({
+      summary: {
+        ...makeResult().summary!,
+        severityCounts: {
+          SUGGESTION: 2,
+          WARNING: 0,
+          CRITICAL: 1,
+          HARSHLY_CRITICAL: 0,
+        },
+      },
+    }), { failOnSeverity: 'CRITICAL' })).toBe(1);
+  });
+
+  it('returns exit code 3 for pipeline error results', () => {
+    expect(getAgentReviewExitCode(makeResult({
+      status: 'error',
+      error: 'Pipeline failed',
+      summary: undefined,
+    }))).toBe(3);
   });
 });

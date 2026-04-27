@@ -372,6 +372,22 @@ describe('review_full handler', () => {
     expect(formatReviewResult).toHaveBeenCalledWith(expect.anything(), 'md');
   });
 
+  it('routes output_format=json through the versioned review formatter', async () => {
+    const { runReviewRaw } = await import('../helpers.js');
+    const { formatReviewResult } = await import('../post-actions.js');
+    vi.mocked(runReviewRaw).mockResolvedValue({ status: 'success' } as never);
+    vi.mocked(formatReviewResult).mockResolvedValue('{"schemaVersion":"codeagora.review.v1"}');
+
+    const { registerReviewFull } = await import('../tools/review-full.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewFull(server as never);
+
+    const result = await getHandler('review_full')({ diff: '+x', output_format: 'json' });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.schemaVersion).toBe('codeagora.review.v1');
+    expect(formatReviewResult).toHaveBeenCalledWith(expect.anything(), 'json');
+  });
+
   it('returns error on pipeline failure', async () => {
     const { runReviewCompact } = await import('../helpers.js');
     vi.mocked(runReviewCompact).mockRejectedValue(new Error('out of tokens'));

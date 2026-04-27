@@ -70,6 +70,32 @@ describe('post-actions exports', () => {
     expect(typeof mod.postToGitHub).toBe('function');
   });
 
+  it('formats output_format=json with the CLI agent contract marker', async () => {
+    const { formatReviewResult } = await import('../post-actions.js');
+    const formatted = await formatReviewResult({
+      sessionId: '001',
+      date: '2026-04-27',
+      status: 'success',
+      summary: {
+        decision: 'ACCEPT',
+        reasoning: 'No blocking issues.',
+        totalReviewers: 3,
+        forfeitedReviewers: 0,
+        severityCounts: {},
+        topIssues: [],
+        totalDiscussions: 0,
+        resolved: 0,
+        escalated: 0,
+      },
+      evidenceDocs: [],
+      discussions: [],
+    }, 'json');
+
+    const parsed = JSON.parse(formatted);
+    expect(parsed.schemaVersion).toBe('codeagora.review.v1');
+    expect(parsed.status).toBe('success');
+    expect(parsed.summary.decision).toBe('ACCEPT');
+  });
 });
 
 // ============================================================================

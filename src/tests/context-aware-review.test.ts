@@ -147,6 +147,28 @@ describe('parseDiffFileRanges', () => {
     expect(parseDiffFileRanges('   \n\n  ')).toEqual([]);
   });
 
+  it('ignores embedded diff headers inside added fixture lines', () => {
+    const diff = `diff --git a/benchmarks/golden-bugs/example/diff.patch b/benchmarks/golden-bugs/example/diff.patch
+--- a/benchmarks/golden-bugs/example/diff.patch
++++ b/benchmarks/golden-bugs/example/diff.patch
+@@ -1,2 +1,6 @@
++diff --git a/src/admin.ts b/src/admin.ts
++--- a/src/admin.ts
++++ b/src/admin.ts
++@@ -1 +1,2 @@
+++export function adminOnly(user) { return true; }
+`;
+
+    const result = parseDiffFileRanges(diff);
+
+    expect(result).toEqual([
+      {
+        file: 'benchmarks/golden-bugs/example/diff.patch',
+        ranges: [[1, 6]],
+      },
+    ]);
+  });
+
   it('handles hunk with no count (single line change)', () => {
     const diff = `diff --git a/file.ts b/file.ts
 --- a/file.ts
