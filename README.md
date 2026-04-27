@@ -225,6 +225,8 @@ Current seed fixtures: 7 recall cases (8 expected findings total) + 4 FP regress
 
 ### Latest low-cost diverse run (2026-04-27)
 
+Full report: [`docs/golden-bug-benchmark-report-2026-04-27.md`](docs/golden-bug-benchmark-report-2026-04-27.md).
+
 Smoke gate:
 
 ```bash
