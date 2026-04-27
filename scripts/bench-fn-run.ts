@@ -9,6 +9,7 @@
 // Usage:
 //   pnpm bench:fn:run -- --results <dir>                     # run all fixtures
 //   pnpm bench:fn:run -- --results <dir> --fixtures id1,id2  # subset
+//   pnpm bench:fn:run -- --results <dir> --config .ca/config.low-cost-diverse.json
 //   pnpm bench:fn:run -- --results <dir> --skip-head         # skip L3 verdict
 //
 // Requirements:
@@ -40,6 +41,7 @@ interface Args {
   fixtureFilter: Set<string> | null;
   skipHead: boolean;
   dryRun: boolean;
+  configPath: string | null;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -48,6 +50,7 @@ function parseArgs(argv: string[]): Args {
     fixtureFilter: null,
     skipHead: false,
     dryRun: false,
+    configPath: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -57,9 +60,10 @@ function parseArgs(argv: string[]): Args {
       args.fixtureFilter = new Set(list.split(',').map((s) => s.trim()).filter(Boolean));
     } else if (a === '--skip-head') args.skipHead = true;
     else if (a === '--dry-run') args.dryRun = true;
+    else if (a === '--config') args.configPath = argv[++i] ?? null;
     else if (a === '--help' || a === '-h') {
       console.log(
-        'Usage: pnpm bench:fn:run -- --results <dir> [--fixtures id1,id2] [--skip-head] [--dry-run]',
+        'Usage: pnpm bench:fn:run -- --results <dir> [--fixtures id1,id2] [--config <path>] [--skip-head] [--dry-run]',
       );
       process.exit(0);
     }
@@ -94,9 +98,13 @@ async function loadFixtures(filter: Set<string> | null): Promise<GoldenBugFixtur
   return out.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-async function runOne(fixtureId: string, skipHead: boolean): Promise<unknown[]> {
+async function runOne(
+  fixtureId: string,
+  skipHead: boolean,
+  configPath: string | null,
+): Promise<unknown[]> {
   const diffPath = path.join(fixturesDir, fixtureId, 'diff.patch');
-  const result = await runPipeline({ diffPath, skipHead });
+  const result = await runPipeline({ diffPath, skipHead, configPath: configPath ?? undefined });
   if (result.status !== 'success') {
     throw new Error(`pipeline error for ${fixtureId}: ${result.error ?? 'unknown'}`);
   }
@@ -118,10 +126,14 @@ async function main(): Promise<void> {
   }
 
   const resultsDir = path.resolve(process.cwd(), args.resultsDir);
+  const configPath = args.configPath
+    ? path.resolve(process.cwd(), args.configPath)
+    : null;
   await mkdir(resultsDir, { recursive: true });
 
   if (args.dryRun) {
     console.log(`[dry-run] would run ${fixtures.length} fixture(s):`);
+    console.log(`  config: ${configPath ?? path.join(benchmarkCwd, '.ca', 'config.json')}`);
     for (const f of fixtures) console.log(`  - ${f.id} → ${path.join(resultsDir, `${f.id}.json`)}`);
     return;
   }
@@ -138,7 +150,7 @@ async function main(): Promise<void> {
       process.stderr.write(`[${fixture.id}] running... `);
       const started = Date.now();
       try {
-        const findings = await runOne(fixture.id, args.skipHead);
+        const findings = await runOne(fixture.id, args.skipHead, configPath);
         const outPath = path.join(resultsDir, `${fixture.id}.json`);
         await writeFile(outPath, JSON.stringify(findings, null, 2) + '\n');
         summary.push({ id: fixture.id, findings: findings.length, status: 'ok' });

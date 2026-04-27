@@ -149,6 +149,13 @@ describe('scoreCase — recall path', () => {
     expect(result.isFpRegression).toBe(false);
     expect(result.matched).toHaveLength(1);
     expect(result.missed).toHaveLength(0);
+    expect(result.metrics).toMatchObject({
+      truePositives: 1,
+      falsePositives: 0,
+      falseNegatives: 0,
+      actualFindings: 1,
+      expectedFindings: 1,
+    });
     expect(result.recallAtK[3]).toBe(1);
     expect(result.recallAtK[5]).toBe(1);
   });
@@ -158,6 +165,12 @@ describe('scoreCase — recall path', () => {
     const result = scoreCase(fx, [finding({ lineRange: [100, 101] })]);
     expect(result.matched).toHaveLength(0);
     expect(result.missed).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(1);
+    expect(result.metrics).toMatchObject({
+      truePositives: 0,
+      falsePositives: 1,
+      falseNegatives: 1,
+    });
     expect(result.recallAtK[3]).toBe(0);
   });
 
@@ -198,6 +211,7 @@ describe('scoreCase — recall path', () => {
     const result = scoreCase(fx, [finding()]);
     expect(result.matched).toHaveLength(1);
     expect(result.missed).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
     expect(result.recallAtK[3]).toBe(0.5);
   });
 });
@@ -208,6 +222,13 @@ describe('scoreCase — FP regression path', () => {
     const result = scoreCase(fx, []);
     expect(result.isFpRegression).toBe(true);
     expect(result.falsePositives).toEqual([]);
+    expect(result.metrics).toMatchObject({
+      truePositives: 0,
+      falsePositives: 0,
+      falseNegatives: 0,
+      actualFindings: 0,
+      expectedFindings: 0,
+    });
     expect(result.recallAtK[3]).toBeNull();
   });
 
@@ -215,6 +236,7 @@ describe('scoreCase — FP regression path', () => {
     const fx = fixture({ expectedFindings: [] });
     const result = scoreCase(fx, [finding(), finding({ filePath: 'src/other.ts' })]);
     expect(result.falsePositives).toHaveLength(2);
+    expect(result.metrics.falsePositives).toBe(2);
   });
 });
 
@@ -234,6 +256,17 @@ describe('aggregate', () => {
     expect(report.fpRegressionCases).toBe(1);
     expect(report.meanRecallAtK[3]).toBe(0.5);
     expect(report.fpRegressionsTriggered).toBe(1);
+    expect(report.metrics).toMatchObject({
+      truePositives: 1,
+      falsePositives: 1,
+      falseNegatives: 1,
+      actualFindings: 2,
+      expectedFindings: 2,
+      precision: 0.5,
+      recall: 0.5,
+      f1: 0.5,
+      fpCleanRate: 0,
+    });
   });
 
   it('returns 0 mean recall when no recall cases exist', () => {
@@ -241,5 +274,9 @@ describe('aggregate', () => {
     const report = aggregate([scoreCase(fp, [])]);
     expect(report.meanRecallAtK[3]).toBe(0);
     expect(report.fpRegressionsTriggered).toBe(0);
+    expect(report.metrics.precision).toBeNull();
+    expect(report.metrics.recall).toBeNull();
+    expect(report.metrics.f1).toBeNull();
+    expect(report.metrics.fpCleanRate).toBe(1);
   });
 });
