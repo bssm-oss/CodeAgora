@@ -1,7 +1,7 @@
 /**
  * Triage Classification
  * Shared logic for classifying evidence documents into must-fix / verify / ignore.
- * Used by CLI output, GitHub PR comments, notifications, and MCP responses.
+ * Used by CLI output, GitHub PR comments, desktop summaries, and MCP responses.
  */
 
 import type { EvidenceDocument } from '../types/evidence.js';

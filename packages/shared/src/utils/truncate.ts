@@ -1,6 +1,6 @@
 /**
- * Text truncation helpers for previews in logs, notifications, and
- * GitHub review bodies where full content is too large.
+ * Text truncation helpers for previews in logs, GitHub review bodies,
+ * and MCP responses where full content is too large.
  */
 
 /**
