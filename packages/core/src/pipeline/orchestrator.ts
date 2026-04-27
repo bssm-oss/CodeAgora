@@ -4,7 +4,7 @@
  */
 
 import { SessionManager, recoverStaleSessions } from '../session/manager.js';
-import { loadConfig, normalizeConfig } from '../config/loader.js';
+import { loadConfig, loadConfigFile, normalizeConfig } from '../config/loader.js';
 import { writeAllReviews } from '../l1/writer.js';
 import { applyThreshold } from '../l2/threshold.js';
 import { writeModeratorReport, writeSuggestions } from '../l2/writer.js';
@@ -56,6 +56,8 @@ export interface PipelineInput {
   repoPath?: string;
   /** Number of surrounding lines to include around changed ranges (default 20, 0 = disabled) */
   contextLines?: number;
+  /** Explicit config file path. Defaults to process.cwd()/.ca/config.* */
+  configPath?: string;
 }
 
 export interface PipelineSummary {
@@ -128,7 +130,9 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     // Load config and normalize (expand declarative reviewers if needed)
     progress?.stageStart('init', 'Loading config...');
-    const rawConfig = await loadConfig();
+    const rawConfig = input.configPath
+      ? await loadConfigFile(input.configPath)
+      : await loadConfig();
     const config = normalizeConfig(rawConfig);
 
     // Apply CLI overrides to config

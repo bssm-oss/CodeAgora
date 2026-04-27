@@ -53,6 +53,19 @@ export async function loadConfigFrom(baseDir: string): Promise<Config> {
 }
 
 /**
+ * Load config from an explicit JSON/YAML file path.
+ */
+export async function loadConfigFile(filePath: string): Promise<Config> {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.yaml' || ext === '.yml') {
+    return loadYamlConfig(filePath);
+  }
+
+  const data = await readJson(filePath);
+  return validateConfig(data);
+}
+
+/**
  * Load config using process.cwd() as the base directory (default behaviour).
  */
 export async function loadConfig(): Promise<Config> {
