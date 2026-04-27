@@ -1,14 +1,20 @@
 {
   "name": "@codeagora/core",
-  "version": "2.3.4",
+  "version": "0.1.0-alpha.0",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": {
       "import": "./dist/index.js"
     },
-    "./*.js": "./dist/*.js",
-    "./*": "./dist/*"
+    "./*.js": {
+      "development": "./src/*.ts",
+      "import": "./dist/*.js"
+    },
+    "./*": {
+      "development": "./src/*",
+      "import": "./dist/*"
+    }
   },
   "scripts": {
     "build": "tsup",

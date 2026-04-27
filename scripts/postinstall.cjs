@@ -30,10 +30,10 @@ console.log(`    ${bold}$ agora language${reset}     ${dim}Switch language (en/k
 console.log('');
 console.log(`  ${yellow}Free tier:${reset} ${dim}Groq + GitHub Models = unlimited free reviews${reset}`);
 console.log('');
-console.log(`  ${cyan}Extensions:${reset}`);
-console.log(`    ${dim}npm i -g @codeagora/web${reset}   ${dim}→ agora dashboard${reset}`);
-console.log(`    ${dim}npm i -g @codeagora/tui${reset}   ${dim}→ agora tui${reset}`);
+console.log(`  ${cyan}Integrations:${reset}`);
 console.log(`    ${dim}npm i -g @codeagora/mcp${reset}   ${dim}→ Claude Code / Cursor${reset}`);
+console.log(`    ${dim}GitHub Action${reset}              ${dim}→ automated PR reviews${reset}`);
+console.log(`    ${dim}Desktop app${reset}                ${dim}→ local human UI (scaffold)${reset}`);
 console.log('');
 console.log(`  ${dim}Docs: https://github.com/bssm-oss/CodeAgora${reset}`);
 console.log('');

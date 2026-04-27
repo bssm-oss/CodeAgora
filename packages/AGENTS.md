@@ -4,7 +4,7 @@
 # packages
 
 ## Purpose
-Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement the multi-LLM code review pipeline. Each package has a focused responsibility: shared utilities and types, core review logic (L0-L3), CLI entrypoint, GitHub integration, notifications, terminal UI, MCP server, and web dashboard.
+Monorepo workspace containing scoped packages (`@codeagora/*`) that implement the multi-LLM code review pipeline. Each package has a focused responsibility: shared utilities and types, core review logic (L0-L3), CLI entrypoint, GitHub integration, and MCP server support.
 
 ## Subdirectories
 
@@ -14,10 +14,7 @@ Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement 
 | `core/` | Review pipeline implementation (L0 model intelligence, L1 parallel reviewers, L2 debate, L3 head verdict), config management, session handling, plugin system |
 | `cli/` | CLI entrypoint (`codeagora` / `agora` commands), command definitions, formatters, user prompts — orchestrates core pipeline |
 | `github/` | GitHub PR integration: diff parsing, SARIF generation, comment posting, deduplication, Actions support |
-| `notifications/` | Webhook integrations (Discord, Slack, generic), event streaming, live-update notifications |
-| `tui/` | Terminal UI (ink + React), interactive components, screens, theme system — uses `@codeagora/core` |
 | `mcp/` | MCP (Model Context Protocol) server with 9 tools exposing review pipeline to Claude and other MCP clients |
-| `web/` | Hono.js REST API server and React SPA dashboard; both share `@codeagora/core` for review orchestration |
 
 ## For AI Agents
 
@@ -42,8 +39,8 @@ Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement 
 **Dependencies Flow:**
 - `shared` — no internal deps, foundation layer
 - `core` — depends on `shared`
-- `cli`, `github`, `notifications`, `tui`, `mcp`, `web` — all depend on `core` and `shared`
-- `cli` also depends on `github` and `notifications` (orchestration)
+- `cli`, `github`, `mcp` — depend on `core` and `shared`
+- `cli` also depends on `github` (orchestration)
 - `mcp` also depends on `cli` (tools expose CLI functions)
 
 ### Common Patterns
@@ -88,12 +85,9 @@ Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement 
 ### Internal (Cross-Package)
 - `shared` ← foundation (types, utils, schemas)
 - `core` ← `shared`
-- `cli` ← `core`, `github`, `notifications`, `shared`
+- `cli` ← `core`, `github`, `shared`
 - `github` ← `core`, `shared`
-- `notifications` ← `core`, `shared`
-- `tui` ← `core`, `shared`
 - `mcp` ← `core`, `cli`, `shared`
-- `web` ← `core`, `shared`
 
 ### External (Notable)
 - `ai` (Vercel AI SDK) — multi-provider LLM abstraction
@@ -102,8 +96,6 @@ Monorepo workspace containing 8 scoped packages (`@codeagora/*`) that implement 
 - `zod` — schema validation (in shared, core, cli)
 - `@octokit/rest` — GitHub API (github package)
 - `@modelcontextprotocol/sdk` — MCP server (mcp package)
-- `ink`, `react` — Terminal UI (tui package)
-- `hono` — Web server (web package)
-- `tsup` — Build tool (web package)
+- `tsup` — Build tool
 
 <!-- MANUAL: -->

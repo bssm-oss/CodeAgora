@@ -4,7 +4,7 @@
 # i18n/ (@codeagora/shared internationalization)
 
 ## Purpose
-Lightweight internationalization module providing locale-aware message retrieval. Supports English ('en') and Korean ('ko') locales via JSON files. No external i18n libraries (no i18next, messageformat). Simple setLocale/getText API for use across CLI, web, and TUI packages.
+Lightweight internationalization module providing locale-aware message retrieval. Supports English ('en') and Korean ('ko') locales via JSON files. No external i18n libraries (no i18next, messageformat). Simple setLocale/getText API for active CodeAgora packages.
 
 ## Key Files
 | File | Description |

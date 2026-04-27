@@ -22,7 +22,3 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test --no-file-parallelism
-      - name: Web package tests
-        run: pnpm test:web
-      - name: Build web package
-        run: cd packages/web && npx tsup && npx vite build

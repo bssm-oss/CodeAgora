@@ -9,7 +9,7 @@ CLI entrypoint and command implementations for CodeAgora. Provides the command-l
 ## Key Files
 | File | Description |
 |------|-------------|
-| `src/index.ts` | CLI entrypoint; commander-based command router; 14+ commands registered |
+| `src/index.ts` | CLI entrypoint; commander-based command router |
 | `src/commands/` | Command implementations (init, review, doctor, sessions, etc.) |
 | `src/formatters/` | Output formatting (text, JSON, Markdown, GitHub, annotated) |
 | `src/options/` | CLI option parsing (review options, reviewer selection) |
@@ -33,7 +33,6 @@ Core command modules:
 - `config-set.ts` — Config value mutations (dot notation)
 - `providers-test.ts` — API key status verification
 - `learn.ts` — Pattern learning and management
-- `dashboard.ts` — Web dashboard launcher
 
 ### formatters/
 Output formatters:
@@ -59,7 +58,6 @@ Output formatters:
 ### Common Patterns
 - **Diff acquisition**: Handle file path, stdin, --pr URL parsing, --staged git diff
 - **Progress indication**: Use `ProgressEmitter` from core for spinner + JSON streaming
-- **Notifications**: After successful review, send via `@codeagora/notifications`
 - **GitHub integration**: Parse PR URLs, fetch diffs, post reviews back to GitHub
 - **Session management**: Store in `.ca/sessions/{YYYY-MM-DD}/{NNN}/`
 - **Config validation**: Load and validate via `@codeagora/core/config/loader`
@@ -78,9 +76,6 @@ Output formatters:
 - `@codeagora/core` — Pipeline orchestrator, config loader, provider registry
 - `@codeagora/shared` — Types, zod schemas, i18n, utilities
 - `@codeagora/github` — PR diff fetching, review posting, SARIF
-- `@codeagora/notifications` — Webhook sending (Discord, Slack)
-- `@codeagora/tui` — Interactive terminal UI
-
 ### External
 - `commander` — CLI framework
 - `ora` — Progress spinners

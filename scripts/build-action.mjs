@@ -15,8 +15,8 @@ const root = path.resolve(__dirname, '..');
 const workspaceResolverPlugin = {
   name: 'workspace-resolver',
   setup(build) {
-    build.onResolve({ filter: /^@codeagora\/(core|shared|github|notifications)/ }, (args) => {
-      const match = args.path.match(/^@codeagora\/(core|shared|github|notifications)\/(.+?)(?:\.js)?$/);
+    build.onResolve({ filter: /^@codeagora\/(core|shared|github)/ }, (args) => {
+      const match = args.path.match(/^@codeagora\/(core|shared|github)\/(.+?)(?:\.js)?$/);
       if (!match) return null;
       const [, pkg, subpath] = match;
       const tsPath = path.resolve(root, 'packages', pkg, 'src', subpath + '.ts');

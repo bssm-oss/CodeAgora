@@ -7,7 +7,6 @@
   "references": [
     { "path": "../core" },
     { "path": "../github" },
-    { "path": "../notifications" },
     { "path": "../shared" }
   ],
   "include": ["./src/**/*.ts"]

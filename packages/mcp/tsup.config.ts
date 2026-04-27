@@ -37,7 +37,6 @@ export default defineConfig({
     /^@openrouter\//,
     /^@codeagora\/cli/,
     /^@codeagora\/github/,
-    /^@codeagora\/notifications/,
     '@modelcontextprotocol/sdk',
     'ai',
     'zod',

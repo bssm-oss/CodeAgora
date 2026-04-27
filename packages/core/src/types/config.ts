@@ -208,13 +208,6 @@ export type ReviewersField = z.infer<typeof ReviewersFieldSchema>;
 // Full Config Schema
 // ============================================================================
 
-export const NotificationsConfigSchema = z.object({
-  discord: z.object({ webhookUrl: z.string().url() }).optional(),
-  slack: z.object({ webhookUrl: z.string().url() }).optional(),
-  autoNotify: z.boolean().optional(),
-});
-export type NotificationsConfig = z.infer<typeof NotificationsConfigSchema>;
-
 export const GitHubIntegrationSchema = z.object({
   humanReviewers: z.array(z.string()).default([]),
   humanTeams: z.array(z.string()).default([]),
@@ -303,7 +296,6 @@ export const ConfigSchema = z.object({
   errorHandling: ErrorHandlingSchema,
   chunking: ChunkingConfigSchema.optional(),
   modelRouter: ModelRouterConfigSchema.optional(),
-  notifications: NotificationsConfigSchema.optional(),
   github: GitHubIntegrationSchema.optional(),
   autoApprove: AutoApproveConfigSchema,
   prompts: PromptsConfigSchema,

@@ -15,7 +15,6 @@
     "outDir": "./dist",
     "rootDir": ".",
     "types": ["node", "vitest/globals"],
-    "jsx": "react-jsx",
     "paths": {
       "@codeagora/shared": ["./packages/shared/src/index.ts"],
       "@codeagora/shared/*": ["./packages/shared/src/*"],
@@ -23,21 +22,14 @@
       "@codeagora/core/*": ["./packages/core/src/*"],
       "@codeagora/github": ["./packages/github/src/index.ts"],
       "@codeagora/github/*": ["./packages/github/src/*"],
-      "@codeagora/notifications": ["./packages/notifications/src/index.ts"],
-      "@codeagora/notifications/*": ["./packages/notifications/src/*"],
       "@codeagora/cli": ["./packages/cli/src/index.ts"],
       "@codeagora/cli/*": ["./packages/cli/src/*"],
-      "@codeagora/tui": ["./packages/tui/src/index.ts"],
-      "@codeagora/tui/*": ["./packages/tui/src/*"],
       "@codeagora/mcp": ["./packages/mcp/src/index.ts"],
-      "@codeagora/mcp/*": ["./packages/mcp/src/*"],
-      "@codeagora/web": ["./packages/web/src/index.ts"],
-      "@codeagora/web/*": ["./packages/web/src/*"]
+      "@codeagora/mcp/*": ["./packages/mcp/src/*"]
     }
   },
   "include": [
-    "./packages/*/src/**/*.ts",
-    "./packages/*/src/**/*.tsx"
+    "./packages/*/src/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

@@ -42,7 +42,7 @@ export default defineConfig({
   bundle: true,
   splitting: false,
   // shebang already in src/index.ts — tsup preserves it
-  noExternal: [/^@codeagora\/(?!tui|web|mcp|notifications)/],
+  noExternal: [/^@codeagora\/(?!mcp)/],
   // Keep all npm dependencies external — they'll be installed from package.json
   external: [
     /^@ai-sdk\//,
@@ -50,22 +50,14 @@ export default defineConfig({
     /^@octokit\//,
     /^@clack\//,
     /^@modelcontextprotocol\//,
-    /^@hono\//,
     'ai',
     'zod',
     'commander',
     'ora',
     'yaml',
     'picocolors',
-    'ink',
-    'ink-select-input',
-    'react',
-    'hono',
     'p-limit',
-    /^@codeagora\/tui/,
-    /^@codeagora\/web/,
     /^@codeagora\/mcp/,
-    /^@codeagora\/notifications/,
   ],
   define: {
     'process.env.CODEAGORA_VERSION': JSON.stringify(PKG_VERSION),
