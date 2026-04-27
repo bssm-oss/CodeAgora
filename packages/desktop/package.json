@@ -1,0 +1,19 @@
+{
+  "name": "@codeagora/desktop",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeAgora desktop app scaffold — human-facing local UI for sessions, config, and review runs",
+  "scripts": {
+    "build": "tsup && node scripts/copy-assets.mjs",
+    "dev": "pnpm build && echo \"Open packages/desktop/dist/index.html for the scaffold preview\"",
+    "tauri:check": "pnpm build && cd src-tauri && cargo check",
+    "tauri:dev": "pnpm build && cd src-tauri && cargo run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}
