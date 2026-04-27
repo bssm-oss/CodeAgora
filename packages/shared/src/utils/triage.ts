@@ -39,6 +39,7 @@ export function classifyTriage(doc: EvidenceDocument): TriageCategory {
   const conf = doc.confidenceTrace?.final ?? doc.confidence ?? 50;
 
   if (conf < 20) return 'ignore';
+  if (doc.confidenceTrace?.classPrior && conf <= 50) return 'ignore';
 
   const isCritical = doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
   const isWarning = doc.severity === 'WARNING';

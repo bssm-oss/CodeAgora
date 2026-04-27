@@ -71,6 +71,24 @@ describe('evidenceListToActualFindings', () => {
     expect(result.map((r) => r.filePath)).toEqual(['a.ts', 'b.ts']);
   });
 
+  it('omits ignore-tier findings from benchmark output', () => {
+    const input = [
+      doc({ issueTitle: 'must fix', confidence: 90 }),
+      doc({ issueTitle: 'verify low critical', confidence: 23 }),
+      doc({
+        issueTitle: 'ignore class prior critical',
+        confidence: 40,
+        confidenceTrace: { raw: 100, filtered: 40, final: 40, classPrior: 'sorting-comparator' },
+      }),
+      doc({ issueTitle: 'ignore warning', severity: 'WARNING', confidence: 42 }),
+      doc({ issueTitle: 'ignore very low critical', confidence: 12 }),
+    ];
+
+    const result = evidenceListToActualFindings(input);
+
+    expect(result.map((r) => r.issueTitle)).toEqual(['must fix', 'verify low critical']);
+  });
+
   it('returns empty array for empty input', () => {
     expect(evidenceListToActualFindings([])).toEqual([]);
   });

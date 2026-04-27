@@ -317,6 +317,26 @@ describe('Check 4: Self-contradiction detection', () => {
   });
 });
 
+describe('Check 7: Finding-class prior', () => {
+  it('routes undeclared-type compile-error claims below the benchmark actionable threshold', () => {
+    const docs = [makeDoc({
+      issueTitle: 'Return type annotation uses undeclared Severity type',
+      problem: richProblem(
+        'The return type annotation references Severity but the type is not imported. ' +
+        'This will cause a TypeScript compilation error.',
+      ),
+      confidence: 48,
+    })];
+
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(0);
+    expect(result.uncertain).toHaveLength(1);
+    expect(result.uncertain[0].confidence).toBe(19);
+    expect(result.uncertain[0].confidenceTrace?.classPrior).toBe('undeclared-type');
+  });
+});
+
 // ============================================================================
 // Check 5: Speculative Language Penalty
 // ============================================================================

@@ -66,7 +66,7 @@ jobs:
       - name: Score results
         id: score
         run: |
-          set -e
+          set -euo pipefail
           pnpm bench:fn -- --results ${{ github.workspace }}/bench-out --json \
             > ${{ github.workspace }}/bench-out/_report.json
           pnpm bench:fn -- --results ${{ github.workspace }}/bench-out \

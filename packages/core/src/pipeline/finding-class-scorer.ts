@@ -100,6 +100,29 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     ],
   },
   {
+    id: 'undeclared-type',
+    label: 'undeclared type / missing import',
+    multiplier: 0.4,
+    patterns: [
+      /\b(?:undeclared|undefined)\s+(?:type|interface|symbol|identifier)\b/i,
+      /\b(?:not|never)\s+imported\b/i,
+      /\b(?:missing|forgot(?:ten)?)\s+import\b/i,
+      /\bcannot\s+find\s+name\b/i,
+      /\btypescript\s+compilation\s+error\b/i,
+    ],
+  },
+  {
+    id: 'sorting-comparator',
+    label: 'generic incorrect sorting comparator claim',
+    multiplier: 0.4,
+    patterns: [
+      /\bincorrect\s+sorting\b/i,
+      /\bsorting\s+logic\s+(?:is\s+)?(?:incorrect|flawed|wrong)\b/i,
+      /\bcomparator\s+(?:is\s+)?(?:incorrect|flawed|wrong)\b/i,
+      /\bwrong\s+(?:top|order|ordering)\s+(?:users|items|results|entries)\b/i,
+    ],
+  },
+  {
     id: 'generic-potential',
     label: 'generic "potential" security concern',
     multiplier: 0.85,
