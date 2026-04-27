@@ -189,7 +189,7 @@ export function classifyDiffFiles(
   const result = new Map<string, FileClassification>();
   if (!diffContent.trim()) return result;
 
-  const sections = diffContent.split(/(?=diff --git )/);
+  const sections = diffContent.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
     const trimmed = section.trim();

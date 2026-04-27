@@ -25,7 +25,7 @@ export interface DiffFileRange {
  */
 export function parseDiffFileRanges(diffContent: string): DiffFileRange[] {
   const result: DiffFileRange[] = [];
-  const sections = diffContent.split(/(?=diff --git )/);
+  const sections = diffContent.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
     const trimmed = section.trim();
@@ -176,11 +176,11 @@ export interface CodeSnippet {
  */
 export function extractFileListFromDiff(diffContent: string): string[] {
   const files: string[] = [];
-  const sections = diffContent.split(/(?=diff --git)/);
+  const sections = diffContent.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
     // Match: diff --git a/path/to/file.ts b/path/to/file.ts
-    const match = section.match(/diff --git a\/(.+?) b\//);
+    const match = section.match(/^diff --git a\/(.+?) b\//m);
     if (match) {
       files.push(match[1]);
     }
@@ -246,6 +246,9 @@ export function extractCodeSnippet(
   if (!fileSection) {
     return null;
   }
+  if (!extractFileListFromDiff(fileSection).includes(filePath)) {
+    return null;
+  }
 
   // Extract lines around the target range
   const lines = fileSection.split('\n');
@@ -306,15 +309,22 @@ export function extractCodeSnippet(
  * Extract file section from full diff
  */
 function extractFileSection(diffContent: string, filePath: string): string | null {
-  const sections = diffContent.split(/(?=diff --git)/);
+  const sections = diffContent.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
-    if (section.includes(`b/${filePath}`)) {
+    if (sectionMatchesFilePath(section, filePath)) {
       return section;
     }
   }
 
   return null;
+}
+
+function sectionMatchesFilePath(section: string, filePath: string): boolean {
+  const escapedFilePath = escapeRegExp(filePath);
+  const gitHeader = new RegExp(`^diff --git a/.+ b/${escapedFilePath}$`, 'm');
+  const newFileHeader = new RegExp(`^\\+\\+\\+ b/${escapedFilePath}$`, 'm');
+  return gitHeader.test(section) || newFileHeader.test(section);
 }
 
 /**
