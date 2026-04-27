@@ -38,9 +38,16 @@ agora review --post-review --pr 123          # Post back to PR
 | `--quiet` | Suppress progress output | — |
 | `--verbose` | Show detailed info | — |
 
-**Exit codes:** `0` = command completed and no failure gate tripped, `1` = `--fail-on-reject` or `--fail-on-severity` tripped, `2` = setup/input/config error, `3` = runtime or pipeline failure.
+**Exit codes:**
 
-`--output json` and `--json-stream` use the stable agent contract documented in [Agent Contract](AGENT_CONTRACT.md). JSON objects include `schemaVersion: "codeagora.review.v1"`.
+| Code | Meaning |
+|------|---------|
+| `0` | Review completed and no requested failure gate tripped |
+| `1` | Review completed, but `--fail-on-reject` or `--fail-on-severity` tripped |
+| `2` | Setup, input, or config error |
+| `3` | Runtime or pipeline failure, including `status: "error"` JSON results |
+
+`--output json` and `--json-stream` use the stable agent contract documented in [Agent Contract](AGENT_CONTRACT.md). JSON result objects include `schemaVersion: "codeagora.review.v1"`; NDJSON stream lines include a `type` discriminator (`progress` or `result`).
 
 ## `agora init`
 

@@ -66,6 +66,7 @@ Consumers should branch first on `schemaVersion`, then `status`, then `summary.d
 ## NDJSON Stream
 
 `agora review --json-stream` writes newline-delimited JSON only. It does not also print the normal text formatter.
+Each line is one complete JSON object with a `type` discriminator. Consumers should ignore unknown fields and continue reading until a `type: "result"` event arrives.
 
 Progress event:
 
@@ -91,6 +92,7 @@ Progress event fields:
 | `timestamp` | Unix epoch milliseconds |
 
 Result event fields are the same as JSON Result plus `type: "result"`.
+The final result event is always the last contract event emitted by the CLI command.
 
 ## Exit Codes
 
@@ -150,6 +152,20 @@ Session JSON is intentionally smaller than review JSON, but uses the same contra
 ## MCP Alignment
 
 MCP review tools default to compact output to preserve agent context.
+
+Default compact response shape:
+
+```json
+{
+  "decision": "ACCEPT",
+  "reasoning": "No blocking issues.",
+  "issues": [],
+  "summary": "No issues found.",
+  "sessionId": "2026-04-27/001"
+}
+```
+
+For compact MCP output, `decision` is `ACCEPT`, `REJECT`, `NEEDS_HUMAN`, or `ERROR`; `issues` is an array of compact finding objects; `summary` is a short string; and `sessionId` is the review session identifier when available.
 
 When a caller requests `output_format: "json"`, MCP delegates to the same CLI JSON formatter and therefore includes `schemaVersion: "codeagora.review.v1"`.
 

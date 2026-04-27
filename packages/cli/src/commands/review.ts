@@ -22,7 +22,7 @@ import { formatOutput, type OutputFormat } from '../formatters/review-output.js'
 import { parseReviewerOption, readStdin } from '../options/review-options.js';
 import { classifyCliErrorExitCode, formatError } from '../utils/errors.js';
 import { dim } from '../utils/colors.js';
-import { formatProgressNdjsonEvent, formatResultNdjsonEvent } from '../utils/agent-contract.js';
+import { formatProgressNdjsonEvent, formatResultNdjsonEvent, getAgentReviewExitCode } from '../utils/agent-contract.js';
 
 // ============================================================================
 // Types
@@ -391,26 +391,12 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       if (!options.quiet) console.error(t('cli.info.reviewPosted', { url: postResult.reviewUrl }));
     }
 
-    if (result.summary?.decision === 'REJECT' && options.failOnReject) {
-      process.exit(1);
-    }
-
-    // --fail-on-severity: exit 1 if any issue at or above the threshold
-    if (options.failOnSeverity && result.summary?.severityCounts) {
-      const order = ['SUGGESTION', 'WARNING', 'CRITICAL', 'HARSHLY_CRITICAL'];
-      const threshold = order.indexOf(options.failOnSeverity.toUpperCase());
-      if (threshold >= 0) {
-        const hasIssueAtOrAbove = order.slice(threshold).some(
-          (sev) => (result.summary!.severityCounts[sev as keyof typeof result.summary.severityCounts] ?? 0) > 0
-        );
-        if (hasIssueAtOrAbove) {
-          process.exit(1);
-        }
-      }
-    }
-
-    if (result.status !== 'success') {
-      process.exit(3);
+    const exitCode = getAgentReviewExitCode(result, {
+      failOnReject: options.failOnReject,
+      failOnSeverity: options.failOnSeverity,
+    });
+    if (exitCode !== 0) {
+      process.exit(exitCode);
     }
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
