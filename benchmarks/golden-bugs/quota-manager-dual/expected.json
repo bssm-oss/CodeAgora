@@ -14,7 +14,7 @@
     },
     {
       "filePath": "packages/shared/src/utils/quota-manager.ts",
-      "lineRange": [34, 36],
+      "lineRange": [37, 38],
       "lineTolerance": 3,
       "minSeverity": "WARNING",
       "rationale": "maybeResetWindow mutates its input quota parameter (quota.usedToday = 0; quota.windowStartMs = nowMs) despite a 'returns updated quota' contract. Breaks purity expectations for callers who share the object.",

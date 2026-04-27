@@ -61,6 +61,7 @@ describe('matchRules', () => {
     expect(doc.issueTitle).toBe('Rule: no-console');
     expect(doc.problem).toBe('Avoid console.log in production code');
     expect(doc.severity).toBe('WARNING');
+    expect(doc.confidence).toBe(70);
     expect(doc.source).toBe('rule');
     expect(doc.filePath).toBe('src/index.ts');
     expect(doc.lineRange[0]).toBe(doc.lineRange[1]); // single line

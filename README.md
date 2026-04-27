@@ -214,14 +214,57 @@ pnpm bench:fn:run -- --results ./bench-out
 pnpm bench:fn     -- --results ./bench-out
 ```
 
-The driver uses `benchmarks/.ca/config.json` — a lean 3-reviewer OpenRouter setup. A full run over the 4 seed fixtures costs roughly $0.04–$0.10 depending on discussion rounds. Add `--fixtures id1,id2` to restrict, `--skip-head` to skip the L3 verdict stage.
+The driver uses `benchmarks/.ca/config.json` by default. Dedicated run configs live under `benchmarks/.ca/`, including `config.free-smoke.json` for a one-fixture free-model gate and `config.low-cost-diverse.json` for the current low-cost diverse benchmark. Add `--fixtures id1,id2` to restrict, `--skip-head` to skip the L3 verdict stage.
 
 Two fixture kinds live side by side:
 
 - **Recall cases** (`expectedFindings` non-empty) — review must surface each listed bug. Misses count as FN.
 - **FP regression cases** (`expectedFindings` is `[]`) — review must report nothing. Any finding is a regression.
 
-Current seed fixtures: 3 recall cases (off-by-one, null-deref, SQL injection) + 1 FP regression (PR #490 moderator regex). See `benchmarks/golden-bugs/README.md` for fixture format.
+Current seed fixtures: 7 recall cases (8 expected findings total) + 4 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format.
+
+### Latest low-cost diverse run (2026-04-27)
+
+Full report: [`docs/golden-bug-benchmark-report-2026-04-27.md`](docs/golden-bug-benchmark-report-2026-04-27.md).
+
+Smoke gate:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-smoke \
+  --config benchmarks/.ca/config.free-smoke.json \
+  --fixtures authz-admin-bypass \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-smoke
+```
+
+The smoke run executed only `authz-admin-bypass` and passed that fixture (`1/1`, `fp=0`). The full-suite aggregate for `bench-out-smoke` is intentionally not meaningful because the other fixtures were not run.
+
+Full low-cost diverse run:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-low-cost-final \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-low-cost-final
+```
+
+| Metric | Result |
+|---|---:|
+| Total fixtures | 11 |
+| Recall / FP-regression fixtures | 7 / 4 |
+| Expected findings | 8 |
+| Actual findings | 21 |
+| TP / FP / FN | 8 / 0 / 0 |
+| Precision | 100.0% |
+| Recall | 100.0% |
+| F1 | 100.0% |
+| FP clean-rate | 100.0% |
+| mean recall@3 / @5 / @10 | 92.9% / 100.0% / 100.0% |
+| FP regressions triggered | 0/4 |
+
+Per-fixture result: every recall fixture passed with `fp=0`; every FP regression fixture passed. In the original full run, `quota-manager-dual` hit both expected findings (`2/2`) with `r@3=50.0%` and `r@5=100.0%`. A follow-up targeted run on the same fixture now scores `2/2`, `fp=0`, and `r@3=100.0%`; rerun the full suite in a clean environment to refresh the aggregate table.
+
+Session baseline before tuning was `TP=5 FP=20 FN=3`, precision `20.0%`, recall `62.5%`, F1 `30.3%`, and FP clean-rate `50.0%` on the low-cost diverse run.
 
 ### Baseline (n=3, 2026-04-20)
 

@@ -478,6 +478,9 @@ Before writing issues, systematically check:
 3. **Security boundaries**: Any user input reaching SQL/shell/file/network? Any auth/authz gaps?
 4. **Resource lifecycle**: Are connections/handles/memory properly acquired and released?
 5. **Logic correctness**: Do conditionals cover all cases? Off-by-one? Race conditions? Null derefs?
+   - Check for property access before a null/undefined guard.
+   - Check slice/page limits for \`limit + 1\` or inclusive/exclusive boundary mistakes.
+   - Check functions whose comments/contracts imply "returns updated value/record/copy" but mutate their input object.
 
 ## Your Task
 For each **real, actionable issue** in the **newly added or modified code**, write an evidence document:
@@ -731,6 +734,7 @@ Before flagging, systematically check:
 1. **Input validation**: Can malformed input crash or corrupt state?
 2. **Error paths**: Are failures caught, logged, propagated correctly?
 3. **Logic correctness**: Off-by-one? Null deref? Race condition? Unhandled edge case?
+   - Especially: property access before null checks, \`limit + 1\` slice bounds, and input mutation hidden behind a "returns updated value/record" contract.
 
 ## Severity (pick one per finding)
 

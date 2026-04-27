@@ -214,6 +214,211 @@ describe('scoreCase — recall path', () => {
     expect(result.falsePositives).toHaveLength(0);
     expect(result.recallAtK[3]).toBe(0.5);
   });
+
+  it('does not count duplicate findings for the same expected bug as false positives', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/foo.ts',
+          lineRange: [10, 12],
+          minSeverity: 'WARNING',
+          rationale: 'off-by-one in loop',
+          keyword: 'off-by-one',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one in loop bounds',
+        problem: 'The off-by-one returns one extra item.',
+        lineRange: [10, 12],
+      }),
+      finding({
+        issueTitle: 'Loop range is off-by-one',
+        problem: 'This is the same off-by-one defect reported by another reviewer.',
+        lineRange: [11, 11],
+      }),
+      finding({
+        issueTitle: 'Unrelated concern',
+        problem: 'Different issue in the same file.',
+        lineRange: [40, 40],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives.map((f) => f.issueTitle)).toEqual(['Unrelated concern']);
+    expect(result.metrics).toMatchObject({
+      truePositives: 1,
+      falsePositives: 1,
+      falseNegatives: 0,
+      actualFindings: 3,
+    });
+  });
+
+  it('suppresses same-root duplicates even when wording misses the expected keyword', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/db/users.ts',
+          lineRange: [5, 6],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'email is concatenated into the SQL string',
+          keyword: 'injection',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'SQL Injection Vulnerability',
+        problem: 'The email is concatenated into the SQL query string, creating SQL injection.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/db/users.ts',
+        lineRange: [5, 9],
+      }),
+      finding({
+        issueTitle: 'Insecure String Concatenation for SQL Query',
+        problem: 'The email parameter is inserted directly into the SQL query using string concatenation instead of proper parameter binding.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/db/users.ts',
+        lineRange: [7, 7],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses same-root duplicates attached to the wrong line after a true positive', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'packages/shared/src/utils/quota-manager.ts',
+          lineRange: [26, 28],
+          lineTolerance: 1,
+          minSeverity: 'CRITICAL',
+          rationale: 'slice(0, limit + 1) returns one extra quota entry',
+          keyword: 'off-by-one',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one quota pagination',
+        problem: 'The slice(0, limit + 1) call returns one extra quota record instead of respecting the limit.',
+        severity: 'CRITICAL',
+        filePath: 'packages/shared/src/utils/quota-manager.ts',
+        lineRange: [26, 28],
+      }),
+      finding({
+        issueTitle: 'Off-by-one quota check attached to comparator',
+        problem: 'The quota lookup reports the same off\u2011by\u2011one slice(0, limit + 1) defect but anchors it on the surrounding sort comparator.',
+        severity: 'CRITICAL',
+        filePath: 'packages/shared/src/utils/quota-manager.ts',
+        lineRange: [7, 7],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('computes recall@k over unique bug candidates after duplicate suppression', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/quota.ts',
+          lineRange: [10, 10],
+          minSeverity: 'WARNING',
+          rationale: 'limit + 1 returns one extra item',
+          keyword: 'off-by-one',
+        },
+        {
+          filePath: 'src/quota.ts',
+          lineRange: [30, 32],
+          minSeverity: 'WARNING',
+          rationale: 'quota object is mutated in place',
+          keyword: 'mutat',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one quota pagination',
+        problem: 'The off-by-one slice returns one extra quota record.',
+        severity: 'CRITICAL',
+        confidence: 100,
+        filePath: 'src/quota.ts',
+        lineRange: [10, 10],
+      }),
+      finding({
+        issueTitle: 'Duplicate off-by-one quota pagination',
+        problem: 'The same off-by-one slice returns one extra quota record.',
+        severity: 'CRITICAL',
+        confidence: 95,
+        filePath: 'src/quota.ts',
+        lineRange: [10, 10],
+      }),
+      finding({
+        issueTitle: 'Off-by-one attached to surrounding declaration',
+        problem: 'The same off-by-one slice defect is anchored to nearby setup code.',
+        severity: 'CRITICAL',
+        confidence: 35,
+        filePath: 'src/quota.ts',
+        lineRange: [1, 1],
+      }),
+      finding({
+        issueTitle: 'Quota reset mutates caller-owned object',
+        problem: 'The reset path mutates the quota object in place before returning it.',
+        severity: 'WARNING',
+        confidence: 100,
+        filePath: 'src/quota.ts',
+        lineRange: [30, 32],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(2);
+    expect(result.falsePositives).toHaveLength(0);
+    expect(result.recallAtK[3]).toBe(1);
+  });
+
+  it('suppresses detailed duplicates when the matched rule finding is terse', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/quota.ts',
+          lineRange: [37, 38],
+          lineTolerance: 3,
+          minSeverity: 'WARNING',
+          rationale:
+            'maybeResetWindow mutates its input quota parameter (quota.usedToday = 0; quota.windowStartMs = nowMs) despite a returned updated quota contract.',
+          keyword: 'mutat',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Rule: golden-quota-input-mutation',
+        problem: 'Input mutation in quota reset violates the returned-updated-record contract.',
+        severity: 'CRITICAL',
+        confidence: 70,
+        filePath: 'src/quota.ts',
+        lineRange: [37, 37],
+      }),
+      finding({
+        issueTitle: 'Mutates Input Object Without Documentation or Protection',
+        problem:
+          'The maybeResetWindow function mutates the quota object directly, modifying usedToday and windowStartMs before returning the same object.',
+        severity: 'CRITICAL',
+        confidence: 24,
+        filePath: 'src/quota.ts',
+        lineRange: [26, 30],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
 });
 
 describe('scoreCase — FP regression path', () => {

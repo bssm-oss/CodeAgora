@@ -1,0 +1,16 @@
+rules:
+  - id: golden-quota-limit-plus-one
+    pattern: '\.slice\(0,\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\+\s*1\)'
+    severity: CRITICAL
+    message: 'Off-by-one quota pagination: slice(0, limit + 1) returns one extra item instead of the documented limit.'
+    suggestion: 'Use slice(0, limit) so the function returns at most the requested number of entries.'
+    filePatterns:
+      - 'packages/shared/src/utils/quota-manager.ts'
+
+  - id: golden-quota-input-mutation
+    pattern: '^\s*[A-Za-z_$][A-Za-z0-9_$]*\.[A-Za-z_$][A-Za-z0-9_$]*\s*='
+    severity: CRITICAL
+    message: 'Input mutation in quota reset: assigning to fields on the quota parameter violates the returned-updated-record contract.'
+    suggestion: 'Return a copied quota object with updated fields instead of mutating the input object in place.'
+    filePatterns:
+      - 'packages/shared/src/utils/quota-manager.ts'

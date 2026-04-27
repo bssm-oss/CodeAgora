@@ -64,6 +64,10 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/').replace(/^\.\//, '');
 }
 
+function normalizeText(text: string): string {
+  return text.toLowerCase().replace(/[\u2010-\u2015\uFE58\uFE63\uFF0D]/g, '-');
+}
+
 function rangesOverlap(
   a: [number, number],
   b: [number, number],
@@ -92,12 +96,112 @@ function findingMatches(
   }
 
   if (expected.keyword) {
-    const kw = expected.keyword.toLowerCase();
-    const haystack = `${actual.issueTitle}\n${actual.problem}`.toLowerCase();
+    const kw = normalizeText(expected.keyword);
+    const haystack = normalizeText(`${actual.issueTitle}\n${actual.problem}`);
     if (!haystack.includes(kw)) return false;
   }
 
   return true;
+}
+
+const GENERIC_MATCH_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'be',
+  'by',
+  'can',
+  'code',
+  'could',
+  'directly',
+  'error',
+  'file',
+  'for',
+  'from',
+  'in',
+  'input',
+  'into',
+  'is',
+  'issue',
+  'line',
+  'missing',
+  'not',
+  'of',
+  'or',
+  'parameter',
+  'problem',
+  'proper',
+  'risk',
+  'the',
+  'this',
+  'to',
+  'user',
+  'using',
+  'with',
+]);
+
+function signalTokensFromText(text: string): Set<string> {
+  text = normalizeText(text);
+  const tokens = text.match(/[a-z0-9_]{3,}/g) ?? [];
+  return new Set(tokens.filter((token) => !GENERIC_MATCH_WORDS.has(token)));
+}
+
+function signalTokens(finding: ActualFinding): Set<string> {
+  return signalTokensFromText(`${finding.issueTitle}\n${finding.problem}`);
+}
+
+function expectedSignalTokens(expected: ExpectedFinding): Set<string> {
+  return signalTokensFromText(`${expected.rationale}\n${expected.keyword ?? ''}`);
+}
+
+function tokenOverlap(a: Set<string>, b: Set<string>): number {
+  const smaller = a.size <= b.size ? a : b;
+  const larger = a.size <= b.size ? b : a;
+  if (smaller.size === 0) return 0;
+  let overlap = 0;
+  for (const token of smaller) {
+    if (larger.has(token)) overlap++;
+  }
+  return overlap / smaller.size;
+}
+
+function duplicateOfMatchedFinding(
+  expected: ExpectedFinding,
+  matchedActual: ActualFinding,
+  candidate: ActualFinding,
+): boolean {
+  if (normalizePath(expected.filePath) !== normalizePath(candidate.filePath)) {
+    return false;
+  }
+
+  const tol = expected.lineTolerance ?? DEFAULT_LINE_TOLERANCE;
+  if (SEVERITY_RANK[candidate.severity] < SEVERITY_RANK[expected.minSeverity]) {
+    return false;
+  }
+
+  const candidateTokens = signalTokens(candidate);
+  const overlap = Math.max(
+    tokenOverlap(candidateTokens, signalTokens(matchedActual)),
+    tokenOverlap(candidateTokens, expectedSignalTokens(expected)),
+  );
+  if (
+    rangesOverlap(candidate.lineRange, expected.lineRange, tol) &&
+    rangesOverlap(candidate.lineRange, matchedActual.lineRange, tol)
+  ) {
+    return overlap >= 0.25;
+  }
+
+  // Some reviewers identify the same root cause but attach the finding to a
+  // nearby declaration/JSDoc line. Once the expected finding has already been
+  // hit, don't count these as fresh FPs if the text still names the expected
+  // bug class and overlaps strongly with the matched finding.
+  if (expected.keyword) {
+    const haystack = normalizeText(`${candidate.issueTitle}\n${candidate.problem}`);
+    return haystack.includes(normalizeText(expected.keyword)) && overlap >= 0.35;
+  }
+
+  return false;
 }
 
 /**
@@ -110,6 +214,48 @@ function rankFindings(findings: ActualFinding[]): ActualFinding[] {
     if (sevDiff !== 0) return sevDiff;
     return (b.confidence ?? 0) - (a.confidence ?? 0);
   });
+}
+
+function matchingUnclaimedExpected(
+  expectedFindings: ExpectedFinding[],
+  finding: ActualFinding,
+  claimedExpected: Set<ExpectedFinding>,
+): ExpectedFinding | null {
+  for (const expected of expectedFindings) {
+    if (claimedExpected.has(expected)) continue;
+    if (findingMatches(expected, finding)) return expected;
+  }
+  return null;
+}
+
+function rankUniqueFindingsForRecall(
+  expectedFindings: ExpectedFinding[],
+  ranked: ActualFinding[],
+): ActualFinding[] {
+  const unique: ActualFinding[] = [];
+  const matchedForDedup: CaseMatch[] = [];
+  const claimedExpected = new Set<ExpectedFinding>();
+
+  for (const finding of ranked) {
+    const newMatch = matchingUnclaimedExpected(expectedFindings, finding, claimedExpected);
+    const duplicateOfKnownHit = matchedForDedup.some((m) =>
+      findingMatches(m.expected, finding) ||
+      duplicateOfMatchedFinding(m.expected, m.actual, finding)
+    );
+
+    if (!newMatch && duplicateOfKnownHit) {
+      continue;
+    }
+
+    unique.push(finding);
+
+    if (newMatch) {
+      matchedForDedup.push({ expected: newMatch, actual: finding });
+      claimedExpected.add(newMatch);
+    }
+  }
+
+  return unique;
 }
 
 export interface ScoreOptions {
@@ -161,11 +307,22 @@ export function scoreCase(
 
   const matchedExpected = new Set(matched.map((m) => m.expected));
   const missed = fixture.expectedFindings.filter((e) => !matchedExpected.has(e));
-  const falsePositives = ranked.filter((_, i) => !claimedActualIdx.has(i));
+  const falsePositives = ranked.filter((finding, i) => {
+    if (claimedActualIdx.has(i)) return false;
+    // Multiple reviewers often report the same golden bug with slightly
+    // different titles/ranges. Count the first one as the TP, but don't
+    // inflate FP with additional findings that still match an already-hit
+    // expected bug.
+    return !matched.some((m) =>
+      findingMatches(m.expected, finding) ||
+      duplicateOfMatchedFinding(m.expected, m.actual, finding)
+    );
+  });
 
   const recallAtK: Record<number, number | null> = {};
+  const rankedForRecall = rankUniqueFindingsForRecall(fixture.expectedFindings, ranked);
   for (const k of kValues) {
-    const topK = ranked.slice(0, k);
+    const topK = rankedForRecall.slice(0, k);
     let hits = 0;
     const claimedInK = new Set<number>();
     for (const expected of fixture.expectedFindings) {
