@@ -1,0 +1,17 @@
+{
+  "id": "authz-admin-bypass",
+  "title": "deleteAccountHandler drops server-side admin authorization",
+  "source": "synthetic — authorization guard removal",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "src/api/admin.ts",
+      "lineRange": [15, 15],
+      "lineTolerance": 6,
+      "minSeverity": "CRITICAL",
+      "rationale": "The server no longer calls requireAdmin before deleting another account, so any authenticated user can invoke the handler directly.",
+      "keyword": "admin"
+    }
+  ],
+  "notes": "Recall fixture for auth/authorization: UI gating is not a substitute for server-side access control."
+}

@@ -1,0 +1,8 @@
+{
+  "id": "fp-type-only-import-refactor",
+  "title": "type-only import style refactor",
+  "source": "synthetic — import/type false-positive guard",
+  "category": "fp-regression",
+  "expectedFindings": [],
+  "notes": "FP regression fixture: changing inline type imports to an import type declaration is behavior-preserving."
+}

@@ -1,0 +1,22 @@
+diff --git a/docs/release-runbook.md b/docs/release-runbook.md
+index 9999999..aaaaaaa 100644
+--- a/docs/release-runbook.md
++++ b/docs/release-runbook.md
+@@ -1,10 +1,17 @@
+ # Release runbook
+
+ ## Before publishing
+
+ - Confirm CI is green.
+ - Confirm the changelog has a section for the release.
+ - Confirm the package version was bumped.
+
++## After publishing
++
++- Tag the release commit.
++- Verify the GitHub Action uses the published package.
++- Announce the release in the maintainer channel.
++
+ ## Rollback
+
+ Restore the previous package version and publish a patch release if needed.

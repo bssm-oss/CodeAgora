@@ -1,0 +1,8 @@
+{
+  "id": "fp-docs-only-runbook",
+  "title": "docs-only release runbook update",
+  "source": "synthetic — docs-only diff",
+  "category": "fp-regression",
+  "expectedFindings": [],
+  "notes": "FP regression fixture: documentation-only changes should not be reported as code defects."
+}

@@ -1,0 +1,30 @@
+diff --git a/src/profile/cache.ts b/src/profile/cache.ts
+index 3333333..4444444 100644
+--- a/src/profile/cache.ts
++++ b/src/profile/cache.ts
+@@ -1,19 +1,18 @@
+ interface Profile {
+   id: string;
+   displayName: string;
+   updatedAt: number;
+ }
+
+ const cache = new Map<string, Profile>();
+
+ export async function refreshProfile(id: string, load: () => Promise<Profile>): Promise<Profile> {
+-  const fresh = await load();
+-  const current = cache.get(id);
+-  if (!current || fresh.updatedAt >= current.updatedAt) {
+-    cache.set(id, fresh);
+-  }
+-  return fresh;
++  const current = cache.get(id);
++  load().then((fresh) => {
++    cache.set(id, fresh);
++  });
++  return current ?? await load();
+ }
+
+ export function getCachedProfile(id: string): Profile | undefined {
+   return cache.get(id);
+ }

@@ -1,0 +1,19 @@
+diff --git a/src/session/serializer.ts b/src/session/serializer.ts
+index bbbbbbb..ccccccc 100644
+--- a/src/session/serializer.ts
++++ b/src/session/serializer.ts
+@@ -1,12 +1,12 @@
+-import { type Session, type SessionPayload } from './types.js';
++import type { Session, SessionPayload } from './types.js';
+
+ export function serializeSession(session: Session): SessionPayload {
+   return {
+     id: session.id,
+     userId: session.userId,
+     expiresAt: session.expiresAt.toISOString(),
+   };
+ }
+
+ export function isExpired(session: Session, now = new Date()): boolean {
+   return session.expiresAt <= now;
+ }

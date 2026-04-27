@@ -1,0 +1,17 @@
+{
+  "id": "async-stale-profile-cache",
+  "title": "refreshProfile can overwrite fresh cache entries with stale async results",
+  "source": "synthetic — async race/stale state",
+  "category": "hotfix",
+  "expectedFindings": [
+    {
+      "filePath": "src/profile/cache.ts",
+      "lineRange": [11, 13],
+      "lineTolerance": 4,
+      "minSeverity": "WARNING",
+      "rationale": "The fire-and-forget load writes to cache without checking updatedAt, so a slower older request can overwrite a newer profile.",
+      "keyword": "cache"
+    }
+  ],
+  "notes": "Recall fixture for async race/stale state. The removed timestamp guard is the key bug."
+}

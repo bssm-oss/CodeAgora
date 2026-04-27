@@ -1,0 +1,8 @@
+{
+  "id": "fp-stable-sorting-refactor",
+  "title": "deterministic tie-breaker added to search result sorting",
+  "source": "synthetic — sorting false-positive guard",
+  "category": "fp-regression",
+  "expectedFindings": [],
+  "notes": "FP regression fixture: the sort still orders by descending score and only adds a deterministic title tie-breaker."
+}
