@@ -214,6 +214,46 @@ describe('scoreCase — recall path', () => {
     expect(result.falsePositives).toHaveLength(0);
     expect(result.recallAtK[3]).toBe(0.5);
   });
+
+  it('does not count duplicate findings for the same expected bug as false positives', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/foo.ts',
+          lineRange: [10, 12],
+          minSeverity: 'WARNING',
+          rationale: 'off-by-one in loop',
+          keyword: 'off-by-one',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one in loop bounds',
+        problem: 'The off-by-one returns one extra item.',
+        lineRange: [10, 12],
+      }),
+      finding({
+        issueTitle: 'Loop range is off-by-one',
+        problem: 'This is the same off-by-one defect reported by another reviewer.',
+        lineRange: [11, 11],
+      }),
+      finding({
+        issueTitle: 'Unrelated concern',
+        problem: 'Different issue in the same file.',
+        lineRange: [40, 40],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives.map((f) => f.issueTitle)).toEqual(['Unrelated concern']);
+    expect(result.metrics).toMatchObject({
+      truePositives: 1,
+      falsePositives: 1,
+      falseNegatives: 0,
+      actualFindings: 3,
+    });
+  });
 });
 
 describe('scoreCase — FP regression path', () => {

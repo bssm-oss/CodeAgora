@@ -77,8 +77,8 @@ describe('evidenceListToActualFindings', () => {
       doc({ issueTitle: 'verify low critical', confidence: 23 }),
       doc({
         issueTitle: 'ignore class prior critical',
-        confidence: 40,
-        confidenceTrace: { raw: 100, filtered: 40, final: 40, classPrior: 'sorting-comparator' },
+        confidence: 70,
+        confidenceTrace: { raw: 100, filtered: 70, final: 70, classPrior: 'sorting-comparator' },
       }),
       doc({ issueTitle: 'ignore warning', severity: 'WARNING', confidence: 42 }),
       doc({ issueTitle: 'ignore very low critical', confidence: 12 }),

@@ -161,7 +161,14 @@ export function scoreCase(
 
   const matchedExpected = new Set(matched.map((m) => m.expected));
   const missed = fixture.expectedFindings.filter((e) => !matchedExpected.has(e));
-  const falsePositives = ranked.filter((_, i) => !claimedActualIdx.has(i));
+  const falsePositives = ranked.filter((finding, i) => {
+    if (claimedActualIdx.has(i)) return false;
+    // Multiple reviewers often report the same golden bug with slightly
+    // different titles/ranges. Count the first one as the TP, but don't
+    // inflate FP with additional findings that still match an already-hit
+    // expected bug.
+    return !matched.some((m) => findingMatches(m.expected, finding));
+  });
 
   const recallAtK: Record<number, number | null> = {};
   for (const k of kValues) {

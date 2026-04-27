@@ -210,8 +210,18 @@ export async function executeL2Discussions(
     const matchingDocs = allEvidenceDocs.filter(d =>
       d.filePath === verdict.filePath && Math.abs(d.lineRange[0] - verdict.lineRange[0]) <= 5
     );
+    const hasL1Consensus = matchingDocs.filter((doc) => !doc.confidenceTrace?.classPrior).length >= 2;
     for (const doc of matchingDocs) {
-      const adjusted = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
+      let adjusted = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
+      if (verdict.finalSeverity === 'DISMISSED' && hasL1Consensus && !doc.confidenceTrace?.classPrior) {
+        adjusted = 50;
+      }
+      // Class-prior findings are empirically FP-heavy. L2 agreement is useful
+      // signal, but it should not turn a prior-penalized concern into a
+      // must-fix finding by itself.
+      if (doc.confidenceTrace?.classPrior && verdict.finalSeverity !== 'DISMISSED') {
+        adjusted = Math.min(adjusted, 50);
+      }
       doc.confidence = adjusted; // BC: legacy single-field confidence
       // ConfidenceTrace: record final confidence (stage 5 of 5).
       doc.confidenceTrace = {

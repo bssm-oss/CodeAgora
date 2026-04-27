@@ -104,6 +104,116 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('zero-width');
   });
 
+  it('catches prototype pollution claims against JSON/schema parsing', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Prototype Pollution via JSON Parsing',
+        problem:
+          'The parseForcedDecisionJson function parses JSON input and validates with a Zod schema, but could allow prototype pollution.',
+      }),
+    )!;
+    expect(match.id).toBe('prototype-pollution-json-parse');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches generic weak regex extractor claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Weak Regex for Code Block Detection',
+        problem: 'The regex may not reliably match all markdown code block formats.',
+      }),
+    )!;
+    expect(match.id).toBe('weak-regex-extractor');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches malformed fence detection regex claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Unreliable extraction of JSON payload due to malformed fence detection',
+        problem: 'The regex prevents matching a fenced code block.',
+      }),
+    )!;
+    expect(match.id).toBe('weak-regex-extractor');
+  });
+
+  it('catches malformed JSON parser edge-case claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incorrect Return Value in extractModeratorJsonPayload',
+        problem:
+          "The function doesn't distinguish between valid JSON and malformed input that starts with a JSON brace.",
+      }),
+    )!;
+    expect(match.id).toBe('malformed-json-parser-edge');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches speculative XSS claims that rely on a hypothetical rendering context', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential XSS Vulnerability via Malicious JSON Payload',
+        problem:
+          'The reasoning field could contain malicious JavaScript that executes if the output is rendered in a browser dashboard.',
+      }),
+    )!;
+    expect(match.id).toBe('speculative-rendered-xss');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches JSON-payload XSS claims without a concrete sink', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential XSS Vulnerability via Improper JSON Payload Handling',
+        problem: 'The JSON payload could cause malicious code execution in downstream consumers.',
+      }),
+    )!;
+    expect(match.id).toBe('speculative-rendered-xss');
+  });
+
+  it('catches internal enum mismatch compatibility claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Weak JSON Schema Validation for Severity Enum',
+        problem:
+          "The schema allows DISMISSED, which may not be a valid value for the consuming code's Severity enum.",
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches schema/use-case mismatch claims for moderator JSON', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: "Schema Validation Doesn't Match Actual Use Case",
+        problem: 'The reasoning field might be empty or missing, causing valid JSON responses to be incorrectly rejected.',
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+  });
+
+  it('catches missing payload size limit claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'No maximum payload size limit in extractModeratorJsonPayload',
+        problem: 'The parser accepts an unbounded payload from a model response.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-size-limit');
+    expect(match.multiplier).toBe(0.6);
+  });
+
+  it('catches large JSON payload denial-of-service claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Denial of Service via Large JSON Payload',
+        problem: 'JSON.parse(payload) has no size or complexity limits for deeply nested JSON.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-size-limit');
+  });
+
   it('catches "missing null guard" (PR #499 self-review FP)', () => {
     const match = matchFindingClass(
       doc({
@@ -163,6 +273,17 @@ describe('matchFindingClass — positive matches', () => {
         issueTitle: 'Incorrect sorting in findExceededUsers when daily limits differ',
         problem:
           'The sorting logic is flawed and could return the wrong top users when limits vary.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches NaN sort-instability claims against stable sorting refactors', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential sort instability when scores are NaN',
+        problem: 'Returning NaN from the sort comparator could make result ordering unpredictable.',
       }),
     )!;
     expect(match.id).toBe('sorting-comparator');
