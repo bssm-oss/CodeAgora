@@ -36,7 +36,13 @@ fn read_json(path: &Path) -> Option<Value> {
 }
 
 fn read_optional_text(path: &Path) -> Option<String> {
-    fs::read_to_string(path).ok().filter(|raw| !raw.trim().is_empty())
+    fs::read_to_string(path)
+        .ok()
+        .filter(|raw| !raw.trim().is_empty())
+}
+
+fn read_session_verdict(dir: &Path) -> Option<Value> {
+    read_json(&dir.join("head-verdict.json")).or_else(|| read_json(&dir.join("result.json")))
 }
 
 fn session_parts(id: &str) -> Result<(&str, &str), String> {
@@ -44,8 +50,12 @@ fn session_parts(id: &str) -> Result<(&str, &str), String> {
     let date = parts.next().unwrap_or_default();
     let session_id = parts.next().unwrap_or_default();
     if parts.next().is_some()
-        || !date.chars().all(|char| char.is_ascii_digit() || char == '-')
-        || !session_id.chars().all(|char| char.is_ascii_alphanumeric() || char == '-' || char == '_')
+        || !date
+            .chars()
+            .all(|char| char.is_ascii_digit() || char == '-')
+        || !session_id
+            .chars()
+            .all(|char| char.is_ascii_alphanumeric() || char == '-' || char == '_')
         || date.is_empty()
         || session_id.is_empty()
     {
@@ -73,9 +83,20 @@ fn status_from_metadata(metadata: Option<&Value>) -> String {
 
 fn updated_at_from_metadata(metadata: Option<&Value>) -> Option<String> {
     let millis = metadata
-        .and_then(|value| value.get("completedAt").or_else(|| value.get("startedAt")).or_else(|| value.get("timestamp")))
+        .and_then(|value| {
+            value
+                .get("completedAt")
+                .or_else(|| value.get("startedAt"))
+                .or_else(|| value.get("timestamp"))
+        })
         .and_then(Value::as_i64)?;
     Some(millis.to_string())
+}
+
+fn summary_object(verdict: Option<&Value>) -> Option<&serde_json::Map<String, Value>> {
+    verdict
+        .and_then(|value| value.get("summary"))
+        .and_then(Value::as_object)
 }
 
 fn issue_objects(verdict: Option<&Value>) -> Vec<Value> {
@@ -85,11 +106,25 @@ fn issue_objects(verdict: Option<&Value>) -> Vec<Value> {
     ["issues", "findings", "items"]
         .iter()
         .find_map(|key| verdict.get(key).and_then(Value::as_array))
+        .or_else(|| {
+            verdict
+                .get("summary")
+                .and_then(|summary| summary.get("topIssues"))
+                .and_then(Value::as_array)
+        })
+        .or_else(|| verdict.get("evidenceDocs").and_then(Value::as_array))
         .cloned()
         .unwrap_or_default()
 }
 
-fn severity_counts(issues: &[Value]) -> Value {
+fn severity_counts(verdict: Option<&Value>, issues: &[Value]) -> Value {
+    if let Some(counts) = summary_object(verdict)
+        .and_then(|summary| summary.get("severityCounts"))
+        .and_then(Value::as_object)
+    {
+        return Value::Object(counts.clone());
+    }
+
     let mut counts = serde_json::Map::new();
     for issue in issues {
         let severity = issue
@@ -102,8 +137,40 @@ fn severity_counts(issues: &[Value]) -> Value {
     Value::Object(counts)
 }
 
-fn top_issues(issues: &[Value]) -> Vec<Value> {
-    issues
+fn text_field<'a>(value: Option<&'a Value>, keys: &[&str]) -> Option<&'a str> {
+    let value = value?;
+    for key in keys {
+        if let Some(found) = value.get(*key).and_then(Value::as_str) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn verdict_decision(verdict: Option<&Value>) -> Option<&str> {
+    text_field(verdict, &["decision", "verdict"]).or_else(|| {
+        summary_object(verdict)
+            .and_then(|summary| summary.get("decision"))
+            .and_then(Value::as_str)
+    })
+}
+
+fn verdict_reasoning(verdict: Option<&Value>) -> Option<&str> {
+    text_field(verdict, &["reasoning", "summary"]).or_else(|| {
+        summary_object(verdict)
+            .and_then(|summary| summary.get("reasoning"))
+            .and_then(Value::as_str)
+    })
+}
+
+fn top_issues(verdict: Option<&Value>, issues: &[Value]) -> Vec<Value> {
+    let source = summary_object(verdict)
+        .and_then(|summary| summary.get("topIssues"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_else(|| issues.to_vec());
+
+    source
         .iter()
         .take(5)
         .map(|issue| {
@@ -140,7 +207,13 @@ fn top_issues(issues: &[Value]) -> Vec<Value> {
         .collect()
 }
 
-fn session_entry(date: &str, session_id: &str, dir: &Path, metadata: Option<&Value>, verdict: Option<&Value>) -> Value {
+fn session_entry(
+    date: &str,
+    session_id: &str,
+    dir: &Path,
+    metadata: Option<&Value>,
+    verdict: Option<&Value>,
+) -> Value {
     let id = format!("{date}/{session_id}");
     let issues = issue_objects(verdict);
     json!({
@@ -149,14 +222,10 @@ fn session_entry(date: &str, session_id: &str, dir: &Path, metadata: Option<&Val
         "sessionId": session_id,
         "status": status_from_metadata(metadata),
         "dirPath": dir.display().to_string(),
-        "decision": verdict
-            .and_then(|value| value.get("decision").or_else(|| value.get("verdict")))
-            .and_then(Value::as_str),
-        "reasoning": verdict
-            .and_then(|value| value.get("reasoning").or_else(|| value.get("summary")))
-            .and_then(Value::as_str),
-        "severityCounts": severity_counts(&issues),
-        "topIssues": top_issues(&issues),
+        "decision": verdict_decision(verdict),
+        "reasoning": verdict_reasoning(verdict),
+        "severityCounts": severity_counts(verdict, &issues),
+        "topIssues": top_issues(verdict, &issues),
         "updatedAt": updated_at_from_metadata(metadata),
     })
 }
@@ -169,12 +238,16 @@ fn session_detail_value(id: &str) -> Result<Value, String> {
 
     let (date, session_id) = session_parts(id)?;
     let metadata = read_json(&dir.join("metadata.json"));
-    let verdict = read_json(&dir.join("head-verdict.json"));
+    let verdict = read_session_verdict(&dir);
     let markdown = read_optional_text(&dir.join("report.md"))
         .or_else(|| read_optional_text(&dir.join("result.md")))
         .or_else(|| read_optional_text(&dir.join("suggestions.md")));
-    let evidence_count = fs::read_dir(dir.join("reviews")).map(|entries| entries.count()).unwrap_or(0);
-    let discussions_count = fs::read_dir(dir.join("discussions")).map(|entries| entries.count()).unwrap_or(0);
+    let evidence_count = fs::read_dir(dir.join("reviews"))
+        .map(|entries| entries.count())
+        .unwrap_or(0);
+    let discussions_count = fs::read_dir(dir.join("discussions"))
+        .map(|entries| entries.count())
+        .unwrap_or(0);
 
     Ok(json!({
         "entry": session_entry(date, session_id, &dir, metadata.as_ref(), verdict.as_ref()),
@@ -240,7 +313,10 @@ fn list_sessions() -> Result<Value, String> {
 
     for date_entry in date_dirs {
         let date = date_entry.file_name().to_string_lossy().to_string();
-        if !date.chars().all(|char| char.is_ascii_digit() || char == '-') {
+        if !date
+            .chars()
+            .all(|char| char.is_ascii_digit() || char == '-')
+        {
             continue;
         }
         let mut session_dirs = fs::read_dir(date_entry.path())
@@ -255,8 +331,14 @@ fn list_sessions() -> Result<Value, String> {
             let session_id = session_entry_dir.file_name().to_string_lossy().to_string();
             let dir = session_entry_dir.path();
             let metadata = read_json(&dir.join("metadata.json"));
-            let verdict = read_json(&dir.join("head-verdict.json"));
-            sessions.push(session_entry(&date, &session_id, &dir, metadata.as_ref(), verdict.as_ref()));
+            let verdict = read_session_verdict(&dir);
+            sessions.push(session_entry(
+                &date,
+                &session_id,
+                &dir,
+                metadata.as_ref(),
+                verdict.as_ref(),
+            ));
             if sessions.len() >= 25 {
                 return Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": sessions }));
             }
@@ -282,9 +364,12 @@ fn run_review(app: tauri::AppHandle, staged: bool) -> Result<CommandResult, Stri
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let session_id = stdout.lines().rev().find_map(|line| {
-        serde_json::from_str::<Value>(line)
-            .ok()
-            .and_then(|value| value.get("sessionId").and_then(|id| id.as_str()).map(str::to_owned))
+        serde_json::from_str::<Value>(line).ok().and_then(|value| {
+            value
+                .get("sessionId")
+                .and_then(|id| id.as_str())
+                .map(str::to_owned)
+        })
     });
 
     let result = CommandResult {
@@ -305,7 +390,8 @@ fn run_review(app: tauri::AppHandle, staged: bool) -> Result<CommandResult, Stri
 #[tauri::command]
 fn read_config() -> Result<DesktopConfig, String> {
     let path = repo_root()?.join(".ca").join("config.json");
-    let raw = fs::read_to_string(&path).unwrap_or_else(|_| "{\n  \"language\": \"en\",\n  \"reviewers\": []\n}\n".to_string());
+    let raw = fs::read_to_string(&path)
+        .unwrap_or_else(|_| "{\n  \"language\": \"en\",\n  \"reviewers\": []\n}\n".to_string());
     Ok(DesktopConfig {
         raw,
         path: path.display().to_string(),
