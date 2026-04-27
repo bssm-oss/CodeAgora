@@ -83,6 +83,16 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('missing-validation');
   });
 
+  it('catches incomplete validation phrasing for required property claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incomplete Input Validation in parseQuotaConfig',
+        problem: 'The parseQuotaConfig function does not verify that the input has the required limits property.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-validation');
+  });
+
   it('catches zero-width-space claim against pure-ASCII code (PR #490 FP)', () => {
     const match = matchFindingClass(
       doc({

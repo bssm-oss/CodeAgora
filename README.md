@@ -262,7 +262,7 @@ pnpm bench:fn -- --results ./bench-out-low-cost-final
 | mean recall@3 / @5 / @10 | 92.9% / 100.0% / 100.0% |
 | FP regressions triggered | 0/4 |
 
-Per-fixture result: every recall fixture passed with `fp=0`; every FP regression fixture passed. `quota-manager-dual` hit both expected findings (`2/2`) with `r@3=50.0%` and `r@5=100.0%`, so the next tuning candidate is ranking the second quota finding into the top 3.
+Per-fixture result: every recall fixture passed with `fp=0`; every FP regression fixture passed. In the original full run, `quota-manager-dual` hit both expected findings (`2/2`) with `r@3=50.0%` and `r@5=100.0%`. A follow-up targeted run on the same fixture now scores `2/2`, `fp=0`, and `r@3=100.0%`; rerun the full suite in a clean environment to refresh the aggregate table.
 
 Session baseline before tuning was `TP=5 FP=20 FN=3`, precision `20.0%`, recall `62.5%`, F1 `30.3%`, and FP clean-rate `50.0%` on the low-cost diverse run.
 

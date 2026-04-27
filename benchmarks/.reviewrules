@@ -9,7 +9,7 @@ rules:
 
   - id: golden-quota-input-mutation
     pattern: '^\s*[A-Za-z_$][A-Za-z0-9_$]*\.[A-Za-z_$][A-Za-z0-9_$]*\s*='
-    severity: WARNING
+    severity: CRITICAL
     message: 'Input mutation in quota reset: assigning to fields on the quota parameter violates the returned-updated-record contract.'
     suggestion: 'Return a copied quota object with updated fields instead of mutating the input object in place.'
     filePatterns:

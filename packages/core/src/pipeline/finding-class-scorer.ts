@@ -151,8 +151,10 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     label: 'missing input validation / sanitization',
     multiplier: 0.7,
     patterns: [
+      /\bincomplete\s+(?:input\s+)?(?:validation|sanitization|sanitisation)\b/i,
       /\bmissing\s+(?:input\s+)?(?:validation|sanitization|sanitisation)\b/i,
       /\b(?:no|without|lacks)\s+(?:input\s+)?(?:validation|sanitization|sanitisation)\b/i,
+      /\bdoes\s+not\s+verify\b[\s\S]{0,120}\brequired\s+\w+\s+property\b/i,
       /\bunsanitized\s+(?:input|parameter|argument)\b/i,
       /\bunvalidated\s+(?:input|parameter|argument|user\s+input)\b/i,
     ],

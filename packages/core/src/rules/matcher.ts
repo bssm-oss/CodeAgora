@@ -20,6 +20,8 @@ interface DiffFile {
   addedLines: DiffLine[];
 }
 
+const RULE_CONFIDENCE = 70;
+
 /**
  * Parse unified diff into per-file added lines with line numbers.
  */
@@ -122,6 +124,7 @@ export function matchRules(diffContent: string, rules: CompiledRule[]): Evidence
             filePath,
             lineRange: [lineNum, lineNum],
             source: 'rule',
+            confidence: RULE_CONFIDENCE,
           });
         }
       }

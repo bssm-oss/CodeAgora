@@ -93,7 +93,27 @@ The full low-cost diverse run produced:
 | quota-manager-dual | recall | 2/2 | 0 | 50.0% | 100.0% | 100.0% |
 | sql-injection-concat | recall | 1/1 | 0 | 100.0% | 100.0% | 100.0% |
 
-The only remaining quality gap is ranking, not hit rate: `quota-manager-dual` catches both expected findings, but one finding lands outside the top 3 and inside the top 5.
+The original full run's only remaining quality gap was ranking, not hit rate: `quota-manager-dual` caught both expected findings, but one finding landed outside the top 3 and inside the top 5.
+
+## Follow-Up Top-3 Tuning
+
+PR #507 includes a targeted follow-up for the `quota-manager-dual` ranking gap. The rerun used:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-quota-top3-v4 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures quota-manager-dual \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-quota-top3-v4
+```
+
+Targeted result:
+
+| Fixture | Result | FP | recall@3 | recall@5 | recall@10 |
+|---|---:|---:|---:|---:|---:|
+| quota-manager-dual | 2/2 | 0 | 100.0% | 100.0% | 100.0% |
+
+This targeted aggregate reports the other fixtures as missed because they were not rerun. It should be read only as the quota fixture follow-up. A full-suite rerun is still needed to refresh the aggregate `mean recall@3` table.
 
 ## Before and After
 
@@ -124,8 +144,11 @@ Key implementation changes:
 - Strong non-class-prior L1 consensus can survive an L2 dismissal at low confidence, preserving useful recall while still avoiding must-fix escalation.
 - Reviewer prompts and logic persona guidance now call out benchmark-relevant bug shapes: null access before checks, `limit + 1` slice bounds, and input mutation despite an updated-record contract.
 - Benchmark-scoped `.reviewrules` now anchor the quota fixture's two expected issues.
+- Rule-based findings now carry deterministic confidence so exact rule anchors rank above low-confidence LLM duplicates.
 - Golden-bug scorer text matching normalizes Unicode dash variants, which avoids treating ASCII-hyphen and non-ASCII-dash spellings of `off-by-one` as different bug classes.
 - Same-root duplicate suppression now handles findings that describe the correct bug but anchor to a nearby declaration or documentation line after a true positive has already been counted.
+- `recall@k` now uses unique bug candidates after same-root duplicate suppression, so duplicate reports of one already-hit bug do not crowd out a different expected bug.
+- The quota fixture's mutation line range was aligned with the scorer's post-patch coordinates, and a generic incomplete-validation prior now catches a recurring `parseQuotaConfig` phantom.
 
 ## Interpretation
 
@@ -141,13 +164,13 @@ The result is strong but should be treated as a calibrated benchmark snapshot, n
 
 - The run used `--skip-head`, so it measures reviewer, rules, triage, and discussion output without final L3 verdict synthesis.
 - Low-cost OpenRouter model behavior can drift over time as upstream providers update models or routing.
-- `quota-manager-dual` still has imperfect top-3 ranking despite full recall by top 5.
+- The latest quota targeted run resolves the top-3 ranking gap, but the full suite has not yet been rerun after that follow-up.
 - Benchmark-scoped rules improve this fixture set but should not be mistaken for broad production rules without additional validation.
 - The scorer now suppresses same-root duplicate findings more aggressively after a true positive. This improves benchmark accounting, but future fixture additions should include regression tests for unrelated same-file findings so this logic stays narrow.
 
 ## Next Tuning Candidates
 
-1. Improve ranking for `quota-manager-dual` so both expected findings land inside top 3.
+1. Rerun the full low-cost diverse suite after the quota top-3 follow-up to refresh aggregate recall@3.
 2. Add at least one multi-bug recall fixture that is not quota-related to validate duplicate suppression against unrelated same-file bugs.
 3. Run the same fixture set with L3 enabled and compare final verdict precision against the `--skip-head` measurement.
 4. Add a second full run for variance tracking, because low-cost model routing can be noisy.

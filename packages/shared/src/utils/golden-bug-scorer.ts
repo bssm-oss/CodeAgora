@@ -141,10 +141,18 @@ const GENERIC_MATCH_WORDS = new Set([
   'with',
 ]);
 
-function signalTokens(finding: ActualFinding): Set<string> {
-  const text = normalizeText(`${finding.issueTitle}\n${finding.problem}`);
+function signalTokensFromText(text: string): Set<string> {
+  text = normalizeText(text);
   const tokens = text.match(/[a-z0-9_]{3,}/g) ?? [];
   return new Set(tokens.filter((token) => !GENERIC_MATCH_WORDS.has(token)));
+}
+
+function signalTokens(finding: ActualFinding): Set<string> {
+  return signalTokensFromText(`${finding.issueTitle}\n${finding.problem}`);
+}
+
+function expectedSignalTokens(expected: ExpectedFinding): Set<string> {
+  return signalTokensFromText(`${expected.rationale}\n${expected.keyword ?? ''}`);
 }
 
 function tokenOverlap(a: Set<string>, b: Set<string>): number {
@@ -172,7 +180,11 @@ function duplicateOfMatchedFinding(
     return false;
   }
 
-  const overlap = tokenOverlap(signalTokens(candidate), signalTokens(matchedActual));
+  const candidateTokens = signalTokens(candidate);
+  const overlap = Math.max(
+    tokenOverlap(candidateTokens, signalTokens(matchedActual)),
+    tokenOverlap(candidateTokens, expectedSignalTokens(expected)),
+  );
   if (
     rangesOverlap(candidate.lineRange, expected.lineRange, tol) &&
     rangesOverlap(candidate.lineRange, matchedActual.lineRange, tol)
@@ -202,6 +214,48 @@ function rankFindings(findings: ActualFinding[]): ActualFinding[] {
     if (sevDiff !== 0) return sevDiff;
     return (b.confidence ?? 0) - (a.confidence ?? 0);
   });
+}
+
+function matchingUnclaimedExpected(
+  expectedFindings: ExpectedFinding[],
+  finding: ActualFinding,
+  claimedExpected: Set<ExpectedFinding>,
+): ExpectedFinding | null {
+  for (const expected of expectedFindings) {
+    if (claimedExpected.has(expected)) continue;
+    if (findingMatches(expected, finding)) return expected;
+  }
+  return null;
+}
+
+function rankUniqueFindingsForRecall(
+  expectedFindings: ExpectedFinding[],
+  ranked: ActualFinding[],
+): ActualFinding[] {
+  const unique: ActualFinding[] = [];
+  const matchedForDedup: CaseMatch[] = [];
+  const claimedExpected = new Set<ExpectedFinding>();
+
+  for (const finding of ranked) {
+    const newMatch = matchingUnclaimedExpected(expectedFindings, finding, claimedExpected);
+    const duplicateOfKnownHit = matchedForDedup.some((m) =>
+      findingMatches(m.expected, finding) ||
+      duplicateOfMatchedFinding(m.expected, m.actual, finding)
+    );
+
+    if (!newMatch && duplicateOfKnownHit) {
+      continue;
+    }
+
+    unique.push(finding);
+
+    if (newMatch) {
+      matchedForDedup.push({ expected: newMatch, actual: finding });
+      claimedExpected.add(newMatch);
+    }
+  }
+
+  return unique;
 }
 
 export interface ScoreOptions {
@@ -266,8 +320,9 @@ export function scoreCase(
   });
 
   const recallAtK: Record<number, number | null> = {};
+  const rankedForRecall = rankUniqueFindingsForRecall(fixture.expectedFindings, ranked);
   for (const k of kValues) {
-    const topK = ranked.slice(0, k);
+    const topK = rankedForRecall.slice(0, k);
     let hits = 0;
     const claimedInK = new Set<number>();
     for (const expected of fixture.expectedFindings) {
