@@ -1,0 +1,2 @@
+# Generated benchmark fixtures contain intentionally vulnerable diffs.
+benchmarks/golden-bugs/**
