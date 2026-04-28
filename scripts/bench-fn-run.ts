@@ -56,6 +56,7 @@ interface FixtureRunMetadata {
   fixtureId: string;
   status: 'ok' | 'error';
   findings: number;
+  decision?: 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
   durationMs: number;
   startedAt: string;
   completedAt: string;
@@ -67,6 +68,7 @@ interface SummaryEntry {
   id: string;
   findings: number;
   status: 'ok' | 'error';
+  decision?: 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
   durationMs: number;
   performance?: RunPerformanceSummary;
   error?: string;
@@ -156,7 +158,11 @@ async function runOne(
   fixtureId: string,
   skipHead: boolean,
   configPath: string | null,
-): Promise<{ findings: unknown[]; performance?: RunPerformanceSummary }> {
+): Promise<{
+  findings: unknown[];
+  decision?: 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
+  performance?: RunPerformanceSummary;
+}> {
   const diffPath = path.join(fixturesDir, fixtureId, 'diff.patch');
   const result = await runPipeline({
     diffPath,
@@ -170,6 +176,7 @@ async function runOne(
   const docs = result.evidenceDocs ?? [];
   return {
     findings: evidenceListToActualFindings(docs),
+    decision: result.summary?.decision,
     performance: parsePerformanceSummary(result.performanceText),
   };
 }
@@ -224,6 +231,7 @@ async function main(): Promise<void> {
           fixtureId: fixture.id,
           status: 'ok',
           findings: run.findings.length,
+          ...(run.decision ? { decision: run.decision } : {}),
           durationMs,
           startedAt,
           completedAt: new Date().toISOString(),
@@ -234,6 +242,7 @@ async function main(): Promise<void> {
           id: fixture.id,
           findings: run.findings.length,
           status: 'ok',
+          ...(run.decision ? { decision: run.decision } : {}),
           durationMs,
           ...(run.performance ? { performance: run.performance } : {}),
         });

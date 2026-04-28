@@ -331,3 +331,57 @@ Runtime metadata from `bench-out-quality-gate12-20260428/_meta/summary.json`:
 | Unknown cost present | false |
 
 L2 debate smoke verification also passed after the hardening change: `auth-session-dual` produced a completed session where a rate-limited supporter was preserved as `NEUTRAL` instead of being dropped, and the verdict correctly avoided a false "all supporters agreed" consensus.
+
+## 2026-04-28 Phase 2 L3 Comparison Addendum
+
+Phase 2 starts by comparing the current 12-fixture `--skip-head` gate against an L3-enabled run using the same low-cost diverse benchmark config. The reproducible comparison path is now:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-quality-gate12-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --skip-head
+pnpm bench:fn:run -- --results ./bench-out-l3-confirm-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json
+pnpm bench:fn:compare -- --baseline ./bench-out-quality-gate12-20260428 \
+  --candidate ./bench-out-l3-confirm-20260428
+```
+
+The local comparison against the existing L3 result directory produced:
+
+| Metric | `--skip-head` baseline | L3 enabled | Delta |
+|---|---:|---:|---:|
+| TP / FP / FN | 10 / 0 / 0 | 9 / 6 / 1 | -1 / +6 / +1 |
+| Actual findings | 35 | 31 | -4 |
+| Precision | 100.0% | 60.0% | -40.0% |
+| Recall | 100.0% | 90.0% | -10.0% |
+| F1 | 100.0% | 72.0% | -28.0% |
+| FP clean-rate | 100.0% | 50.0% | -50.0% |
+| Duration | 734,928ms | 522,000ms | -212,928ms |
+| Tokens | 137,346 | 125,885 | -11,461 |
+| Known OpenRouter cost | $0.0210 | $0.0182 | -$0.0028 |
+
+Per-fixture L3 regressions:
+
+| Fixture | Baseline TP/FP/FN | L3 TP/FP/FN | Notes |
+|---|---:|---:|---|
+| async-stale-profile-cache | 1 / 0 / 0 | 0 / 0 / 1 | One missed expected finding |
+| auth-session-dual | 2 / 0 / 0 | 2 / 1 / 0 | One extra false positive |
+| fp-moderator-regex | 0 / 0 / 0 | 0 / 3 / 0 | FP-regression failed |
+| fp-stable-sorting-refactor | 0 / 0 / 0 | 0 / 2 / 0 | FP-regression failed |
+
+Verdict flip, false-accept, and false-reject counts require fresh metadata from `bench:fn:run`; the older `bench-out-l3-confirm-20260428` summary predates per-fixture `decision` capture. The runner now records each fixture's final decision in `_meta/*.json` and `_meta/summary.json`, and `pnpm bench:fn:compare` will report:
+
+- verdict flips between baseline and L3 candidate when both summaries contain decisions,
+- false accepts when a recall fixture is accepted while still missing expected findings,
+- false rejects when an FP-regression fixture is rejected because of false positives.
+
+Latest live rerun status on this workstation:
+
+| Check | Result |
+|---|---|
+| Fixture/schema validation | PASS: 12 fixtures validated |
+| Targeted scorer tests | PASS: golden-bug scorer, mapping, and comparison tests |
+| `OPENROUTER_API_KEY` | unset |
+| Latest L3 live rerun | blocked until OpenRouter credentials are present |
+
+No API key values were printed or recorded.
