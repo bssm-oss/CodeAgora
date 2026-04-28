@@ -94,6 +94,30 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.3);
   });
 
+  it('catches generic unauthorized response information-leak nits', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Info Leak in Unauthorized Response',
+        problem:
+          'When !actor is detected, the handler returns new Response("Unauthorized", { status: 401 }). The plain text "Unauthorized" may expose internal endpoint naming to attackers, aiding enumeration.',
+      }),
+    )!;
+    expect(match.id).toBe('unauthorized-response-info-leak-nit');
+    expect(match.multiplier).toBe(0.3);
+  });
+
+  it('catches TypeScript type assertion bypass speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Type Assertion Bypass',
+        problem:
+          'The type assertion as SessionActor | null could allow invalid data to flow through if getUser does not properly validate its return value.',
+      }),
+    )!;
+    expect(match.id).toBe('type-assertion-bypass-speculation');
+    expect(match.multiplier).toBe(0.3);
+  });
+
   it('catches typed-object required-field validation claims', () => {
     const match = matchFindingClass(
       doc({
@@ -749,6 +773,18 @@ describe('matchFindingClass — positive matches', () => {
         issueTitle: 'Potential performance regression in sorting',
         problem:
           'The new implementation introduces a function call overhead for every comparison, potentially degrading performance compared to the direct subtraction approach.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches title-only comparator execution speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Predicate to Sort by Title Alone Still Executes',
+        problem:
+          "While adding title fallback for ties, the performance impact includes unnecessary work when all scores are unique or when title comparison isn't needed.",
       }),
     )!;
     expect(match.id).toBe('sorting-comparator');

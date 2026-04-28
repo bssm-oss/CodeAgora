@@ -172,6 +172,11 @@ const GENERIC_RESTATEMENT_PATTERNS: RegExp[] = [
   /\bconfiguration\b[\s\S]{0,120}\b(?:validation|required|missing|environment\s+variables?)\b/i,
   /\brace\s+condition\b[\s\S]{0,160}\b(?:input|object|quota|concurrent|mutat|modif)/i,
   /\b(?:one\s+extra|more\s+results\s+than\s+requested|limit\s*\+\s*1)\b/i,
+  /\b(?:sql\s+)?query\s+construction\b[\s\S]{0,160}\b(?:string\s+concatenation|malformed|parameterized|security)\b/i,
+  /\b(?:secure\s+parameterized\s+queries|security\s+best\s+practice|string\s+concatenation)\b[\s\S]{0,160}\b(?:regress|query|sql)\b/i,
+  /\bloss\s+of\s+security\s+best\s+practice\b/i,
+  /\bregressed\s+from\s+secure\s+parameterized\s+queries\b/i,
+  /\b(?:origin\s+validation|base\s+url\s+context|relative\s+paths?|arbitrary\s+url|malformed\s+urls?)\b[\s\S]{0,180}\b(?:fetch|url|ssrf|avatar)\b/i,
   /\bmisleading\s+documentation\b/i,
   /\bdocumentation\b[\s\S]{0,160}\b(?:more\s+than\s+limit|limit\s*\+\s*1|returns\s+the\s+top\s+limit)\b/i,
 ];

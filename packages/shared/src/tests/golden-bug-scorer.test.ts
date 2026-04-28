@@ -681,6 +681,79 @@ describe('scoreCase — recall path', () => {
     expect(result.matched).toHaveLength(1);
     expect(result.falsePositives).toHaveLength(0);
   });
+
+  it('suppresses SQL construction restatements after the injection bug is hit', () => {
+    const fx = fixture({
+      id: 'sql-injection-concat',
+      category: 'cve-shaped',
+      expectedFindings: [
+        {
+          filePath: 'src/db/users.ts',
+          lineRange: [5, 6],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'email is concatenated into the SQL string instead of being bound as a parameter',
+          keyword: 'injection',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'SQL Injection Vulnerability in findUserByEmail',
+        problem: 'The function constructs a SQL query by directly concatenating user-provided email input.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/db/users.ts',
+        lineRange: [4, 6],
+      }),
+      finding({
+        issueTitle: 'Code Regression - Loss of Security Best Practice',
+        problem:
+          'The code has regressed from secure parameterized queries to vulnerable string concatenation, removing a fundamental security protection.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/db/users.ts',
+        lineRange: [5, 8],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses origin-validation restatements after the SSRF bug is hit', () => {
+    const fx = fixture({
+      id: 'ssrf-avatar-fetch',
+      category: 'held-out-security',
+      expectedFindings: [
+        {
+          filePath: 'src/profile/avatar.ts',
+          lineRange: [5, 7],
+          lineTolerance: 4,
+          minSeverity: 'CRITICAL',
+          rationale: 'userInputPath becomes an arbitrary URL passed to fetch, allowing server-side request forgery',
+          keyword: 'SSRF',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Remote Code Execution via SSRF from Unvalidated Avatar URLs',
+        problem: 'The loadAvatar function removes all origin validation, allowing any URL to be fetched.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/profile/avatar.ts',
+        lineRange: [4, 8],
+      }),
+      finding({
+        issueTitle: 'Missing Base URL Context for Relative Paths',
+        problem: 'Replacing new URL(userInputPath, CDN_ORIGIN) with new URL(userInputPath) loses the base URL context.',
+        severity: 'CRITICAL',
+        filePath: 'src/profile/avatar.ts',
+        lineRange: [4, 4],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
 });
 
 describe('scoreCase — FP regression path', () => {

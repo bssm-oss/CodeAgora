@@ -544,7 +544,43 @@ Result:
 - `OK: 20 fixture(s) validated`
 - `OK: reference phase2-quality-gate validates 20 fixture(s) (14 recall, 6 fp-regression)`
 
-The 20-fixture expansion is validated but not yet live-scored. The previous 12-fixture quality gate and L3 evidence remain the only live model evidence in this report until a full 20-fixture run is recorded.
+The 20-fixture expansion was then scored with an L3-enabled live run. The first fresh run exposed one false negative (`tenant-cache-leak`) and one FP-regression failure (`fp-stable-sorting-refactor`), plus duplicate/restatement FP accounting in recall fixtures. The follow-up patch added a deterministic tenant cache-key anchor and narrowed the observed low-signal priors/accounting cases, then targeted-reran the affected fixtures into the same results directory.
+
+Commands:
+
+```bash
+source ~/.config/codeagora/credentials
+pnpm bench:fn:run -- --results ./bench-out-l3-20-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json
+pnpm bench:fn:run -- --results ./bench-out-l3-20-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures fp-stable-sorting-refactor,tenant-cache-leak
+pnpm bench:fn:run -- --results ./bench-out-l3-20-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures auth-session-dual
+pnpm bench:fn -- --results ./bench-out-l3-20-20260428
+pnpm bench:reference -- --results ./bench-out-l3-20-20260428
+```
+
+Final 20-fixture L3 composite:
+
+| Metric | Result |
+|---|---:|
+| Total fixtures | 20 |
+| Recall / FP-regression fixtures | 14 / 6 |
+| TP / FP / FN | 16 / 0 / 0 |
+| Precision | 100.0% |
+| Recall | 100.0% |
+| F1 | 100.0% |
+| FP clean-rate | 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
+| FP regressions triggered | 0 / 6 |
+| Actual findings | 47 |
+| Duration | 1,264,588ms |
+| Tokens | 242,892 |
+| Known OpenRouter cost | $0.0398 |
+
+`pnpm bench:reference -- --results ./bench-out-l3-20-20260428` passed against `benchmarks/references/phase2-quality-gate.json`.
 
 For #476, a synthetic local rate-limit simulator was added:
 

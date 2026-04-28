@@ -78,3 +78,11 @@ rules:
     suggestion: 'Throw when SERVICE_TOKEN_SECRET is missing and only sign service tokens with configured secret material.'
     filePatterns:
       - 'src/api/security-actions.ts'
+
+  - id: golden-tenant-cache-key
+    pattern: 'profile:\$\{userId\}'
+    severity: CRITICAL
+    message: 'Cross-tenant cache leak: profile cache key omits tenantId, so identical userId values can reuse cached profile data across tenants.'
+    suggestion: 'Include tenantId in the cache key, for example profile:${tenantId}:${userId}.'
+    filePatterns:
+      - 'src/cache/profile.ts'
