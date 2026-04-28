@@ -5,6 +5,7 @@
 
 import { spawn } from 'child_process';
 import type { Backend } from '../types/config.js';
+import type { TokenUsage } from '../pipeline/telemetry.js';
 import { gracefulKill } from '@codeagora/shared/utils/process-kill.js';
 
 // ============================================================================
@@ -23,6 +24,8 @@ export interface BackendInput {
   timeout: number;
   signal?: AbortSignal;
   temperature?: number;
+  /** API backends report token usage here when the provider returns it. */
+  onUsage?: (usage: TokenUsage) => void;
 }
 
 /** Command definition: binary + args, no shell. */

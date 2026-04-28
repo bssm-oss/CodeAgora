@@ -347,6 +347,78 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.4);
   });
 
+  it('catches broader NaN and performance claims against typed sort tie-breakers', () => {
+    const nanMatch = matchFindingClass(
+      doc({
+        issueTitle: 'Potential NaN-inducing comparison can corrupt sort order',
+        problem: 'If a score value is non-numeric, b.score - a.score yields NaN and breaks Array.prototype.sort ordering.',
+      }),
+    )!;
+    expect(nanMatch.id).toBe('sorting-comparator');
+
+    const perfMatch = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Performance Regression',
+        problem: 'Additional conditional logic in the sort comparison function may slow large datasets.',
+      }),
+    )!;
+    expect(perfMatch.id).toBe('sorting-comparator');
+  });
+
+  it('catches localeCompare non-string speculation against typed sort tie-breakers', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Runtime TypeError when titles are non-string',
+        problem:
+          'The title comparison uses a.title.localeCompare(b.title), which could throw if title is not a string.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches JSON payload size-limit DoS speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Denial of Service via Malicious JSON Input',
+        problem:
+          'parseForcedDecisionJson does not validate or limit the size of the incoming JSON string before parsing a massive JSON payload.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-size-limit');
+  });
+
+  it('catches typed Date serialization guard speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential TypeError when serializing sessions with missing expiresAt',
+        problem:
+          'serializeSession calls session.expiresAt.toISOString() without verifying that expiresAt is a valid Date instance.',
+      }),
+    )!;
+    expect(match.id).toBe('date-serialization-type-guard');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches flat key-value parser injection and regex-memory speculation', () => {
+    const injectionMatch = matchFindingClass(
+      doc({
+        issueTitle: 'Security vulnerability in KV string parsing',
+        problem: 'The parseKVString function potentially allows injection-like behavior through crafted input strings.',
+      }),
+    )!;
+    expect(injectionMatch.id).toBe('flat-kv-parser-speculation');
+
+    const regexMatch = matchFindingClass(
+      doc({
+        issueTitle: 'Potential memory leak through regex usage',
+        problem: 'parseKVString uses a regex with the g flag, which can lead to memory leaks due to state retention.',
+      }),
+    )!;
+    expect(regexMatch.id).toBe('flat-kv-parser-speculation');
+    expect(regexMatch.multiplier).toBe(0.4);
+  });
+
   it('catches generic "potential security concern" phrasing (run 3 FP)', () => {
     const match = matchFindingClass(
       doc({

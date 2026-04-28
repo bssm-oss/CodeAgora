@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { ConfidenceTraceSchema } from '@codeagora/shared/types/confidence-trace.js';
+import type { TokenUsage } from '../pipeline/telemetry.js';
 
 // ============================================================================
 // Result Type (functional error handling)
@@ -73,12 +74,15 @@ export type EvidenceDocument = z.infer<typeof EvidenceDocumentSchema>;
 export interface ReviewOutput {
   reviewerId: string;
   model: string;
+  provider?: string;
   group: string; // Which file group this review covers
   evidenceDocs: EvidenceDocument[];
   rawResponse: string;
   status: 'success' | 'forfeit' | 'error';
   error?: string;
   chunkIndex?: number; // Set when diff is split into multiple chunks
+  latencyMs?: number;
+  usage?: TokenUsage;
 }
 
 /**

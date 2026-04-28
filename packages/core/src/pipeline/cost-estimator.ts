@@ -49,7 +49,7 @@ export async function estimateCost(
 ): Promise<CostEstimate> {
   const pricing = await getPricing();
   const key = `${provider}/${model}`;
-  const entry = pricing[key];
+  const entry = pricing[key] ?? getOpenRouterBasePricing(pricing, provider, model);
 
   if (!entry) {
     return {
@@ -71,6 +71,15 @@ export async function estimateCost(
     model,
     provider,
   };
+}
+
+function getOpenRouterBasePricing(
+  pricing: Record<string, PricingEntry>,
+  provider: string,
+  model: string,
+): PricingEntry | undefined {
+  if (provider !== 'openrouter' || !model.includes(':')) return undefined;
+  return pricing[`${provider}/${model.replace(/:[^/:]+$/, '')}`];
 }
 
 // Format cost to string ($X.XXXX)

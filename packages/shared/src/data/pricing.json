@@ -25,5 +25,12 @@
   "xai/grok-2": { "input": 0.002, "output": 0.01 },
   "openrouter/meta-llama/llama-3.3-70b-instruct": { "input": 0.00012, "output": 0.0003 },
   "openrouter/deepseek/deepseek-r1": { "input": 0.0008, "output": 0.0024 },
+  "openrouter/deepseek/deepseek-v3.2": { "input": 0.000252, "output": 0.000378 },
+  "openrouter/qwen/qwen3-coder-30b-a3b-instruct": { "input": 0.00007, "output": 0.00027 },
+  "openrouter/xiaomi/mimo-v2-flash": { "input": 0.00009, "output": 0.00029 },
+  "openrouter/nvidia/nemotron-3-nano-30b-a3b": { "input": 0.00005, "output": 0.0002 },
+  "openrouter/nvidia/nemotron-3-nano-30b-a3b:nitro": { "input": 0.00005, "output": 0.0002 },
+  "openrouter/baidu/ernie-4.5-21b-a3b-thinking": { "input": 0.00007, "output": 0.00028 },
+  "openrouter/tencent/hunyuan-a13b-instruct": { "input": 0.00014, "output": 0.00057 },
   "openrouter/mistral/mistral-large": { "input": 0.002, "output": 0.006 }
 }

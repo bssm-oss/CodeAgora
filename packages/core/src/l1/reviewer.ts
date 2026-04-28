@@ -6,6 +6,7 @@
 import crypto from 'crypto';
 import type { ReviewerConfig, FallbackConfig } from '../types/config.js';
 import type { ReviewOutput } from '../types/core.js';
+import type { TokenUsage } from '../pipeline/telemetry.js';
 import { parseEvidenceResponse, isExplicitNoIssues } from './parser.js';
 import { executeBackend } from './backend.js';
 import { extractFileListFromDiff } from '@codeagora/shared/utils/diff.js';
@@ -157,11 +158,13 @@ export async function executeReviewers(
         results.push({
           reviewerId: batch[j].config.id,
           model: batch[j].config.model,
+          provider: batch[j].config.provider ?? batch[j].config.backend,
           group: batch[j].groupName,
           evidenceDocs: [],
           rawResponse: '',
           status: 'forfeit',
           error: result.reason?.message || 'Unexpected execution error',
+          latencyMs: 0,
         });
       }
     }
@@ -182,6 +185,10 @@ async function executeReviewerWithGuards(
   hm: HealthMonitor
 ): Promise<ReviewOutput> {
   const { config, groupName, diffContent, prSummary, surroundingContext } = input;
+  const startedAt = Date.now();
+  let usage: TokenUsage | undefined;
+  const captureUsage = (nextUsage: TokenUsage) => { usage = nextUsage; };
+  const elapsed = () => Date.now() - startedAt;
   // Only guard API backends — those have an explicit provider field.
   const provider = config.provider;
   const useGuards = !!provider;
@@ -191,11 +198,13 @@ async function executeReviewerWithGuards(
     return {
       reviewerId: config.id,
       model: config.model,
+      provider: config.provider ?? config.backend,
       group: groupName,
       evidenceDocs: [],
       rawResponse: '',
       status: 'forfeit',
       error: `Circuit open for ${provider}/${config.model}`,
+      latencyMs: elapsed(),
     };
   }
 
@@ -267,6 +276,7 @@ async function executeReviewerWithGuards(
         timeout: config.timeout,
         signal: controller.signal,
         temperature: config.temperature,
+        onUsage: captureUsage,
       });
 
       if (useGuards) cb.recordSuccess(provider!, config.model);
@@ -282,21 +292,26 @@ async function executeReviewerWithGuards(
       return {
         reviewerId: config.id,
         model: config.model,
+        provider: config.provider ?? config.backend,
         group: groupName,
         evidenceDocs,
         rawResponse: response,
         status: 'success',
+        latencyMs: elapsed(),
+        usage,
       };
     } catch (error) {
       if (error instanceof CircuitOpenError) {
         return {
           reviewerId: config.id,
           model: config.model,
+          provider: config.provider ?? config.backend,
           group: groupName,
           evidenceDocs: [],
           rawResponse: '',
           status: 'forfeit',
           error: error.message,
+          latencyMs: elapsed(),
         };
       }
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -307,11 +322,13 @@ async function executeReviewerWithGuards(
         return {
           reviewerId: config.id,
           model: config.model,
+          provider: config.provider ?? config.backend,
           group: groupName,
           evidenceDocs: [],
           rawResponse: '',
           status: 'forfeit',
           error: `Auth error (permanent): ${lastError.message}`,
+          latencyMs: elapsed(),
         };
       }
 
@@ -359,6 +376,7 @@ async function executeReviewerWithGuards(
         prompt: fullPrompt,
         timeout: config.timeout,
         temperature: config.temperature,
+        onUsage: captureUsage,
       });
 
       if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);
@@ -375,10 +393,13 @@ async function executeReviewerWithGuards(
       return {
         reviewerId: config.id,
         model: fb.model,
+        provider: fb.provider ?? fb.backend,
         group: groupName,
         evidenceDocs,
         rawResponse: response,
         status: 'success',
+        latencyMs: elapsed(),
+        usage,
       };
     } catch (fbError) {
       // Only record transient errors as CB failures (not 429 rate limits)
@@ -395,11 +416,13 @@ async function executeReviewerWithGuards(
   return {
     reviewerId: config.id,
     model: config.model,
+    provider: config.provider ?? config.backend,
     group: groupName,
     evidenceDocs: [],
     rawResponse: '',
     status: 'forfeit',
     error: lastError?.message || 'Unknown error',
+    latencyMs: elapsed(),
   };
 }
 

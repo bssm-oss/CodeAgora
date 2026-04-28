@@ -31,6 +31,11 @@ describe('estimateCost', () => {
     expect(result.provider).toBe('groq');
     expect(result.model).toBe('llama-3.3-70b-versatile');
   });
+
+  it('uses OpenRouter base pricing for variant-suffixed model ids', async () => {
+    const result = await estimateCost(usage, 'openrouter', 'nvidia/nemotron-3-nano-30b-a3b:nitro');
+    expect(result.totalCost).toBeCloseTo(0.00015, 8);
+  });
 });
 
 describe('formatCost', () => {

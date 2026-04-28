@@ -287,9 +287,10 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     for (const r of allReviewResults) {
       telemetry.record({
         reviewerId: r.reviewerId,
-        provider: allReviewerInputs.find((i) => i.config.id === r.reviewerId)?.config.provider ?? 'unknown',
+        provider: r.provider ?? allReviewerInputs.find((i) => i.config.id === r.reviewerId)?.config.provider ?? 'unknown',
         model: r.model,
-        latencyMs: Math.round(l1Elapsed / allReviewResults.length),
+        latencyMs: r.latencyMs ?? Math.round(l1Elapsed / allReviewResults.length),
+        usage: r.usage,
         success: r.status === 'success',
         error: r.error,
       });
@@ -416,7 +417,6 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     } else {
       // === L2 MODERATOR: Run Discussions ===
       progress?.stageStart('discuss', 'Moderating discussions...');
-      const l2Start = Date.now();
       const discussionEmitter = input.discussionEmitter ?? new DiscussionEmitter();
       moderatorReport = await executeL2Discussions(
         config,
@@ -429,14 +429,8 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         qualityTracker,
         logger,
         enrichedContext,
+        (call) => telemetry.record(call),
       );
-      telemetry.record({
-        reviewerId: 'l2-moderator',
-        provider: config.moderator?.provider ?? 'unknown',
-        model: config.moderator?.model ?? 'unknown',
-        latencyMs: Date.now() - l2Start,
-        success: true,
-      });
       progress?.stageComplete('discuss', 'Discussions complete');
     }
 
@@ -491,15 +485,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     // === L3 HEAD: Final Verdict ===
     progress?.stageStart('verdict', 'Generating verdict...');
-    const l3Start = Date.now();
-    const headVerdict = await executeL3Verdict(config, moderatorReport);
-    telemetry.record({
-      reviewerId: 'l3-head',
-      provider: config.head?.provider ?? 'unknown',
-      model: config.head?.model ?? 'unknown',
-      latencyMs: Date.now() - l3Start,
-      success: true,
-    });
+    const headVerdict = await executeL3Verdict(config, moderatorReport, (call) => telemetry.record(call));
     // Write moderator report AFTER L3 promoted-issue mutation (#299)
     await writeModeratorReport(date, sessionId, moderatorReport);
     await writeHeadVerdict(date, sessionId, headVerdict);

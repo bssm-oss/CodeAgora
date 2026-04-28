@@ -14,6 +14,7 @@ import { makeHeadVerdict, scanUnconfirmedQueue } from '../l3/verdict.js';
 import { QualityTracker } from '../l0/quality-tracker.js';
 import { resolveReviewers, getBanditStore } from '../l0/index.js';
 import type { EvidenceDocument, ReviewOutput, ModeratorReport } from '../types/core.js';
+import type { BackendCallRecord } from './telemetry.js';
 import type { ReviewerInput } from '../l1/reviewer.js';
 import { chunkDiff } from './chunker.js';
 import { pLimit } from '@codeagora/shared/utils/concurrency.js';
@@ -157,6 +158,7 @@ export async function executeL2Discussions(
   qualityTracker: QualityTracker,
   logger: ReturnType<typeof createLogger>,
   enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<ModeratorReport> {
   const { deduplicated, mergedCount } = deduplicateDiscussions(thresholdResult.discussions);
   logger.info(`Deduplicated discussions: ${mergedCount} merged`);
@@ -196,6 +198,7 @@ export async function executeL2Discussions(
     sessionId,
     emitter: discussionEmitter,
     enrichedContext,
+    onBackendCall,
   });
 
   // === QUALITY TRACKING: Record L2 discussion results ===
@@ -250,6 +253,7 @@ export async function executeL2Discussions(
 export async function executeL3Verdict(
   config: Config,
   moderatorReport: ModeratorReport,
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<ReturnType<typeof makeHeadVerdict>> {
   // === L3 HEAD: Scan Unconfirmed Queue ===
   const { promoted, dismissed: _dismissed } = scanUnconfirmedQueue(
@@ -273,7 +277,7 @@ export async function executeL3Verdict(
     moderatorReport.summary.totalDiscussions += promoted.length;
   }
 
-  return makeHeadVerdict(moderatorReport, config.head, config.mode, config.language);
+  return makeHeadVerdict(moderatorReport, config.head, config.mode, config.language, onBackendCall);
 }
 
 /**

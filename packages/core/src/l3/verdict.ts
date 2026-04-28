@@ -7,6 +7,7 @@
 
 import type { ModeratorReport, HeadVerdict, EvidenceDocument } from '../types/core.js';
 import type { HeadConfig } from '../types/config.js';
+import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
 
 // ============================================================================
 // LLM-Based Verdict
@@ -22,11 +23,12 @@ export async function makeHeadVerdict(
   headConfig?: HeadConfig,
   mode?: 'strict' | 'pragmatic',
   language?: 'en' | 'ko',
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<HeadVerdict> {
   // Try LLM-based verdict if configured
   if (headConfig?.enabled !== false && headConfig?.model) {
     try {
-      return await llmVerdict(report, headConfig, language);
+      return await llmVerdict(report, headConfig, language, onBackendCall);
     } catch {
       // Fallback to rule-based on any LLM failure
     }
@@ -35,21 +37,53 @@ export async function makeHeadVerdict(
   return ruleBasedVerdict(report, mode);
 }
 
-async function llmVerdict(report: ModeratorReport, config: HeadConfig, language?: 'en' | 'ko'): Promise<HeadVerdict> {
+async function llmVerdict(
+  report: ModeratorReport,
+  config: HeadConfig,
+  language?: 'en' | 'ko',
+  onBackendCall?: (call: BackendCallRecord) => void,
+): Promise<HeadVerdict> {
   const { executeBackend } = await import('../l1/backend.js');
   const { retryOnError } = await import('@codeagora/shared/utils/recovery.js');
   const { classifyError } = await import('../l1/error-classifier.js');
 
   const prompt = buildHeadPrompt(report, language);
   const response = await retryOnError(
-    () => executeBackend({
-      backend: config.backend,
-      model: config.model,
-      provider: config.provider,
-      prompt,
-      timeout: config.timeout ?? 120,
-      temperature: 0.2,
-    }),
+    async () => {
+      const startedAt = Date.now();
+      let usage: TokenUsage | undefined;
+      try {
+        const text = await executeBackend({
+          backend: config.backend,
+          model: config.model,
+          provider: config.provider,
+          prompt,
+          timeout: config.timeout ?? 120,
+          temperature: 0.2,
+          onUsage: (nextUsage) => { usage = nextUsage; },
+        });
+        onBackendCall?.({
+          reviewerId: 'l3-head',
+          provider: config.provider ?? config.backend,
+          model: config.model,
+          latencyMs: Date.now() - startedAt,
+          usage,
+          success: true,
+        });
+        return text;
+      } catch (err) {
+        onBackendCall?.({
+          reviewerId: 'l3-head',
+          provider: config.provider ?? config.backend,
+          model: config.model,
+          latencyMs: Date.now() - startedAt,
+          usage,
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+    },
     (err) => {
       const cls = classifyError(err);
       return cls.kind === 'rate-limited' || cls.kind === 'transient';

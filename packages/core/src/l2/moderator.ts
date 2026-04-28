@@ -14,6 +14,7 @@ import { checkForObjections, handleObjections } from './objection.js';
 import { selectSupporters, loadPersona } from './supporter-selector.js';
 import type { SelectedSupporter } from './supporter-selector.js';
 import type { DiscussionEmitter } from './event-emitter.js';
+import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
 
 // Re-export for backward compatibility (tests and other modules import from here)
 export { selectSupporters, loadPersona } from './supporter-selector.js';
@@ -35,16 +36,18 @@ export interface ModeratorInput {
   emitter?: DiscussionEmitter;
   /** Pre-analysis enriched context for evidence-based debate (#431) */
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext;
+  /** Records per-call backend telemetry for supporter/moderator API calls. */
+  onBackendCall?: (call: BackendCallRecord) => void;
 }
 
 /**
  * Run all discussions and generate final report
  */
 export async function runModerator(input: ModeratorInput): Promise<ModeratorReport> {
-  const { config, supporterPoolConfig, discussions, settings, date, sessionId, language, emitter, enrichedContext } = input;
+  const { config, supporterPoolConfig, discussions, settings, date, sessionId, language, emitter, enrichedContext, onBackendCall } = input;
 
   const results = await Promise.allSettled(
-    discussions.map((d) => runDiscussion(d, config, supporterPoolConfig, settings, date, sessionId, language, emitter, enrichedContext))
+    discussions.map((d) => runDiscussion(d, config, supporterPoolConfig, settings, date, sessionId, language, emitter, enrichedContext, onBackendCall))
   );
 
   const verdicts: DiscussionVerdict[] = [];
@@ -103,6 +106,7 @@ async function runDiscussion(
   language?: 'en' | 'ko',
   emitter?: DiscussionEmitter,
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<DiscussionResult> {
   const rounds: DiscussionRound[] = [];
 
@@ -152,6 +156,7 @@ async function runDiscussion(
       selectedSupporters,
       language,
       enrichedContext,
+      onBackendCall,
     );
 
     // Emit supporter responses (2.1)
@@ -244,7 +249,8 @@ async function runDiscussion(
   const finalVerdict = await moderatorForcedDecision(
     discussion,
     rounds,
-    moderatorConfig
+    moderatorConfig,
+    onBackendCall,
   );
 
   const verdict: DiscussionVerdict = {
@@ -289,6 +295,7 @@ async function runRound(
   selectedSupporters: SelectedSupporter[],
   language?: 'en' | 'ko',
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<DiscussionRound> {
   // Moderator prompts the discussion
   const moderatorPrompt = buildModeratorPrompt(discussion, roundNum, language, enrichedContext);
@@ -296,7 +303,7 @@ async function runRound(
   // Supporters respond in parallel with graceful degradation
   const supporterResults = await Promise.allSettled(
     selectedSupporters.map((supporter) =>
-      executeSupporterResponse(supporter, discussion, moderatorPrompt)
+      executeSupporterResponse(supporter, discussion, moderatorPrompt, onBackendCall)
     )
   );
 
@@ -314,7 +321,8 @@ async function runRound(
 async function executeSupporterResponse(
   supporter: SelectedSupporter,
   discussion: Discussion,
-  moderatorPrompt: string
+  moderatorPrompt: string,
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<{ supporterId: string; response: string; stance: 'agree' | 'disagree' | 'neutral' }> {
   // Load persona if assigned
   let personaContent = '';
@@ -364,14 +372,41 @@ If NEUTRAL:
     : basePrompt;
 
   const response = await retryOnError(
-    () => executeBackend({
-      backend: supporter.backend,
-      model: supporter.model,
-      provider: supporter.provider,
-      prompt,
-      timeout: supporter.timeout,
-      temperature: supporter.temperature,
-    }),
+    async () => {
+      const startedAt = Date.now();
+      let usage: TokenUsage | undefined;
+      try {
+        const text = await executeBackend({
+          backend: supporter.backend,
+          model: supporter.model,
+          provider: supporter.provider,
+          prompt,
+          timeout: supporter.timeout,
+          temperature: supporter.temperature,
+          onUsage: (nextUsage) => { usage = nextUsage; },
+        });
+        onBackendCall?.({
+          reviewerId: `l2-supporter:${supporter.id}`,
+          provider: supporter.provider ?? supporter.backend,
+          model: supporter.model,
+          latencyMs: Date.now() - startedAt,
+          usage,
+          success: true,
+        });
+        return text;
+      } catch (err) {
+        onBackendCall?.({
+          reviewerId: `l2-supporter:${supporter.id}`,
+          provider: supporter.provider ?? supporter.backend,
+          model: supporter.model,
+          latencyMs: Date.now() - startedAt,
+          usage,
+          success: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        throw err;
+      }
+    },
     (err) => {
       const cls = classifyError(err);
       return cls.kind === 'rate-limited' || cls.kind === 'transient';
@@ -483,7 +518,8 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
 async function moderatorForcedDecision(
   discussion: Discussion,
   rounds: DiscussionRound[],
-  config: ModeratorConfig
+  config: ModeratorConfig,
+  onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<{ severity: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED'; reasoning: string }> {
   const useJsonFormat = config.outputFormat === 'json';
   const roundsBlock = rounds.map((r, i) =>
@@ -519,14 +555,39 @@ Rounds:
 ${roundsBlock}
 `;
 
-  const response = await executeBackend({
-    backend: config.backend,
-    model: config.model,
-    provider: config.provider,
-    prompt,
-    timeout: config.timeout ?? 120,
-    temperature: 0.2,
-  });
+  const startedAt = Date.now();
+  let usage: TokenUsage | undefined;
+  let response: string;
+  try {
+    response = await executeBackend({
+      backend: config.backend,
+      model: config.model,
+      provider: config.provider,
+      prompt,
+      timeout: config.timeout ?? 120,
+      temperature: 0.2,
+      onUsage: (nextUsage) => { usage = nextUsage; },
+    });
+    onBackendCall?.({
+      reviewerId: 'l2-moderator',
+      provider: config.provider ?? config.backend,
+      model: config.model,
+      latencyMs: Date.now() - startedAt,
+      usage,
+      success: true,
+    });
+  } catch (err) {
+    onBackendCall?.({
+      reviewerId: 'l2-moderator',
+      provider: config.provider ?? config.backend,
+      model: config.model,
+      latencyMs: Date.now() - startedAt,
+      usage,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 
   return parseForcedDecision(response);
 }

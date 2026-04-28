@@ -110,6 +110,26 @@ describe('executeViaAISDK — system/user split', () => {
     }));
     expect(result).toBe('great review output');
   });
+
+  it('normalizes AI SDK usage into pipeline token usage', async () => {
+    const onUsage = vi.fn();
+    mockGenerateText.mockResolvedValueOnce({
+      text: 'usage-bearing response',
+      usage: {
+        inputTokens: 77,
+        outputTokens: 23,
+        totalTokens: 100,
+      },
+    });
+
+    await executeViaAISDK(makeInput({ onUsage }));
+
+    expect(onUsage).toHaveBeenCalledWith({
+      promptTokens: 77,
+      completionTokens: 23,
+      totalTokens: 100,
+    });
+  });
 });
 
 describe('executeViaAISDK — CLI backend regression (combined prompt path)', () => {

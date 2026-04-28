@@ -108,6 +108,16 @@ describe('Cost Estimator', () => {
     expect(formatCost(cost)).toBe('N/A');
   });
 
+  it('OpenRouter :variant 모델은 base pricing fallback으로 비용 계산', async () => {
+    const usage: TokenUsage = {
+      promptTokens: 1000,
+      completionTokens: 500,
+      totalTokens: 1500,
+    };
+    const result = await estimateCost(usage, 'openrouter', 'nvidia/nemotron-3-nano-30b-a3b:nitro');
+    expect(result.totalCost).toBeCloseTo(0.00005 + 0.0001, 8);
+  });
+
   // Test 8: loadPricing — pricing table에 key가 존재하는지
   it('loadPricing — pricing table에 기대하는 key들이 존재', async () => {
     const pricing = await loadPricing();
@@ -116,6 +126,12 @@ describe('Cost Estimator', () => {
     expect(pricing).toHaveProperty('groq/deepseek-r1-distill-llama-70b');
     expect(pricing).toHaveProperty('openrouter/anthropic/claude-3.5-sonnet');
     expect(pricing).toHaveProperty('openrouter/google/gemini-2.5-flash');
+    expect(pricing).toHaveProperty('openrouter/deepseek/deepseek-v3.2');
+    expect(pricing).toHaveProperty('openrouter/qwen/qwen3-coder-30b-a3b-instruct');
+    expect(pricing).toHaveProperty('openrouter/xiaomi/mimo-v2-flash');
+    expect(pricing).toHaveProperty('openrouter/nvidia/nemotron-3-nano-30b-a3b:nitro');
+    expect(pricing).toHaveProperty('openrouter/baidu/ernie-4.5-21b-a3b-thinking');
+    expect(pricing).toHaveProperty('openrouter/tencent/hunyuan-a13b-instruct');
     expect(pricing).toHaveProperty('google/gemini-2.5-flash');
     expect(pricing).toHaveProperty('google/gemini-2.5-pro');
     expect(pricing).toHaveProperty('mistral/mistral-large-latest');

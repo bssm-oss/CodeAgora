@@ -66,6 +66,35 @@ describe('API Backend (executeViaAISDK)', () => {
     expect(callArgs.abortSignal).toBeDefined();
   });
 
+  it('should report token usage when generateText returns usage', async () => {
+    const fakeModel = { modelId: 'test-model' };
+    const onUsage = vi.fn();
+    mockGetModel.mockReturnValue(fakeModel as any);
+    mockGenerateText.mockResolvedValue({
+      text: 'review output',
+      usage: {
+        inputTokens: 120,
+        outputTokens: 30,
+        totalTokens: 150,
+      },
+    } as any);
+
+    await executeViaAISDK({
+      backend: 'api',
+      model: 'model',
+      provider: 'groq',
+      prompt: 'test',
+      timeout: 60,
+      onUsage,
+    });
+
+    expect(onUsage).toHaveBeenCalledWith({
+      promptTokens: 120,
+      completionTokens: 30,
+      totalTokens: 150,
+    });
+  });
+
   it('should throw when provider is missing', async () => {
     await expect(
       executeViaAISDK({

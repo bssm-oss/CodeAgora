@@ -158,7 +158,12 @@ async function runOne(
   configPath: string | null,
 ): Promise<{ findings: unknown[]; performance?: RunPerformanceSummary }> {
   const diffPath = path.join(fixturesDir, fixtureId, 'diff.patch');
-  const result = await runPipeline({ diffPath, skipHead, configPath: configPath ?? undefined });
+  const result = await runPipeline({
+    diffPath,
+    skipHead,
+    configPath: configPath ?? undefined,
+    noCache: true,
+  });
   if (result.status !== 'success') {
     throw new Error(`pipeline error for ${fixtureId}: ${result.error ?? 'unknown'}`);
   }
