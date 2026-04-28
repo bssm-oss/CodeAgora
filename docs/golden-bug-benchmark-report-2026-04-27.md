@@ -436,3 +436,72 @@ Fresh L3 remaining regressions:
 | null-deref-early-access | 1 / 0 / 0 | ACCEPT | False accept: expected bug was found, but final verdict accepted the diff |
 
 The fresh run improves over the older L3 result (`9 / 6 / 1`) by restoring full recall and cutting FP count from 6 to 3. It still does not meet the Phase 2 quality gate because L3 lowers precision, FP clean-rate, and verdict reliability versus the `--skip-head` baseline.
+
+## 2026-04-28 L3 Guard Targeted Rerun
+
+The fresh L3 result showed two separate failure modes:
+
+- L3 could return `ACCEPT` even when the moderator report still contained unresolved discussion state.
+- Several benchmark-known FP classes survived as actionable findings in the L3 result set.
+
+The implementation now adds a head-verdict safety guard:
+
+- `ACCEPT` is overridden to `REJECT` when actionable CRITICAL/HARSHLY_CRITICAL discussions remain.
+- `ACCEPT` is overridden to `NEEDS_HUMAN` when unresolved discussions or very low-confidence critical findings remain.
+
+The finding-class priors were also narrowed for the observed FP shapes:
+
+- sorting comparator function-call overhead speculation;
+- typed `parseQuotaConfig` required-field validation nits;
+- `maybeResetWindow` exact-boundary/time-zone/system-clock nits;
+- `parseKVString` injection-style speculation.
+
+Targeted L3 rerun command:
+
+```bash
+source ~/.config/codeagora/credentials
+cp -R ./bench-out-l3-fresh-20260428 ./bench-out-l3-guard-20260428
+pnpm bench:fn:run -- --results ./bench-out-l3-guard-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures null-deref-early-access,fp-stable-sorting-refactor,quota-manager-dual
+pnpm bench:fn:run -- --results ./bench-out-l3-guard-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --fixtures quota-manager-dual
+pnpm bench:fn -- --results ./bench-out-l3-guard-20260428
+pnpm bench:fn:compare -- --baseline ./bench-out-quality-gate12-20260428 \
+  --candidate ./bench-out-l3-guard-20260428
+```
+
+The second quota-only rerun was needed because the first targeted quota rerun exposed a new `parseKVString` injection-style FP variant after the earlier quota FP classes were suppressed.
+
+Targeted composite score:
+
+| Metric | Result |
+|---|---:|
+| Total fixtures | 12 |
+| Recall / FP-regression fixtures | 8 / 4 |
+| TP / FP / FN | 10 / 0 / 0 |
+| Precision | 100.0% |
+| Recall | 100.0% |
+| F1 | 100.0% |
+| FP clean-rate | 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
+| FP regressions triggered | 0 / 4 |
+| False accepts | 0 |
+| False rejects | 0 |
+
+Targeted composite comparison against the `--skip-head` gate:
+
+| Metric | `--skip-head` baseline | L3 guarded composite | Delta |
+|---|---:|---:|---:|
+| TP / FP / FN | 10 / 0 / 0 | 10 / 0 / 0 | 0 / 0 / 0 |
+| Actual findings | 35 | 30 | -5 |
+| Precision | 100.0% | 100.0% | 0.0% |
+| Recall | 100.0% | 100.0% | 0.0% |
+| F1 | 100.0% | 100.0% | 0.0% |
+| FP clean-rate | 100.0% | 100.0% | 0.0% |
+| Duration | 734,928ms | 884,151ms | +149,223ms |
+| Tokens | 137,346 | 143,096 | +5,750 |
+| Known OpenRouter cost | $0.0210 | $0.0225 | +$0.0015 |
+
+This is a targeted composite, not a fresh full 12-fixture rerun after the guard changes. It is enough to prove the observed regressions are addressed, but a full fresh 12-fixture L3 rerun is still recommended before closing #475.

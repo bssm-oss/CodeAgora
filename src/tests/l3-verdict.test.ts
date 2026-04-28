@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { makeHeadVerdict, scanUnconfirmedQueue } from '@codeagora/core/l3/verdict.js';
+import { applyHeadVerdictSafety, makeHeadVerdict, scanUnconfirmedQueue } from '@codeagora/core/l3/verdict.js';
 import type { ModeratorReport, DiscussionVerdict, EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
@@ -215,6 +215,65 @@ describe('makeHeadVerdict()', () => {
 
       expect(verdict.reasoning.toLowerCase()).toContain('consensus');
     });
+  });
+});
+
+describe('applyHeadVerdictSafety()', () => {
+  it('overrides ACCEPT to REJECT when actionable critical discussions remain', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-critical',
+          finalSeverity: 'CRITICAL',
+          consensusReached: true,
+          avgConfidence: 60,
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'ACCEPT',
+      reasoning: 'LLM says safe.',
+    }, report);
+
+    expect(verdict.decision).toBe('REJECT');
+    expect(verdict.reasoning).toContain('Head safety guard');
+  });
+
+  it('overrides ACCEPT to NEEDS_HUMAN when discussions are unresolved', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-escalated',
+          finalSeverity: 'DISMISSED',
+          consensusReached: false,
+          avgConfidence: 55,
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'ACCEPT',
+      reasoning: 'LLM says dismissed.',
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.questionsForHuman?.[0]).toContain('d-escalated');
+  });
+
+  it('leaves non-ACCEPT verdicts unchanged', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({ discussionId: 'd001', finalSeverity: 'CRITICAL', consensusReached: true }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'REJECT',
+      reasoning: 'Already blocking.',
+    }, report);
+
+    expect(verdict).toEqual({ decision: 'REJECT', reasoning: 'Already blocking.' });
   });
 });
 

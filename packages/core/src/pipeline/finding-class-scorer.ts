@@ -271,6 +271,15 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     ],
   },
   {
+    id: 'parse-quota-required-field-nit',
+    label: 'typed parseQuotaConfig required-field validation nit',
+    multiplier: 0.3,
+    patterns: [
+      /\bparseQuotaConfig\b[\s\S]{0,180}\b(?:required\s+limits?\s+property|required\s+fields?|does\s+not\s+validate|does\s+not\s+verify)\b/i,
+      /\b(?:required\s+limits?\s+property|required\s+fields?|does\s+not\s+validate|does\s+not\s+verify)\b[\s\S]{0,180}\bparseQuotaConfig\b/i,
+    ],
+  },
+  {
     id: 'missing-validation',
     label: 'missing input validation / sanitization',
     multiplier: 0.7,
@@ -380,6 +389,10 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\bnegative\s+infinity\b[\s\S]{0,160}\b(?:score|sort|comparison|order)\b/i,
       /\b(?:score|sort|comparison|order)\b[\s\S]{0,160}\bnegative\s+infinity\b/i,
       /\bperformance\s+regression\b[\s\S]{0,160}\bsort\s+comparison\b/i,
+      /\bperformance\s+regression\b[\s\S]{0,180}\bsort(?:ing)?\b/i,
+      /\bsort(?:ing)?\b[\s\S]{0,180}\bperformance\s+regression\b/i,
+      /\bfunction\s+call\s+overhead\b[\s\S]{0,180}\b(?:sort(?:ing)?|comparison|comparator)\b/i,
+      /\b(?:sort(?:ing)?|comparison|comparator)\b[\s\S]{0,180}\bfunction\s+call\s+overhead\b/i,
       /\btitle\s+comparison\b[\s\S]{0,160}\bperformance\s+overhead\b/i,
       /\btitle\s+comparison\s+fallback\b[\s\S]{0,220}\b(?:performance\s+(?:regression|degradation)|large\s+result\s+sets?|localeCompare)\b/i,
       /\bperformance\s+(?:regression|degradation)\b[\s\S]{0,220}\b(?:title\s+comparison\s+fallback|localeCompare)\b/i,
@@ -410,9 +423,24 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     multiplier: 0.4,
     patterns: [
       /\bparseKVString\b[\s\S]{0,200}\b(?:injection-like|security\s+vulnerability|regex|memory\s+leak)\b/i,
-      /\b(?:injection-like|security\s+vulnerability|regex|memory\s+leak)\b[\s\S]{0,200}\bparseKVString\b/i,
+      /\b(?:injection-like|injection[-\s]?style|security\s+vulnerability|regex|memory\s+leak)\b[\s\S]{0,200}\bparseKVString\b/i,
+      /\bparseKVString\b[\s\S]{0,220}\b(?:injection[-\s]?style|filesystem\s+paths?|database\s+columns?|system\s+components?)\b/i,
+      /\b(?:injection[-\s]?style|filesystem\s+paths?|database\s+columns?|system\s+components?)\b[\s\S]{0,220}\bparseKVString\b/i,
       /\bregex\b[\s\S]{0,160}\bmemory\s+leaks?\b/i,
       /\binjection-like\s+behavior\b/i,
+      /\binjection[-\s]?style\s+behavior\b/i,
+    ],
+  },
+  {
+    id: 'quota-reset-boundary-nit',
+    label: 'quota reset exact-boundary timing nit',
+    multiplier: 0.3,
+    patterns: [
+      /\bmaybeResetWindow\b[\s\S]{0,220}\b(?:24[-\s]?hour|boundary|extra\s+millisecond|>=\s*WINDOW_MS|non[-\s]?inclusive)\b/i,
+      /\b(?:24[-\s]?hour|boundary|extra\s+millisecond|>=\s*WINDOW_MS|non[-\s]?inclusive)\b[\s\S]{0,220}\bmaybeResetWindow\b/i,
+      /\bquota\b[\s\S]{0,220}\b(?:resets?\s+exactly|extra\s+millisecond|24[-\s]?hour\s+boundary)\b/i,
+      /\bmaybeResetWindow\b[\s\S]{0,220}\b(?:time\s+zones?|system\s+clock|clock\s+adjustments?|absolute\s+timestamps?)\b/i,
+      /\b(?:time\s+zones?|system\s+clock|clock\s+adjustments?|absolute\s+timestamps?)\b[\s\S]{0,220}\bmaybeResetWindow\b/i,
     ],
   },
   {

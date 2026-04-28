@@ -90,7 +90,8 @@ describe('matchFindingClass — positive matches', () => {
         problem: 'The parseQuotaConfig function does not verify that the input has the required limits property.',
       }),
     )!;
-    expect(match.id).toBe('missing-validation');
+    expect(match.id).toBe('parse-quota-required-field-nit');
+    expect(match.multiplier).toBe(0.3);
   });
 
   it('catches typed-object required-field validation claims', () => {
@@ -742,6 +743,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.4);
   });
 
+  it('catches function-call overhead sorting speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential performance regression in sorting',
+        problem:
+          'The new implementation introduces a function call overhead for every comparison, potentially degrading performance compared to the direct subtraction approach.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches localeCompare thread-safety race speculation', () => {
     const match = matchFindingClass(
       doc({
@@ -900,6 +913,42 @@ describe('matchFindingClass — positive matches', () => {
       }),
     )!;
     expect(match.id).toBe('quota-reset-race-speculation');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches quota reset exact-boundary timing nits', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Non-inclusive window reset logic',
+        problem:
+          'The maybeResetWindow function uses >= WINDOW_MS, which means a user might be rate-limited for an extra millisecond beyond the 24-hour boundary.',
+      }),
+    )!;
+    expect(match.id).toBe('quota-reset-boundary-nit');
+    expect(match.multiplier).toBe(0.3);
+  });
+
+  it('catches quota reset time-zone and system-clock speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Window reset logic may not handle time zone changes correctly',
+        problem:
+          'The maybeResetWindow function uses absolute timestamps without considering time zone changes or system clock adjustments.',
+      }),
+    )!;
+    expect(match.id).toBe('quota-reset-boundary-nit');
+    expect(match.multiplier).toBe(0.3);
+  });
+
+  it('catches parseKVString injection-style speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Security Issue with `parseKVString` Input Validation',
+        problem:
+          'The parseKVString function does not restrict key names to a safe set. This creates a potential for injection-style behavior if these keys are later used as identifiers for filesystem paths, database columns, or other system components.',
+      }),
+    )!;
+    expect(match.id).toBe('flat-kv-parser-speculation');
     expect(match.multiplier).toBe(0.4);
   });
 

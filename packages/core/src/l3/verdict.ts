@@ -28,7 +28,7 @@ export async function makeHeadVerdict(
   // Try LLM-based verdict if configured
   if (headConfig?.enabled !== false && headConfig?.model) {
     try {
-      return await llmVerdict(report, headConfig, language, onBackendCall);
+      return applyHeadVerdictSafety(await llmVerdict(report, headConfig, language, onBackendCall), report);
     } catch {
       // Fallback to rule-based on any LLM failure
     }
@@ -267,6 +267,61 @@ function parseHeadResponse(response: string, report: ModeratorReport): HeadVerdi
     reasoning,
     questionsForHuman: questionsForHuman?.length ? questionsForHuman : undefined,
   };
+}
+
+/**
+ * LLM head verdicts are advisory, but they must not erase unresolved or
+ * actionable critical state already present in the moderator report.
+ */
+export function applyHeadVerdictSafety(
+  verdict: HeadVerdict,
+  report: ModeratorReport,
+): HeadVerdict {
+  if (verdict.decision !== 'ACCEPT') {
+    return verdict;
+  }
+
+  const allCritical = report.discussions.filter(
+    (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
+  );
+  const criticalIssues = allCritical.filter(
+    (d) => d.avgConfidence == null || d.avgConfidence > ZERO_CONFIDENCE_THRESHOLD
+  );
+  if (criticalIssues.length > 0) {
+    return {
+      decision: 'REJECT',
+      reasoning:
+        `Head safety guard: ACCEPT was overridden because ${criticalIssues.length} ` +
+        `critical issue(s) remain actionable in the moderator report. Original reasoning: ${verdict.reasoning}`,
+      questionsForHuman: verdict.questionsForHuman,
+    };
+  }
+
+  const unverifiedCritical = allCritical.filter(
+    (d) => d.avgConfidence != null && d.avgConfidence <= ZERO_CONFIDENCE_THRESHOLD
+  );
+  const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
+  if (unverifiedCritical.length > 0 || escalatedIssues.length > 0) {
+    const questions = [
+      ...(verdict.questionsForHuman ?? []),
+      ...unverifiedCritical.map(
+        (d) => `Verify: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${d.finalSeverity}, ${d.avgConfidence}% confidence`
+      ),
+      ...escalatedIssues.map(
+        (d) => `Resolve: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}-${d.lineRange[1]}) — no consensus`
+      ),
+    ];
+    return {
+      decision: 'NEEDS_HUMAN',
+      reasoning:
+        `Head safety guard: ACCEPT was overridden because ${escalatedIssues.length} unresolved ` +
+        `discussion(s) and ${unverifiedCritical.length} low-confidence critical finding(s) require human judgment. ` +
+        `Original reasoning: ${verdict.reasoning}`,
+      questionsForHuman: questions.length > 0 ? questions : undefined,
+    };
+  }
+
+  return verdict;
 }
 
 // ============================================================================

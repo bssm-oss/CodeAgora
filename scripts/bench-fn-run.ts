@@ -74,6 +74,23 @@ interface SummaryEntry {
   error?: string;
 }
 
+interface RunSummaryMetadata {
+  generatedAt: string;
+  resultsDir: string;
+  config: string;
+  skipHead: boolean;
+  fixtures: SummaryEntry[];
+  totals: {
+    fixtures: number;
+    ok: number;
+    errors: number;
+    durationMs: number;
+    knownCostUsd: number;
+    hasUnknownCost: boolean;
+    totalTokens: number;
+  };
+}
+
 function parseArgs(argv: string[]): Args {
   const args: Args = {
     resultsDir: null,
@@ -152,6 +169,38 @@ function knownCostUsd(performance: RunPerformanceSummary | undefined): number {
   if (!cost?.startsWith('$')) return 0;
   const parsed = Number(cost.slice(1));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function loadExistingSummary(summaryPath: string): Promise<RunSummaryMetadata | null> {
+  try {
+    return JSON.parse(await readFile(summaryPath, 'utf8')) as RunSummaryMetadata;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+function mergeSummaryEntries(
+  previous: SummaryEntry[] | undefined,
+  next: SummaryEntry[],
+): SummaryEntry[] {
+  const byId = new Map<string, SummaryEntry>();
+  for (const entry of previous ?? []) byId.set(entry.id, entry);
+  for (const entry of next) byId.set(entry.id, entry);
+  return Array.from(byId.values()).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function summarizeEntries(entries: SummaryEntry[]): RunSummaryMetadata['totals'] {
+  const failures = entries.filter((s) => s.status === 'error').length;
+  return {
+    fixtures: entries.length,
+    ok: entries.length - failures,
+    errors: failures,
+    durationMs: entries.reduce((sum, s) => sum + s.durationMs, 0),
+    knownCostUsd: Number(entries.reduce((sum, s) => sum + knownCostUsd(s.performance), 0).toFixed(6)),
+    hasUnknownCost: entries.some((s) => !s.performance?.totalCost || s.performance.totalCost === 'N/A'),
+    totalTokens: entries.reduce((sum, s) => sum + (s.performance?.totalTokens ?? 0), 0),
+  };
 }
 
 async function runOne(
@@ -285,23 +334,27 @@ async function main(): Promise<void> {
   }
 
   const failures = summary.filter((s) => s.status === 'error').length;
-  const summaryMetadata = {
+  const summaryPath = path.join(metadataDir, 'summary.json');
+  const existingSummary = await loadExistingSummary(summaryPath);
+  const configForSummary = configPath ?? path.join(benchmarkCwd, '.ca', 'config.json');
+  const canMergeSummary = Boolean(
+    existingSummary &&
+    existingSummary.resultsDir === resultsDir &&
+    existingSummary.config === configForSummary &&
+    existingSummary.skipHead === args.skipHead,
+  );
+  const summaryFixtures = canMergeSummary
+    ? mergeSummaryEntries(existingSummary?.fixtures, summary)
+    : summary;
+  const summaryMetadata: RunSummaryMetadata = {
     generatedAt: new Date().toISOString(),
     resultsDir,
-    config: configPath ?? path.join(benchmarkCwd, '.ca', 'config.json'),
+    config: configForSummary,
     skipHead: args.skipHead,
-    fixtures: summary,
-    totals: {
-      fixtures: summary.length,
-      ok: summary.length - failures,
-      errors: failures,
-      durationMs: summary.reduce((sum, s) => sum + s.durationMs, 0),
-      knownCostUsd: Number(summary.reduce((sum, s) => sum + knownCostUsd(s.performance), 0).toFixed(6)),
-      hasUnknownCost: summary.some((s) => !s.performance?.totalCost || s.performance.totalCost === 'N/A'),
-      totalTokens: summary.reduce((sum, s) => sum + (s.performance?.totalTokens ?? 0), 0),
-    },
+    fixtures: summaryFixtures,
+    totals: summarizeEntries(summaryFixtures),
   };
-  await writeFile(path.join(metadataDir, 'summary.json'), JSON.stringify(summaryMetadata, null, 2) + '\n');
+  await writeFile(summaryPath, JSON.stringify(summaryMetadata, null, 2) + '\n');
 
   if (failures > 0) process.exit(1);
 }
