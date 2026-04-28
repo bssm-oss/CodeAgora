@@ -47,6 +47,7 @@
     "bench:fn": "tsx scripts/bench-fn.ts",
     "bench:fn:run": "tsx scripts/bench-fn-run.ts",
     "bench:fn:compare": "tsx scripts/bench-fn-compare.ts",
+    "bench:reference": "tsx scripts/bench-reference-check.ts",
     "bench:rate-limit": "tsx scripts/bench-rate-limit-sim.ts"
   },
   "dependencies": {

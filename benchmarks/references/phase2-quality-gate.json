@@ -1,0 +1,36 @@
+{
+  "id": "phase2-quality-gate",
+  "title": "Phase 2 golden-bug quality gate",
+  "fixtureSet": "golden-bugs-20",
+  "fixtures": [
+    "async-stale-profile-cache",
+    "auth-session-dual",
+    "authz-admin-bypass",
+    "env-secret-fallback",
+    "fp-docs-only-runbook",
+    "fp-moderator-regex",
+    "fp-readme-command-rename",
+    "fp-stable-sorting-refactor",
+    "fp-test-helper-refactor",
+    "fp-type-only-import-refactor",
+    "jwt-ignore-expiration",
+    "null-deref-early-access",
+    "off-by-one-slice",
+    "path-traversal-download",
+    "payment-negative-refund",
+    "quota-manager-dual",
+    "sql-injection-concat",
+    "ssrf-avatar-fetch",
+    "tenant-cache-leak",
+    "webhook-missing-signature"
+  ],
+  "thresholds": {
+    "minPrecision": 1,
+    "minRecall": 1,
+    "minF1": 1,
+    "minFpCleanRate": 1,
+    "maxFalsePositives": 0,
+    "maxFalseNegatives": 0
+  },
+  "notes": "Read-only reference set for model-change regression checks. Validate with pnpm bench:reference -- --validate-only; score a live result directory with pnpm bench:reference -- --results <dir>."
+}

@@ -536,9 +536,13 @@ Validation:
 
 ```bash
 pnpm bench:fn -- --validate-only
+pnpm bench:reference -- --validate-only
 ```
 
-Result: `OK: 20 fixture(s) validated`.
+Result:
+
+- `OK: 20 fixture(s) validated`
+- `OK: reference phase2-quality-gate validates 20 fixture(s) (14 recall, 6 fp-regression)`
 
 The 20-fixture expansion is validated but not yet live-scored. The previous 12-fixture quality gate and L3 evidence remain the only live model evidence in this report until a full 20-fixture run is recorded.
 

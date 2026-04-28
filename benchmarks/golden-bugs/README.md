@@ -14,6 +14,13 @@ See `scripts/bench-fn.ts` (scorer) and `scripts/bench-fn-run.ts` (live-pipeline 
 
 The Phase 2 reference dataset currently contains 20 fixtures: 14 recall cases and 6 FP-regression cases.
 
+The read-only reference set lives at `benchmarks/references/phase2-quality-gate.json`:
+
+```bash
+pnpm bench:reference -- --validate-only
+pnpm bench:reference -- --results ./bench-out
+```
+
 ## Adding a fixture
 
 1. Pick a kebab-case id and create `benchmarks/golden-bugs/<id>/`.
