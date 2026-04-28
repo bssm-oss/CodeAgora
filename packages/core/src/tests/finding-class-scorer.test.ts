@@ -324,6 +324,28 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('undeclared-type');
   });
 
+  it('catches TypeScript trailing-comma syntax trivia claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Invalid TypeScript function signature causing compile-time failure',
+        problem:
+          'The function signature has a trailing comma after the sole parameter, and TypeScript does not permit a comma there.',
+      }),
+    )!;
+    expect(match.id).toBe('typescript-syntax-trivia');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches missing-import phrasing that says without importing it', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Undefined z reference leads to runtime crash',
+        problem: 'The newly added function uses the z object without importing it, so z will be undefined at runtime.',
+      }),
+    )!;
+    expect(match.id).toBe('undeclared-type');
+  });
+
   it('catches generic incorrect sorting comparator claims', () => {
     const match = matchFindingClass(
       doc({
@@ -363,6 +385,26 @@ describe('matchFindingClass — positive matches', () => {
       }),
     )!;
     expect(perfMatch.id).toBe('sorting-comparator');
+
+    const stringMatch = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Performance Degradation from Unnecessary String Comparison',
+        problem:
+          'Secondary sorting by title may add performance overhead because the unnecessary string comparison only matters for tie-breaking scenarios.',
+      }),
+    )!;
+    expect(stringMatch.id).toBe('sorting-comparator');
+  });
+
+  it('catches stable-sort engine variance claims against deterministic tie-breakers', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Inconsistent sorting behavior due to unstable sort comparison',
+        problem:
+          'The implementation does not guarantee stable sorting behavior for equal scores across JavaScript engine implementations.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
   });
 
   it('catches localeCompare non-string speculation against typed sort tie-breakers', () => {
@@ -386,6 +428,30 @@ describe('matchFindingClass — positive matches', () => {
       }),
     )!;
     expect(match.id).toBe('missing-size-limit');
+  });
+
+  it('catches impossible Zod safeParse result.data access speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Null Dereference if Zod Schema Violation Occurs',
+        problem:
+          'The code uses result.data.severity and result.data.reasoning after checking result.success, but Zod parsing failures could make property access unsafe.',
+      }),
+    )!;
+    expect(match.id).toBe('zod-safeparse-data-access');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches forced-decision null-return flow speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Unhandled Nullish Return in Moderation Processing Flow',
+        problem:
+          'parseForcedDecisionJson returns null when JSON parsing fails, but the calling code assumes a non-null result and can hit runtime errors.',
+      }),
+    )!;
+    expect(match.id).toBe('forced-decision-null-flow');
+    expect(match.multiplier).toBe(0.4);
   });
 
   it('catches typed Date serialization guard speculation', () => {

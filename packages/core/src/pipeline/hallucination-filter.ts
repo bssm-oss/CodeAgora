@@ -2,19 +2,20 @@
  * Pre-Debate Hallucination Filter (#428)
  * Validates evidence documents against the actual diff before L2 debate.
  *
- * 7 checks (zero model cost):
+ * 8 checks (zero model cost):
  * 1. File existence — filePath must be in diff file list
  * 2. Line range — lineRange must overlap at least one diff hunk
- * 3. Code quote — inline code quotes must exist in diff content
- * 4. Self-contradiction — finding must not contradict observed change direction
- * 5. Speculative language — hedge markers in problem/suggestion dampen confidence
- * 6. Evidence quality (#468) — vague/short evidence dampens confidence
- * 7. Finding-class prior (#468 follow-up) — empirically FP-heavy claim
+ * 3. Added-line anchor — findings on unchanged context lines are down-ranked
+ * 4. Code quote — inline code quotes must exist in diff content
+ * 5. Self-contradiction — finding must not contradict observed change direction
+ * 6. Speculative language — hedge markers in problem/suggestion dampen confidence
+ * 7. Evidence quality (#468) — vague/short evidence dampens confidence
+ * 8. Finding-class prior (#468 follow-up) — empirically FP-heavy claim
  *    classes (ReDoS, "may throw", missing-validation, zero-width) take
  *    an additional multiplier derived from observed base rates.
  *
  * Findings that fail checks 1-2 are hard-removed.
- * Checks 3-7 apply confidence penalties (soft) and may flag as uncertain.
+ * Checks 3-8 apply confidence penalties (soft) and may flag as uncertain.
  */
 
 import type { EvidenceDocument } from '../types/core.js';
@@ -33,6 +34,8 @@ export interface FilterResult {
 const UNCERTAINTY_THRESHOLD = 20;
 
 const HUNK_TOLERANCE = 10;
+const ADDED_LINE_ANCHOR_PENALTY = 0.4;
+const UNCHANGED_CONTEXT_PRIOR = 'unchanged-context';
 
 // ============================================================================
 // Diff Analysis Helpers
@@ -60,6 +63,52 @@ function parseDiffChangeDirection(diffContent: string): Map<string, { added: str
   }
 
   return result;
+}
+
+/** Extract exact added-line ranges per file from unified diff new-file line numbers. */
+function parseAddedLineRanges(diffContent: string): Map<string, Array<[number, number]>> {
+  const result = new Map<string, Array<[number, number]>>();
+  let currentFile: string | null = null;
+  let newLine: number | null = null;
+
+  for (const line of diffContent.split('\n')) {
+    if (line.startsWith('diff --git')) {
+      const match = line.match(/b\/(.+)$/);
+      currentFile = match?.[1] ?? null;
+      newLine = null;
+      if (currentFile && !result.has(currentFile)) result.set(currentFile, []);
+      continue;
+    }
+
+    if (!currentFile) continue;
+
+    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunkMatch) {
+      newLine = Number(hunkMatch[1]);
+      continue;
+    }
+
+    if (newLine === null) continue;
+
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      result.get(currentFile)!.push([newLine, newLine]);
+      newLine++;
+    } else if (line.startsWith(' ') || line === '') {
+      newLine++;
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      // Removed lines do not advance new-file line numbers.
+    }
+  }
+
+  return result;
+}
+
+function overlapsAnyRange(
+  lineRange: [number, number],
+  ranges: Array<[number, number]> | undefined,
+): boolean {
+  if (!ranges || ranges.length === 0) return false;
+  return ranges.some(([start, end]) => lineRange[0] <= end && lineRange[1] >= start);
 }
 
 // Contradiction signal keywords
@@ -142,6 +191,7 @@ export function filterHallucinations(
   const diffFiles = new Set(extractFileListFromDiff(diffContent));
   const diffRanges = parseDiffFileRanges(diffContent);
   const changeMap = parseDiffChangeDirection(diffContent);
+  const addedLineMap = parseAddedLineRanges(diffContent);
 
   // Build a map of file -> hunk ranges for quick lookup
   const hunkMap = new Map<string, Array<[number, number]>>();
@@ -181,7 +231,17 @@ export function filterHallucinations(
       }
     }
 
-    // Check 3: Code quote verification
+    let anchorPrior: string | undefined;
+    if (doc.filePath !== 'unknown' && doc.lineRange[0] > 0) {
+      const addedRanges = addedLineMap.get(doc.filePath);
+      if (addedRanges && addedRanges.length > 0 && !overlapsAnyRange(doc.lineRange, addedRanges)) {
+        const penalized = Math.round((doc.confidence ?? 50) * ADDED_LINE_ANCHOR_PENALTY);
+        doc.confidence = penalized; // BC: legacy single-field confidence
+        anchorPrior = UNCHANGED_CONTEXT_PRIOR;
+      }
+    }
+
+    // Check 4: Code quote verification
     const codeQuotes = doc.problem.match(/`([^`]{10,})`/g);
     if (codeQuotes && codeQuotes.length > 0) {
       let fabricatedCount = 0;
@@ -197,21 +257,21 @@ export function filterHallucinations(
       }
     }
 
-    // Check 4: Self-contradiction detection
+    // Check 5: Self-contradiction detection
     const contradictionPenalty = checkContradiction(doc, changeMap);
     if (contradictionPenalty < 1.0) {
       const penalized = Math.round((doc.confidence ?? 50) * contradictionPenalty);
       doc.confidence = penalized; // BC: legacy single-field confidence
     }
 
-    // Check 5: Speculative language penalty — hedge words dampen confidence
+    // Check 6: Speculative language penalty — hedge words dampen confidence
     const speculationPenalty = checkSpeculation(doc);
     if (speculationPenalty < 1.0) {
       const penalized = Math.round((doc.confidence ?? 50) * speculationPenalty);
       doc.confidence = penalized; // BC: legacy single-field confidence
     }
 
-    // Check 6 (#468): Evidence quality penalty — vague/short evidence
+    // Check 7 (#468): Evidence quality penalty — vague/short evidence
     // dampens confidence. The FP class exposed by the #472 baseline
     // (short template-style problem text, no file:line citations, no
     // backtick identifiers) scores low here and gets the full ×0.7.
@@ -222,7 +282,7 @@ export function filterHallucinations(
       doc.confidence = penalized; // BC: legacy single-field confidence
     }
 
-    // Check 7 (#468 follow-up): Finding-class prior — empirically
+    // Check 8 (#468 follow-up): Finding-class prior — empirically
     // FP-heavy claim categories take an additional multiplier. See
     // finding-class-scorer.ts for the table.
     const classMatch = matchFindingClass(doc);
@@ -240,7 +300,7 @@ export function filterHallucinations(
         ...(doc.confidenceTrace ?? {}),
         filtered: doc.confidence,
         evidence: evScore,
-        ...(classMatch ? { classPrior: classMatch.id } : {}),
+        ...(classMatch || anchorPrior ? { classPrior: classMatch?.id ?? anchorPrior } : {}),
       };
     }
 

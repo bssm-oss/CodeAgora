@@ -144,6 +144,16 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     ],
   },
   {
+    id: 'zod-safeparse-data-access',
+    label: 'impossible Zod safeParse data access speculation',
+    multiplier: 0.4,
+    patterns: [
+      /\bzod\b[\s\S]{0,200}\b(?:safeParse|result\.success|result\.data)\b[\s\S]{0,200}\b(?:undefined|null|property\s+access|null\s+dereference)/i,
+      /\bresult\.data\.(?:severity|reasoning)\b[\s\S]{0,200}\bresult\.success\b/i,
+      /\bresult\.success\b[\s\S]{0,200}\bresult\.data\.(?:severity|reasoning)\b/i,
+    ],
+  },
+  {
     id: 'missing-size-limit',
     label: 'missing payload/input size limit',
     multiplier: 0.6,
@@ -158,6 +168,15 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\bdeeply\s+nested\b[\s\S]{0,160}\bjson\b/i,
       /\b(?:size|complexity)\s+limits?\b[\s\S]{0,160}\bjson\.parse\b/i,
       /\bjson\.parse\b[\s\S]{0,160}\b(?:size|complexity)\s+limits?\b/i,
+    ],
+  },
+  {
+    id: 'forced-decision-null-flow',
+    label: 'forced-decision null-return flow speculation',
+    multiplier: 0.4,
+    patterns: [
+      /\bparseForcedDecisionJson\b[\s\S]{0,220}\breturns\s+null\b[\s\S]{0,220}\bcalling\s+code\s+assumes\b/i,
+      /\bextractModeratorJsonPayload\b[\s\S]{0,220}\breturns\s+null\b[\s\S]{0,220}\bruntime\s+errors?\b/i,
     ],
   },
   {
@@ -215,8 +234,19 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\b(?:undeclared|undefined)\s+(?:type|interface|symbol|identifier)\b/i,
       /\b(?:not|never)\s+imported\b/i,
       /\b(?:missing|forgot(?:ten)?)\s+import\b/i,
+      /\bwithout\s+importing\s+it\b/i,
       /\bcannot\s+find\s+name\b/i,
       /\btypescript\s+compilation\s+error\b/i,
+    ],
+  },
+  {
+    id: 'typescript-syntax-trivia',
+    label: 'TypeScript syntax trivia false positive',
+    multiplier: 0.4,
+    patterns: [
+      /\btrailing\s+comma\b[\s\S]{0,160}\b(?:last|sole)\s+parameter\b/i,
+      /\bfunction\s+signature\b[\s\S]{0,160}\btrailing\s+comma\b/i,
+      /\btypescript\b[\s\S]{0,160}\bdoes\s+not\s+permit\s+a\s+comma\b/i,
     ],
   },
   {
@@ -229,6 +259,9 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\bcomparator\s+(?:is\s+)?(?:incorrect|flawed|wrong)\b/i,
       /\bwrong\s+(?:top|order|ordering)\s+(?:users|items|results|entries)\b/i,
       /\bsort(?:ing)?\s+instability\b/i,
+      /\bunstable\s+sort\s+comparison\b/i,
+      /\bdoes\s+not\s+guarantee\s+stable\s+sort(?:ing)?\s+behavior\b/i,
+      /\bstable\s+sort(?:ing)?\s+behavior\b[\s\S]{0,160}\b(?:inconsistent|engine|implementation)/i,
       /\bsort(?:ing)?\s+behavior\s+with\s+nan\b/i,
       /\bnan\s+scores?\b[\s\S]{0,120}\bsort/i,
       /\bsort\b[\s\S]{0,120}\bnan\s+scores?\b/i,
@@ -236,6 +269,8 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
       /\bnan\b[\s\S]{0,160}\bsort(?:ing)?\b/i,
       /\bperformance\s+regression\b[\s\S]{0,160}\bsort\s+comparison\b/i,
       /\badditional\s+conditional\s+logic\b[\s\S]{0,160}\bsort\b/i,
+      /\bunnecessary\s+string\s+comparison\b[\s\S]{0,160}\bsort/i,
+      /\bsecondary\s+sorting\s+by\s+title\b[\s\S]{0,160}\bperformance\s+overhead\b/i,
       /\blocaleCompare\b[\s\S]{0,160}\b(?:non[-\s]?string|not\s+a\s+string|typeerror)\b/i,
       /\b(?:non[-\s]?string|not\s+a\s+string|typeerror)\b[\s\S]{0,160}\blocaleCompare\b/i,
     ],

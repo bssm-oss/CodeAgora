@@ -165,14 +165,16 @@ describe('Check 2: Line range overlap', () => {
     const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [20, 25] })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
-    expect(result.filtered).toHaveLength(1);
+    expect(result.removed).toHaveLength(0);
+    expect(result.filtered.length + result.uncertain.length).toBe(1);
   });
 
   it('should keep findings at exact hunk boundaries', () => {
     const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [10, 10] })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
-    expect(result.filtered).toHaveLength(1);
+    expect(result.removed).toHaveLength(0);
+    expect(result.filtered.length + result.uncertain.length).toBe(1);
   });
 
   it('should handle lineRange [0, 0] gracefully (skip line check)', () => {
@@ -180,6 +182,34 @@ describe('Check 2: Line range overlap', () => {
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
     expect(result.filtered).toHaveLength(1);
+  });
+
+  it('should down-rank findings that only touch unchanged context lines', () => {
+    const docs = [makeDoc({
+      filePath: 'src/index.ts',
+      lineRange: [4, 4],
+      confidence: 80,
+      problem: richProblem('The unchanged call to helper() is now unsafe even though the diff only adds an import.'),
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered[0].confidence).toBe(32);
+    expect(result.filtered[0].confidenceTrace?.classPrior).toBe('unchanged-context');
+  });
+
+  it('should not down-rank findings that overlap exact added lines', () => {
+    const docs = [makeDoc({
+      filePath: 'src/index.ts',
+      lineRange: [2, 2],
+      confidence: 80,
+      problem: richProblem('The new import line introduces a module resolution issue.'),
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered[0].confidence).toBe(80);
+    expect(result.filtered[0].confidenceTrace?.classPrior).toBeUndefined();
   });
 });
 

@@ -379,7 +379,10 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     const totalDiffLines = filteredDiffContent.split('\n').length;
     for (const doc of allEvidenceDocs) {
       if (doc.source !== 'rule') {
-        const corroborated = computeL1Confidence(doc, allEvidenceDocs, activeReviewers, totalDiffLines);
+        const rawCorroborated = computeL1Confidence(doc, allEvidenceDocs, activeReviewers, totalDiffLines);
+        const corroborated = doc.confidenceTrace?.classPrior
+          ? Math.min(rawCorroborated, 75)
+          : rawCorroborated;
         doc.confidence = corroborated; // BC: legacy single-field confidence
         // ConfidenceTrace: record post-corroboration confidence (stage 3 of 5).
         doc.confidenceTrace = {
