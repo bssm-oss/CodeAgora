@@ -51,9 +51,16 @@ vi.mock('../../packages/core/src/l3/grouping.js', () => ({
   groupDiff: vi.fn(),
 }));
 
-vi.mock('../../packages/core/src/pipeline/chunker.js', () => ({
-  chunkDiff: vi.fn(),
-}));
+vi.mock('../../packages/core/src/pipeline/chunker.js', () => {
+  const chunkDiff = vi.fn();
+  return {
+    chunkDiff,
+    chunkDiffWithMetadata: vi.fn(async (...args: unknown[]) => ({
+      chunks: await chunkDiff(...args),
+      metadata: { includedFiles: [], excludedFiles: [], diffChunking: { excludedByBuiltinPatterns: [], excludedByReviewIgnorePatterns: [], excludedByContextIgnorePatterns: [] } },
+    })),
+  };
+});
 
 vi.mock('../../packages/core/src/l3/verdict.js', () => ({
   makeHeadVerdict: vi.fn(),
@@ -129,6 +136,7 @@ import fs from 'fs/promises';
 const mockSession = {
   getDate: vi.fn().mockReturnValue('2026-01-15'),
   getSessionId: vi.fn().mockReturnValue('001'),
+  setMetadata: vi.fn().mockResolvedValue(undefined),
   setStatus: vi.fn().mockResolvedValue(undefined),
   registerCleanup: vi.fn(),
 };

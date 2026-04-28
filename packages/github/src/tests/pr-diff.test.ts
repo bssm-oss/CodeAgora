@@ -19,8 +19,8 @@ function makeOctokit(options: {
   prData?: Partial<{
     number: number;
     title: string;
-    base: { ref: string };
-    head: { ref: string };
+    base: { ref: string; sha?: string; repo?: { full_name: string } };
+    head: { ref: string; sha?: string; repo?: { full_name: string } };
   }>;
   diffData?: unknown;
   getError?: Error;
@@ -34,8 +34,8 @@ function makeOctokit(options: {
   const pr = {
     number: prData.number ?? 42,
     title: prData.title ?? 'Test PR',
-    base: prData.base ?? { ref: 'main' },
-    head: prData.head ?? { ref: 'feature-branch' },
+    base: prData.base ?? { ref: 'main', sha: 'base123', repo: { full_name: 'test-owner/test-repo' } },
+    head: prData.head ?? { ref: 'feature-branch', sha: 'head456', repo: { full_name: 'test-owner/test-repo' } },
   };
 
   let callCount = 0;
@@ -61,7 +61,12 @@ function makeOctokit(options: {
 describe('fetchPrDiff', () => {
   it('returns PR number, title, baseBranch, headBranch, and diff', async () => {
     const octokit = makeOctokit({
-      prData: { number: 7, title: 'My Feature', base: { ref: 'main' }, head: { ref: 'feat/x' } },
+      prData: {
+        number: 7,
+        title: 'My Feature',
+        base: { ref: 'main', sha: 'base1', repo: { full_name: 'test-owner/test-repo' } },
+        head: { ref: 'feat/x', sha: 'head1', repo: { full_name: 'fork-owner/test-repo' } },
+      },
       diffData: '--- a/x.ts\n+++ b/x.ts\n@@ -1 +1 @@\n+new',
     });
 
@@ -71,7 +76,23 @@ describe('fetchPrDiff', () => {
     expect(result.title).toBe('My Feature');
     expect(result.baseBranch).toBe('main');
     expect(result.headBranch).toBe('feat/x');
+    expect(result.baseSha).toBe('base1');
+    expect(result.headSha).toBe('head1');
+    expect(result.isFork).toBe(true);
     expect(result.diff).toContain('+new');
+  });
+
+  it('reports same-repository PRs as non-forks for rebase/force-push playbooks', async () => {
+    const octokit = makeOctokit({
+      prData: {
+        base: { ref: 'main', sha: 'base2', repo: { full_name: 'test-owner/test-repo' } },
+        head: { ref: 'feature', sha: 'head2', repo: { full_name: 'test-owner/test-repo' } },
+      },
+    });
+
+    const result = await fetchPrDiff(makeConfig(), 42, octokit as never);
+    expect(result.isFork).toBe(false);
+    expect(result.headSha).toBe('head2');
   });
 
   it('calls kit.pulls.get twice — once for metadata, once for diff', async () => {

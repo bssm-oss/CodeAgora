@@ -34,6 +34,14 @@ export interface ChunkMetadata {
     excludedByBuiltinPatterns: string[];
     excludedByReviewIgnorePatterns: string[];
     excludedByContextIgnorePatterns: string[];
+    priorityFiles: string[];
+    oversizedHunks: Array<{
+      filePath: string;
+      hunkHeader: string;
+      estimatedTokens: number;
+      priority: 'security' | 'normal';
+    }>;
+    tokenBudgetDecisions: string[];
   };
 }
 
@@ -48,6 +56,9 @@ interface ParsedDiffFile {
   hunks: string[];
 }
 
+const SECURITY_SENSITIVE_PATH_RE = /(?:auth|oauth|session|cookie|jwt|token|secret|credential|password|permission|policy|rbac|csrf|crypto|encrypt|decrypt|sql|query|database|migration|webhook|signature|sandbox|exec|shell)/i;
+const SECURITY_SENSITIVE_CONTENT_RE = /(?:password|secret|token|credential|authorization|cookie|jwt|csrf|sql|query|eval|exec|spawn|child_process|signature|verify|permission|role|admin|sanitize|escape)/i;
+
 // ============================================================================
 // Token Estimation
 // ============================================================================
@@ -57,6 +68,12 @@ interface ParsedDiffFile {
  */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+export function scoreDiffPriority(filePath: string, content: string): 'security' | 'normal' {
+  return SECURITY_SENSITIVE_PATH_RE.test(filePath) || SECURITY_SENSITIVE_CONTENT_RE.test(content)
+    ? 'security'
+    : 'normal';
 }
 
 // ============================================================================
@@ -166,6 +183,30 @@ export function splitLargeFile(
   return results;
 }
 
+function splitLargeFileWithMetadata(
+  file: ParsedDiffFile,
+  maxTokens: number,
+  metadata: ChunkMetadata,
+): Array<{ filePath: string; content: string }> {
+  const result = splitLargeFile(file, maxTokens);
+  for (const part of result) {
+    const estimatedTokens = estimateTokens(part.content);
+    if (estimatedTokens <= maxTokens) continue;
+    const hunkHeader = part.content.match(/^@@.*$/m)?.[0] ?? '(whole file section)';
+    const priority = scoreDiffPriority(file.filePath, part.content);
+    metadata.diffChunking.oversizedHunks.push({
+      filePath: file.filePath,
+      hunkHeader,
+      estimatedTokens,
+      priority,
+    });
+    metadata.diffChunking.tokenBudgetDecisions.push(
+      `kept oversized ${priority} hunk for ${file.filePath} (${estimatedTokens} tokens > budget ${maxTokens})`
+    );
+  }
+  return result;
+}
+
 // ============================================================================
 // File Grouping into Chunks
 // ============================================================================
@@ -189,9 +230,15 @@ export function chunkDiffFiles(
 ): DiffChunk[] {
   if (files.length === 0) return [];
 
+  const orderedFiles = [...files].sort((a, b) => {
+    const aPriority = scoreDiffPriority(a.filePath, a.content) === 'security' ? 0 : 1;
+    const bPriority = scoreDiffPriority(b.filePath, b.content) === 'security' ? 0 : 1;
+    return aPriority - bPriority;
+  });
+
   // Group by directory first
   const dirMap = new Map<string, Array<{ filePath: string; content: string }>>();
-  for (const file of files) {
+  for (const file of orderedFiles) {
     const dir = getFileDir(file.filePath);
     if (!dirMap.has(dir)) {
       dirMap.set(dir, []);
@@ -518,6 +565,9 @@ export async function chunkDiffWithMetadata(
       excludedByBuiltinPatterns: [],
       excludedByReviewIgnorePatterns: [],
       excludedByContextIgnorePatterns: [],
+      priorityFiles: [],
+      oversizedHunks: [],
+      tokenBudgetDecisions: [],
     },
   };
 
@@ -554,6 +604,9 @@ export async function chunkDiffWithMetadata(
 
   const filteredFiles = contextIgnoreFilter.included;
   metadata.includedFiles = filteredFiles.map((f) => f.filePath);
+  metadata.diffChunking.priorityFiles = filteredFiles
+    .filter((f) => scoreDiffPriority(f.filePath, f.content) === 'security')
+    .map((f) => f.filePath);
   metadata.excludedFiles = [
     ...metadata.diffChunking.excludedByBuiltinPatterns,
     ...metadata.diffChunking.excludedByReviewIgnorePatterns,
@@ -563,13 +616,18 @@ export async function chunkDiffWithMetadata(
     return { chunks: [], metadata };
   }
 
-  // 4. Split large files by hunk boundaries
+  // 5. Split large files by hunk boundaries and record oversize decisions.
   const splitFiles: Array<{ filePath: string; content: string }> = [];
   for (const file of filteredFiles) {
-    splitFiles.push(...splitLargeFile(file, maxTokens));
+    splitFiles.push(...splitLargeFileWithMetadata(file, maxTokens, metadata));
+  }
+  if (splitFiles.length !== filteredFiles.length) {
+    metadata.diffChunking.tokenBudgetDecisions.push(
+      `split ${filteredFiles.length} file section(s) into ${splitFiles.length} token-budget section(s)`
+    );
   }
 
-  // 5. Check if everything fits in a single chunk
+  // 6. Check if everything fits in a single chunk
   const totalTokens = splitFiles.reduce((sum, f) => sum + estimateTokens(f.content), 0);
   if (totalTokens <= maxTokens) {
     const joined = splitFiles.map((f) => f.content).join('\n');
@@ -586,9 +644,13 @@ export async function chunkDiffWithMetadata(
     };
   }
 
-  // 6. Group into chunks
+  // 7. Group into chunks
+  const chunks = chunkDiffFiles(splitFiles, maxTokens);
+  metadata.diffChunking.tokenBudgetDecisions.push(
+    `grouped ${splitFiles.length} section(s) into ${chunks.length} review chunk(s) with budget ${maxTokens}`
+  );
   return {
-    chunks: chunkDiffFiles(splitFiles, maxTokens),
+    chunks,
     metadata,
   };
 }

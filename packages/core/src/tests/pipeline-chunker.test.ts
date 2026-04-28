@@ -14,6 +14,7 @@ import {
   loadReviewIgnorePatterns,
   chunkDiff,
   chunkDiffWithMetadata,
+  scoreDiffPriority,
   REVIEW_IGNORE_MAX_BYTES,
   BUILT_IN_ARTIFACT_PATTERNS,
 } from '../pipeline/chunker.js';
@@ -472,5 +473,55 @@ doc
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it('records priority files and token budget decisions for security-sensitive diffs', async () => {
+    const diff = [
+      'diff --git a/src/auth/session.ts b/src/auth/session.ts',
+      '--- a/src/auth/session.ts',
+      '+++ b/src/auth/session.ts',
+      '@@ -1,2 +1,3 @@',
+      ' export function verify(token: string) {',
+      '+  return token === process.env.ADMIN_TOKEN;',
+      ' }',
+      'diff --git a/docs/readme.md b/docs/readme.md',
+      '--- a/docs/readme.md',
+      '+++ b/docs/readme.md',
+      '@@ -1,1 +1,1 @@',
+      '-old',
+      '+new',
+    ].join('\n');
+
+    const result = await chunkDiffWithMetadata(diff, { maxTokens: 80 });
+    expect(result.metadata.diffChunking.priorityFiles).toContain('src/auth/session.ts');
+    expect(result.metadata.diffChunking.tokenBudgetDecisions.some((d) => d.includes('review chunk'))).toBe(true);
+    expect(result.chunks[0]?.files).toContain('src/auth/session.ts');
+  });
+
+  it('records oversized hunks instead of silently hiding token budget overflow', async () => {
+    const longLine = `+${'secret token verification '.repeat(80)}`;
+    const diff = [
+      'diff --git a/src/auth/huge.ts b/src/auth/huge.ts',
+      '--- a/src/auth/huge.ts',
+      '+++ b/src/auth/huge.ts',
+      '@@ -1,1 +1,2 @@',
+      longLine,
+    ].join('\n');
+
+    const result = await chunkDiffWithMetadata(diff, { maxTokens: 20 });
+    expect(result.metadata.diffChunking.oversizedHunks).toHaveLength(1);
+    expect(result.metadata.diffChunking.oversizedHunks[0]).toMatchObject({
+      filePath: 'src/auth/huge.ts',
+      priority: 'security',
+    });
+    expect(result.metadata.diffChunking.tokenBudgetDecisions[0]).toContain('kept oversized security hunk');
+  });
+});
+
+describe('scoreDiffPriority', () => {
+  it('prioritizes security-sensitive paths and hunk content', () => {
+    expect(scoreDiffPriority('src/auth/login.ts', '+const ok = true')).toBe('security');
+    expect(scoreDiffPriority('src/ui/button.tsx', '+const token = getToken()')).toBe('security');
+    expect(scoreDiffPriority('src/ui/button.tsx', '+const label = "Save"')).toBe('normal');
   });
 });

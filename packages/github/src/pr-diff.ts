@@ -7,6 +7,12 @@ import { Octokit } from '@octokit/rest';
 import type { GitHubConfig, PullRequestInfo } from './client.js';
 import { createOctokit } from './client.js';
 
+function repoFullName(repo: unknown): string | undefined {
+  if (!repo || typeof repo !== 'object') return undefined;
+  const value = (repo as Record<string, unknown>)['full_name'];
+  return typeof value === 'string' ? value : undefined;
+}
+
 /**
  * Fetch a pull request's metadata and unified diff.
  *
@@ -52,6 +58,13 @@ export async function fetchPrDiff(
     title: pr.title,
     baseBranch: pr.base.ref,
     headBranch: pr.head.ref,
+    baseSha: pr.base.sha,
+    headSha: pr.head.sha,
+    baseRepoFullName: repoFullName(pr.base.repo),
+    headRepoFullName: repoFullName(pr.head.repo),
+    isFork: repoFullName(pr.base.repo) !== undefined && repoFullName(pr.head.repo) !== undefined
+      ? repoFullName(pr.base.repo) !== repoFullName(pr.head.repo)
+      : undefined,
     diff: diffContent,
     truncated,
   };

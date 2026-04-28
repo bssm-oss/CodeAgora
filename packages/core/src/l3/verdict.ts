@@ -8,6 +8,7 @@
 import type { ModeratorReport, HeadVerdict, EvidenceDocument } from '../types/core.js';
 import type { HeadConfig } from '../types/config.js';
 import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
+import { untrustedContentInstruction, wrapUntrustedBlock } from '../security/untrusted-content.js';
 
 // ============================================================================
 // LLM-Based Verdict
@@ -104,7 +105,10 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
     const confStr = d.avgConfidence != null
       ? (isKo ? `, 신뢰도: ${d.avgConfidence}%` : `, confidence: ${d.avgConfidence}%`)
       : '';
-    return `- [${d.finalSeverity}] ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${consensus}, ${d.rounds} ${isKo ? '라운드' : 'round(s)'}${confStr}: ${d.reasoning}`;
+    return [
+      `- [${d.finalSeverity}] ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${consensus}, ${d.rounds} ${isKo ? '라운드' : 'round(s)'}${confStr}`,
+      wrapUntrustedBlock(`moderator_reasoning_${d.discussionId}`, d.reasoning),
+    ].join('\n');
   }).join('\n');
 
   // Build condensed evidence for CRITICAL+ findings (#310)
@@ -116,7 +120,7 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
     const snippets = rounds.flatMap((r) =>
       r.supporterResponses.map((s) => {
         const text = s.response.slice(0, 200);
-        return `  - [${s.stance}] ${s.supporterId}: ${text}${s.response.length > 200 ? '…' : ''}`;
+        return `  - [${s.stance}] ${s.supporterId}:\n${wrapUntrustedBlock(`supporter_${s.supporterId}_evidence`, `${text}${s.response.length > 200 ? '...' : ''}`)}`;
       })
     );
     if (snippets.length === 0) return null;
@@ -175,6 +179,7 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 
   if (isKo) {
     return `당신은 멀티 에이전트 코드 리뷰 시스템의 최종 판관입니다. 여러 AI 리뷰어가 독립적으로 코드 변경을 검토한 후 토론을 진행했습니다. 최종 판결을 내려주세요.
+${untrustedContentInstruction('reviewer, supporter, and moderator models')}
 
 ## 토론 결과
 
@@ -208,6 +213,7 @@ QUESTIONS: <인간 리뷰어를 위한 질문 목록 (쉼표 구분), 없으면 
   }
 
   return `You are the Head Judge in a multi-agent code review system. Multiple AI reviewers independently reviewed a code change, then debated their findings. You must now deliver the final verdict.
+${untrustedContentInstruction('reviewer, supporter, and moderator models')}
 
 ## Discussion Results
 

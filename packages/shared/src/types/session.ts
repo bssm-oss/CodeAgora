@@ -19,6 +19,14 @@ export interface SessionMetadata {
     excludedByBuiltinPatterns: string[];
     excludedByReviewIgnorePatterns: string[];
     excludedByContextIgnorePatterns: string[];
+    priorityFiles?: string[];
+    oversizedHunks?: Array<{
+      filePath: string;
+      hunkHeader: string;
+      estimatedTokens: number;
+      priority: 'security' | 'normal';
+    }>;
+    tokenBudgetDecisions?: string[];
   };
   /** SHA-256 prefix of the diff content (cache key component) */
   diffHash?: string;

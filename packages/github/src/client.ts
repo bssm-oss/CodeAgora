@@ -78,6 +78,11 @@ export interface PullRequestInfo {
   title: string;
   baseBranch: string;
   headBranch: string;
+  baseSha?: string;
+  headSha?: string;
+  headRepoFullName?: string;
+  baseRepoFullName?: string;
+  isFork?: boolean;
   diff: string;
   /** True when diff size exceeds GitHub's ~300KB truncation threshold (#288) */
   truncated?: boolean;

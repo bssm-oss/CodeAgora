@@ -15,6 +15,7 @@ import { selectSupporters, loadPersona } from './supporter-selector.js';
 import type { SelectedSupporter } from './supporter-selector.js';
 import type { DiscussionEmitter } from './event-emitter.js';
 import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
+import { untrustedContentInstruction, wrapUntrustedBlock } from '../security/untrusted-content.js';
 
 // Re-export for backward compatibility (tests and other modules import from here)
 export { selectSupporters, loadPersona } from './supporter-selector.js';
@@ -550,12 +551,17 @@ async function moderatorForcedDecision(
   onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<{ severity: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED'; reasoning: string }> {
   const useJsonFormat = config.outputFormat === 'json';
-  const roundsBlock = rounds.map((r, i) =>
-    `Round ${i + 1}:\n${r.supporterResponses.map(s => `- ${s.supporterId}: ${s.stance} — ${s.response.substring(0, 200)}`).join('\n')}`
-  ).join('\n\n');
+  const roundsBlock = rounds.map((r, i) => {
+    const responses = r.supporterResponses.map((s) => {
+      const response = s.response.substring(0, 200);
+      return `- ${s.supporterId}: ${s.stance}\n${wrapUntrustedBlock(`supporter_${s.supporterId}_response`, response)}`;
+    }).join('\n');
+    return `Round ${i + 1}:\n${responses}`;
+  }).join('\n\n');
 
   const prompt = useJsonFormat
     ? `You are the moderator. The discussion has reached max rounds without consensus.
+${untrustedContentInstruction('supporter models')}
 
 Issue: ${discussion.issueTitle}
 Severity claimed: ${discussion.severity}
@@ -571,6 +577,7 @@ Rounds:
 ${roundsBlock}
 `
     : `You are the moderator. The discussion has reached max rounds without consensus.
+${untrustedContentInstruction('supporter models')}
 
 Issue: ${discussion.issueTitle}
 Severity claimed: ${discussion.severity}
@@ -633,19 +640,23 @@ function buildEvidenceSection(discussion: Discussion, isKo: boolean): string {
   }
 
   const sections = content.map((doc, i) => {
+    const untrustedDoc = wrapUntrustedBlock(
+      `reviewer_${i + 1}_evidence`,
+      [
+        isKo ? `문제: ${doc.problem}` : `Problem: ${doc.problem}`,
+        doc.evidence.length > 0 ? (isKo ? `근거: ${doc.evidence.join('; ')}` : `Evidence: ${doc.evidence.join('; ')}`) : '',
+        doc.suggestion ? (isKo ? `제안: ${doc.suggestion}` : `Suggestion: ${doc.suggestion}`) : '',
+      ].filter(Boolean).join('\n'),
+    );
     if (isKo) {
       return [
         `**리뷰어 ${i + 1}** (${doc.severity}):`,
-        `문제: ${doc.problem}`,
-        doc.evidence.length > 0 ? `근거: ${doc.evidence.join('; ')}` : '',
-        doc.suggestion ? `제안: ${doc.suggestion}` : '',
+        untrustedDoc,
       ].filter(Boolean).join('\n');
     }
     return [
       `**Reviewer ${i + 1}** (${doc.severity}):`,
-      `Problem: ${doc.problem}`,
-      doc.evidence.length > 0 ? `Evidence: ${doc.evidence.join('; ')}` : '',
-      doc.suggestion ? `Suggestion: ${doc.suggestion}` : '',
+      untrustedDoc,
     ].filter(Boolean).join('\n');
   });
 
@@ -729,6 +740,7 @@ ${discussion.codeSnippet}
       : `코드 스니펫: (사용 불가 - 파일이 diff에 없을 수 있음)`;
 
     return `라운드 ${roundNum}
+${untrustedContentInstruction('reviewer models')}
 
 이슈: ${discussion.issueTitle}
 파일: ${discussion.filePath}:${discussion.lineRange[0]}-${discussion.lineRange[1]}
@@ -754,6 +766,7 @@ ${discussion.codeSnippet}
     : `Code snippet: (not available - file may not be in diff)`;
 
   return `Round ${roundNum}
+${untrustedContentInstruction('reviewer models')}
 
 Issue: ${discussion.issueTitle}
 File: ${discussion.filePath}:${discussion.lineRange[0]}-${discussion.lineRange[1]}

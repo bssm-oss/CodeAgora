@@ -294,6 +294,21 @@ export function formatDryRunText(result: DryRunResult): string {
     lines.push(`    - Built-in artifacts: ${diffChunking.excludedByBuiltinPatterns.length}`);
     lines.push(`    - .reviewignore: ${diffChunking.excludedByReviewIgnorePatterns.length}`);
     lines.push(`    - reviewContext.ignorePatterns: ${diffChunking.excludedByContextIgnorePatterns.length}`);
+    if (diffChunking.priorityFiles?.length) {
+      lines.push(`    - Priority files retained: ${diffChunking.priorityFiles.length}`);
+    }
+    if (diffChunking.oversizedHunks?.length) {
+      lines.push(`    - Oversized hunks retained: ${diffChunking.oversizedHunks.length}`);
+    }
+    if (diffChunking.tokenBudgetDecisions?.length) {
+      lines.push('  Token Budget Decisions:');
+      for (const decision of diffChunking.tokenBudgetDecisions.slice(0, 8)) {
+        lines.push(`    - ${decision}`);
+      }
+      if (diffChunking.tokenBudgetDecisions.length > 8) {
+        lines.push(`    ... and ${diffChunking.tokenBudgetDecisions.length - 8} more`);
+      }
+    }
     lines.push('');
   }
 
