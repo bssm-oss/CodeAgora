@@ -38,11 +38,58 @@ jobs:
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+              {
+                "id": "r1",
+                "model": "llama-3.3-70b-versatile",
+                "backend": "api",
+                "provider": "groq",
+                "enabled": true,
+                "timeout": 120
+              }
             ],
             "moderator": { "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq" },
             "head": { "backend": "api", "model": "llama-3.3-70b-versatile", "provider": "groq", "enabled": true },
-            "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+            "supporters": {
+              "pool": [
+                {
+                  "id": "s1",
+                  "model": "llama-3.3-70b-versatile",
+                  "backend": "api",
+                  "provider": "groq",
+                  "enabled": true,
+                  "timeout": 120
+                }
+              ],
+              "pickCount": 1,
+              "pickStrategy": "random",
+              "devilsAdvocate": {
+                "id": "da",
+                "model": "llama-3.3-70b-versatile",
+                "backend": "api",
+                "provider": "groq",
+                "enabled": true,
+                "timeout": 120
+              },
+              "personaPool": ["safety", "security", "maintainer"],
+              "personaAssignment": "random"
+            },
+            "discussion": {
+              "enabled": true,
+              "maxRounds": 3,
+              "registrationThreshold": {
+                "HARSHLY_CRITICAL": 1,
+                "CRITICAL": 1,
+                "WARNING": 2,
+                "SUGGESTION": null
+              },
+              "codeSnippetRange": 10,
+              "objectionTimeout": 60,
+              "maxObjectionRounds": 1
+            },
+            "errorHandling": {
+              "maxRetries": 1,
+              "forfeitThreshold": 0.7
+            }
           }
           CONF
 
