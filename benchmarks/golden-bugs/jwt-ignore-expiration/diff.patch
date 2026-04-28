@@ -1,0 +1,19 @@
+diff --git a/src/auth/jwt.ts b/src/auth/jwt.ts
+index 2000001..2000002 100644
+--- a/src/auth/jwt.ts
++++ b/src/auth/jwt.ts
+@@ -1,12 +1,12 @@
+ import jwt from 'jsonwebtoken';
+
+ const PUBLIC_KEY = process.env.JWT_PUBLIC_KEY ?? '';
+
+ export function verifyAccessToken(token: string) {
+   return jwt.verify(token, PUBLIC_KEY, {
+     algorithms: ['RS256'],
+-    clockTolerance: 5,
++    ignoreExpiration: true,
+   });
+ }
+
+ export function decodeAccessToken(token: string) {
+   return jwt.decode(token);

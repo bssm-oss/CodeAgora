@@ -1,0 +1,16 @@
+diff --git a/README.md b/README.md
+index 7000001..7000002 100644
+--- a/README.md
++++ b/README.md
+@@ -12,12 +12,12 @@ Install the CLI and run a review from any Git repository.
+
+ ```bash
+ pnpm install
+-pnpm codeagora review
++pnpm agora review
+ ```
+
+ The review command reads `.ca/config.json`, loads provider credentials from
+ your local environment, and writes session artifacts under `.ca/sessions`.
+
+ For CI usage, prefer the GitHub Action example in `action.yml`.

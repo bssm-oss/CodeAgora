@@ -1,0 +1,19 @@
+diff --git a/src/tests/helpers/user-fixtures.ts b/src/tests/helpers/user-fixtures.ts
+index 8000001..8000002 100644
+--- a/src/tests/helpers/user-fixtures.ts
++++ b/src/tests/helpers/user-fixtures.ts
+@@ -1,12 +1,13 @@
+ export function makeUser(overrides = {}) {
+-  return {
++  const defaults = {
+     id: 'u_123',
+     email: 'user@example.com',
+     role: 'member',
+-    ...overrides,
+   };
++  return { ...defaults, ...overrides };
+ }
+
+ export function makeAdmin(overrides = {}) {
+   return makeUser({ role: 'admin', ...overrides });
+ }

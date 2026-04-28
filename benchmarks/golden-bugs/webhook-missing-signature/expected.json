@@ -1,0 +1,17 @@
+{
+  "id": "webhook-missing-signature",
+  "title": "webhook verifier accepts unsigned requests",
+  "source": "synthetic held-out — webhook auth bypass",
+  "category": "held-out-security",
+  "expectedFindings": [
+    {
+      "filePath": "src/webhooks/verify.ts",
+      "lineRange": [4, 4],
+      "lineTolerance": 2,
+      "minSeverity": "CRITICAL",
+      "rationale": "missing signatures are treated as valid, allowing unsigned webhook requests through",
+      "keyword": "signature"
+    }
+  ],
+  "notes": "Held-out recall case for auth-bypass behavior."
+}

@@ -1,0 +1,17 @@
+{
+  "id": "ssrf-avatar-fetch",
+  "title": "avatar loader fetches arbitrary user-provided URLs",
+  "source": "synthetic held-out — SSRF reproducer",
+  "category": "held-out-security",
+  "expectedFindings": [
+    {
+      "filePath": "src/profile/avatar.ts",
+      "lineRange": [5, 7],
+      "lineTolerance": 4,
+      "minSeverity": "CRITICAL",
+      "rationale": "userInputPath becomes an arbitrary URL passed to fetch, allowing server-side request forgery",
+      "keyword": "SSRF"
+    }
+  ],
+  "notes": "Held-out recall case for outbound request validation."
+}

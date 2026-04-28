@@ -1,0 +1,17 @@
+{
+  "id": "payment-negative-refund",
+  "title": "refund path accepts negative amounts",
+  "source": "synthetic held-out — billing invariant regression",
+  "category": "held-out-logic",
+  "expectedFindings": [
+    {
+      "filePath": "src/billing/refunds.ts",
+      "lineRange": [4, 5],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "negative refund amounts pass validation and are credited into the ledger call",
+      "keyword": "negative"
+    }
+  ],
+  "notes": "Held-out recall case for payment amount validation."
+}

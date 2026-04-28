@@ -1,0 +1,8 @@
+{
+  "id": "fp-test-helper-refactor",
+  "title": "test fixture helper refactor should stay clean",
+  "source": "synthetic held-out — test-only FP regression",
+  "category": "fp-regression",
+  "expectedFindings": [],
+  "notes": "Equivalent test helper refactor. Review should not report production security or behavior issues."
+}

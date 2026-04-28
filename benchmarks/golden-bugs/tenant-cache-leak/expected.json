@@ -1,0 +1,17 @@
+{
+  "id": "tenant-cache-leak",
+  "title": "profile cache key drops tenant isolation",
+  "source": "synthetic held-out — multi-tenant isolation regression",
+  "category": "held-out-security",
+  "expectedFindings": [
+    {
+      "filePath": "src/cache/profile.ts",
+      "lineRange": [4, 4],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "cache key omits tenantId, so the same userId can reuse another tenant's cached profile",
+      "keyword": "tenant"
+    }
+  ],
+  "notes": "Held-out recall case for cross-tenant cache isolation."
+}

@@ -1,0 +1,19 @@
+diff --git a/src/cache/profile.ts b/src/cache/profile.ts
+index 6000001..6000002 100644
+--- a/src/cache/profile.ts
++++ b/src/cache/profile.ts
+@@ -1,13 +1,13 @@
+ import { cache } from './client.js';
+
+ export async function getCachedProfile(tenantId: string, userId: string) {
+-  const key = `profile:${tenantId}:${userId}`;
++  const key = `profile:${userId}`;
+   const cached = await cache.get(key);
+   if (cached) return JSON.parse(cached);
+
+   const profile = await loadProfileFromDb(tenantId, userId);
+   await cache.set(key, JSON.stringify(profile), { ttl: 60 });
+   return profile;
+ }
+
+ async function loadProfileFromDb(tenantId: string, userId: string) {

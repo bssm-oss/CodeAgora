@@ -1,0 +1,21 @@
+diff --git a/src/files/download.ts b/src/files/download.ts
+index 1000001..1000002 100644
+--- a/src/files/download.ts
++++ b/src/files/download.ts
+@@ -1,13 +1,13 @@
+ import path from 'node:path';
+ import { createReadStream } from 'node:fs';
+
+ const UPLOAD_ROOT = '/srv/app/uploads';
+
+ export function streamUserFile(req, res) {
+-  const safeName = path.basename(String(req.query.name ?? ''));
+-  const filePath = path.join(UPLOAD_ROOT, safeName);
++  const requestedName = String(req.query.name ?? '');
++  const filePath = path.join(UPLOAD_ROOT, requestedName);
+   res.setHeader('content-type', 'application/octet-stream');
+   return createReadStream(filePath).pipe(res);
+ }
+
+ export function listDownloadableFiles() {
+   return ['profile.png', 'invoice.pdf'];

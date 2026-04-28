@@ -1,0 +1,17 @@
+{
+  "id": "path-traversal-download",
+  "title": "download path trusts user-controlled file name",
+  "source": "synthetic held-out — CWE-22 reproducer",
+  "category": "held-out-security",
+  "expectedFindings": [
+    {
+      "filePath": "src/files/download.ts",
+      "lineRange": [7, 8],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "requestedName is joined directly under UPLOAD_ROOT, allowing ../ path traversal outside the upload directory",
+      "keyword": "traversal"
+    }
+  ],
+  "notes": "Held-out recall case added after the 12-fixture L3 tuning pass."
+}

@@ -1,0 +1,8 @@
+{
+  "id": "fp-readme-command-rename",
+  "title": "README command alias rename should not produce findings",
+  "source": "synthetic held-out — docs-only FP regression",
+  "category": "fp-regression",
+  "expectedFindings": [],
+  "notes": "Docs-only command alias update. Review should not invent runtime or CI defects."
+}

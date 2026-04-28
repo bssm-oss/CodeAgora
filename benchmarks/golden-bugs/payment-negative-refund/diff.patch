@@ -1,0 +1,19 @@
+diff --git a/src/billing/refunds.ts b/src/billing/refunds.ts
+index 5000001..5000002 100644
+--- a/src/billing/refunds.ts
++++ b/src/billing/refunds.ts
+@@ -1,14 +1,12 @@
+ import { ledger } from './ledger.js';
+
+ export async function issueRefund(userId: string, amountCents: number) {
+-  if (!Number.isInteger(amountCents) || amountCents <= 0) {
++  if (!Number.isInteger(amountCents)) {
+     throw new Error('invalid refund amount');
+   }
+
+   await ledger.credit(userId, amountCents);
+   return { userId, amountCents };
+ }
+
+ export function canRefund(status: string) {
+   return status === 'settled';

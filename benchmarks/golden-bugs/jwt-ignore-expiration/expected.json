@@ -1,0 +1,17 @@
+{
+  "id": "jwt-ignore-expiration",
+  "title": "access token verification ignores expiration",
+  "source": "synthetic held-out — auth regression",
+  "category": "held-out-security",
+  "expectedFindings": [
+    {
+      "filePath": "src/auth/jwt.ts",
+      "lineRange": [8, 8],
+      "lineTolerance": 3,
+      "minSeverity": "CRITICAL",
+      "rationale": "ignoreExpiration accepts expired access tokens during normal verification",
+      "keyword": "expiration"
+    }
+  ],
+  "notes": "Held-out auth recall case."
+}

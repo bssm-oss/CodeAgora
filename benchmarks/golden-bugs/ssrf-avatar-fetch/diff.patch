@@ -1,0 +1,22 @@
+diff --git a/src/profile/avatar.ts b/src/profile/avatar.ts
+index 4000001..4000002 100644
+--- a/src/profile/avatar.ts
++++ b/src/profile/avatar.ts
+@@ -1,15 +1,15 @@
+ const CDN_ORIGIN = 'https://cdn.example.com/';
+
+ export async function loadAvatar(userInputPath: string) {
+-  const url = new URL(userInputPath, CDN_ORIGIN);
+-  if (url.origin !== CDN_ORIGIN.slice(0, -1)) {
+-    throw new Error('invalid avatar origin');
+-  }
++  const url = new URL(userInputPath);
+
+   const response = await fetch(url);
+   if (!response.ok) throw new Error('avatar fetch failed');
+   return response.arrayBuffer();
+ }
+
+ export function avatarCacheKey(userId: string) {
+   return `avatar:${userId}`;
+ }

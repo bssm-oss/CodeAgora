@@ -505,3 +505,59 @@ Targeted composite comparison against the `--skip-head` gate:
 | Known OpenRouter cost | $0.0210 | $0.0225 | +$0.0015 |
 
 This is a targeted composite, not a fresh full 12-fixture rerun after the guard changes. It is enough to prove the observed regressions are addressed, but a full fresh 12-fixture L3 rerun is still recommended before closing #475.
+
+## 2026-04-28 Phase 2 Fixture Expansion And Rate-Limit Simulation
+
+The golden-bug dataset now has 20 validated fixtures:
+
+- 14 recall fixtures;
+- 6 FP-regression fixtures;
+- 8 newly added held-out fixtures that were not used during the 12-fixture L3 tuning pass.
+
+New held-out recall fixtures:
+
+| Fixture | Category | Expected bug |
+|---|---|---|
+| `path-traversal-download` | held-out-security | user-controlled file name can escape the upload directory |
+| `jwt-ignore-expiration` | held-out-security | access token verification accepts expired tokens |
+| `webhook-missing-signature` | held-out-security | unsigned webhook requests are accepted |
+| `ssrf-avatar-fetch` | held-out-security | arbitrary user URL is passed to server-side `fetch` |
+| `payment-negative-refund` | held-out-logic | negative refund amounts pass validation |
+| `tenant-cache-leak` | held-out-security | cache key drops tenant isolation |
+
+New held-out FP-regression fixtures:
+
+| Fixture | Category | Clean change |
+|---|---|---|
+| `fp-readme-command-rename` | fp-regression | README command alias update |
+| `fp-test-helper-refactor` | fp-regression | equivalent test helper refactor |
+
+Validation:
+
+```bash
+pnpm bench:fn -- --validate-only
+```
+
+Result: `OK: 20 fixture(s) validated`.
+
+The 20-fixture expansion is validated but not yet live-scored. The previous 12-fixture quality gate and L3 evidence remain the only live model evidence in this report until a full 20-fixture run is recorded.
+
+For #476, a synthetic local rate-limit simulator was added:
+
+```bash
+pnpm bench:rate-limit -- --requests 20 --concurrency 3 \
+  --max-retries 2 --per-minute 20 --request-ms 8000
+```
+
+Result:
+
+| Metric | Result |
+|---|---:|
+| Requests | 20 |
+| Completed / failed | 20 / 0 |
+| Attempts / retries / 429s | 20 / 0 / 0 |
+| Daily-cap blocks | 0 |
+| Peak concurrency | 3 |
+| Simulated duration | 56,000ms |
+
+This supports the current budget/free guidance for a 20-fixture smoke-sized run under a 20 requests/minute synthetic provider cap: concurrency 3, two retries, and 5s retry-after complete without simulated rate-limit loss.
