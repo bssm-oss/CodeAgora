@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.1.0-alpha.1 (2026-04-29)
+
+### Product Surface Reset
+- Keep supported surfaces focused on CLI, MCP, GitHub Actions, and Desktop App.
+- Retired web, TUI, and notification surfaces remain out of the active release path.
+
+### Operational Hygiene
+- Fixed provider-health workflow stub config drift against the current config schema.
+- Closed stale provider-health issue noise after verifying successful workflow runs.
+
+### CLI And Configuration
+- Added non-interactive preset init support for repeatable setup.
+- Added config-driven `reviewContext.ignorePatterns` filtering with excluded-file metadata in dry-run/session output.
+
+### Benchmark Proof Loop
+- Expanded the golden-bug benchmark set to 20 validated fixtures.
+- Added L3 comparison reporting, reference checks, and live-run gate evidence.
+- Recorded a 20-fixture L3-enabled OpenRouter run with TP/FP/FN 16/0/0 and 100.0% precision, recall, F1, and FP clean-rate.
+
+### Reporting And Learning
+- Added `agora metrics benchmark` for local JSON/Markdown quality and cost artifacts.
+- Extended `agora learn stats --json` and added `agora learn audit --results <path>`.
+
+### Security And CI Robustness
+- Wrapped upstream LLM output as untrusted data across L1->L2, supporter->moderator, and L2->L3 prompt paths.
+- Added adversarial prompt-injection coverage for role override, system/developer spoofing, JSON breakout, hidden-prompt requests, premature ACCEPT, and forged delimiters.
+- Added large-diff priority metadata for security-sensitive files, oversized hunks, and token budget decisions.
+- Added GitHub PR freshness metadata for fork/rebase/force-push handling.
+
+### Research Backlog
+- Added `agora research plan` with guarded experiment plans for binary severity, ambiguous calibration, cross-file interaction review, and model-pool exploration.
+
+### Verification
+- Latest pushed `main` passed CI and Build Action Bundle workflows.
+- Local release prep gates passed: `pnpm test`, `pnpm typecheck`, `pnpm build`, and `pnpm build:action`.
+
 ## 2.x Final Legacy Release (planned)
 
 ### Package Line Reset

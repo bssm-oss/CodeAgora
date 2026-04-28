@@ -1,5 +1,41 @@
 # 변경 이력
 
+## 0.1.0-alpha.1 (2026-04-29)
+
+### 제품 표면 리셋
+- 지원 표면을 CLI, MCP, GitHub Actions, Desktop App으로 좁혔습니다.
+- web, TUI, notifications 표면은 활성 릴리즈 경로에서 제외된 상태를 유지합니다.
+
+### 운영 안정화
+- provider-health workflow의 stub config가 현재 config schema와 어긋나던 문제를 수정했습니다.
+- 성공한 workflow run 확인 후 stale provider-health 이슈 노이즈를 정리했습니다.
+
+### CLI 및 설정
+- 반복 가능한 설정을 위해 non-interactive preset init 경로를 추가했습니다.
+- `reviewContext.ignorePatterns` 기반 필터링과 dry-run/session excluded-file metadata를 추가했습니다.
+
+### 벤치마크 증명 루프
+- golden-bug benchmark를 20개 validated fixtures로 확장했습니다.
+- L3 비교 리포트, reference check, live-run gate 증거를 추가했습니다.
+- OpenRouter 기반 20-fixture L3 run에서 TP/FP/FN 16/0/0, precision/recall/F1/FP clean-rate 100.0%를 기록했습니다.
+
+### 리포팅 및 러닝
+- 로컬 JSON/Markdown 품질/비용 artifact 생성을 위한 `agora metrics benchmark`를 추가했습니다.
+- `agora learn stats --json`를 확장하고 `agora learn audit --results <path>`를 추가했습니다.
+
+### 보안 및 CI 견고성
+- L1->L2, supporter->moderator, L2->L3 prompt 경로에서 upstream LLM 출력을 untrusted data로 감싸도록 강화했습니다.
+- role override, system/developer spoofing, JSON breakout, hidden-prompt request, premature ACCEPT, forged delimiter 공격 케이스를 테스트에 추가했습니다.
+- 대형 diff에서 security-sensitive file, oversized hunk, token budget decision metadata를 기록합니다.
+- fork/rebase/force-push 대응을 위한 GitHub PR freshness metadata를 추가했습니다.
+
+### 연구 백로그
+- binary severity, ambiguous calibration, cross-file interaction review, model-pool exploration을 위한 guarded experiment plan을 `agora research plan`으로 추가했습니다.
+
+### 검증
+- 최신 `main` push 기준 CI와 Build Action Bundle workflow가 통과했습니다.
+- 로컬 릴리즈 준비 gate: `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm build:action` 통과.
+
 ## 2.x 마지막 레거시 릴리즈 (예정)
 
 ### 패키지 라인 리셋

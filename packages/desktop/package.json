@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/desktop",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "type": "module",
   "description": "CodeAgora desktop app scaffold — human-facing local UI for sessions, config, and review runs",
