@@ -13,6 +13,7 @@ import {
   filterIgnoredFiles,
   loadReviewIgnorePatterns,
   chunkDiff,
+  chunkDiffWithMetadata,
   REVIEW_IGNORE_MAX_BYTES,
   BUILT_IN_ARTIFACT_PATTERNS,
 } from '../pipeline/chunker.js';
@@ -401,6 +402,73 @@ describe('chunkDiff', () => {
 `;
       const chunks = await chunkDiff(diff, { cwd: tmpDir });
       expect(chunks).toEqual([]);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('supports context-driven ignore patterns and returns metadata', async () => {
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'chunker-context-ignore-'));
+    try {
+      await writeFile(path.join(tmpDir, '.reviewignore'), 'docs/**\n', 'utf-8');
+      const diff = `diff --git a/src/app.ts b/src/app.ts
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,2 +1,3 @@
+ line
+ new
+diff --git a/src/app.spec.ts b/src/app.spec.ts
+--- a/src/app.spec.ts
++++ b/src/app.spec.ts
+@@ -1,2 +1,3 @@
+ test
++assert
+diff --git a/dist/bundle.js b/dist/bundle.js
+--- a/dist/bundle.js
++++ b/dist/bundle.js
+@@ -1,2 +1,3 @@
+const a = 1;
++const b = 2;
+diff --git a/docs/readme.md b/docs/readme.md
+--- a/docs/readme.md
++++ b/docs/readme.md
+@@ -1,2 +1,3 @@
+doc
+`;
+      const result = await chunkDiffWithMetadata(diff, {
+        cwd: tmpDir,
+        contextIgnorePatterns: ['**/*.spec.ts'],
+      });
+
+      expect(result.chunks).toHaveLength(1);
+      expect(result.metadata.includedFiles).toEqual(['src/app.ts']);
+      expect(result.metadata.diffChunking.excludedByBuiltinPatterns).toContain('dist/bundle.js');
+      expect(result.metadata.diffChunking.excludedByReviewIgnorePatterns).toContain('docs/readme.md');
+      expect(result.metadata.diffChunking.excludedByContextIgnorePatterns).toContain('src/app.spec.ts');
+      expect(result.metadata.excludedFiles).toContain('dist/bundle.js');
+      expect(result.metadata.excludedFiles).toContain('docs/readme.md');
+      expect(result.metadata.excludedFiles).toContain('src/app.spec.ts');
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns empty chunks when context ignores cover all remaining files', async () => {
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'chunker-context-empty-'));
+    try {
+      const diff = `diff --git a/src/app.ts b/src/app.ts
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,2 +1,3 @@
+ line
++new`;
+      const result = await chunkDiffWithMetadata(diff, {
+        cwd: tmpDir,
+        contextIgnorePatterns: ['src/**'],
+      });
+      expect(result.chunks).toHaveLength(0);
+      expect(result.metadata.includedFiles).toEqual([]);
+      expect(result.metadata.excludedFiles).toEqual(['src/app.ts']);
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }

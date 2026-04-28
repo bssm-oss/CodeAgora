@@ -23,6 +23,23 @@ export interface DiffChunk {
 export interface ChunkOptions {
   maxTokens?: number; // default 8000
   cwd?: string;
+  /** Extra ignore patterns from review context config. */
+  contextIgnorePatterns?: string[];
+}
+
+export interface ChunkMetadata {
+  includedFiles: string[];
+  excludedFiles: string[];
+  diffChunking: {
+    excludedByBuiltinPatterns: string[];
+    excludedByReviewIgnorePatterns: string[];
+    excludedByContextIgnorePatterns: string[];
+  };
+}
+
+export interface ChunkResult {
+  chunks: DiffChunk[];
+  metadata: ChunkMetadata;
 }
 
 interface ParsedDiffFile {
@@ -427,6 +444,26 @@ export function filterIgnoredFiles<T extends { filePath: string }>(
   });
 }
 
+function splitFilesByPatterns<T extends { filePath: string }>(
+  files: T[],
+  patterns: string[]
+): { included: T[]; excluded: string[] } {
+  if (patterns.length === 0) {
+    return { included: files, excluded: [] };
+  }
+
+  const included = filterIgnoredFiles(files, patterns);
+  const excludedSet = new Set(files.map((f) => f.filePath));
+  for (const file of included) {
+    excludedSet.delete(file.filePath);
+  }
+
+  return {
+    included,
+    excluded: Array.from(excludedSet),
+  };
+}
+
 /**
  * Maximum allowed file size for .reviewignore (1 MB).
  * Prevents excessive memory usage from accidentally or maliciously large files.
@@ -466,22 +503,65 @@ export async function loadReviewIgnorePatterns(cwd?: string): Promise<string[]> 
  * If total tokens <= maxTokens, returns a single chunk (backward compat).
  */
 export async function chunkDiff(diffContent: string, options?: ChunkOptions): Promise<DiffChunk[]> {
-  const maxTokens = options?.maxTokens ?? 8000;
+  return (await chunkDiffWithMetadata(diffContent, options)).chunks;
+}
 
-  if (!diffContent.trim()) return [];
+export async function chunkDiffWithMetadata(
+  diffContent: string,
+  options?: ChunkOptions
+): Promise<ChunkResult> {
+  const maxTokens = options?.maxTokens ?? 8000;
+  const metadata: ChunkMetadata = {
+    includedFiles: [],
+    excludedFiles: [],
+    diffChunking: {
+      excludedByBuiltinPatterns: [],
+      excludedByReviewIgnorePatterns: [],
+      excludedByContextIgnorePatterns: [],
+    },
+  };
+
+  if (!diffContent.trim()) return { chunks: [], metadata };
 
   // 1. Parse diff into per-file entries
   const parsedFiles = parseDiffFiles(diffContent);
-  if (parsedFiles.length === 0) return [];
+  if (parsedFiles.length === 0) return { chunks: [], metadata };
 
   // 2. Filter built-in artifact patterns (dist/, lock files, minified bundles)
-  const artifactFiltered = filterIgnoredFiles(parsedFiles, BUILT_IN_ARTIFACT_PATTERNS);
-  if (artifactFiltered.length === 0) return [];
+  const artifactFilter = splitFilesByPatterns(parsedFiles, BUILT_IN_ARTIFACT_PATTERNS);
+  metadata.diffChunking.excludedByBuiltinPatterns = artifactFilter.excluded;
+  if (artifactFilter.included.length === 0) {
+    metadata.excludedFiles = [...metadata.diffChunking.excludedByBuiltinPatterns];
+    return { chunks: [], metadata };
+  }
 
   // 3. Apply .reviewignore filter (user-defined patterns)
   const ignorePatterns = await loadReviewIgnorePatterns(options?.cwd);
-  const filteredFiles = filterIgnoredFiles(artifactFiltered, ignorePatterns);
-  if (filteredFiles.length === 0) return [];
+  const reviewIgnoreFilter = splitFilesByPatterns(artifactFilter.included, ignorePatterns);
+  metadata.diffChunking.excludedByReviewIgnorePatterns = reviewIgnoreFilter.excluded;
+  if (reviewIgnoreFilter.included.length === 0) {
+    metadata.excludedFiles = [
+      ...metadata.diffChunking.excludedByBuiltinPatterns,
+      ...metadata.diffChunking.excludedByReviewIgnorePatterns,
+    ];
+    return { chunks: [], metadata };
+  }
+
+  // 4. Apply config-driven context ignore patterns from reviewContext.ignorePatterns
+  const contextPatterns = options?.contextIgnorePatterns ?? [];
+  const contextIgnoreFilter = splitFilesByPatterns(reviewIgnoreFilter.included, contextPatterns);
+  metadata.diffChunking.excludedByContextIgnorePatterns = contextIgnoreFilter.excluded;
+
+  const filteredFiles = contextIgnoreFilter.included;
+  metadata.includedFiles = filteredFiles.map((f) => f.filePath);
+  metadata.excludedFiles = [
+    ...metadata.diffChunking.excludedByBuiltinPatterns,
+    ...metadata.diffChunking.excludedByReviewIgnorePatterns,
+    ...metadata.diffChunking.excludedByContextIgnorePatterns,
+  ];
+  if (filteredFiles.length === 0) {
+    return { chunks: [], metadata };
+  }
 
   // 4. Split large files by hunk boundaries
   const splitFiles: Array<{ filePath: string; content: string }> = [];
@@ -493,16 +573,22 @@ export async function chunkDiff(diffContent: string, options?: ChunkOptions): Pr
   const totalTokens = splitFiles.reduce((sum, f) => sum + estimateTokens(f.content), 0);
   if (totalTokens <= maxTokens) {
     const joined = splitFiles.map((f) => f.content).join('\n');
-    return [
-      {
-        index: 0,
-        files: [...new Set(splitFiles.map((f) => f.filePath))],
-        diffContent: joined,
-        estimatedTokens: estimateTokens(joined),
-      },
-    ];
+    return {
+      chunks: [
+        {
+          index: 0,
+          files: [...new Set(splitFiles.map((f) => f.filePath))],
+          diffContent: joined,
+          estimatedTokens: estimateTokens(joined),
+        },
+      ],
+      metadata,
+    };
   }
 
   // 6. Group into chunks
-  return chunkDiffFiles(splitFiles, maxTokens);
+  return {
+    chunks: chunkDiffFiles(splitFiles, maxTokens),
+    metadata,
+  };
 }

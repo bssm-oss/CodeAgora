@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import ora from 'ora';
 import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
+import { dryRun, formatDryRunText } from '@codeagora/core/pipeline/dryrun.js';
 import { loadConfig } from '@codeagora/core/config/loader.js';
 import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
 import { parsePrUrl, createGitHubConfig } from '@codeagora/github/client.js';
@@ -208,12 +209,15 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     }
 
     if (options.dryRun) {
-      console.log('Validating config...');
       const config = await loadConfig();
-      console.log('Config valid.');
-      console.log(`  Reviewers: ${Array.isArray(config.reviewers) ? config.reviewers.length : config.reviewers.count}`);
-      console.log(`  Supporters: ${config.supporters.pool.length}`);
-      console.log(`  Max rounds: ${config.discussion.maxRounds}`);
+      const diffContent = await fs.readFile(resolvedPath, 'utf-8');
+      const report = await dryRun(config, diffContent);
+
+      if (options.output === 'json') {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      console.log(formatDryRunText(report));
       return;
     }
 

@@ -32,6 +32,7 @@ export interface InitOptions {
   force: boolean;
   baseDir: string;
   ci?: boolean;
+  preset?: string;
 }
 
 export interface InitResult {
@@ -93,6 +94,25 @@ export interface DynamicPreset {
   reviewerCount: number;
   discussion: boolean;
   backend: 'api' | 'cli';
+}
+
+const PRESET_ALIASES: Record<string, string> = {
+  budget: 'quick',
+  balanced: 'free',
+  premium: 'thorough',
+};
+
+export const PRESET_ALIAS_ENTRIES = Object.entries(PRESET_ALIASES).map(
+  ([alias, target]) => ({ alias, target })
+);
+
+export function resolvePresetAlias(rawPreset?: string): string | undefined {
+  if (!rawPreset) {
+    return undefined;
+  }
+  const preset = rawPreset.trim().toLowerCase();
+  if (!preset) return undefined;
+  return PRESET_ALIASES[preset] ?? preset;
 }
 
 // ============================================================================
@@ -672,12 +692,66 @@ export async function writeGitHubWorkflow(
   return true;
 }
 
+export async function buildPresetConfig(preset: string): Promise<GeneratedConfig> {
+  const canonicalPreset = resolvePresetAlias(preset);
+  if (!canonicalPreset) {
+    throw new Error('Preset must be specified.');
+  }
+
+  const [env, catalog, cliBackends] = await Promise.all([
+    Promise.resolve(detectEnvironment()),
+    loadModelsCatalog().catch(() => null),
+    detectCliBackends().catch(() => [] as DetectedCli[]),
+  ]);
+
+  const dynamicPresets = generatePresets(env, catalog, cliBackends);
+  const selected = dynamicPresets.find((p) => p.id === canonicalPreset);
+  if (!selected) {
+    const available = dynamicPresets.map((p) => p.id).join(', ');
+    throw new Error(
+      `Unknown preset "${preset}". Available presets: ${available || 'quick, free, thorough'}`
+    );
+  }
+
+  const selections: ProviderModelSelection[] = selected.providers.map((provider) => ({
+    provider,
+    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'llama-3.3-70b-versatile',
+    backend: selected.backend,
+  }));
+
+  if (selections.length === 0) {
+    throw new Error(`Preset "${preset}" has no providers.`);
+  }
+
+  const primaryProvider = selections[0]!.provider;
+  const primaryModel = selections[0]!.model;
+
+  if (selections.length === 1) {
+    return buildCustomConfig({
+      provider: primaryProvider,
+      model: primaryModel,
+      reviewerCount: selected.reviewerCount,
+      discussion: selected.discussion,
+      language: 'en',
+      mode: 'pragmatic',
+    });
+  }
+
+  return buildMultiProviderConfig({
+    selections,
+    reviewerCount: selected.reviewerCount,
+    discussion: selected.discussion,
+    language: 'en',
+    mode: 'pragmatic',
+  });
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
 
 export async function runInit(options: InitOptions): Promise<InitResult> {
-  const { format, force, baseDir, ci } = options;
+  const { format, force, baseDir, ci, preset } = options;
   const created: string[] = [];
   const skipped: string[] = [];
   const warnings: string[] = [];
@@ -689,7 +763,9 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   // Config file
   const configFileName = format === 'yaml' ? 'config.yaml' : 'config.json';
   const configPath = path.join(caDir, configFileName);
-  const configContent = generateMinimalTemplate(format);
+  const configContent = preset
+    ? JSON.stringify(await buildPresetConfig(preset), null, 2)
+    : generateMinimalTemplate(format);
   await writeFile(configPath, configContent, force, created, skipped);
 
   // Personas

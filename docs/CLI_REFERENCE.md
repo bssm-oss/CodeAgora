@@ -56,6 +56,8 @@ Initialize CodeAgora in the current project.
 ```bash
 agora init                  # Interactive wizard
 agora init -y               # Non-interactive defaults
+agora init --preset quick    # Generate from preset (quick/free/thorough)
+agora init --preset budget   # Alias for quick
 agora init --format yaml    # YAML config
 agora init --ci             # Also create GitHub Actions workflow
 agora init --force          # Overwrite existing

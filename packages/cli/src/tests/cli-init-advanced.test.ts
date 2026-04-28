@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMultiProviderConfig,
   generatePresets,
+  resolvePresetAlias,
+  PRESET_ALIAS_ENTRIES,
 } from '../commands/init.js';
 import type {
   MultiProviderConfigParams,
@@ -336,5 +338,29 @@ describe('generatePresets()', () => {
     const presets = generatePresets(env, null);
     const quick = presets.find((p) => p.id === 'quick');
     expect(quick!.label).toContain('anthropic');
+  });
+});
+
+describe('resolvePresetAlias()', () => {
+  it('maps legacy aliases to canonical presets', () => {
+    for (const { alias, target } of PRESET_ALIAS_ENTRIES) {
+      expect(resolvePresetAlias(alias)).toBe(target);
+    }
+  });
+
+  it('returns provided preset name when no alias applies', () => {
+    expect(resolvePresetAlias('thorough')).toBe('thorough');
+    expect(resolvePresetAlias('free')).toBe('free');
+    expect(resolvePresetAlias('quick')).toBe('quick');
+  });
+
+  it('trims and normalizes case', () => {
+    expect(resolvePresetAlias('  BuDGeT  ')).toBe('quick');
+    expect(resolvePresetAlias('  QUICK  ')).toBe('quick');
+  });
+
+  it('returns undefined for empty input', () => {
+    expect(resolvePresetAlias(undefined)).toBeUndefined();
+    expect(resolvePresetAlias('   ')).toBeUndefined();
   });
 });

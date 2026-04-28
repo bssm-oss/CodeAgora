@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { pruneSessions, formatSessionStats } from '../commands/sessions.js';
-import type { SessionStats } from '../commands/sessions.js';
+import { pruneSessions, formatSessionStats, formatSessionDetail } from '../commands/sessions.js';
+import type { SessionStats, SessionDetail } from '../commands/sessions.js';
 import fs from 'fs/promises';
 
 // ============================================================================
@@ -218,5 +218,76 @@ describe('formatSessionStats()', () => {
     // No percentage expressions should appear for failed/inProgress when total is 0
     // The pct() helper returns '' when totalSessions === 0
     expect(output).not.toContain('NaN');
+  });
+});
+
+// ============================================================================
+// formatSessionDetail
+// ============================================================================
+
+describe('formatSessionDetail()', () => {
+  it('shows diff filtering metadata when present', () => {
+    const detail: SessionDetail = {
+      entry: {
+        id: '2026-01-01/001',
+        date: '2026-01-01',
+        sessionId: '001',
+        status: 'completed',
+        dirPath: '/tmp/sessions/2026-01-01/001',
+      },
+      metadata: {
+        sessionId: '001',
+        date: '2026-01-01',
+        timestamp: 1_700_000_000_000,
+        diffPath: '/tmp/repo.patch',
+        status: 'completed',
+        startedAt: 1_700_000_000_000,
+        includedFiles: ['src/app.ts'],
+        excludedFiles: ['dist/bundle.js', 'src/app.spec.ts'],
+        diffChunking: {
+          excludedByBuiltinPatterns: ['dist/bundle.js'],
+          excludedByReviewIgnorePatterns: [],
+          excludedByContextIgnorePatterns: ['src/app.spec.ts'],
+        },
+      },
+      verdict: { issues: [{ title: 'Potential bug', severity: 'CRITICAL' }] },
+    };
+
+    const output = formatSessionDetail(detail);
+
+    expect(output).toContain('Included Files: 1');
+    expect(output).toContain('Excluded Files: 2');
+    expect(output).toContain('Diff Filtering:');
+    expect(output).toContain('Built-in artifacts: 1');
+    expect(output).toContain('reviewContext.ignorePatterns: 1');
+    expect(output).toContain('Potential bug');
+  });
+
+  it('does not render empty filtering metadata when absent', () => {
+    const detail: SessionDetail = {
+      entry: {
+        id: '2026-01-02/002',
+        date: '2026-01-02',
+        sessionId: '002',
+        status: 'completed',
+        dirPath: '/tmp/sessions/2026-01-02/002',
+      },
+      metadata: {
+        sessionId: '002',
+        date: '2026-01-02',
+        timestamp: 1_700_100_000_000,
+        diffPath: '/tmp/repo2.patch',
+        status: 'completed',
+        startedAt: 1_700_100_000_000,
+      },
+      verdict: undefined,
+    };
+
+    const output = formatSessionDetail(detail);
+
+    expect(output).toContain('Session: 2026-01-02/002');
+    expect(output).toContain('Status:');
+    expect(output).not.toContain('Diff Filtering:');
+    expect(output).not.toContain('Included Files');
   });
 });

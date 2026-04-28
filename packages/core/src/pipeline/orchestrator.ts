@@ -16,7 +16,7 @@ import { QualityTracker } from '../l0/quality-tracker.js';
 import type { EvidenceDocument, DiscussionVerdict } from '../types/core.js';
 import { SEVERITY_ORDER } from '../types/core.js';
 import type { ProgressEmitter } from './progress.js';
-import { chunkDiff } from './chunker.js';
+import { chunkDiffWithMetadata } from './chunker.js';
 import { analyzeTrivialDiff } from './auto-approve.js';
 import { computeL1Confidence } from './confidence.js';
 import { isExplicitNoIssues } from '../l1/parser.js';
@@ -228,7 +228,18 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     }
 
     // === DIFF CHUNKING ===
-    const chunks = await chunkDiff(diffContent, { maxTokens: config.chunking?.maxTokens ?? 8000 });
+    const chunkResult = await chunkDiffWithMetadata(diffContent, {
+      maxTokens: config.chunking?.maxTokens ?? 8000,
+      contextIgnorePatterns: config.reviewContext?.ignorePatterns,
+      cwd: process.cwd(),
+    });
+    const chunks = chunkResult.chunks;
+
+    await session.setMetadata({
+      includedFiles: chunkResult.metadata.includedFiles,
+      excludedFiles: chunkResult.metadata.excludedFiles,
+      diffChunking: chunkResult.metadata.diffChunking,
+    }).catch(() => {});
 
     if (chunks.length > 1) {
       progress?.stageUpdate('init', 50, `Large diff split into ${chunks.length} chunks for parallel review`);

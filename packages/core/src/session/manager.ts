@@ -87,6 +87,18 @@ export class SessionManager {
   }
 
   /**
+   * Update session metadata fields (merges with existing values).
+   */
+  async setMetadata(nextMetadata: Partial<SessionMetadata>): Promise<void> {
+    const merged: SessionMetadata = {
+      ...this.metadata,
+      ...nextMetadata,
+    };
+    await writeSessionMetadata(this.date, this.sessionId, merged);
+    this.metadata = merged;
+  }
+
+  /**
    * Get date
    */
   getDate(): string {

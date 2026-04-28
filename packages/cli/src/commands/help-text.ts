@@ -32,6 +32,8 @@ Examples:
 Examples:
   ${displayName} init                              Interactive setup wizard
   ${displayName} init -y                           Use defaults (no prompts)
+  ${displayName} init --preset quick                Generate quick preset config
+  ${displayName} init --preset budget               Alias for quick
   ${displayName} init --format yaml                Create YAML config
   ${displayName} init --ci                         Also create GitHub Actions workflow
 `);

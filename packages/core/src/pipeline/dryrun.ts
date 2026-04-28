@@ -13,6 +13,7 @@ import {
   expandDeclarativeReviewers,
 } from '../config/loader.js';
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { chunkDiffWithMetadata, type ChunkMetadata } from './chunker.js';
 
 export type { TokenUsage };
 
@@ -21,6 +22,7 @@ export type { TokenUsage };
 // ============================================================================
 
 export interface DryRunResult {
+  diffMetadata?: ChunkMetadata;
   config: {
     reviewerCount: number;
     supporterCount: number;
@@ -74,6 +76,15 @@ export function estimateTokensFromDiff(diffContent: string): number {
  */
 export async function dryRun(config: Config, diffContent: string): Promise<DryRunResult> {
   const warnings: string[] = [];
+  const chunkingMaxTokens = 8000;
+  const chunkResult = await chunkDiffWithMetadata(diffContent, {
+    maxTokens: chunkingMaxTokens,
+    cwd: process.cwd(),
+    contextIgnorePatterns: config.reviewContext?.ignorePatterns,
+  });
+
+  const filteredDiff = chunkResult.chunks.map((chunk) => chunk.diffContent).join('\n');
+  const diffTokens = estimateTokensFromDiff(filteredDiff);
 
   // ---- Resolve reviewer entries (handles both array and declarative formats) ----
   const reviewerEntries = isDeclarativeReviewers(config.reviewers)
@@ -105,7 +116,8 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
   });
 
   // ---- Token estimation ----
-  const diffTokens = estimateTokensFromDiff(diffContent);
+  // Use diff content after all ignore filters so dry-run reflects actual files
+  // sent to the model in real runs.
 
   // L1: each reviewer gets the diff as input; output ≈ 1.5x input
   const l1InputTokens = diffTokens * reviewers.length;
@@ -214,6 +226,7 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
       totalEstimatedCost,
     },
     health,
+    diffMetadata: chunkResult.metadata,
     warnings,
   };
 }
@@ -227,6 +240,7 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
  */
 export function formatDryRunText(result: DryRunResult): string {
   const lines: string[] = [];
+  const diffMetadata = result.diffMetadata;
 
   lines.push('Pipeline Dry Run Report');
   lines.push('========================');
@@ -254,6 +268,34 @@ export function formatDryRunText(result: DryRunResult): string {
   lines.push(`  L3 (Verdict):    ~${result.estimation.estimatedL3Cost}`);
   lines.push(`  Total:           ~${result.estimation.totalEstimatedCost}`);
   lines.push('');
+
+  if (diffMetadata) {
+    const included = diffMetadata.includedFiles;
+    const excluded = diffMetadata.excludedFiles;
+    const diffChunking = diffMetadata.diffChunking;
+    lines.push('Diff Filtering:');
+    lines.push(`  Included files: ${included.length}`);
+    for (const file of included.slice(0, 12)) lines.push(`    - ${file}`);
+    if (included.length > 12) {
+      lines.push(`    ... and ${included.length - 12} more`);
+    }
+    lines.push('');
+
+    if (excluded.length > 0) {
+      lines.push(`  Excluded files: ${excluded.length}`);
+      for (const file of excluded.slice(0, 12)) lines.push(`    - ${file}`);
+      if (excluded.length > 12) {
+        lines.push(`    ... and ${excluded.length - 12} more`);
+      }
+      lines.push('');
+    }
+
+    lines.push('  Exclusion Breakdown:');
+    lines.push(`    - Built-in artifacts: ${diffChunking.excludedByBuiltinPatterns.length}`);
+    lines.push(`    - .reviewignore: ${diffChunking.excludedByReviewIgnorePatterns.length}`);
+    lines.push(`    - reviewContext.ignorePatterns: ${diffChunking.excludedByContextIgnorePatterns.length}`);
+    lines.push('');
+  }
 
   lines.push('Provider Health:');
   for (const h of result.health) {

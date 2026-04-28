@@ -16,11 +16,32 @@ export function registerInitCommand(program: Command): void {
     .option('--force', 'Overwrite existing files', false)
     .option('-y, --yes', 'Skip prompts, use defaults', false)
     .option('--ci', 'also create GitHub Actions workflow', false)
+    .option('--preset <name>', 'Generate config from preset: quick/free/thorough (or aliases: budget/balanced/premium)')
     .option('--advanced', 'Full wizard with provider/model/reviewer customization', false)
-    .action(async (options: { format: string; force: boolean; yes: boolean; ci: boolean; advanced: boolean }) => {
+    .action(async (options: { format: string; force: boolean; yes: boolean; ci: boolean; preset?: string; advanced: boolean }) => {
       try {
         const format = options.format === 'yaml' ? 'yaml' : 'json';
         const isInteractive = !options.yes && process.stdin.isTTY;
+
+        if (options.preset) {
+          const result = await runInit({
+            format,
+            force: options.force,
+            baseDir: process.cwd(),
+            ci: options.ci,
+            preset: options.preset,
+          });
+          for (const f of result.created) console.log(`  created: ${f}`);
+          for (const f of result.skipped) console.log(`  skipped: ${f} (already exists, use --force to overwrite)`);
+          for (const w of result.warnings) console.warn(`  warning: ${w}`);
+          if (result.created.length > 0) console.log('CodeAgora initialized successfully.');
+          if (options.ci && result.created.some(f => f.includes('codeagora-review.yml'))) {
+            console.log('Created: .github/workflows/codeagora-review.yml');
+            console.log('  Add GROQ_API_KEY to your repository secrets:');
+            console.log('  Settings -> Secrets -> Actions -> New repository secret');
+          }
+          return;
+        }
 
         if (isInteractive && !options.advanced) {
           const { detectAvailableProvider, runInlineSetup } = await import('../utils/inline-setup.js');

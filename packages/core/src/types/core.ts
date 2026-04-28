@@ -179,6 +179,16 @@ export interface SessionMetadata {
   status: 'in_progress' | 'completed' | 'failed' | 'interrupted';
   startedAt: number;
   completedAt?: number;
+  /** Files included in review after all ignore filters are applied */
+  includedFiles?: string[];
+  /** Files excluded from review by chunking/ignore logic */
+  excludedFiles?: string[];
+  /** Diff filtering breakdown by category */
+  diffChunking?: {
+    excludedByBuiltinPatterns: string[];
+    excludedByReviewIgnorePatterns: string[];
+    excludedByContextIgnorePatterns: string[];
+  };
   /** SHA-256 prefix of the diff content (cache key component) */
   diffHash?: string;
   /** SHA-256 prefix of the reviewer config (cache key component) */

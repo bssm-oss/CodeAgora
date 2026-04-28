@@ -183,6 +183,36 @@ export function formatSessionDetail(detail: SessionDetail): string {
     if (typeof m['diffPath'] === 'string') {
       lines.push(`Diff:    ${m['diffPath']}`);
     }
+    if (Array.isArray(m['includedFiles'])) {
+      const includedFiles = m['includedFiles'] as string[];
+      lines.push(`Included Files: ${includedFiles.length}`);
+      for (const file of includedFiles.slice(0, 6)) {
+        lines.push(`  + ${file}`);
+      }
+      if (includedFiles.length > 6) {
+        lines.push(`  ... and ${includedFiles.length - 6} more`);
+      }
+    }
+    if (Array.isArray(m['excludedFiles'])) {
+      const excludedFiles = m['excludedFiles'] as string[];
+      lines.push(`Excluded Files: ${excludedFiles.length}`);
+      for (const file of excludedFiles.slice(0, 6)) {
+        lines.push(`  - ${file}`);
+      }
+      if (excludedFiles.length > 6) {
+        lines.push(`  ... and ${excludedFiles.length - 6} more`);
+      }
+    }
+    if (typeof m['diffChunking'] === 'object' && m['diffChunking'] !== null) {
+      const diffChunking = m['diffChunking'] as Record<string, string[]>;
+      const builtin = diffChunking['excludedByBuiltinPatterns']?.length ?? 0;
+      const reviewIgnore = diffChunking['excludedByReviewIgnorePatterns']?.length ?? 0;
+      const contextIgnore = diffChunking['excludedByContextIgnorePatterns']?.length ?? 0;
+      lines.push(`Diff Filtering:`);
+      lines.push(`  Built-in artifacts: ${builtin}`);
+      lines.push(`  .reviewignore: ${reviewIgnore}`);
+      lines.push(`  reviewContext.ignorePatterns: ${contextIgnore}`);
+    }
     if (typeof m['timestamp'] === 'number') {
       lines.push(`Started: ${new Date(m['timestamp']).toISOString()}`);
     }
