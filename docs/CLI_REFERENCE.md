@@ -92,6 +92,18 @@ agora sessions prune --days 30               # Delete old
 
 `sessions list --json` and `sessions show --json` include `schemaVersion: "codeagora.review.v1"` so desktop and agent callers can branch on a stable contract marker.
 
+## `agora metrics`
+
+Generate local quality/cost artifacts without a web dashboard.
+
+```bash
+agora metrics benchmark --results ./bench-out-l3-20-20260428
+agora metrics benchmark --results ./bench-out-l3-20-20260428 --json
+agora metrics benchmark --results ./bench-out-l3-20-20260428 --out ./bench-reports/phase2
+```
+
+`--out` writes `benchmark-metrics.json` and `benchmark-metrics.md`.
+
 ## `agora models`
 
 Model leaderboard — Thompson Sampling scores, win rates, health status.
@@ -129,6 +141,8 @@ agora costs --by provider    # By provider
 | `agora providers-test` | Verify API key status |
 | `agora learn list` | List learned patterns |
 | `agora learn stats` | Learning statistics |
+| `agora learn stats --json` | Machine-readable learning statistics |
+| `agora learn audit --results <path>` | Audit which learned patterns would suppress or downgrade findings |
 
 ## Output Formats
 

@@ -14,6 +14,7 @@ import {
   mergePatterns,
   LearnedPatternsSchema,
 } from '@codeagora/core/learning/store.js';
+import { auditLearnedPatterns, formatLearningAuditText } from '@codeagora/core/learning/audit.js';
 import { parseGitRemote } from '@codeagora/github/client.js';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -167,11 +168,19 @@ export function registerLearnCommand(program: Command): void {
   learnCmd
     .command('stats')
     .description('Show learned pattern statistics')
-    .action(async () => {
+    .option('--json', 'Output machine-readable JSON')
+    .action(async (options: { json?: boolean }) => {
       try {
         const data = await loadLearnedPatterns(process.cwd());
         if (!data || data.dismissedPatterns.length === 0) {
-          console.log(t('cli.learn.list.empty'));
+          const empty = {
+            totalPatterns: 0,
+            totalDismissals: 0,
+            activePatterns: 0,
+            bySeverity: {},
+            byAction: {},
+          };
+          console.log(options.json ? JSON.stringify(empty, null, 2) : t('cli.learn.list.empty'));
           return;
         }
 
@@ -179,24 +188,68 @@ export function registerLearnCommand(program: Command): void {
         const totalDismissals = patterns.reduce((sum, p) => sum + p.dismissCount, 0);
         const mostSuppressed = patterns.reduce((max, p) => p.dismissCount > max.dismissCount ? p : max, patterns[0]!);
         const lastUpdated = patterns.reduce((latest, p) => p.lastDismissed > latest ? p.lastDismissed : latest, '');
+        const activePatterns = patterns.filter((p) => p.dismissCount >= 3);
+
+        const bySeverity = new Map<string, number>();
+        const byAction = new Map<string, number>();
+        for (const p of patterns) {
+          bySeverity.set(p.severity, (bySeverity.get(p.severity) ?? 0) + 1);
+          byAction.set(p.action, (byAction.get(p.action) ?? 0) + 1);
+        }
+        if (options.json) {
+          console.log(JSON.stringify({
+            totalPatterns: patterns.length,
+            totalDismissals,
+            activePatterns: activePatterns.length,
+            threshold: 3,
+            mostSuppressed,
+            lastUpdated,
+            bySeverity: Object.fromEntries(bySeverity),
+            byAction: Object.fromEntries(byAction),
+          }, null, 2));
+          return;
+        }
 
         console.log(bold('Learn Stats'));
         console.log('─'.repeat(40));
         console.log(`  Total patterns:     ${patterns.length}`);
+        console.log(`  Active patterns:    ${activePatterns.length} (threshold: 3 dismissals)`);
         console.log(`  Total dismissals:   ${totalDismissals}`);
         console.log(`  Most suppressed:    "${mostSuppressed.pattern}" (${mostSuppressed.dismissCount}x)`);
         console.log(`  Last updated:       ${lastUpdated}`);
 
-        // Severity breakdown
-        const bySeverity = new Map<string, number>();
-        for (const p of patterns) {
-          bySeverity.set(p.severity, (bySeverity.get(p.severity) ?? 0) + 1);
-        }
         console.log('');
         console.log('  By severity:');
         for (const [sev, count] of bySeverity) {
           console.log(`    ${sev}: ${count}`);
         }
+        console.log('');
+        console.log('  By action:');
+        for (const [action, count] of byAction) {
+          console.log(`    ${action}: ${count}`);
+        }
+      } catch (err) {
+        console.error('Error:', err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
+    });
+
+  learnCmd
+    .command('audit')
+    .description('Audit how learned patterns would affect a result file or benchmark result directory')
+    .requiredOption('--results <path>', 'JSON result file or benchmark result directory')
+    .option('--threshold <n>', 'Dismiss count threshold for active patterns', (v) => parseInt(v, 10), 3)
+    .option('--json', 'Output machine-readable JSON')
+    .action(async (options: { results: string; threshold: number; json?: boolean }) => {
+      try {
+        const data = await loadLearnedPatterns(process.cwd());
+        const patterns = data?.dismissedPatterns ?? [];
+        const report = await auditLearnedPatterns({
+          sourcePath: path.resolve(options.results),
+          patterns,
+          threshold: options.threshold,
+        });
+        console.log(options.json ? JSON.stringify(report, null, 2) : formatLearningAuditText(report));
       } catch (err) {
         console.error('Error:', err instanceof Error ? err.message : String(err));
         process.exit(1);

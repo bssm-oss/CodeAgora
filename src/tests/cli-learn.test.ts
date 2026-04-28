@@ -295,6 +295,21 @@ describe('learn stats', () => {
     const { stdout } = await runLearnSubcommand(['stats']);
     expect(stdout.join('\n')).toContain('2026-04-10');
   });
+
+  it('outputs JSON statistics', async () => {
+    mockedLoad.mockResolvedValue(
+      makeLearnedPatterns([
+        makePattern({ pattern: 'r1', dismissCount: 3, action: 'suppress' }),
+        makePattern({ pattern: 'r2', dismissCount: 2, action: 'downgrade' }),
+      ]),
+    );
+
+    const { stdout } = await runLearnSubcommand(['stats', '--json']);
+    const parsed = JSON.parse(stdout.join('\n'));
+    expect(parsed.totalPatterns).toBe(2);
+    expect(parsed.activePatterns).toBe(1);
+    expect(parsed.byAction).toMatchObject({ suppress: 1, downgrade: 1 });
+  });
 });
 
 // ============================================================================
