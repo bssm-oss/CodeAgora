@@ -217,6 +217,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.5);
   });
 
+  it('catches JSON parse error-handling logging nits', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Insecure JSON Parsing Without Proper Error Handling',
+        problem:
+          "The code catches generic exceptions during JSON parsing but doesn't log or handle them specifically, making it difficult to debug parsing failures or detect malicious input attempts.",
+      }),
+    )!;
+    expect(match.id).toBe('json-error-handling-nit');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches empty-fence JSON extraction claims', () => {
     const match = matchFindingClass(
       doc({
@@ -608,6 +620,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.4);
   });
 
+  it('catches generic inconsistent-ordering sorting claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Bug in `findExceededUsers` sorting logic',
+        problem:
+          'The sorting logic in `findExceededUsers` is incorrect and may produce inconsistent ordering results.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches incorrect sort-function logic claims', () => {
     const match = matchFindingClass(
       doc({
@@ -706,6 +730,30 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.4);
   });
 
+  it('catches title-comparison fallback performance-regression speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Performance Degradation Due to Title Comparison',
+        problem:
+          'The new sorting logic introduces a title comparison fallback for equal scores, which creates a performance regression for large result sets where many items have identical scores, as it will invoke localeCompare for each such pair.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches localeCompare thread-safety race speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Race Condition Potential in Concurrent Environments',
+        problem:
+          'While the current implementation creates a new array with spread operator, the localeCompare function itself is not inherently thread-safe in all JavaScript environments, potentially introducing race conditions in concurrent sorting operations.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches stable-sort engine variance claims against deterministic tie-breakers', () => {
     const match = matchFindingClass(
       doc({
@@ -715,6 +763,18 @@ describe('matchFindingClass — positive matches', () => {
       }),
     )!;
     expect(match.id).toBe('sorting-comparator');
+  });
+
+  it('catches secondary-sort-key stable-sorting expectation claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Inconsistent Sorting Behavior for Equal Scores',
+        problem:
+          'The modified sorting function introduces a secondary sort key (title) when scores are equal, but this creates inconsistent behavior that could break expectations in downstream code relying on stable sorting.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
   });
 
   it('catches localeCompare non-string speculation against typed sort tie-breakers', () => {

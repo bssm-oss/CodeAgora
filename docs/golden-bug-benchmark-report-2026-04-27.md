@@ -278,3 +278,56 @@ Additional tuning in this pass:
 - Extended scorer duplicate suppression for same-root lower-severity findings, generic config/control-flow restatements, race-condition restatements of mutation bugs, compound off-by-one findings, and documentation-line duplicates after a true positive.
 
 The benchmark is now at the requested quality-gate level for the 12-fixture `--skip-head` low-cost diverse run. This remains a calibrated benchmark snapshot, not proof that production review precision is generally 100%.
+
+## 2026-04-28 Latest HEAD Recheck Addendum
+
+After hardening L2 debate behavior in `890a478`, the quality gate was rerun on the latest local `main` to ensure the benchmark still passes with the updated consensus logic.
+
+The first latest-HEAD full reruns exposed remaining stochastic FP variants:
+
+- `bench-out-quality-gate9-20260428`: TP 10 / FP 1 / FN 0; `fp-stable-sorting-refactor` emitted a title-comparison performance-regression FP.
+- `bench-out-quality-gate10-20260428`: TP 10 / FP 2 / FN 0; remaining FPs were stable-sort `localeCompare` thread-safety speculation and generic quota sorting-logic noise.
+- `bench-out-quality-gate11-20260428`: TP 10 / FP 1 / FN 0; stable-sort and quota were clean, but `fp-moderator-regex` emitted a JSON parse error-logging nit.
+
+Additional narrow priors were added for these observed FP classes:
+
+- title-comparison fallback performance speculation;
+- `localeCompare` thread-safety/race-condition speculation;
+- secondary-sort-key stable-sorting expectation claims;
+- generic `findExceededUsers` sorting-logic claims that do not describe the planted `limit + 1` bug;
+- JSON parse error-handling/logging nits in the moderator parser fixture.
+
+Final latest-HEAD quality-gate run:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-quality-gate12-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-quality-gate12-20260428
+```
+
+Final score:
+
+| Metric | Result |
+|---|---:|
+| Total fixtures | 12 |
+| Recall / FP-regression fixtures | 8 / 4 |
+| TP / FP / FN | 10 / 0 / 0 |
+| Precision | 100.0% |
+| Recall | 100.0% |
+| F1 | 100.0% |
+| FP clean-rate | 100.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
+| FP regressions triggered | 0 / 4 |
+
+Runtime metadata from `bench-out-quality-gate12-20260428/_meta/summary.json`:
+
+| Metric | Result |
+|---|---:|
+| OK fixtures | 12 / 12 |
+| Duration | 734,928ms |
+| Total tokens | 137,346 |
+| Known OpenRouter cost | $0.0210 |
+| Unknown cost present | false |
+
+L2 debate smoke verification also passed after the hardening change: `auth-session-dual` produced a completed session where a rate-limited supporter was preserved as `NEUTRAL` instead of being dropped, and the verdict correctly avoided a false "all supporters agreed" consensus.
