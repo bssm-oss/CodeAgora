@@ -1,0 +1,52 @@
+name: npm Dist Tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to tag
+        required: true
+        type: choice
+        options:
+          - '@codeagora/review'
+          - '@codeagora/mcp'
+      version:
+        description: Published package version
+        required: true
+        type: string
+      tag:
+        description: npm dist-tag to assign
+        required: true
+        type: choice
+        options:
+          - alpha
+          - legacy
+          - latest
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Add npm dist-tag
+        run: pnpm dist-tag add "${PACKAGE}@${VERSION}" "${TAG}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
+
+      - name: Verify npm dist-tags
+        run: pnpm dist-tag ls "${PACKAGE}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
