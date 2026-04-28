@@ -125,6 +125,17 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('zero-width');
   });
 
+  it('catches zero-width with unicode hyphen variant', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incomplete JSON fence detection may cause moderation decisions to be silently ignored',
+        problem: 'The regular expression contains literal zero‑width space characters instead of plain back-ticks.',
+      }),
+    )!;
+    expect(match.id).toBe('zero-width');
+    expect(match.multiplier).toBe(0.5);
+  });
+
   it('catches prototype pollution claims against JSON/schema parsing', () => {
     const match = matchFindingClass(
       doc({
@@ -158,12 +169,60 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('weak-regex-extractor');
   });
 
+  it('catches regex-injection/backtick claims against fence extraction', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Insecure Regex Pattern Matching',
+        problem:
+          'The regex pattern can be problematic due to the way backticks are escaped, creating potential denial-of-service or regex injection vectors.',
+      }),
+    )!;
+    expect(match.id).toBe('weak-regex-extractor');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches malformed JSON parser edge-case claims', () => {
     const match = matchFindingClass(
       doc({
         issueTitle: 'Incorrect Return Value in extractModeratorJsonPayload',
         problem:
           "The function doesn't distinguish between valid JSON and malformed input that starts with a JSON brace.",
+      }),
+    )!;
+    expect(match.id).toBe('malformed-json-parser-edge');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches parseForcedDecisionJson array-input claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'JSON Parsing Not Properly Handling Array Inputs',
+        problem:
+          "The parseForcedDecisionJson logic does not properly validate that the JSON payload is an object when it's passed in as an array input.",
+      }),
+    )!;
+    expect(match.id).toBe('malformed-json-parser-edge');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches fabricated logical-expression claims in moderator JSON extraction', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incorrect logical expression in extractModeratorJsonPayload causing always-true condition',
+        problem:
+          "The extractModeratorJsonPayload line contains an incorrect logical expression where a truthy string literal makes the condition always true.",
+      }),
+    )!;
+    expect(match.id).toBe('malformed-json-parser-edge');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches empty-fence JSON extraction claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Logic Error in extractModeratorJsonPayload May Cause Moderator Verdicts to Be Silently Ignored',
+        problem:
+          'extractModeratorJsonPayload only returns fullFence[1] when the capture group is truthy, so an empty capture or empty JSON payload is treated as falsy and silently ignored.',
       }),
     )!;
     expect(match.id).toBe('malformed-json-parser-edge');
@@ -192,6 +251,30 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('speculative-rendered-xss');
   });
 
+  it('catches arbitrary-code-execution claims from JSON reasoning fields', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Insecure JSON Parsing Allows Arbitrary Code Execution',
+        problem:
+          'The code parses JSON payloads from moderator responses, potentially allowing attackers to inject malicious code via the reasoning field.',
+      }),
+    )!;
+    expect(match.id).toBe('speculative-rendered-xss');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches XSS claims against JSON parsing without a render sink', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential XSS Vulnerability via Improper JSON Parsing',
+        problem:
+          'extractModeratorJsonPayload does not properly handle malicious input that could contain XSS payloads before JSON.parse, although the immediate XSS risk is reduced due to JSON parsing.',
+      }),
+    )!;
+    expect(match.id).toBe('speculative-rendered-xss');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches hand-rolled session cookie / JWT-library preference claims', () => {
     const match = matchFindingClass(
       doc({
@@ -202,6 +285,18 @@ describe('matchFindingClass — positive matches', () => {
     )!;
     expect(match.id).toBe('hand-rolled-session-cookie');
     expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches speculative service-token race claims against env reads', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Race Condition in Service Token Creation Logic',
+        problem:
+          'The createServiceToken function uses a shared, potentially mutable environment object without protections against concurrent access during service token generation.',
+      }),
+    )!;
+    expect(match.id).toBe('service-token-concurrency-speculation');
+    expect(match.multiplier).toBe(0.4);
   });
 
   it('catches speculative internal-failure error handling claims', () => {
@@ -216,12 +311,84 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.5);
   });
 
+  it('catches non-blocking error-message quality nits', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incorrect Error Handling for Missing userId',
+        problem:
+          'The error response for missing userId contains an unhelpful message instead of providing a more informative error message for debugging and client handling.',
+      }),
+    )!;
+    expect(match.id).toBe('error-message-quality-nit');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches internal enum mismatch compatibility claims', () => {
     const match = matchFindingClass(
       doc({
         issueTitle: 'Weak JSON Schema Validation for Severity Enum',
         problem:
           "The schema allows DISMISSED, which may not be a valid value for the consuming code's Severity enum.",
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches unvalidated severity enum claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Unvalidated Severity Enum',
+        problem:
+          "The severity enum values are validated against the schema, but the return type doesn't explicitly type-check that values are one of the allowed enum options.",
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches JSON/string enum architecture mismatch claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Architecture Mismatch Between JSON and Enum Values',
+        problem:
+          'parseForcedDecisionJson creates a mismatch between internal TypeScript Severity enum values and external JSON string representations.',
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches Zod severity type-mismatch claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incorrect Severity Type Assignment in parseForcedDecisionJson',
+        problem:
+          'The parseForcedDecisionJson function is expected to return a Severity type, but the Zod schema defines severity as an enum of string literals, not the Severity type internally used by the codebase.',
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches severity string-enum type handling claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Inconsistent Severity Type Handling',
+        problem:
+          'parseForcedDecisionJson returns a Severity type but the schema defines severity as a string enum, creating a TypeScript interface type mismatch.',
+      }),
+    )!;
+    expect(match.id).toBe('internal-enum-mismatch');
+    expect(match.multiplier).toBe(0.5);
+  });
+
+  it('catches schema/return type mismatch claims for forced decisions', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Output type mismatch between schema and function return type annotation',
+        problem:
+          'The parseForcedDecisionJson function returns severity typed as Severity but the schema expects one of the string enum values, causing a type mismatch in type definitions.',
       }),
     )!;
     expect(match.id).toBe('internal-enum-mismatch');
@@ -249,6 +416,30 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.6);
   });
 
+  it('catches speculative session actor type-confusion claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Type Confusion in getUser Return Value',
+        problem:
+          'The getUser function is cast to SessionActor | null, which could introduce a type safety violation if the user session was tampered with.',
+      }),
+    )!;
+    expect(match.id).toBe('session-actor-type-confusion');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches unsafe SessionActor type assertion claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Unsafe Type Assertion in Session Actor Handling',
+        problem:
+          'The code performs an unsafe type assertion on the result of getUser(req) with as SessionActor | null.',
+      }),
+    )!;
+    expect(match.id).toBe('session-actor-type-confusion');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches large JSON payload denial-of-service claims', () => {
     const match = matchFindingClass(
       doc({
@@ -257,6 +448,18 @@ describe('matchFindingClass — positive matches', () => {
       }),
     )!;
     expect(match.id).toBe('missing-size-limit');
+  });
+
+  it('catches resource-exhaustion size-limit claims for JSON payload extraction', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Integer Overflow Risk in JSON Payload Size Handling',
+        problem:
+          'extractModeratorJsonPayload accepts large blocks of text as JSON without size limits, leading to possible resource exhaustion.',
+      }),
+    )!;
+    expect(match.id).toBe('missing-size-limit');
+    expect(match.multiplier).toBe(0.6);
   });
 
   it('catches speculative broad-catch JSON parse masking claims', () => {
@@ -302,6 +505,29 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.id).toBe('missing-null-guard');
   });
 
+  it('catches numeric limit validation nits', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Invalid limit values are not handled',
+        problem: 'The function does not validate that limit is a finite non-negative number.',
+      }),
+    )!;
+    expect(match.id).toBe('numeric-limit-validation-nit');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches documentation/contract wording nits', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Misleading Documentation in findExceededUsers',
+        problem:
+          'The documentation states that it returns the top limit users, but implementation can return more than limit when limit + 1 is used.',
+      }),
+    )!;
+    expect(match.id).toBe('documentation-contract-nit');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches undeclared type / missing import compile-error claims', () => {
     const match = matchFindingClass(
       doc({
@@ -336,6 +562,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.4);
   });
 
+  it('catches defensive array-copy micro-performance claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Performance Degradation Due to Unnecessary Array Copy',
+        problem:
+          'The implementation creates an unnecessary array copy, which could lead to performance degradation for large result sets in memory-constrained environments.',
+      }),
+    )!;
+    expect(match.id).toBe('array-copy-microperf');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches missing-import phrasing that says without importing it', () => {
     const match = matchFindingClass(
       doc({
@@ -352,6 +590,42 @@ describe('matchFindingClass — positive matches', () => {
         issueTitle: 'Incorrect sorting in findExceededUsers when daily limits differ',
         problem:
           'The sorting logic is flawed and could return the wrong top users when limits vary.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches incorrect-formula sorting claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Inefficient sorting in findExceededUsers function',
+        problem:
+          "The sorting logic in findExceededUsers uses an incorrect formula that doesn't properly compare how far over the limit users are.",
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches incorrect sort-function logic claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Logic Error in findExceededUsers Sort Function',
+        problem:
+          'The sort function in findExceededUsers has incorrect logic for sorting by how far over the limit users are.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches sorting-comparator logic-error claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Logic Error in findExceededUsers Function',
+        problem:
+          'The findExceededUsers function has a logic error in its sorting comparator that causes incorrect ordering.',
       }),
     )!;
     expect(match.id).toBe('sorting-comparator');
@@ -396,6 +670,42 @@ describe('matchFindingClass — positive matches', () => {
     expect(stringMatch.id).toBe('sorting-comparator');
   });
 
+  it('catches negative-infinity sort speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Undefined Behavior When Handling Negative Infinity Scores',
+        problem:
+          'The sorting implementation does not properly account for negative infinity values in score comparisons, which may result in unpredictable sorting order.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches floating-point precision sorting speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Inconsistent Sorting Behavior Due to Floating-Point Precision Issues',
+        problem:
+          'The sorting function introduces a potential bug related to floating-point precision when comparing scores and equality.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches title-comparison performance-overhead speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Performance Degradation with Title Comparison',
+        problem:
+          'The stable sorting tie-breaker introduces performance overhead for every comparison because title comparison is more expensive than numeric comparison.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches stable-sort engine variance claims against deterministic tie-breakers', () => {
     const match = matchFindingClass(
       doc({
@@ -413,6 +723,18 @@ describe('matchFindingClass — positive matches', () => {
         issueTitle: 'Potential Runtime TypeError when titles are non-string',
         problem:
           'The title comparison uses a.title.localeCompare(b.title), which could throw if title is not a string.',
+      }),
+    )!;
+    expect(match.id).toBe('sorting-comparator');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches localeCompare null/undefined speculation against typed sort tie-breakers', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Null/Undefined Access in Title Comparison',
+        problem:
+          'The localeCompare method is called on a.title and b.title, which could be undefined or null despite required string types.',
       }),
     )!;
     expect(match.id).toBe('sorting-comparator');
@@ -485,6 +807,42 @@ describe('matchFindingClass — positive matches', () => {
     expect(regexMatch.multiplier).toBe(0.4);
   });
 
+  it('catches broad moderator JSON parser compatibility noise', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Moderator parser compatibility issue',
+        problem:
+          'extractModeratorJsonPayload may silently ignore a forced-decision verdict when a JSON payload is wrapped in a fence.',
+      }),
+    )!;
+    expect(match.id).toBe('moderator-json-parser-compatibility-noise');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches moderator JSON denial-of-service speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential Denial of Service via Malformed JSON Input',
+        problem:
+          'parseForcedDecisionJson is vulnerable to denial-of-service through crafted JSON input that causes excessive memory or CPU consumption.',
+      }),
+    )!;
+    expect(match.id).toBe('moderator-json-parser-compatibility-noise');
+    expect(match.multiplier).toBe(0.4);
+  });
+
+  it('catches quota reset race-condition restatements', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Potential race condition in quota reset logic',
+        problem:
+          'The maybeResetWindow function modifies the input quota object directly, which could lead to race conditions if multiple processes access the same quota object concurrently.',
+      }),
+    )!;
+    expect(match.id).toBe('quota-reset-race-speculation');
+    expect(match.multiplier).toBe(0.4);
+  });
+
   it('catches generic "potential security concern" phrasing (run 3 FP)', () => {
     const match = matchFindingClass(
       doc({
@@ -553,6 +911,17 @@ describe('matchFindingClass — negative cases (real bugs must pass)', () => {
         issueTitle: 'Hard-coded session secret fallback',
         problem:
           'SESSION_SECRET falls back to dev-session-secret, so missing configuration signs cookies with a public secret.',
+      }),
+    );
+    expect(match).toBeNull();
+  });
+
+  it('hard-coded service-token secret claims do not match concurrency speculation', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Hard-coded service-token secret fallback',
+        problem:
+          'SERVICE_TOKEN_SECRET falls back to dev-service-token-secret, so missing configuration signs service tokens with a public secret.',
       }),
     );
     expect(match).toBeNull();

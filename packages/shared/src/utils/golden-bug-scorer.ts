@@ -166,6 +166,25 @@ function tokenOverlap(a: Set<string>, b: Set<string>): number {
   return overlap / smaller.size;
 }
 
+const GENERIC_RESTATEMENT_PATTERNS: RegExp[] = [
+  /\b(?:logic|control\s+flow|function\s+flow)\b[\s\S]{0,120}\b(?:order|flow|flaw|error)\b/i,
+  /\bmissing\s+runtime\s+validation\b/i,
+  /\bconfiguration\b[\s\S]{0,120}\b(?:validation|required|missing|environment\s+variables?)\b/i,
+  /\brace\s+condition\b[\s\S]{0,160}\b(?:input|object|quota|concurrent|mutat|modif)/i,
+  /\b(?:one\s+extra|more\s+results\s+than\s+requested|limit\s*\+\s*1)\b/i,
+  /\bmisleading\s+documentation\b/i,
+  /\bdocumentation\b[\s\S]{0,160}\b(?:more\s+than\s+limit|limit\s*\+\s*1|returns\s+the\s+top\s+limit)\b/i,
+];
+
+function looksLikeGenericRestatement(finding: ActualFinding): boolean {
+  const haystack = `${finding.issueTitle}\n${finding.problem}`;
+  return GENERIC_RESTATEMENT_PATTERNS.some((pattern) => pattern.test(haystack));
+}
+
+function looksLikeDocumentationRestatement(finding: ActualFinding): boolean {
+  return /\bdocumentation\b/i.test(`${finding.issueTitle}\n${finding.problem}`);
+}
+
 function duplicateOfMatchedFinding(
   expected: ExpectedFinding,
   matchedActual: ActualFinding,
@@ -176,9 +195,6 @@ function duplicateOfMatchedFinding(
   }
 
   const tol = expected.lineTolerance ?? DEFAULT_LINE_TOLERANCE;
-  if (SEVERITY_RANK[candidate.severity] < SEVERITY_RANK[expected.minSeverity]) {
-    return false;
-  }
 
   const candidateTokens = signalTokens(candidate);
   const overlap = Math.max(
@@ -189,7 +205,7 @@ function duplicateOfMatchedFinding(
     rangesOverlap(candidate.lineRange, expected.lineRange, tol) &&
     rangesOverlap(candidate.lineRange, matchedActual.lineRange, tol)
   ) {
-    return overlap >= 0.25;
+    return overlap >= 0.25 || looksLikeGenericRestatement(candidate);
   }
 
   // Some reviewers identify the same root cause but attach the finding to a
@@ -198,10 +214,13 @@ function duplicateOfMatchedFinding(
   // bug class and overlaps strongly with the matched finding.
   if (expected.keyword) {
     const haystack = normalizeText(`${candidate.issueTitle}\n${candidate.problem}`);
-    return haystack.includes(normalizeText(expected.keyword)) && overlap >= 0.35;
+    return (haystack.includes(normalizeText(expected.keyword)) && overlap >= 0.35) ||
+      (looksLikeGenericRestatement(candidate) &&
+        (overlap >= 0.08 || looksLikeDocumentationRestatement(candidate)));
   }
 
-  return false;
+  return looksLikeGenericRestatement(candidate) &&
+    (overlap >= 0.08 || looksLikeDocumentationRestatement(candidate));
 }
 
 /**

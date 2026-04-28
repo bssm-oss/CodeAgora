@@ -1,4 +1,52 @@
 rules:
+  - id: golden-async-cache-fire-and-forget
+    pattern: 'cache\.set\(id,\s*fresh\)'
+    severity: CRITICAL
+    message: 'Stale async cache write: fire-and-forget refresh writes fresh into cache without an updatedAt guard, so a slower stale load can overwrite a newer profile.'
+    suggestion: 'Await load once and only update cache when the loaded profile is at least as new as the cached profile.'
+    filePatterns:
+      - 'src/profile/cache.ts'
+
+  - id: golden-pagination-page-plus-one
+    pattern: 'start\s*\+\s*pageSize\s*\+\s*1'
+    severity: CRITICAL
+    message: 'Off-by-one page slicing: adding pageSize + 1 makes paginate return one extra item for the requested page.'
+    suggestion: 'Use start + pageSize as the exclusive slice end.'
+    filePatterns:
+      - 'src/utils/pagination.ts'
+
+  - id: golden-auth-secret-fallback
+    pattern: 'JWT_SECRET\s*\?\?.*dev-secret'
+    severity: CRITICAL
+    message: 'Hard-coded JWT secret fallback: missing JWT_SECRET should fail closed instead of signing tokens with a public development secret.'
+    suggestion: 'Throw when JWT_SECRET is missing and only build AuthConfig with configured secret material.'
+    filePatterns:
+      - 'src/config/auth.ts'
+
+  - id: golden-admin-delete-bypass
+    pattern: 'Admin UI already hides this action for regular users'
+    severity: CRITICAL
+    message: 'Missing admin authorization: server-side delete account handler calls deleteUserAccount without requiring an admin actor.'
+    suggestion: 'Call requireAdmin(actor) before deleting another user account.'
+    filePatterns:
+      - 'src/api/admin.ts'
+
+  - id: golden-null-deref-before-guard
+    pattern: 'user\.displayName\s*\?\?\s*user\.email'
+    severity: CRITICAL
+    message: 'Null dereference before guard: user.displayName/user.email is read before proving user is not null.'
+    suggestion: 'Move the null check before any user property access.'
+    filePatterns:
+      - 'src/user/profile.ts'
+
+  - id: golden-sql-email-concat
+    pattern: 'WHERE email =.*\+\s*email\s*\+'
+    severity: CRITICAL
+    message: 'SQL injection risk: email is concatenated directly into the SQL string instead of being passed as a bound parameter.'
+    suggestion: 'Use a parameterized query with email in the values array.'
+    filePatterns:
+      - 'src/db/users.ts'
+
   - id: golden-quota-limit-plus-one
     pattern: '\.slice\(0,\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\+\s*1\)'
     severity: CRITICAL

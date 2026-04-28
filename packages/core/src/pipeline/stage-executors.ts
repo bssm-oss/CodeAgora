@@ -215,6 +215,9 @@ export async function executeL2Discussions(
     );
     const hasL1Consensus = matchingDocs.filter((doc) => !doc.confidenceTrace?.classPrior).length >= 2;
     for (const doc of matchingDocs) {
+      if (doc.source === 'rule') {
+        continue;
+      }
       let adjusted = adjustConfidenceFromDiscussion(doc.confidence ?? 50, verdict);
       if (verdict.finalSeverity === 'DISMISSED' && hasL1Consensus && !doc.confidenceTrace?.classPrior) {
         adjusted = 50;

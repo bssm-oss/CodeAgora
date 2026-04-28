@@ -323,6 +323,215 @@ describe('scoreCase — recall path', () => {
     expect(result.falsePositives).toHaveLength(0);
   });
 
+  it('suppresses lower-severity duplicates after a critical true positive', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/user/profile.ts',
+          lineRange: [4, 4],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'user.displayName is read before the null check',
+          keyword: 'null',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Null Dereference in getDisplayName',
+        problem: 'The function accesses user.displayName before checking if user is null.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/user/profile.ts',
+        lineRange: [4, 8],
+      }),
+      finding({
+        issueTitle: 'Logic Error in Function Flow',
+        problem:
+          'The function attempts to compute a value from potentially null input before handling the null case.',
+        severity: 'WARNING',
+        filePath: 'src/user/profile.ts',
+        lineRange: [3, 9],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses generic same-location control-flow restatements', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/user/profile.ts',
+          lineRange: [4, 4],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'user.displayName is read before the null check',
+          keyword: 'null',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Null Check Logic Error',
+        problem: 'The null check is reordered incorrectly, causing a null dereference.',
+        severity: 'CRITICAL',
+        filePath: 'src/user/profile.ts',
+        lineRange: [5, 9],
+      }),
+      finding({
+        issueTitle: 'Incorrect Control Flow Order',
+        problem: 'The function uses an incorrect order of operations that creates a logical flaw in the control flow.',
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/user/profile.ts',
+        lineRange: [5, 9],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses generic config-validation restatements of secret fallback bugs', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/config/auth.ts',
+          lineRange: [7, 7],
+          lineTolerance: 3,
+          minSeverity: 'CRITICAL',
+          rationale: 'Missing JWT_SECRET falls back to a public hard-coded secret.',
+          keyword: 'secret',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Hardcoded Development Default for JWT Secret',
+        problem: "JWT_SECRET falls back to 'dev-secret', a hard-coded secret.",
+        severity: 'HARSHLY_CRITICAL',
+        filePath: 'src/config/auth.ts',
+        lineRange: [7, 8],
+      }),
+      finding({
+        issueTitle: 'Missing Runtime Validation for Auth Configuration',
+        problem:
+          'The auth configuration loading function does not validate that required configuration values are set when environment variables are missing.',
+        severity: 'CRITICAL',
+        filePath: 'src/config/auth.ts',
+        lineRange: [6, 12],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses race-condition restatements of input mutation bugs', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/quota.ts',
+          lineRange: [37, 38],
+          lineTolerance: 3,
+          minSeverity: 'WARNING',
+          rationale: 'maybeResetWindow mutates its input quota parameter.',
+          keyword: 'mutat',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Mutating Input Object in maybeResetWindow',
+        problem: 'The maybeResetWindow function mutates its input parameter quota directly.',
+        severity: 'WARNING',
+        filePath: 'src/quota.ts',
+        lineRange: [31, 39],
+      }),
+      finding({
+        issueTitle: 'Potential race condition in quota reset logic',
+        problem:
+          'maybeResetWindow modifies the input quota object directly, which could lead to race conditions if multiple processes access the same quota object concurrently.',
+        severity: 'WARNING',
+        filePath: 'src/quota.ts',
+        lineRange: [36, 41],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses compound off-by-one restatements with validation nits', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/quota.ts',
+          lineRange: [27, 27],
+          lineTolerance: 3,
+          minSeverity: 'WARNING',
+          rationale: 'slice(0, limit + 1) returns one extra item',
+          keyword: 'off-by-one',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one quota pagination',
+        problem: 'The off-by-one slice returns limit + 1 users.',
+        severity: 'CRITICAL',
+        filePath: 'src/quota.ts',
+        lineRange: [24, 27],
+      }),
+      finding({
+        issueTitle: 'findExceededUsers may return more results than requested and can mishandle invalid limit values',
+        problem:
+          'The function returns one extra element beyond the caller expectation and also does not validate finite non-negative limit values.',
+        severity: 'CRITICAL',
+        filePath: 'src/quota.ts',
+        lineRange: [24, 27],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
+  it('suppresses documentation restatements attached above the changed line', () => {
+    const fx = fixture({
+      expectedFindings: [
+        {
+          filePath: 'src/quota.ts',
+          lineRange: [27, 27],
+          lineTolerance: 3,
+          minSeverity: 'WARNING',
+          rationale: 'slice(0, limit + 1) returns one extra item',
+          keyword: 'off-by-one',
+        },
+      ],
+    });
+    const result = scoreCase(fx, [
+      finding({
+        issueTitle: 'Off-by-one quota pagination',
+        problem: 'The off-by-one slice returns limit + 1 users.',
+        severity: 'CRITICAL',
+        filePath: 'src/quota.ts',
+        lineRange: [24, 27],
+      }),
+      finding({
+        issueTitle: 'Misleading Documentation in findExceededUsers',
+        problem:
+          'The documentation says it returns the top limit users, but the implementation can return more than limit when limit + 1 is used.',
+        severity: 'WARNING',
+        filePath: 'src/quota.ts',
+        lineRange: [16, 18],
+      }),
+    ]);
+
+    expect(result.matched).toHaveLength(1);
+    expect(result.falsePositives).toHaveLength(0);
+  });
+
   it('computes recall@k over unique bug candidates after duplicate suppression', () => {
     const fx = fixture({
       expectedFindings: [
