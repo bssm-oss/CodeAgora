@@ -375,13 +375,64 @@ Verdict flip, false-accept, and false-reject counts require fresh metadata from 
 - false accepts when a recall fixture is accepted while still missing expected findings,
 - false rejects when an FP-regression fixture is rejected because of false positives.
 
-Latest live rerun status on this workstation:
+Initial latest live rerun status on this workstation before credentials were loaded:
 
 | Check | Result |
 |---|---|
 | Fixture/schema validation | PASS: 12 fixtures validated |
 | Targeted scorer tests | PASS: golden-bug scorer, mapping, and comparison tests |
-| `OPENROUTER_API_KEY` | unset |
-| Latest L3 live rerun | blocked until OpenRouter credentials are present |
+| `OPENROUTER_API_KEY` in process env | unset |
+| `OPENROUTER_API_KEY` in `~/.config/codeagora/credentials` | present |
 
 No API key values were printed or recorded.
+
+After loading `~/.config/codeagora/credentials`, a fresh L3-enabled 12-fixture run completed:
+
+```bash
+source ~/.config/codeagora/credentials
+pnpm bench:fn:run -- --results ./bench-out-l3-fresh-20260428 \
+  --config benchmarks/.ca/config.low-cost-diverse.json
+pnpm bench:fn -- --results ./bench-out-l3-fresh-20260428
+pnpm bench:fn:compare -- --baseline ./bench-out-quality-gate12-20260428 \
+  --candidate ./bench-out-l3-fresh-20260428
+```
+
+Fresh L3 score:
+
+| Metric | Result |
+|---|---:|
+| Total fixtures | 12 |
+| Recall / FP-regression fixtures | 8 / 4 |
+| TP / FP / FN | 10 / 3 / 0 |
+| Precision | 76.9% |
+| Recall | 100.0% |
+| F1 | 87.0% |
+| FP clean-rate | 75.0% |
+| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
+| FP regressions triggered | 1 / 4 |
+
+Fresh L3 comparison against the `--skip-head` gate:
+
+| Metric | `--skip-head` baseline | Fresh L3 enabled | Delta |
+|---|---:|---:|---:|
+| TP / FP / FN | 10 / 0 / 0 | 10 / 3 / 0 | 0 / +3 / 0 |
+| Actual findings | 35 | 31 | -4 |
+| Precision | 100.0% | 76.9% | -23.1% |
+| Recall | 100.0% | 100.0% | 0.0% |
+| F1 | 100.0% | 87.0% | -13.0% |
+| FP clean-rate | 100.0% | 75.0% | -25.0% |
+| Duration | 734,928ms | 926,339ms | +191,411ms |
+| Tokens | 137,346 | 140,916 | +3,570 |
+| Known OpenRouter cost | $0.0210 | $0.0228 | +$0.0018 |
+| False accepts | n/a | 1 | n/a |
+| False rejects | n/a | 0 | n/a |
+
+Fresh L3 remaining regressions:
+
+| Fixture | L3 TP/FP/FN | Verdict | Notes |
+|---|---:|---|---|
+| fp-stable-sorting-refactor | 0 / 1 / 0 | ACCEPT | False positive: function-call overhead claim for stable sort comparator |
+| quota-manager-dual | 2 / 2 / 0 | REJECT | Two extra false positives: `parseQuotaConfig` required-field claim and `maybeResetWindow` boundary nit |
+| null-deref-early-access | 1 / 0 / 0 | ACCEPT | False accept: expected bug was found, but final verdict accepted the diff |
+
+The fresh run improves over the older L3 result (`9 / 6 / 1`) by restoring full recall and cutting FP count from 6 to 3. It still does not meet the Phase 2 quality gate because L3 lowers precision, FP clean-rate, and verdict reliability versus the `--skip-head` baseline.

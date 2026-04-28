@@ -117,11 +117,9 @@ export function compareGoldenBugReports(
       baselineDecision !== candidateDecision,
     );
     const falseAccept = !candidateCase.isFpRegression &&
-      candidateDecision === 'ACCEPT' &&
-      candidateCase.metrics.falseNegatives > 0;
+      candidateDecision === 'ACCEPT';
     const falseReject = candidateCase.isFpRegression &&
-      candidateDecision === 'REJECT' &&
-      candidateCase.metrics.falsePositives > 0;
+      candidateDecision === 'REJECT';
 
     return {
       fixtureId: candidateCase.fixtureId,

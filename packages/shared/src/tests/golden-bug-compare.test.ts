@@ -76,7 +76,7 @@ describe('compareGoldenBugReports()', () => {
       ]),
       candidateSummary: summary([
         { id: 'auth-bug', status: 'ok', findings: 0, durationMs: 20, decision: 'ACCEPT' },
-        { id: 'docs-clean', status: 'ok', findings: 1, durationMs: 20, decision: 'REJECT' },
+        { id: 'docs-clean', status: 'ok', findings: 0, durationMs: 20, decision: 'REJECT' },
       ]),
     });
 
@@ -93,5 +93,18 @@ describe('compareGoldenBugReports()', () => {
       falseAccepts: 1,
       falseRejects: 1,
     });
+  });
+
+  it('counts an ACCEPT verdict on a recall fixture as a false accept even when findings match', () => {
+    const baseline = aggregate([scoreCase(recallFixture, [finding()])]);
+    const candidate = aggregate([scoreCase(recallFixture, [finding()])]);
+
+    const comparison = compareGoldenBugReports(baseline, candidate, {
+      candidateSummary: summary([
+        { id: 'auth-bug', status: 'ok', findings: 1, durationMs: 20, decision: 'ACCEPT' },
+      ]),
+    });
+
+    expect(comparison.verdicts.falseAccepts).toBe(1);
   });
 });
