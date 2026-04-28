@@ -308,8 +308,18 @@ async function runRound(
   );
 
   const supporterResponses = supporterResults
-    .filter((r): r is PromiseFulfilledResult<{ supporterId: string; response: string; stance: 'agree' | 'disagree' | 'neutral' }> => r.status === 'fulfilled')
-    .map((r) => r.value);
+    .map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      }
+
+      const supporter = selectedSupporters[index];
+      return {
+        supporterId: supporter.id,
+        response: formatSupporterFailure(result.reason),
+        stance: 'neutral' as const,
+      };
+    });
 
   return {
     round: roundNum,
@@ -423,6 +433,24 @@ If NEUTRAL:
   };
 }
 
+function formatSupporterFailure(reason: unknown): string {
+  const rawReason = reason instanceof Error ? reason.message : String(reason);
+  const sanitizedReason = rawReason
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(/sk-or-v1-[A-Za-z0-9_-]+/g, '[REDACTED_API_KEY]')
+    .replace(/OPENROUTER_API_KEY=([^\s]+)/gi, 'OPENROUTER_API_KEY=[REDACTED]');
+  const trimmedReason = sanitizedReason.length > 400
+    ? `${sanitizedReason.slice(0, 400)}...`
+    : sanitizedReason;
+
+  return [
+    'Stance: NEUTRAL',
+    '',
+    'Supporter failed before producing a usable response.',
+    `Failure: ${trimmedReason}`,
+  ].join('\n');
+}
+
 // ============================================================================
 // Consensus Checking
 // ============================================================================
@@ -470,12 +498,12 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
     };
   }
 
-  // Majority agree (>50% excluding neutrals) — preserve original severity
+  // Majority agree (>50% of all participants) — preserve original severity
   const agreeCount = supporters.filter((s) => s.stance === 'agree').length;
   const disagreeCount = supporters.filter((s) => s.stance === 'disagree').length;
   const decidingVotes = agreeCount + disagreeCount;
 
-  if (decidingVotes > 0 && agreeCount > decidingVotes / 2) {
+  if (agreeCount > supporters.length / 2) {
     return {
       reached: true,
       severity: discussion.severity as ConsensusResult['severity'],
@@ -483,7 +511,7 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
     };
   }
 
-  if (decidingVotes > 0 && disagreeCount > decidingVotes / 2) {
+  if (disagreeCount > supporters.length / 2) {
     // HC downgrade: majority disagree downgrades to CRITICAL, not DISMISSED
     if (discussion.severity === 'HARSHLY_CRITICAL') {
       return {

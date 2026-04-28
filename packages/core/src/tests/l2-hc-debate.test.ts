@@ -111,6 +111,21 @@ describe('checkConsensus — HARSHLY_CRITICAL majority agree', () => {
     expect(result.reached).toBe(true);
     expect(result.severity).toBe('HARSHLY_CRITICAL');
   });
+
+  it('does not treat one agree plus one neutral as majority consensus', () => {
+    const discussion = makeDiscussion('HARSHLY_CRITICAL');
+    const round = makeRound(['agree', 'neutral']);
+    const result = checkConsensus(round, discussion);
+    expect(result.reached).toBe(false);
+  });
+
+  it('still reaches majority consensus when agree votes exceed all participants', () => {
+    const discussion = makeDiscussion('HARSHLY_CRITICAL');
+    const round = makeRound(['agree', 'agree', 'neutral']);
+    const result = checkConsensus(round, discussion);
+    expect(result.reached).toBe(true);
+    expect(result.severity).toBe('HARSHLY_CRITICAL');
+  });
 });
 
 // ============================================================================
