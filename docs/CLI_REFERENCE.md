@@ -104,6 +104,16 @@ agora metrics benchmark --results ./bench-out-l3-20-20260428 --out ./bench-repor
 
 `--out` writes `benchmark-metrics.json` and `benchmark-metrics.md`.
 
+## `agora research`
+
+Inspect small proof plans for postponed research issues. This does not mutate
+reviewer configuration or enable experimental reviewer paths.
+
+```bash
+agora research plan
+agora research plan --json
+```
+
 ## `agora models`
 
 Model leaderboard — Thompson Sampling scores, win rates, health status.
@@ -143,6 +153,7 @@ agora costs --by provider    # By provider
 | `agora learn stats` | Learning statistics |
 | `agora learn stats --json` | Machine-readable learning statistics |
 | `agora learn audit --results <path>` | Audit which learned patterns would suppress or downgrade findings |
+| `agora research plan` | Print Phase 5 research experiment plans |
 
 ## Output Formats
 

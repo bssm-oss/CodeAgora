@@ -26,6 +26,7 @@ import { registerConfigGetCommand } from './commands/config-get.js';
 import { registerCheckUpdateCommand } from './commands/check-update.js';
 import { registerLearnCommand } from './commands/learn.js';
 import { registerMetricsCommand } from './commands/metrics.js';
+import { registerResearchCommand } from './commands/research.js';
 import { addHelpExamples } from './commands/help-text.js';
 
 // Command logic imports (for simple inline wiring)
@@ -73,6 +74,7 @@ registerInitCommand(program);
 registerSessionsCommand(program);
 registerLearnCommand(program);
 registerMetricsCommand(program);
+registerResearchCommand(program);
 registerLanguageCommand(program, displayName);
 registerConfigGetCommand(program);
 registerCheckUpdateCommand(program);
