@@ -35,9 +35,6 @@ export default defineConfig({
   external: [
     /^@ai-sdk\//,
     /^@openrouter\//,
-    /^@codeagora\/cli/,
-    /^@codeagora\/github/,
-    /^@codeagora\/notifications/,
     '@modelcontextprotocol/sdk',
     'ai',
     'zod',
