@@ -29,7 +29,7 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          npx codeagora review /tmp/pr.diff --output github --quiet > /tmp/review-output.md
+          npx -y --package @codeagora/review@0.1.0-alpha.2 agora review /tmp/pr.diff --output github --quiet > /tmp/review-output.md
 
       - name: Post review comment
         if: always()
