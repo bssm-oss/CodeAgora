@@ -1,15 +1,15 @@
-# Extensions
+# Integrations
 
-Optional packages installed separately from the core `codeagora` CLI.
+The current public distribution surface is:
 
 ```bash
-npm i -g @codeagora/web            # Web dashboard
-npm i -g @codeagora/tui            # Interactive TUI (experimental)
-npm i -g @codeagora/mcp            # MCP server (Claude Code, Cursor, etc.)
-npm i -g @codeagora/notifications  # Discord/Slack webhooks
+npm i -g @codeagora/review  # CLI: agora/codeagora
+npm i -g @codeagora/mcp     # MCP server: codeagora-mcp
 ```
 
-## Web Dashboard (`@codeagora/web`)
+Workspace packages such as `@codeagora/core`, `@codeagora/shared`, `@codeagora/github`, and `@codeagora/cli` are internal implementation packages. The `2.x` releases are the legacy package line.
+
+## Web Dashboard
 
 Local web dashboard — Hono.js REST API + React SPA.
 
@@ -30,7 +30,7 @@ agora dashboard --open       # Auto-open browser
 
 Binds to `127.0.0.1` (loopback only). CORS restricted to localhost origins.
 
-## Interactive TUI (`@codeagora/tui`) — Experimental
+## Interactive TUI — Experimental
 
 Terminal UI — review setup wizard, real-time pipeline progress, debate viewer, and results drill-down.
 
@@ -42,14 +42,20 @@ agora tui
 
 Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code, Cursor, Windsurf, and VS Code.
 
-**7 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`
+Install:
+
+```bash
+npm i -g @codeagora/mcp
+```
+
+**9 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`, `config_get`, `config_set`
 
 ```json
 {
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["@codeagora/mcp"],
+      "args": ["-y", "@codeagora/mcp"],
       "env": { "GROQ_API_KEY": "your_key_here" }
     }
   }
@@ -58,7 +64,7 @@ Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code
 
 `review_quick` runs L1 only for fast feedback. `review_full` runs the complete L1 > L2 > L3 pipeline.
 
-## Notifications (`@codeagora/notifications`)
+## Notifications
 
 Send review results to Discord or Slack after each review.
 

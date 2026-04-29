@@ -77,7 +77,7 @@ The PR diff exceeds the configured limit (default: 5000 lines). Options:
    }
    ```
 2. Restart Claude Code
-3. Check that `npx @codeagora/mcp` runs without errors
+3. Check that `npx -y @codeagora/mcp --help` runs without errors
 
 ## Web Dashboard
 

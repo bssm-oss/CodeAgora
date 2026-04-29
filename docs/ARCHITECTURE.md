@@ -80,7 +80,7 @@
 
 ## Project Structure
 
-pnpm monorepo with 8 packages:
+pnpm monorepo with 8 workspace packages:
 
 ```
 packages/
@@ -90,12 +90,11 @@ packages/
 ├── cli/            # @codeagora/cli — CLI commands, formatters, options
 ├── web/            # @codeagora/web — Hono.js REST API + React SPA dashboard
 ├── tui/            # @codeagora/tui — interactive terminal UI (ink + React)
-├── mcp/            # @codeagora/mcp — MCP server (7 tools)
+├── mcp/            # @codeagora/mcp — MCP server (9 tools)
 └── notifications/  # @codeagora/notifications — Discord/Slack webhooks
 ```
 
-Core packages (`shared`, `core`, `cli`, `github`) ship with `codeagora`.
-Optional packages (`web`, `tui`, `mcp`, `notifications`) are installed separately.
+The current public distribution surface is `@codeagora/review` for the CLI and `@codeagora/mcp` for MCP integration. Workspace packages such as `shared`, `core`, `cli`, and `github` are internal implementation packages; the `2.x` releases are the legacy package line.
 
 ## Session Storage
 
