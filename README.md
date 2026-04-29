@@ -6,7 +6,7 @@
 <p align="center"><strong>Where LLMs Debate Your Code</strong></p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/codeagora"><img src="https://img.shields.io/npm/v/codeagora?color=%2305A6B9" alt="Version"></a>
+  <a href="https://www.npmjs.com/package/@codeagora/review"><img src="https://img.shields.io/npm/v/@codeagora/review?color=%2305A6B9" alt="Version"></a>
   <img src="https://img.shields.io/badge/tests-3168%20passing-%23191A51" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
@@ -22,12 +22,29 @@ Multiple LLMs review your code in parallel, debate conflicting opinions, then a 
 ## Quick Start
 
 ```bash
-npm i -g codeagora
+npm i -g @codeagora/review
 agora init
 git diff | agora review
 ```
 
 `agora init` auto-detects your API keys and CLI tools, then generates a config.
+
+For one-off execution with pnpm, specify the binary because the package exposes both `agora` and `codeagora`:
+
+```bash
+pnpm --package=@codeagora/review@latest dlx agora --version
+```
+
+### Public Packages
+
+Current public distribution packages:
+
+| Package | Purpose |
+|---------|---------|
+| [`@codeagora/review`](https://www.npmjs.com/package/@codeagora/review) | CLI package exposing `agora` and `codeagora` |
+| [`@codeagora/mcp`](https://www.npmjs.com/package/@codeagora/mcp) | MCP server package exposing `codeagora-mcp` |
+
+Workspace packages such as `@codeagora/core`, `@codeagora/shared`, `@codeagora/github`, and `@codeagora/cli` are internal implementation packages. The `2.x` releases are the legacy package line.
 
 ---
 
@@ -106,7 +123,7 @@ agora tui
 
 ## MCP Server (Claude Code / Cursor)
 
-9-tool MCP server for AI IDE integration.
+MCP server for AI IDE integration.
 
 ```json
 // claude_desktop_config.json or .cursor/mcp.json
@@ -120,7 +137,7 @@ agora tui
 }
 ```
 
-Tools: `review_diff`, `review_pr`, `review_staged`, `session_list`, `session_detail`, `explain_session`, `config_get`, `config_set`, `health_check`.
+Tools: `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`, `config_get`, `config_set`.
 
 ---
 
@@ -139,20 +156,18 @@ Configure in `.ca/config.json` under `notifications`.
 
 ---
 
-## Extensions
+## Integrations
 
-All extensions are optional — install only what you need.
+The CLI package `@codeagora/review` includes the command-line review workflow. The separately published integration package is `@codeagora/mcp` for MCP-compatible IDEs.
 
 | Package | Install | What it does |
 |---------|---------|-------------|
-| [@codeagora/web](https://www.npmjs.com/package/@codeagora/web) | `npm i -g @codeagora/web` | Web dashboard — 9-page SPA with real-time pipeline monitoring, session history, model leaderboard, cost tracking |
-| [@codeagora/tui](https://www.npmjs.com/package/@codeagora/tui) | `npm i -g @codeagora/tui` | Interactive terminal UI — run reviews, browse sessions, edit config, watch debates in real-time |
-| [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp` | MCP server (9 tools) — integrates with Claude Code, Cursor, and any MCP-compatible IDE |
-| [@codeagora/notifications](https://www.npmjs.com/package/@codeagora/notifications) | `npm i -g @codeagora/notifications` | Webhooks — Discord (real-time threads + summary), Slack (summary), generic (HMAC-SHA256 signed) |
+| [@codeagora/review](https://www.npmjs.com/package/@codeagora/review) | `npm i -g @codeagora/review` | CLI package exposing `agora` and `codeagora` |
+| [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp` | MCP server for Claude Code, Cursor, and other MCP-compatible clients |
 
-Each extension works standalone or together. The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions.
+Legacy `2.x` packages and workspace package names are not the current public install surface.
 
-[Extension guide ->](docs/EXTENSIONS.md)
+[Integration guide ->](docs/EXTENSIONS.md)
 
 ---
 
@@ -191,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: justn-hyeok/CodeAgora@v2
+      - uses: bssm-oss/CodeAgora@v0.1.0-alpha.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
@@ -212,7 +227,7 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 | [Configuration](docs/CONFIGURATION.md) | Config file guide |
 | [Providers](docs/PROVIDERS.md) | Full provider list with tiers |
 | [Architecture](docs/ARCHITECTURE.md) | Pipeline design and project structure |
-| [Extensions](docs/EXTENSIONS.md) | Web, TUI, MCP, Notifications |
+| [Integrations](docs/EXTENSIONS.md) | Web dashboard, TUI, MCP, notifications |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
 | [FAQ](docs/FAQ.md) | Frequently asked questions |
 
