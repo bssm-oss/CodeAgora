@@ -1,15 +1,15 @@
 {
   "name": "@codeagora/mcp",
-  "version": "2.3.3",
+  "version": "0.1.0-alpha.2",
   "description": "CodeAgora MCP server — Claude Code integration for AI-powered code review",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/justn-hyeok/CodeAgora.git",
+    "url": "git+https://github.com/bssm-oss/CodeAgora.git",
     "directory": "packages/mcp"
   },
-  "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
+  "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
   "keywords": [
     "codeagora",
     "mcp",
@@ -19,6 +19,10 @@
   ],
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "main": "./dist/index.js",
   "exports": {
@@ -38,7 +42,24 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/baseten": "^1.0.38",
+    "@ai-sdk/cohere": "^3.0.25",
+    "@ai-sdk/deepinfra": "^2.0.39",
+    "@ai-sdk/fireworks": "^2.0.40",
+    "@ai-sdk/google": "^3.0.43",
+    "@ai-sdk/groq": "^3.0.27",
+    "@ai-sdk/huggingface": "^1.0.37",
+    "@ai-sdk/moonshotai": "^2.0.10",
+    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai-compatible": "^2.0.33",
+    "@ai-sdk/perplexity": "^3.0.23",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@openrouter/ai-sdk-provider": "^2.2.3",
+    "ai": "^6.0.111",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.8.3",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@codeagora/core": "workspace:*",

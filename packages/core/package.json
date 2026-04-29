@@ -32,7 +32,7 @@
     "@ai-sdk/huggingface": "^1.0.37",
     "@ai-sdk/baseten": "^1.0.38",
     "@openrouter/ai-sdk-provider": "^2.2.3",
-    "yaml": "^2.8.2",
+    "yaml": "^2.8.3",
     "zod": "^3.22.4",
     "commander": "^14.0.3"
   }

@@ -1,17 +1,22 @@
 {
-  "name": "codeagora",
-  "version": "2.3.3",
+  "name": "@codeagora/review",
+  "version": "0.1.0-alpha.2",
   "type": "module",
   "description": "Multi-LLM code review pipeline — parallel reviewers, structured debate, consensus verdict",
   "license": "MIT",
   "packageManager": "pnpm@10.30.3",
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp": ">=8.4.0"
+    }
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/justn-hyeok/CodeAgora.git"
+    "url": "git+https://github.com/bssm-oss/CodeAgora.git"
   },
-  "homepage": "https://github.com/justn-hyeok/CodeAgora#readme",
+  "homepage": "https://github.com/bssm-oss/CodeAgora#readme",
   "bugs": {
-    "url": "https://github.com/justn-hyeok/CodeAgora/issues"
+    "url": "https://github.com/bssm-oss/CodeAgora/issues"
   },
   "keywords": [
     "code-review",
@@ -24,6 +29,10 @@
   ],
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "files": [
     "packages/cli/dist/**/*.js",
@@ -70,7 +79,7 @@
     "commander": "^14.0.3",
     "ora": "^9.3.0",
     "picocolors": "^1.1.1",
-    "yaml": "^2.8.2",
+    "yaml": "^2.8.3",
     "zod": "^3.22.4"
   },
   "devDependencies": {
