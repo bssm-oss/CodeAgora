@@ -12,11 +12,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
@@ -28,51 +28,48 @@ jobs:
       - name: Web package tests
         run: pnpm test:web
 
-      # Smoke test: pack and verify CLI works
+      - name: Determine npm dist-tag
+        id: dist-tag
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ "$version" == *-* ]]; then
+            tag="${version#*-}"
+            tag="${tag%%.*}"
+          else
+            tag="latest"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package surface
+        run: |
+          node -e "const pkg=require('./package.json'); if (pkg.name !== '@codeagora/review') throw new Error('root package must publish as @codeagora/review')"
+          node -e "const pkg=require('./packages/mcp/package.json'); if (pkg.name !== '@codeagora/mcp') throw new Error('MCP package must publish as @codeagora/mcp')"
+
+      # Smoke test: pack and verify public packages work from a clean install
       - name: Smoke test
         run: |
-          npm pack
+          CLI_TARBALL="$(npm pack --silent)"
+          MCP_TARBALL="$(cd packages/mcp && npm pack --silent)"
           SMOKE_DIR="$(mktemp -d)"
           cd "$SMOKE_DIR"
           npm init -y
-          npm i $GITHUB_WORKSPACE/codeagora-*.tgz
+          npm i "$GITHUB_WORKSPACE/$CLI_TARBALL" "$GITHUB_WORKSPACE/packages/mcp/$MCP_TARBALL"
           npx agora --version
           npx agora doctor || echo "::warning::doctor check failed (expected without API keys)"
+          npx codeagora-mcp --help
 
-      # Publish core package
-      - name: Publish codeagora
-        id: publish-core
+      - name: Publish @codeagora/review
+        id: publish-review
         continue-on-error: true
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # Publish optional packages
-      - name: Publish @codeagora/web
-        id: publish-web
-        continue-on-error: true
-        run: cd packages/web && npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @codeagora/tui
-        id: publish-tui
-        continue-on-error: true
-        run: cd packages/tui && npm publish --access public
+        run: npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @codeagora/mcp
         id: publish-mcp
         continue-on-error: true
-        run: cd packages/mcp && npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish @codeagora/notifications
-        id: publish-notifications
-        continue-on-error: true
-        run: cd packages/notifications && npm publish --access public
+        run: cd packages/mcp && npm publish --access public --tag "${{ steps.dist-tag.outputs.tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -81,11 +78,8 @@ jobs:
         run: |
           failed=0
           for result in \
-            "${{ steps.publish-core.outcome }}" \
-            "${{ steps.publish-web.outcome }}" \
-            "${{ steps.publish-tui.outcome }}" \
-            "${{ steps.publish-mcp.outcome }}" \
-            "${{ steps.publish-notifications.outcome }}"; do
+            "${{ steps.publish-review.outcome }}" \
+            "${{ steps.publish-mcp.outcome }}"; do
             if [ "$result" = "failure" ]; then
               failed=$((failed + 1))
             fi
@@ -97,6 +91,7 @@ jobs:
           echo "All packages published successfully"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
