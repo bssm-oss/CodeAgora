@@ -52,12 +52,12 @@ describe('writeGitHubWorkflow()', () => {
     expect(content).toContain('synchronize');
   });
 
-  it('written file contains npx codeagora review step', async () => {
+  it('written file contains pinned CodeAgora review step', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('npx -y --package @codeagora/review@0.1.0-alpha.2 agora review');
   });
 
   it('written file contains codeagora-review marker', async () => {
@@ -99,7 +99,7 @@ describe('writeGitHubWorkflow()', () => {
 
     const content = await fs.readFile(workflowPath, 'utf-8');
     expect(content).not.toBe('existing content');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('npx -y --package @codeagora/review@0.1.0-alpha.2 agora review');
   });
 });
 
@@ -175,6 +175,6 @@ describe('runInit() with ci: true', () => {
 
     expect(result.created).toContain(workflowPath);
     const content = await fs.readFile(workflowPath, 'utf-8');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('npx -y --package @codeagora/review@0.1.0-alpha.2 agora review');
   });
 });
