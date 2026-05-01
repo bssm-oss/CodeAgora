@@ -21,6 +21,11 @@ inputs:
     required: false
     default: '5000'
 
+  post-results:
+    description: Post review comments and commit status to GitHub
+    required: false
+    default: 'true'
+
 outputs:
   verdict:
     description: Final verdict — ACCEPT, REJECT, or NEEDS_HUMAN
@@ -33,6 +38,22 @@ outputs:
   session-id:
     description: CodeAgora session ID for audit trail
     value: ${{ steps.review.outputs.session-id }}
+
+  degraded:
+    description: Whether the action ran in degraded or skipped mode
+    value: ${{ steps.review.outputs.degraded }}
+
+  degraded-reason:
+    description: Reason for degraded or skipped mode
+    value: ${{ steps.review.outputs.degraded-reason }}
+
+  head-sha:
+    description: Pull request head SHA reviewed by CodeAgora
+    value: ${{ steps.review.outputs.head-sha }}
+
+  base-sha:
+    description: Pull request base SHA used for diff acquisition
+    value: ${{ steps.review.outputs.base-sha }}
 
 runs:
   using: composite
@@ -80,7 +101,11 @@ runs:
           --sha "$HEAD_SHA" \
           --repo "$REPO" \
           --fail-on-reject "$FAIL_ON_REJECT" \
-          --max-diff-lines "$MAX_DIFF_LINES"
+          --max-diff-lines "$MAX_DIFF_LINES" \
+          --post-results "$POST_RESULTS" \
+          --base-sha "$BASE_SHA" \
+          --base-repo "$BASE_REPO" \
+          --head-repo "$HEAD_REPO"
       env:
         ACTION_PATH: ${{ github.action_path }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -89,4 +114,8 @@ runs:
         REPO: ${{ github.repository }}
         FAIL_ON_REJECT: ${{ inputs.fail-on-reject }}
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
+        POST_RESULTS: ${{ inputs.post-results }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         CONFIG_PATH: ${{ inputs.config-path }}
