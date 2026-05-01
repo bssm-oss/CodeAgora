@@ -34,8 +34,6 @@ CLAUDE.md
 
 # Docs and extras
 docs/
-plugin/
-tools/
 
 # Test and temp
 *.test.ts

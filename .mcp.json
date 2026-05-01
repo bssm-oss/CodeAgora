@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "agora": {
-      "command": "node",
-      "args": ["./plugin/bridge/mcp-server.cjs"]
+    "codeagora": {
+      "command": "npx",
+      "args": ["-y", "@codeagora/mcp"]
     }
   }
 }

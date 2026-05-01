@@ -64,7 +64,7 @@
 | 후보 | 주제 | 핵심 질문 | 주요 앵커 | 권장 처리 |
 |------|------|-----------|-----------|-----------|
 | 25 | Pre-review Impact Analysis | 리뷰 전에 diff의 성격과 영향 범위를 어떻게 추정할 수 있는가? | `packages/core/src/pipeline/analyzers/diff-classifier.ts`, `packages/core/src/pipeline/analyzers/impact-analyzer.ts` | 독립 논문 또는 01 보강 |
-| 26 | Session-Centric Review Platform | CLI, Web, TUI, MCP, plugin을 session model 하나로 묶을 수 있는가? | `packages/core/src/session/manager.ts`, `packages/web/src/server/ws.ts`, `packages/tui/src/App.tsx`, `plugin/bridge/mcp-server.ts` | 독립 논문 권장 |
+| 26 | Session-Centric Review Platform | CLI, MCP, desktop surface를 session model 하나로 묶을 수 있는가? | `packages/core/src/session/manager.ts`, `packages/cli/src/commands/sessions.ts`, `packages/mcp/src/index.ts`, `packages/desktop/src/api/desktop-bridge.ts` | 독립 논문 권장 |
 | 27 | Finding-to-PR Position Mapping | LLM finding을 GitHub PR diff 위치에 안정적으로 매핑하려면 무엇이 필요한가? | `packages/github/src/diff-parser.ts`, `packages/github/src/mapper.ts`, `packages/shared/src/utils/issue-mapper.ts` | 20 보강 또는 독립 논문 |
 | 28 | Review Event Streaming | multi-agent review pipeline의 진행 상황을 외부 채널로 어떻게 흘릴 수 있는가? | `packages/notifications/src/webhook.ts`, `packages/notifications/src/event-stream.ts`, `packages/web/src/server/ws.ts` | 19/03 보강 또는 독립 문서 |
 | 29 | Learning Rules and Review Memory | 조직별 규칙과 학습된 패턴을 리뷰 파이프라인에 어떻게 주입할 수 있는가? | `packages/core/src/learning/store.ts`, `packages/core/src/rules/loader.ts` | 독립 논문 후보 |

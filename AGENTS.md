@@ -25,10 +25,8 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 | Directory | Purpose |
 |-----------|---------|
 | `packages/` | Monorepo workspace packages — all source code (see `packages/AGENTS.md`) |
-| `src/` | Test suite — 249 files, 3442+ tests (see `src/AGENTS.md`) |
+| `src/` | Centralized root test suite (see `src/AGENTS.md`) |
 | `docs/` | Design documents, PRD, phase plans (see `docs/AGENTS.md`) |
-| `tools/` | Standalone utility scripts (see `tools/AGENTS.md`) |
-| `plugin/` | Claude Code plugin with MCP bridge (see `plugin/AGENTS.md`) |
 | `examples/` | Example projects for testing (see `examples/AGENTS.md`) |
 | `assets/` | Static assets — logos, images (see `assets/AGENTS.md`) |
 | `.github/` | GitHub Actions workflows, issue templates (see `.github/AGENTS.md`) |
@@ -38,9 +36,9 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 ### Working In This Directory
 - This is a **pnpm monorepo** — always use `pnpm` (not npm/yarn)
 - Package aliases: `@codeagora/shared`, `@codeagora/core`, `@codeagora/cli`, etc.
-- Build all packages: `pnpm build` (uses tsup per-package)
-- Type-check: `pnpm typecheck` (root) or `pnpm typecheck:ws` (all workspaces)
-- Run CLI in dev: `pnpm dev` or `pnpm cli`
+- Build workspace packages: `pnpm build` (runs recursive package builds)
+- Type-check package sources: `pnpm typecheck`
+- Run CLI in dev: `pnpm dev <command>`
 
 ### Architecture Overview
 ```
@@ -57,7 +55,7 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 
 ### Testing Requirements
 - Tests are in `src/tests/` (not colocated with source)
-- Run: `pnpm test` (root vitest) or `pnpm test:ws` (all workspaces)
+- Run: `pnpm test` (root Vitest config includes root and package-local tests)
 - E2E tests use `forks` pool; unit tests use default pool
 - Coverage targets the active workspace packages under `packages/*`
 
