@@ -11,6 +11,7 @@ import type { GitHubConfig } from './client.js';
 import { createOctokit } from './client.js';
 import type { GitHubReview, PostResult } from './types.js';
 import { findPriorReviews, dismissPriorReviews } from './dedup.js';
+import { redactSecrets } from '@codeagora/shared/utils/redaction.js';
 
 /** Maximum inline comments per review (GitHub's practical limit). */
 const MAX_COMMENTS_PER_REVIEW = 50;
@@ -132,6 +133,11 @@ async function postReviewWithRetry(
   review: GitHubReview,
   inlineComments: Array<{ path: string; position: number; body: string }>,
 ): Promise<{ id: number; html_url: string }> {
+  const safeReview = redactGitHubReview(review);
+  const safeInlineComments = inlineComments.map((comment) => ({
+    ...comment,
+    body: redactSecrets(comment.body),
+  }));
   // Effective review may be downgraded below (APPROVE → COMMENT) if the token
   // lacks approval permission. `effectiveEvent` is the event used for all
   // downstream posts once that downgrade decision is made.
@@ -142,10 +148,10 @@ async function postReviewWithRetry(
       owner: config.owner,
       repo: config.repo,
       pull_number: prNumber,
-      commit_id: review.commit_id,
+      commit_id: safeReview.commit_id,
       event: effectiveEvent,
-      body: review.body,
-      comments: inlineComments,
+      body: safeReview.body,
+      comments: safeInlineComments,
     });
     return response.data;
   } catch (err: unknown) {
@@ -162,10 +168,10 @@ async function postReviewWithRetry(
           owner: config.owner,
           repo: config.repo,
           pull_number: prNumber,
-          commit_id: review.commit_id,
+          commit_id: safeReview.commit_id,
           event: effectiveEvent,
-          body: review.body,
-          comments: inlineComments,
+          body: safeReview.body,
+          comments: safeInlineComments,
         });
         return response.data;
       } catch (retryErr: unknown) {
@@ -175,7 +181,7 @@ async function postReviewWithRetry(
     }
 
     // 422: at least one comment has a bad position — bisect to find valid ones
-    const totalCount = inlineComments.length;
+    const totalCount = safeInlineComments.length;
     if (totalCount === 0) {
       // No comments to bisect — post without inline comments
       const response = await createReviewWithRateLimit(kit, {
@@ -193,7 +199,7 @@ async function postReviewWithRetry(
     console.warn(`[GitHub] 422 error with ${totalCount} inline comment(s). Attempting bisection retry to preserve valid comments.`);
 
     // Bisect: try each half independently, collect survivors
-    const survivors = await bisectComments(kit, config, prNumber, review, inlineComments);
+    const survivors = await bisectComments(kit, config, prNumber, safeReview, safeInlineComments);
     const droppedCount = totalCount - survivors.length;
 
     if (droppedCount > 0) {
@@ -205,13 +211,24 @@ async function postReviewWithRetry(
       owner: config.owner,
       repo: config.repo,
       pull_number: prNumber,
-      commit_id: review.commit_id,
+      commit_id: safeReview.commit_id,
       event: effectiveEvent,
-      body: review.body,
+      body: safeReview.body,
       comments: survivors,
     });
     return response.data;
   }
+}
+
+function redactGitHubReview(review: GitHubReview): GitHubReview {
+  return {
+    ...review,
+    body: redactSecrets(review.body),
+    comments: review.comments.map((comment) => ({
+      ...comment,
+      body: redactSecrets(comment.body),
+    })),
+  };
 }
 
 /**
@@ -285,6 +302,7 @@ export async function postReview(
   octokit?: Octokit,
 ): Promise<PostResult> {
   const kit = octokit ?? createOctokit(config);
+  const safeReview = redactGitHubReview(review);
 
   // Step 1: Dismiss prior reviews
   const priorIds = await findPriorReviews(config, prNumber, kit);
@@ -293,7 +311,7 @@ export async function postReview(
   }
 
   // Step 2: Sort by severity (highest first) and truncate to limit
-  const sortedComments = [...review.comments].sort(
+  const sortedComments = [...safeReview.comments].sort(
     (a, b) => extractSeverityPriority(a.body) - extractSeverityPriority(b.body),
   );
   if (sortedComments.length > MAX_COMMENTS_PER_REVIEW) {
@@ -311,7 +329,7 @@ export async function postReview(
     }));
 
   // Step 3: Post the review with retry logic for 422 (bisection) and 429 (rate limit)
-  const data = await postReviewWithRetry(kit, config, prNumber, review, inlineComments);
+  const data = await postReviewWithRetry(kit, config, prNumber, safeReview, inlineComments);
 
   // Step 4: Post file-level comments as individual issue comments
   const fileLevelComments = comments.filter((c) => c.position === undefined);
@@ -328,9 +346,9 @@ export async function postReview(
 
   // Determine verdict from event and body content
   let verdict: PostResult['verdict'];
-  if (review.event === 'REQUEST_CHANGES') {
+  if (safeReview.event === 'REQUEST_CHANGES') {
     verdict = 'REJECT';
-  } else if (review.body.includes('NEEDS HUMAN REVIEW')) {
+  } else if (safeReview.body.includes('NEEDS HUMAN REVIEW')) {
     verdict = 'NEEDS_HUMAN';
   } else {
     verdict = 'ACCEPT';
