@@ -23,6 +23,7 @@ These documents guide both strategic decision-making and tactical implementation
 | `ARCHITECTURE.md` | Current system architecture — 10-stage pipeline, component boundaries, data flow, tech stack. | Engineers, architects |
 | `5_GITHUB_INTEGRATION.md` | GitHub Integration Specification. PR comment formatting, GitHub Actions workflow, SARIF output structure, UX mockups, API mappings. | Backend/CLI engineers, DevOps |
 | `MAD_RESEARCH_AND_IMPROVEMENTS.md` | Multi-Agent Debate Research & Roadmap. Academic foundations (NeurIPS 2025, X-MAS, Free-MAD), current state analysis, improvement roadmap. | Architects, research engineers |
+| `PRODUCTION_READINESS_ROADMAP.md` | Production-readiness gates for CLI, GitHub Actions, MCP, benchmarks, security, packaging, and desktop sequencing. | Maintainers, release owners |
 
 ## Archive
 
