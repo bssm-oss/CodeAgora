@@ -31,7 +31,8 @@
     "codeagora-mcp": "./dist/index.js"
   },
   "files": [
-    "dist/**/*.js"
+    "dist/**/*.js",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup",
