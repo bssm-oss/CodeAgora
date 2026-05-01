@@ -31,12 +31,10 @@ export default defineConfig({
   clean: true,
   bundle: true,
   splitting: false,
-  noExternal: [/^@codeagora\/(core|shared)/],
+  noExternal: [/^@codeagora\/(core|shared|cli|github)/],
   external: [
     /^@ai-sdk\//,
     /^@openrouter\//,
-    /^@codeagora\/cli/,
-    /^@codeagora\/github/,
     '@modelcontextprotocol/sdk',
     'ai',
     'zod',

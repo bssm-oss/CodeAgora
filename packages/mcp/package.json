@@ -39,10 +39,29 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/baseten": "^1.0.38",
+    "@ai-sdk/cohere": "^3.0.25",
+    "@ai-sdk/deepinfra": "^2.0.39",
+    "@ai-sdk/fireworks": "^2.0.40",
+    "@ai-sdk/google": "^3.0.43",
+    "@ai-sdk/groq": "^3.0.29",
+    "@ai-sdk/huggingface": "^1.0.37",
+    "@ai-sdk/moonshotai": "^2.0.10",
+    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai-compatible": "^2.0.35",
+    "@ai-sdk/perplexity": "^3.0.23",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@openrouter/ai-sdk-provider": "^2.3.1",
+    "ai": "^6.0.116",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.8.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@codeagora/cli": "workspace:*",
     "@codeagora/core": "workspace:*",
+    "@codeagora/github": "workspace:*",
     "@codeagora/shared": "workspace:*"
   }
 }

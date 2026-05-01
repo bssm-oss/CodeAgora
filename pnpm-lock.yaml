@@ -207,13 +207,70 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@ai-sdk/anthropic':
+        specifier: ^3.0.58
+        version: 3.0.58(zod@3.25.76)
+      '@ai-sdk/baseten':
+        specifier: ^1.0.38
+        version: 1.0.38(zod@3.25.76)
+      '@ai-sdk/cohere':
+        specifier: ^3.0.25
+        version: 3.0.25(zod@3.25.76)
+      '@ai-sdk/deepinfra':
+        specifier: ^2.0.39
+        version: 2.0.39(zod@3.25.76)
+      '@ai-sdk/fireworks':
+        specifier: ^2.0.40
+        version: 2.0.40(zod@3.25.76)
+      '@ai-sdk/google':
+        specifier: ^3.0.43
+        version: 3.0.43(zod@3.25.76)
+      '@ai-sdk/groq':
+        specifier: ^3.0.29
+        version: 3.0.29(zod@3.25.76)
+      '@ai-sdk/huggingface':
+        specifier: ^1.0.37
+        version: 1.0.37(zod@3.25.76)
+      '@ai-sdk/moonshotai':
+        specifier: ^2.0.10
+        version: 2.0.10(zod@3.25.76)
+      '@ai-sdk/openai':
+        specifier: ^3.0.41
+        version: 3.0.41(zod@3.25.76)
+      '@ai-sdk/openai-compatible':
+        specifier: ^2.0.35
+        version: 2.0.35(zod@3.25.76)
+      '@ai-sdk/perplexity':
+        specifier: ^3.0.23
+        version: 3.0.23(zod@3.25.76)
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.27.1(zod@3.25.76)
+      '@openrouter/ai-sdk-provider':
+        specifier: ^2.3.1
+        version: 2.3.1(ai@6.0.116(zod@3.25.76))(zod@3.25.76)
+      ai:
+        specifier: ^6.0.116
+        version: 6.0.116(zod@3.25.76)
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
+      yaml:
+        specifier: ^2.8.2
+        version: 2.8.2
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
+      '@codeagora/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@codeagora/core':
         specifier: workspace:*
         version: link:../core
+      '@codeagora/github':
+        specifier: workspace:*
+        version: link:../github
       '@codeagora/shared':
         specifier: workspace:*
         version: link:../shared
