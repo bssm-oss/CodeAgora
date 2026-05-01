@@ -34,6 +34,7 @@ Superseded documents are in `archive/` — kept for historical reference, not no
 | `archive/web-ux-expansion-roadmap.md` | Sprint 7 web/UX roadmap; features since implemented |
 | `archive/audit-2026-04.md` | April 2026 documentation audit; findings applied, now stale |
 | `archive/session-report-2026-04-01.md` | Development session log for 2026-04-01 |
+| `archive/ko/` | Archived Korean translations moved out of the root; English root docs are canonical |
 
 ## For AI Agents
 
