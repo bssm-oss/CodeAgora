@@ -56,9 +56,14 @@ interface ReviewOptions {
 // Action handler
 // ============================================================================
 
+function isConfigNotFoundError(error: Error): boolean {
+  return error.message.includes('Config file not found');
+}
+
 async function reviewAction(diffPath: string | undefined, options: ReviewOptions): Promise<void> {
   // Hoist stdinTmpPath so finally block can clean it up (#77)
   let stdinTmpPath: string | undefined;
+  let resolvedDiffContent: string | undefined;
   try {
     if (options.quiet && options.verbose) {
       options.verbose = false; // --quiet takes precedence
@@ -138,6 +143,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       await fs.mkdir(tmpDir, { recursive: true });
       stdinTmpPath = path.join(tmpDir, `tmp-pr-${ghConfig.prNumber}-${Date.now()}.patch`);
       await fs.writeFile(stdinTmpPath, prInfo.diff);
+      resolvedDiffContent = prInfo.diff;
       resolvedPath = stdinTmpPath;
 
       // Save PR context for --post-review
@@ -166,6 +172,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       stdinTmpPath = path.join(process.cwd(), '.ca', `tmp-stdin-${Date.now()}.patch`);
       await fs.mkdir(path.dirname(stdinTmpPath), { recursive: true });
       await fs.writeFile(stdinTmpPath, stdinContent);
+      resolvedDiffContent = stdinContent;
       resolvedPath = stdinTmpPath;
     } else if (diffPath) {
       resolvedPath = path.resolve(diffPath);
@@ -174,7 +181,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       process.exit(2);
     }
 
-    // Check diff file exists
+    // Check diff file exists and contains reviewable content.
     try {
       await fs.access(resolvedPath);
     } catch {
@@ -182,10 +189,20 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       process.exit(2);
     }
 
+    resolvedDiffContent ??= await fs.readFile(resolvedPath, 'utf-8');
+    if (!resolvedDiffContent.trim()) {
+      console.error(t('cli.error.emptyDiff'));
+      process.exit(2);
+    }
+
     // Zero-config: if no config exists, try inline setup
     try {
       await loadConfig();
-    } catch {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      if (!isConfigNotFoundError(error)) {
+        throw error;
+      }
       const { detectAvailableProvider, runInlineSetup } = await import('../utils/inline-setup.js');
       const existing = detectAvailableProvider();
       if (existing) {
@@ -210,7 +227,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
 
     if (options.dryRun) {
       const config = await loadConfig();
-      const diffContent = await fs.readFile(resolvedPath, 'utf-8');
+      const diffContent = resolvedDiffContent;
       const report = await dryRun(config, diffContent);
 
       if (options.output === 'json') {

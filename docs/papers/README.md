@@ -66,10 +66,10 @@
 | 25 | Pre-review Impact Analysis | 리뷰 전에 diff의 성격과 영향 범위를 어떻게 추정할 수 있는가? | `packages/core/src/pipeline/analyzers/diff-classifier.ts`, `packages/core/src/pipeline/analyzers/impact-analyzer.ts` | 독립 논문 또는 01 보강 |
 | 26 | Session-Centric Review Platform | CLI, MCP, desktop surface를 session model 하나로 묶을 수 있는가? | `packages/core/src/session/manager.ts`, `packages/cli/src/commands/sessions.ts`, `packages/mcp/src/index.ts`, `packages/desktop/src/api/desktop-bridge.ts` | 독립 논문 권장 |
 | 27 | Finding-to-PR Position Mapping | LLM finding을 GitHub PR diff 위치에 안정적으로 매핑하려면 무엇이 필요한가? | `packages/github/src/diff-parser.ts`, `packages/github/src/mapper.ts`, `packages/shared/src/utils/issue-mapper.ts` | 20 보강 또는 독립 논문 |
-| 28 | Review Event Streaming | multi-agent review pipeline의 진행 상황을 외부 채널로 어떻게 흘릴 수 있는가? | `packages/notifications/src/webhook.ts`, `packages/notifications/src/event-stream.ts`, `packages/web/src/server/ws.ts` | 19/03 보강 또는 독립 문서 |
+| 28 | Review Event Streaming | multi-agent review pipeline의 진행 상황을 desktop-local UI나 향후 plugin integration으로 어떻게 흘릴 수 있는가? | `packages/core/src/pipeline/progress.ts`, `packages/desktop/src/api/desktop-bridge.ts` | 19/03 보강 또는 독립 문서 |
 | 29 | Learning Rules and Review Memory | 조직별 규칙과 학습된 패턴을 리뷰 파이프라인에 어떻게 주입할 수 있는가? | `packages/core/src/learning/store.ts`, `packages/core/src/rules/loader.ts` | 독립 논문 후보 |
-| 30 | Terminal Review Cockpit | 터미널 UI가 코드 리뷰 setup, progress, diff, debate 탐색을 어디까지 지원할 수 있는가? | `packages/tui/src/screens/ReviewSetupScreen.tsx`, `packages/tui/src/screens/PipelineScreen.tsx`, `packages/tui/src/components/DiffViewer.tsx` | UX case study |
-| 31 | Web Dashboard Observability | web dashboard와 WebSocket이 multi-agent review observability를 어떻게 제공하는가? | `packages/web/src/server/index.ts`, `packages/web/src/server/routes/review.ts`, `packages/web/src/frontend/hooks/usePipelineEvents.ts` | 03/19 보강 또는 독립 논문 |
+| 30 | Desktop Review Cockpit | desktop UI가 코드 리뷰 setup, progress, diff, debate 탐색을 어디까지 지원할 수 있는가? | `packages/desktop/src/main.ts`, `packages/desktop/src/api/desktop-bridge.ts`, `docs/DESKTOP_APP_CONSOLIDATION.md` | UX case study |
+| 31 | Desktop Observability | desktop UI가 multi-agent review observability를 어떻게 제공하는가? | `packages/desktop/src/main.ts`, `packages/desktop/src/api/desktop-bridge.ts`, `docs/DESKTOP_APP_CONSOLIDATION.md` | 03/19 보강 또는 독립 논문 |
 | 32 | Package Surface Governance | public package surface를 release engineering의 API contract로 관리할 수 있는가? | `.github/workflows/release.yml`, `action.yml`, `package.json`, `docs/release-alpha2-paper.md` | 23 보강 |
 
 ### 추가 후보 우선순위
@@ -78,7 +78,7 @@
 2. **25 Pre-review Impact Analysis**: LLM 호출 이전의 deterministic analysis 계층을 보여준다. hallucination filtering과 함께 “LLM 이전/이후 guardrail” 논문으로 묶을 수 있다.
 3. **27 Finding-to-PR Position Mapping**: GitHub 통합의 어려운 핵심 문제다. LLM output을 실제 review comment 위치로 옮기는 practical systems contribution이다.
 4. **29 Learning Rules and Review Memory**: 조직별 리뷰 정책과 장기 학습을 연결할 수 있어, 향후 CodeAgora의 차별점이 될 수 있다.
-5. **31 Web Dashboard Observability**: multi-agent review를 사람이 이해 가능한 runtime으로 보여주는 UX/observability 논문 후보다.
+5. **31 Desktop Observability**: multi-agent review를 사람이 이해 가능한 local runtime으로 보여주는 UX/observability 논문 후보다.
 
 ---
 
@@ -102,9 +102,9 @@
 
 ### 3. 멀티 인터페이스 코드 리뷰 플랫폼
 
-- **핵심 질문**: CLI, GitHub Action, MCP, TUI, Web dashboard를 하나의 코드 리뷰 경험으로 통합하려면 어떤 경계가 필요한가?
+- **핵심 질문**: CLI, GitHub Action, MCP, desktop app을 하나의 코드 리뷰 경험으로 통합하려면 어떤 경계가 필요한가?
 - **기여**: 동일한 파이프라인을 여러 사용자 인터페이스로 노출하는 distribution architecture.
-- **근거/소스**: `docs/EXTENSIONS.md`, `docs/WEB_API.md`, `docs/5_GITHUB_INTEGRATION.md`, `docs/6_WEB_AND_UX_EXPANSION.md`.
+- **근거/소스**: `docs/EXTENSIONS.md`, `docs/DESKTOP_APP_CONSOLIDATION.md`, `docs/5_GITHUB_INTEGRATION.md`, `docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md`.
 - **필요 평가**: 인터페이스별 사용 시나리오, 동일 세션 재사용성, UX friction 분석.
 - **우선순위**: P2.
 
@@ -252,7 +252,7 @@
 
 - **핵심 질문**: 자동 코드 리뷰가 왜 특정 finding을 채택·기각했는지 추적 가능한가?
 - **기여**: session history, `explain_session`, confidence trace viewer, discussion trace, top issue provenance.
-- **근거/소스**: `docs/EXTENSIONS.md`, `docs/WEB_API.md`, `src/tests/cli-sessions*`, `src/tests/session*`, `src/tests/confidence*`.
+- **근거/소스**: `docs/EXTENSIONS.md`, `docs/DESKTOP_APP_CONSOLIDATION.md`, `src/tests/cli-sessions*`, `src/tests/session*`, `src/tests/confidence*`.
 - **필요 평가**: explanation usefulness, debugging time reduction, human reviewer agreement.
 - **우선순위**: P2.
 
@@ -345,12 +345,12 @@
 - `docs/1_PRD.md`
 - `docs/3_V3_DESIGN.md`
 - `docs/5_GITHUB_INTEGRATION.md`
-- `docs/6_WEB_AND_UX_EXPANSION.md`
+- `docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md`
 - `docs/MAD_RESEARCH_AND_IMPROVEMENTS.md`
 - `docs/HALLUCINATION_FILTER_DESIGN.md`
 - `docs/PROVIDERS.md`
 - `docs/EXTENSIONS.md`
-- `docs/WEB_API.md`
+- `docs/DESKTOP_APP_CONSOLIDATION.md`
 - `docs/release-alpha2-paper.md`
 - `benchmarks/golden-bugs/`
 - `src/tests/`

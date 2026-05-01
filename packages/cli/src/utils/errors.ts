@@ -4,6 +4,7 @@
 
 import { statusColor, dim } from './colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
+import { redactSecrets } from '@codeagora/shared/utils/redaction.js';
 
 export type CliExitCode = 1 | 2 | 3;
 
@@ -32,13 +33,13 @@ function getErrorHint(msg: string): string | undefined {
 export function formatError(error: Error, verbose: boolean): string {
   const hint = getErrorHint(error.message);
   const lines: string[] = [];
-  lines.push(statusColor.fail(`Error: ${error.message}`));
+  lines.push(statusColor.fail(`Error: ${redactSecrets(error.message)}`));
   if (hint) {
     lines.push(dim(`Hint: ${hint}`));
   }
   if (verbose) {
     lines.push('');
-    lines.push(dim(error.stack ?? ''));
+    lines.push(dim(redactSecrets(error.stack ?? '')));
   }
   return lines.join('\n');
 }
@@ -62,7 +63,13 @@ export function classifyCliErrorExitCode(error: Error): CliExitCode {
     msg.includes('empty') ||
     msg.includes('syntax') ||
     msg.includes('json') ||
-    msg.includes('yaml')
+    msg.includes('yaml') ||
+    msg.includes('api key') ||
+    msg.includes('no-api-key') ||
+    msg.includes('missing key') ||
+    msg.includes('not set') ||
+    msg.includes('credential') ||
+    msg.includes('environment variable')
   ) {
     return 2;
   }

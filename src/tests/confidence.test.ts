@@ -18,7 +18,7 @@ const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
 });
 
 describe('computeL1Confidence', () => {
-  it('returns 72 when 3/5 reviewers flag same location (corroboration boost)', () => {
+  it('returns 60 when 3/5 reviewers flag same location without meaningful evidence', () => {
     const doc = makeDoc({ filePath: 'src/foo.ts', lineRange: [10, 12] });
     const allDocs = [
       makeDoc({ filePath: 'src/foo.ts', lineRange: [10, 12] }),
@@ -27,8 +27,8 @@ describe('computeL1Confidence', () => {
       makeDoc({ filePath: 'src/bar.ts', lineRange: [10, 12] }), // different file
       makeDoc({ filePath: 'src/foo.ts', lineRange: [50, 55] }), // different line
     ];
-    // 3/5 = 60% base → ×1.2 corroboration boost = 72
-    expect(computeL1Confidence(doc, allDocs, 5)).toBe(72);
+    // 3/5 = 60% base, but no evidence → no strong corroboration boost
+    expect(computeL1Confidence(doc, allDocs, 5)).toBe(60);
   });
 
   it('returns 100 when all reviewers flag same location', () => {
@@ -66,8 +66,8 @@ describe('computeL1Confidence', () => {
       makeDoc({ filePath: 'src/foo.ts', lineRange: [5, 7] }),   // -5 → in range
       makeDoc({ filePath: 'src/foo.ts', lineRange: [16, 18] }), // +6 → out of range
     ];
-    // 3 agree (10, 15, 5 all within ±5 of 10), 3/4 = 75% → ×1.2 boost = 90
-    expect(computeL1Confidence(doc, allDocs, 4)).toBe(90);
+    // 3 agree (10, 15, 5 all within ±5 of 10), 3/4 = 75%, but no evidence → no boost
+    expect(computeL1Confidence(doc, allDocs, 4)).toBe(75);
   });
 });
 
