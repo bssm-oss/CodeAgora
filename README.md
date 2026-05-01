@@ -179,6 +179,7 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 | [Agent Contract](docs/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
 | [FAQ](docs/FAQ.md) | Frequently asked questions |
+| [Archived Korean Docs](docs/archive/ko/README.md) | Historical Korean translations; English root docs are canonical |
 
 ---
 

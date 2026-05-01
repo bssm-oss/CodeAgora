@@ -1,5 +1,7 @@
+> Archived Korean translation. The English root README is canonical and more current.
+
 <p align="center">
-  <img src="assets/logo.svg" width="120" alt="CodeAgora Logo">
+  <img src="../../../assets/logo.svg" width="120" alt="CodeAgora Logo">
 </p>
 
 <h1 align="center">CodeAgora</h1>
