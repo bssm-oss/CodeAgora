@@ -1,4 +1,5 @@
 import type { EvidenceDocument } from '../types/core.js';
+import { scoreEvidence } from './evidence-scorer.js';
 
 export interface DiscussionVerdictLike {
   filePath: string;
@@ -40,8 +41,9 @@ function claimFingerprint(doc: EvidenceDocument): string {
  * was penalized as 1/5 "disagreement" even though 4 reviewers had simply
  * been silent. See #462 for context.
  *
- * Witness-based echo dampener (#468 follow-up): when 3+ co-located
- * findings exist AND a majority of them collapse to the same evidence
+ * Witness-based corroboration gates (#468 follow-up): when 3+ co-located
+ * findings exist, apply the strong boost only if at least two witnesses have
+ * meaningful evidence. If a majority also collapse to the same evidence
  * fingerprint, the "agreement" is almost certainly multiple reviewers
  * echoing the same superficial cue rather than independently
  * corroborating. Apply a ×0.75 dampener in that case.
@@ -102,8 +104,12 @@ export function computeL1Confidence(
     // penalty to reflect sample-size uncertainty.
     base = Math.round(base * 0.8);
   } else if (agreeing >= 3) {
-    // Strong corroboration boost (capped at 100)
-    base = Math.min(100, Math.round(base * 1.2));
+    const meaningfulWitnesses = coLocated.filter((d) => scoreEvidence(d) >= 0.6).length;
+    if (meaningfulWitnesses >= 2) {
+      // Strong corroboration boost (capped at 100) only when the witnesses
+      // carry concrete, independently checkable evidence.
+      base = Math.min(100, Math.round(base * 1.2));
+    }
   }
 
   // Echo-detection dampener (#468 follow-up, research note #5): if the

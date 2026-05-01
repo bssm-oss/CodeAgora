@@ -42,31 +42,34 @@ describe('witness-based echo dampener', () => {
       makeDoc({ confidence: 80, evidence: echoed }),
       makeDoc({ confidence: 80, evidence: echoed }),
     ];
-    // agreeing=3, activeReviewers=3 → normal boost path (×1.2 on blend)
-    // blend = round(80*0.6 + 100*0.4) = 88
-    // boost = min(100, round(88 * 1.2)) = 100 (capped)
-    // echo dampener = round(100 * 0.75) = 75
+    // agreeing=3, activeReviewers=3 → blend = round(80*0.6 + 100*0.4) = 88.
+    // Evidence is too weak for the strong boost, but the echo dampener still
+    // catches the correlated cascade: round(88 * 0.75) = 66.
     const result = computeL1Confidence(doc, allDocs, 3);
-    expect(result).toBe(75);
+    expect(result).toBe(66);
   });
 
-  it('3 distinct evidence strings → dampener stays off', () => {
+  it('3 distinct strong evidence strings → boost applies and dampener stays off', () => {
+    const strongProblem =
+      'At `src/foo.ts:10`, `readBuffer(input)` indexes into `buffer[offset]` before checking `offset < buffer.length`. ' +
+      'The caller `parseFrame(input)` passes user-controlled frame offsets directly into this helper, so malformed frames can ' +
+      'read beyond the validated range. Line 12 only checks the payload length after the unsafe access has already happened.';
     const doc = makeDoc({
       confidence: 80,
+      problem: strongProblem,
       evidence: ['line 10 reads the buffer without bounds check'],
     });
     const allDocs = [
-      makeDoc({ confidence: 80, evidence: ['line 10 reads the buffer without bounds check'] }),
-      makeDoc({ confidence: 80, evidence: ['the caller in src/parse.ts:42 passes untrusted input'] }),
-      makeDoc({ confidence: 80, evidence: ['adjacent unit test at line 55 covers only short inputs'] }),
+      makeDoc({ confidence: 80, problem: strongProblem, evidence: ['line 10 reads the buffer without bounds check'] }),
+      makeDoc({ confidence: 80, problem: strongProblem, evidence: ['the caller in src/parse.ts:42 passes untrusted input'] }),
+      makeDoc({ confidence: 80, problem: strongProblem, evidence: ['adjacent unit test at line 55 covers only short inputs'] }),
     ];
-    // Each reviewer has distinct evidence → 3 distinct fingerprints → no dampener
-    // Full boost path applies.
+    // Each reviewer has distinct, meaningful evidence → boost path applies.
     const result = computeL1Confidence(doc, allDocs, 3);
     expect(result).toBe(100);
   });
 
-  it('2 identical evidence + 1 distinct → dampener stays off (need 3+ with evidence)', () => {
+  it('2 identical weak evidence + 1 distinct → no boost and dampener stays off', () => {
     const echo = ['same concern phrased the same way'];
     const doc = makeDoc({ confidence: 80, evidence: echo });
     const allDocs = [
@@ -74,10 +77,10 @@ describe('witness-based echo dampener', () => {
       makeDoc({ confidence: 80, evidence: echo }),
       makeDoc({ confidence: 80, evidence: ['a totally different angle on the same bug'] }),
     ];
-    // withEvidence.length = 3, fingerprints = [echo, echo, distinct], distinctCount = 2.
-    // Math.floor(3/2) = 1. 2 > 1 → dampener does NOT fire.
+    // Evidence quality is too weak for the strong boost. The echo dampener also
+    // does not fire because fingerprints = [echo, echo, distinct], distinctCount = 2.
     const result = computeL1Confidence(doc, allDocs, 3);
-    expect(result).toBe(100);
+    expect(result).toBe(88);
   });
 
   it('3 identical but fingerprints trimmed to first 80 chars — long identical prefixes still collapse', () => {
@@ -91,19 +94,19 @@ describe('witness-based echo dampener', () => {
       makeDoc({ confidence: 80, evidence: [longA] }),
     ];
     const result = computeL1Confidence(doc, allDocs, 3);
-    expect(result).toBe(75); // dampener fires
+    expect(result).toBe(66); // no boost, dampener fires
   });
 
-  it('empty evidence lists across the board → dampener stays off (matches existing test suite)', () => {
+  it('empty evidence lists across the board → no boost and dampener stays off', () => {
     const doc = makeDoc({ confidence: 80, evidence: [] });
     const allDocs = [
       makeDoc({ confidence: 80, evidence: [] }),
       makeDoc({ confidence: 80, evidence: [] }),
       makeDoc({ confidence: 80, evidence: [] }),
     ];
-    // No evidence → not eligible for echo detection → full boost
+    // No evidence → not eligible for strong corroboration boost or echo detection.
     const result = computeL1Confidence(doc, allDocs, 3);
-    expect(result).toBe(100);
+    expect(result).toBe(88);
   });
 
   it('echo dampener composes with dissent penalty (not both apply: dissent needs agreeing=1)', () => {

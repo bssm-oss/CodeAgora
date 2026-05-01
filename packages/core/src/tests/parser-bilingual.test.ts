@@ -261,7 +261,7 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     expect(result).toBe(39);
   });
 
-  it('triple corroboration (3/5) → confidence × 1.2', () => {
+  it('triple corroboration (3/5) without meaningful evidence → no boost', () => {
     const doc = makeDoc('src/foo.ts', 10, 80);
     const allDocs = [
       makeDoc('src/foo.ts', 10),
@@ -272,9 +272,9 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     ];
     // agreeing = 3, totalReviewers = 5, agreementRate = 60
     // base = Math.round(80 * 0.6 + 60 * 0.4) = Math.round(48 + 24) = 72
-    // boost: Math.round(72 * 1.2) = 86
+    // no meaningful evidence → no boost
     const result = computeL1Confidence(doc, allDocs, 5);
-    expect(result).toBe(86);
+    expect(result).toBe(72);
   });
 
   it('all reviewers agree (5/5) → confidence × 1.2 (capped at 100)', () => {
@@ -409,7 +409,7 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     expect(result).toBe(28);
   });
 
-  it('corroborated CRITICAL (3/5) → no extra penalty (boost path only)', () => {
+  it('corroborated CRITICAL (3/5) without meaningful evidence → no extra penalty and no boost', () => {
     const doc = makeCriticalDoc('src/foo.ts', 10, 80, 'CRITICAL');
     const allDocs = [
       makeCriticalDoc('src/foo.ts', 10, undefined, 'CRITICAL'),
@@ -418,10 +418,10 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
       makeDoc('src/bar.ts', 100),
       makeDoc('src/baz.ts', 200),
     ];
-    // agreeing = 3 → boost path, lonely-HS not triggered
-    // base = 72, boost = 86 (from earlier test)
+    // agreeing = 3 → lonely-HS not triggered; no meaningful evidence → no boost
+    // base = 72 (from earlier test)
     const result = computeL1Confidence(doc, allDocs, 5);
-    expect(result).toBe(86);
+    expect(result).toBe(72);
   });
 
   // -------------------------------------------------------------------------
@@ -481,9 +481,9 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     // agreeing = 3 (all within ±5 of line 10), activeReviewers = 1
     // raw rate = 300 → clamped to 100
     // base = round(80 * 0.6 + 100 * 0.4) = round(48 + 40) = 88
-    // agreeing=3 hits BOOST branch (>= 3) → min(100, round(88 * 1.2)) = 100
+    // no meaningful evidence → no boost despite duplicate co-location
     const result = computeL1Confidence(doc, allDocs, 1, 100);
-    expect(result).toBe(100);
+    expect(result).toBe(88);
     expect(result).toBeLessThanOrEqual(100); // invariant
   });
 
