@@ -1,3 +1,4 @@
+import path from 'path';
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
 import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
@@ -122,12 +123,26 @@ export async function validateActionDiffPath(
   let lastError = 'Path is outside allowed roots';
 
   for (const root of allowedRoots) {
+    if (!isInputPathUnderRoot(diffPath, root)) {
+      continue;
+    }
+
     const validation = await validatePathWithinRoot(diffPath, root);
     if (validation.success) {
       return validation.data;
     }
     lastError = validation.error;
+    break;
   }
 
   throw new Error(`Action diff path rejected: ${lastError}`);
+}
+
+function isInputPathUnderRoot(inputPath: string, rootDir: string): boolean {
+  const root = path.resolve(rootDir);
+  const resolved = path.isAbsolute(inputPath)
+    ? path.resolve(inputPath)
+    : path.resolve(root, inputPath);
+  const relative = path.relative(root, resolved);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
