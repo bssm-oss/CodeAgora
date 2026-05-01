@@ -1,51 +1,23 @@
 /**
- * github-action.ts parseArgs unit tests
- * Exercises the exported parseArgs function via dynamic import.
+ * GitHub Action input and policy tests.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
+import {
+  determineActionPolicy,
+  hasProviderCredentials,
+  isForkContext,
+  isStaleHead,
+  parseActionInputs,
+} from '@codeagora/github/action-policy.js';
 
-// parseArgs reads process.env.GITHUB_TOKEN — set it before importing
 const TOKEN = 'test-token-123';
 
-// We test parseArgs by re-implementing it inline (it is not exported),
-// so we copy the function signature from the source for isolated unit testing.
-
-function parseArgs(argv: string[], token: string): {
-  diff: string;
-  pr: number;
-  sha: string;
-  repo: string;
-  token: string;
-  failOnReject: boolean;
-  maxDiffLines: number;
-} {
-  const args: Record<string, string> = {};
-  for (let i = 2; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--') && i + 1 < argv.length) {
-      args[arg.slice(2)] = argv[i + 1];
-      i++;
-    }
-  }
-
-  const diff = args['diff'];
-  const pr = parseInt(args['pr'] ?? '', 10);
-  const sha = args['sha'] ?? '';
-  const repo = args['repo'] ?? '';
-  const failOnReject = args['fail-on-reject'] === 'true';
-  const maxDiffLines = parseInt(args['max-diff-lines'] ?? '5000', 10);
-
-  if (!diff) throw new Error('--diff is required');
-  if (isNaN(pr)) throw new Error('--pr must be a valid number');
-  if (!sha) throw new Error('--sha is required');
-  if (!repo || !repo.includes('/')) throw new Error('--repo must be in owner/repo format');
-  if (!token) throw new Error('GITHUB_TOKEN environment variable is required');
-
-  return { diff, pr, sha, repo, token, failOnReject, maxDiffLines };
+function env(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return { ...overrides };
 }
 
-describe('github-action parseArgs', () => {
+describe('github-action parseActionInputs', () => {
   const validArgv = [
     'node', 'github-action.js',
     '--diff', '/tmp/pr.diff',
@@ -55,7 +27,7 @@ describe('github-action parseArgs', () => {
   ];
 
   it('parses valid arguments correctly', () => {
-    const result = parseArgs(validArgv, TOKEN);
+    const result = parseActionInputs(validArgv, env({ GITHUB_TOKEN: TOKEN }));
     expect(result.diff).toBe('/tmp/pr.diff');
     expect(result.pr).toBe(42);
     expect(result.sha).toBe('abc123');
@@ -63,41 +35,123 @@ describe('github-action parseArgs', () => {
     expect(result.token).toBe(TOKEN);
     expect(result.failOnReject).toBe(false);
     expect(result.maxDiffLines).toBe(5000);
+    expect(result.postResults).toBe(true);
   });
 
-  it('parses --fail-on-reject true correctly', () => {
-    const argv = [...validArgv, '--fail-on-reject', 'true'];
-    const result = parseArgs(argv, TOKEN);
+  it('parses production-path metadata and posting controls', () => {
+    const result = parseActionInputs([
+      ...validArgv,
+      '--fail-on-reject', 'true',
+      '--max-diff-lines', '1000',
+      '--post-results', 'false',
+      '--base-sha', 'base123',
+      '--base-repo', 'owner/repo',
+      '--head-repo', 'fork/repo',
+    ], env({ GITHUB_TOKEN: TOKEN }));
+
     expect(result.failOnReject).toBe(true);
-  });
-
-  it('parses custom --max-diff-lines', () => {
-    const argv = [...validArgv, '--max-diff-lines', '1000'];
-    const result = parseArgs(argv, TOKEN);
     expect(result.maxDiffLines).toBe(1000);
+    expect(result.postResults).toBe(false);
+    expect(result.baseSha).toBe('base123');
+    expect(result.baseRepo).toBe('owner/repo');
+    expect(result.headRepo).toBe('fork/repo');
   });
 
   it('throws when --diff is missing', () => {
     const argv = ['node', 'github-action.js', '--pr', '1', '--sha', 'x', '--repo', 'a/b'];
-    expect(() => parseArgs(argv, TOKEN)).toThrow('--diff is required');
+    expect(() => parseActionInputs(argv, env({ GITHUB_TOKEN: TOKEN }))).toThrow('--diff is required');
   });
 
   it('throws when --pr is not a number', () => {
     const argv = ['node', 'github-action.js', '--diff', 'f', '--pr', 'abc', '--sha', 'x', '--repo', 'a/b'];
-    expect(() => parseArgs(argv, TOKEN)).toThrow('--pr must be a valid number');
+    expect(() => parseActionInputs(argv, env({ GITHUB_TOKEN: TOKEN }))).toThrow('--pr must be a valid number');
   });
 
   it('throws when --sha is missing', () => {
     const argv = ['node', 'github-action.js', '--diff', 'f', '--pr', '1', '--repo', 'a/b'];
-    expect(() => parseArgs(argv, TOKEN)).toThrow('--sha is required');
+    expect(() => parseActionInputs(argv, env({ GITHUB_TOKEN: TOKEN }))).toThrow('--sha is required');
   });
 
   it('throws when --repo is missing slash', () => {
     const argv = ['node', 'github-action.js', '--diff', 'f', '--pr', '1', '--sha', 'x', '--repo', 'noslash'];
-    expect(() => parseArgs(argv, TOKEN)).toThrow('--repo must be in owner/repo format');
+    expect(() => parseActionInputs(argv, env({ GITHUB_TOKEN: TOKEN }))).toThrow('--repo must be in owner/repo format');
   });
 
-  it('throws when GITHUB_TOKEN is empty', () => {
-    expect(() => parseArgs(validArgv, '')).toThrow('GITHUB_TOKEN environment variable is required');
+  it('allows missing GITHUB_TOKEN so runtime can return degraded outputs', () => {
+    const result = parseActionInputs(validArgv, env());
+    expect(result.token).toBe('');
+  });
+});
+
+describe('github-action production policy', () => {
+  const baseInputs = parseActionInputs([
+    'node', 'github-action.js',
+    '--diff', '/tmp/pr.diff',
+    '--pr', '42',
+    '--sha', 'head123',
+    '--repo', 'owner/repo',
+    '--base-repo', 'owner/repo',
+    '--head-repo', 'owner/repo',
+  ], env({ GITHUB_TOKEN: TOKEN }));
+
+  it('runs and posts for normal same-repository PRs', () => {
+    expect(determineActionPolicy(baseInputs, env({ GITHUB_TOKEN: TOKEN, GROQ_API_KEY: 'key' }))).toEqual({
+      shouldRunReview: true,
+      shouldPostResults: true,
+      degraded: false,
+    });
+  });
+
+  it('skips clearly when GitHub posting is enabled but token is missing', () => {
+    const inputs = { ...baseInputs, token: '' };
+    expect(determineActionPolicy(inputs, env())).toEqual({
+      shouldRunReview: false,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'missing-github-token',
+      verdictOverride: 'SKIPPED',
+    });
+  });
+
+  it('skips same-repository PRs without provider credentials with a clear reason', () => {
+    expect(determineActionPolicy(baseInputs, env({ GITHUB_TOKEN: TOKEN }))).toEqual({
+      shouldRunReview: false,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'missing-provider-secrets',
+      verdictOverride: 'SKIPPED',
+    });
+  });
+
+  it('skips fork PRs without provider credentials to avoid secret-dependent failures', () => {
+    const inputs = { ...baseInputs, baseRepo: 'owner/repo', headRepo: 'fork/repo' };
+    expect(isForkContext(inputs)).toBe(true);
+    expect(determineActionPolicy(inputs, env({ GITHUB_TOKEN: TOKEN }))).toEqual({
+      shouldRunReview: false,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'fork-missing-provider-secrets',
+      verdictOverride: 'SKIPPED',
+    });
+  });
+
+  it('keeps review execution but disables posting when requested', () => {
+    const inputs = { ...baseInputs, postResults: false };
+    expect(determineActionPolicy(inputs, env({ GITHUB_TOKEN: TOKEN, GROQ_API_KEY: 'key' }))).toEqual({
+      shouldRunReview: true,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'posting-disabled',
+    });
+  });
+
+  it('detects provider credentials without treating GITHUB_TOKEN as an LLM secret', () => {
+    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }))).toBe(false);
+    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN, OPENAI_API_KEY: 'sk-test' }))).toBe(true);
+  });
+
+  it('detects stale head SHAs before posting', () => {
+    expect(isStaleHead('head123', 'head123')).toBe(false);
+    expect(isStaleHead('head123', 'head456')).toBe(true);
   });
 });
