@@ -122,7 +122,7 @@ describe('review_full input schema', () => {
 });
 
 describe('explain_session input schema', () => {
-  const schema = z.object({ session: z.string() });
+  const schema = z.object({ session: z.string(), repo_path: z.string().optional() });
 
   it('accepts a valid session path', () => {
     expect(schema.safeParse({ session: '2026-03-21/001' }).success).toBe(true);
@@ -134,6 +134,10 @@ describe('explain_session input schema', () => {
 
   it('rejects numeric session', () => {
     expect(schema.safeParse({ session: 42 }).success).toBe(false);
+  });
+
+  it('accepts an explicit repo path', () => {
+    expect(schema.safeParse({ session: '2026-03-21/001', repo_path: '/tmp/repo' }).success).toBe(true);
   });
 });
 
