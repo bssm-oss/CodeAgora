@@ -10,7 +10,7 @@ import {
   shouldFailOnSeverity,
   withAgentContract,
 } from '../utils/agent-contract.js';
-import { classifyCliErrorExitCode } from '../utils/errors.js';
+import { classifyCliErrorExitCode, formatError } from '../utils/errors.js';
 
 function makeResult(overrides: Partial<PipelineResult> = {}): PipelineResult {
   return {
@@ -43,10 +43,13 @@ describe('agent contract helpers', () => {
   });
 
   it('formats JSON output with the stable schema marker', () => {
-    const parsed = JSON.parse(formatAgentJson(makeResult())) as Record<string, unknown>;
+    const output = formatAgentJson(makeResult());
+    const parsed = JSON.parse(output) as Record<string, unknown>;
     expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
     expect(parsed['sessionId']).toBe('001');
     expect(parsed['type']).toBeUndefined();
+    expect(output.trim().startsWith('{')).toBe(true);
+    expect(output.trim().endsWith('}')).toBe(true);
   });
 
   it('keeps the required JSON result fields at the top level', () => {
@@ -74,21 +77,63 @@ describe('agent contract helpers', () => {
       timestamp: 1777248000000,
     };
 
-    const parsed = JSON.parse(formatProgressNdjsonEvent(event)) as Record<string, unknown>;
+    const line = formatProgressNdjsonEvent(event);
+    const parsed = JSON.parse(line) as Record<string, unknown>;
     expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
     expect(parsed['type']).toBe('progress');
     expect(parsed['stage']).toBe('review');
     expect(parsed['event']).toBe('stage-update');
     expect(parsed['timestamp']).toBe(1777248000000);
-    expect(formatProgressNdjsonEvent(event)).not.toContain('\n');
+    expect(line).not.toContain('\n');
   });
 
   it('formats result NDJSON events with type=result', () => {
-    const parsed = JSON.parse(formatResultNdjsonEvent(makeResult())) as Record<string, unknown>;
+    const line = formatResultNdjsonEvent(makeResult());
+    const parsed = JSON.parse(line) as Record<string, unknown>;
     expect(parsed['schemaVersion']).toBe('codeagora.review.v1');
     expect(parsed['type']).toBe('result');
     expect(parsed['sessionId']).toBe('001');
-    expect(formatResultNdjsonEvent(makeResult())).not.toContain('\n');
+    expect(line).not.toContain('\n');
+  });
+
+  it('redacts secrets from JSON and NDJSON contract output without breaking parsing', () => {
+    const result = makeResult({
+      error: 'OPENAI_API_KEY=sk-secret123456789 failed',
+      summary: {
+        ...makeResult().summary!,
+        reasoning: 'token: ghp_secret123456789 should not be logged',
+      },
+      evidenceDocs: [{
+        issueTitle: 'Leaked token',
+        problem: 'password=hunter2 appears in output',
+        evidence: ['Authorization token ghp_secret123456789'],
+        severity: 'CRITICAL',
+        suggestion: 'Rotate SECRET=abc123 immediately',
+        filePath: 'src/config.ts',
+        lineRange: [1, 1],
+      }],
+    });
+
+    const jsonOutput = formatAgentJson(result);
+    const resultLine = formatResultNdjsonEvent(result);
+    const progressLine = formatProgressNdjsonEvent({
+      stage: 'review',
+      event: 'stage-error',
+      progress: 10,
+      message: 'ANTHROPIC_API_KEY=sk-secret123456789 failed',
+      timestamp: 1777248000000,
+      details: { error: 'password=hunter2' },
+    });
+
+    expect(() => JSON.parse(jsonOutput)).not.toThrow();
+    expect(() => JSON.parse(resultLine)).not.toThrow();
+    expect(() => JSON.parse(progressLine)).not.toThrow();
+    for (const output of [jsonOutput, resultLine, progressLine]) {
+      expect(output).toContain('[REDACTED]');
+      expect(output).not.toContain('sk-secret123456789');
+      expect(output).not.toContain('ghp_secret123456789');
+      expect(output).not.toContain('hunter2');
+    }
   });
 });
 
@@ -97,11 +142,25 @@ describe('CLI exit code classification', () => {
     expect(classifyCliErrorExitCode(new Error('Config file not found'))).toBe(2);
     expect(classifyCliErrorExitCode(new Error('Diff file not found'))).toBe(2);
     expect(classifyCliErrorExitCode(new Error('Invalid output format'))).toBe(2);
+    expect(classifyCliErrorExitCode(new Error('OPENAI_API_KEY not set'))).toBe(2);
+    expect(classifyCliErrorExitCode(new Error('Missing key for provider credential'))).toBe(2);
   });
 
   it('classifies runtime errors as exit code 3', () => {
     expect(classifyCliErrorExitCode(new Error('Groq rate limit exceeded'))).toBe(3);
     expect(classifyCliErrorExitCode(new Error('Reviewer timed out'))).toBe(3);
+    expect(classifyCliErrorExitCode(new Error('Pipeline failed after retries'))).toBe(3);
+  });
+
+  it('redacts secrets from formatted error messages and verbose stacks', () => {
+    const error = new Error('Failed with OPENAI_API_KEY=sk-secret123456789');
+    error.stack = 'Error: Failed with OPENAI_API_KEY=sk-secret123456789\n    at token: ghp_secret123456789';
+
+    const output = formatError(error, true);
+
+    expect(output).toContain('[REDACTED]');
+    expect(output).not.toContain('sk-secret123456789');
+    expect(output).not.toContain('ghp_secret123456789');
   });
 
   it('keeps successful reviews at exit code 0 without failure gates', () => {

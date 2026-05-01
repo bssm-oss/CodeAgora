@@ -4,6 +4,7 @@
 
 import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
 import type { ProgressEvent } from '@codeagora/core/pipeline/progress.js';
+import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 export const AGENT_CONTRACT_VERSION = 'codeagora.review.v1' as const;
 
@@ -36,9 +37,10 @@ export const REVIEW_SEVERITY_ORDER = [
 ] as const;
 
 export function withAgentContract(result: PipelineResult): AgentJsonResult {
+  const redactedResult = redactDeep(result);
   return {
     schemaVersion: AGENT_CONTRACT_VERSION,
-    ...result,
+    ...redactedResult,
   };
 }
 
@@ -47,10 +49,11 @@ export function formatAgentJson(result: PipelineResult): string {
 }
 
 export function formatProgressNdjsonEvent(event: ProgressEvent): string {
+  const redactedEvent = redactDeep(event);
   return JSON.stringify({
     schemaVersion: AGENT_CONTRACT_VERSION,
     type: 'progress',
-    ...event,
+    ...redactedEvent,
   } satisfies AgentProgressNdjsonEvent);
 }
 
