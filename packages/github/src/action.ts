@@ -16,62 +16,40 @@ import { buildDiffPositionIndex } from './diff-parser.js';
 import { mapToGitHubReview } from './mapper.js';
 import { postReview, setCommitStatus, handleNeedsHuman } from './poster.js';
 import { createAppOctokit } from './client.js';
+import { fetchPrMetadata } from './pr-diff.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
 import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
-
-// ============================================================================
-// Input Parsing
-// ============================================================================
-
-interface ActionInputs {
-  diff: string;
-  pr: number;
-  sha: string;
-  repo: string; // "owner/repo"
-  token: string;
-  failOnReject: boolean;
-  maxDiffLines: number;
-}
-
-function parseArgs(argv: string[]): ActionInputs {
-  const args: Record<string, string> = {};
-  for (let i = 2; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith('--') && i + 1 < argv.length) {
-      args[arg.slice(2)] = argv[i + 1];
-      i++;
-    }
-  }
-
-  const diff = args['diff'];
-  const pr = parseInt(args['pr'] ?? '', 10);
-  const sha = args['sha'] ?? '';
-  const repo = args['repo'] ?? '';
-  const token = process.env['GITHUB_TOKEN'] ?? '';
-  const failOnReject = args['fail-on-reject'] === 'true';
-  const maxDiffLines = parseInt(args['max-diff-lines'] ?? '5000', 10);
-
-  if (!diff) throw new Error('--diff is required');
-  if (isNaN(pr)) throw new Error('--pr must be a valid number');
-  if (!sha) throw new Error('--sha is required');
-  if (!repo || !repo.includes('/')) throw new Error('--repo must be in owner/repo format');
-  if (!token) throw new Error('GITHUB_TOKEN environment variable is required');
-
-  return { diff, pr, sha, repo, token, failOnReject, maxDiffLines };
-}
+import { determineActionPolicy, isStaleHead, parseActionInputs } from './action-policy.js';
 
 // ============================================================================
 // Main
 // ============================================================================
 
 async function main(): Promise<void> {
-  const inputs = parseArgs(process.argv);
+  const inputs = parseActionInputs(process.argv);
   const [owner, repo] = inputs.repo.split('/');
 
   if (!owner || !repo) {
     console.error('Error: --repo must be in <owner>/<repo> format');
     process.exit(1);
+  }
+
+  setActionOutput('head-sha', inputs.sha);
+  if (inputs.baseSha) setActionOutput('base-sha', inputs.baseSha);
+
+  const actionPolicy = determineActionPolicy(inputs);
+  if (actionPolicy.degraded) {
+    setActionOutput('degraded', 'true');
+    if (actionPolicy.degradedReason) setActionOutput('degraded-reason', actionPolicy.degradedReason);
+  } else {
+    setActionOutput('degraded', 'false');
+  }
+
+  if (!actionPolicy.shouldRunReview) {
+    console.log(`::warning::CodeAgora review skipped: ${actionPolicy.degradedReason ?? 'degraded'}`);
+    setActionOutput('verdict', actionPolicy.verdictOverride ?? 'SKIPPED');
+    return;
   }
 
   // Check diff line count
@@ -80,6 +58,8 @@ async function main(): Promise<void> {
     const lineCount = diffContent.split('\n').length;
     if (lineCount > inputs.maxDiffLines) {
       console.log(`::warning::Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}). Skipping review.`);
+      setActionOutput('degraded', 'true');
+      setActionOutput('degraded-reason', 'diff-too-large');
       setActionOutput('verdict', 'SKIPPED');
       return;
     }
@@ -119,11 +99,8 @@ async function main(): Promise<void> {
     ? new Map(Object.entries(result.reviewerOpinions))
     : undefined;
 
-  // Build and post review
+  // Build review payload
   const ghConfig = { token: inputs.token, owner, repo };
-  console.log('::group::Posting review to GitHub');
-
-  // Wire config.github settings to mapper (#257)
   const ghIntegration = config?.github;
   const review = mapToGitHubReview({
     summary: result.summary,
@@ -148,16 +125,45 @@ async function main(): Promise<void> {
 
   const appKit = await createAppOctokit(owner, repo);
   if (appKit) console.log('Using GitHub App authentication (CodeAgora Bot)');
-  const postResult = await postReview(ghConfig, inputs.pr, review, appKit ?? undefined);
-  await setCommitStatus(ghConfig, inputs.sha, postResult.verdict, postResult.reviewUrl);
 
-  // Handle NEEDS_HUMAN: request reviewers and add label
-  if (postResult.verdict === 'NEEDS_HUMAN') {
-    await handleNeedsHuman(ghConfig, inputs.pr, {
-      humanReviewers: ghIntegration?.humanReviewers,
-      humanTeams: ghIntegration?.humanTeams,
-      needsHumanLabel: ghIntegration?.needsHumanLabel,
-    });
+  let reviewUrl = '';
+  let postedVerdict = result.summary.decision;
+
+  if (actionPolicy.shouldPostResults) {
+    console.log('::group::Posting review to GitHub');
+    const currentPr = await fetchPrMetadata(ghConfig, inputs.pr, appKit ?? undefined);
+    if (isStaleHead(inputs.sha, currentPr.headSha)) {
+      console.log(`::warning::PR head changed from ${inputs.sha} to ${currentPr.headSha}; skipping stale posting.`);
+      setActionOutput('degraded', 'true');
+      setActionOutput('degraded-reason', 'stale-head-sha');
+      setActionOutput('verdict', 'SKIPPED');
+      console.log('::endgroup::');
+      return;
+    }
+
+    try {
+      const postResult = await postReview(ghConfig, inputs.pr, review, appKit ?? undefined);
+      await setCommitStatus(ghConfig, inputs.sha, postResult.verdict, postResult.reviewUrl, appKit ?? undefined);
+      reviewUrl = postResult.reviewUrl;
+      postedVerdict = postResult.verdict;
+
+      // Handle NEEDS_HUMAN: request reviewers and add label
+      if (postResult.verdict === 'NEEDS_HUMAN') {
+        await handleNeedsHuman(ghConfig, inputs.pr, {
+          humanReviewers: ghIntegration?.humanReviewers,
+          humanTeams: ghIntegration?.humanTeams,
+          needsHumanLabel: ghIntegration?.needsHumanLabel,
+        }, appKit ?? undefined);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.log(`::warning::GitHub posting degraded: ${message}`);
+      setActionOutput('degraded', 'true');
+      setActionOutput('degraded-reason', 'github-post-failed');
+    }
+    console.log('::endgroup::');
+  } else {
+    console.log(`::warning::GitHub posting skipped: ${actionPolicy.degradedReason ?? 'posting-disabled'}`);
   }
 
   // Generate SARIF output — validate path to prevent traversal attacks
@@ -173,18 +179,16 @@ async function main(): Promise<void> {
     console.error(`::warning::SARIF output path rejected: ${sarifValidation.error}`);
   }
 
-  console.log('::endgroup::');
-
   // Set outputs
   setActionOutput('verdict', result.summary.decision);
-  setActionOutput('review-url', postResult.reviewUrl);
+  if (reviewUrl) setActionOutput('review-url', reviewUrl);
   setActionOutput('session-id', result.sessionId);
 
-  console.log(`Review posted: ${postResult.reviewUrl}`);
+  if (reviewUrl) console.log(`Review posted: ${reviewUrl}`);
   console.log(`Verdict: ${result.summary.decision}`);
 
   // Exit with failure if REJECT and failOnReject is enabled
-  if (result.summary.decision === 'REJECT' && inputs.failOnReject) {
+  if (postedVerdict === 'REJECT' && inputs.failOnReject) {
     process.exit(1);
   }
 }

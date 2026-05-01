@@ -13,6 +13,36 @@ function repoFullName(repo: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+export async function fetchPrMetadata(
+  config: GitHubConfig,
+  prNumber: number,
+  octokit?: Octokit,
+): Promise<Omit<PullRequestInfo, 'diff' | 'truncated'>> {
+  const kit = octokit ?? createOctokit(config);
+  const { data: pr } = await kit.pulls.get({
+    owner: config.owner,
+    repo: config.repo,
+    pull_number: prNumber,
+  });
+
+  const baseRepoFullName = repoFullName(pr.base.repo);
+  const headRepoFullName = repoFullName(pr.head.repo);
+
+  return {
+    number: pr.number,
+    title: pr.title,
+    baseBranch: pr.base.ref,
+    headBranch: pr.head.ref,
+    baseSha: pr.base.sha,
+    headSha: pr.head.sha,
+    baseRepoFullName,
+    headRepoFullName,
+    isFork: baseRepoFullName !== undefined && headRepoFullName !== undefined
+      ? baseRepoFullName !== headRepoFullName
+      : undefined,
+  };
+}
+
 /**
  * Fetch a pull request's metadata and unified diff.
  *
@@ -26,13 +56,7 @@ export async function fetchPrDiff(
   octokit?: Octokit
 ): Promise<PullRequestInfo> {
   const kit = octokit ?? createOctokit(config);
-
-  // Fetch PR metadata (JSON)
-  const { data: pr } = await kit.pulls.get({
-    owner: config.owner,
-    repo: config.repo,
-    pull_number: prNumber,
-  });
+  const metadata = await fetchPrMetadata(config, prNumber, kit);
 
   // Fetch raw diff using the diff media type
   const diffResponse = await kit.pulls.get({
@@ -54,17 +78,7 @@ export async function fetchPrDiff(
   }
 
   return {
-    number: pr.number,
-    title: pr.title,
-    baseBranch: pr.base.ref,
-    headBranch: pr.head.ref,
-    baseSha: pr.base.sha,
-    headSha: pr.head.sha,
-    baseRepoFullName: repoFullName(pr.base.repo),
-    headRepoFullName: repoFullName(pr.head.repo),
-    isFork: repoFullName(pr.base.repo) !== undefined && repoFullName(pr.head.repo) !== undefined
-      ? repoFullName(pr.base.repo) !== repoFullName(pr.head.repo)
-      : undefined,
+    ...metadata,
     diff: diffContent,
     truncated,
   };
