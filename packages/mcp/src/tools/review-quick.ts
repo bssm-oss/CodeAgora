@@ -27,7 +27,7 @@ export function registerReviewQuick(server: McpServer): void {
         }
 
         const diff = params.staged ? await getStagedDiff(repoPath.repoPath) : params.diff;
-        if (!diff) {
+        if (!diff || diff.trim().length === 0) {
           return mcpErrorResponse('INVALID_INPUT', 'Either diff or staged=true is required');
         }
 

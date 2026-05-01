@@ -364,6 +364,24 @@ describe('review_quick handler', () => {
     expect(result.content[0].text).toContain('required');
   });
 
+  it('returns structured error for whitespace-only diff without running review', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewQuick(server as never);
+
+    const result = await getHandler('review_quick')({ diff: '   ' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      message: 'Either diff or staged=true is required',
+    });
+    expect(runReviewCompact).not.toHaveBeenCalled();
+  });
+
   it('runs compact review with diff', async () => {
     const { runReviewCompact } = await import('../helpers.js');
     vi.mocked(runReviewCompact).mockResolvedValue({
@@ -540,6 +558,24 @@ describe('review_full handler', () => {
 
     const result = await getHandler('review_full')({});
     expect(result.isError).toBe(true);
+  });
+
+  it('returns structured error for whitespace-only diff without running review', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    const { registerReviewFull } = await import('../tools/review-full.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewFull(server as never);
+
+    const result = await getHandler('review_full')({ diff: '   ' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      message: 'Either diff or staged=true is required',
+    });
+    expect(runReviewCompact).not.toHaveBeenCalled();
   });
 
   it('runs compact review with diff', async () => {
