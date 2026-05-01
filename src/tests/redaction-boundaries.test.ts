@@ -14,11 +14,12 @@ import type { DiscussionRound, DiscussionVerdict, EvidenceDocument, HeadVerdict,
 const rawSecret = 'OPENAI_API_KEY=sk-test-secret';
 const rawGithubToken = 'GITHUB_TOKEN=ghp_testsecret';
 const rawBearer = 'Authorization: Bearer test-secret';
+const rawBareBearer = 'Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature';
 const date = '2026-05-02';
 const sessionId = '001';
 
 function secretText(): string {
-  return `${rawSecret}\n${rawGithubToken}\n${rawBearer}`;
+  return `${rawSecret}\n${rawGithubToken}\n${rawBearer}\n${rawBareBearer}`;
 }
 
 const evidenceDoc: EvidenceDocument = {
@@ -35,6 +36,7 @@ function expectNoRawSecrets(output: string): void {
   expect(output).not.toContain('sk-test-secret');
   expect(output).not.toContain('ghp_testsecret');
   expect(output).not.toContain('Bearer test-secret');
+  expect(output).not.toContain('eyJhbGciOiJIUzI1NiJ9.payload.signature');
 }
 
 describe('redaction utilities', () => {
@@ -45,6 +47,7 @@ describe('redaction utilities', () => {
     expect(output).toContain('OPENAI_API_KEY=[REDACTED]');
     expect(output).toContain('GITHUB_TOKEN=[REDACTED]');
     expect(output).toContain('Authorization: Bearer [REDACTED]');
+    expect(output).toContain('Bearer [REDACTED]');
   });
 
   it('preserves structured fields while redacting nested values', () => {
