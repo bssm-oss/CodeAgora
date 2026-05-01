@@ -70,9 +70,6 @@ benchmarks/.ca/model-quality.json
 # Archives
 .archive/
 
-# Build outputs — packages
-packages/*/dist/
-
 # CodeAgora runtime (local data, not shared)
 .codeagora/
 .ca/sessions/
