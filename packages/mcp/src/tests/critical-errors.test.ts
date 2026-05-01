@@ -229,6 +229,30 @@ describe('M-09: explain_session path traversal protection', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Error:');
   });
+
+  it('explain_session tool passes repo_path to the CLI session explainer', async () => {
+    vi.resetModules();
+    const explainSessionMock = vi.fn(async () => ({ narrative: 'Session narrative' }));
+    vi.doMock('@codeagora/cli/commands/explain.js', () => ({
+      explainSession: explainSessionMock,
+    }));
+
+    const { registerExplain } = await import('../tools/explain.js');
+
+    let capturedHandler: ((args: { session: string; repo_path?: string }) => Promise<unknown>) | null = null;
+    const mockServer = {
+      tool: vi.fn((_name: string, _desc: string, _schema: unknown, handler: (args: { session: string; repo_path?: string }) => Promise<unknown>) => {
+        capturedHandler = handler;
+      }),
+    };
+
+    registerExplain(mockServer as never);
+    expect(capturedHandler).not.toBeNull();
+
+    await capturedHandler!({ session: '2026-01-01/001', repo_path: '/tmp/target-repo' });
+
+    expect(explainSessionMock).toHaveBeenCalledWith('/tmp/target-repo', '2026-01-01/001');
+  });
 });
 
 // ============================================================================

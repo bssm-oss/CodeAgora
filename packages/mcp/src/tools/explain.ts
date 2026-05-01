@@ -12,10 +12,11 @@ export function registerExplain(server: McpServer): void {
     'Read session artifacts and produce a narrative summary of a past review. No LLM calls.',
     {
       session: z.string().describe('Session path (e.g. 2026-03-19/001)'),
+      repo_path: z.string().optional().describe('Repository path containing the .ca session directory'),
     },
-    async ({ session }) => {
+    async ({ session, repo_path }) => {
       try {
-        const result = await explainSession(process.cwd(), session);
+        const result = await explainSession(repo_path ?? process.cwd(), session);
         return { content: [{ type: 'text' as const, text: result.narrative }] };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
