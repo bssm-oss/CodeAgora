@@ -38,7 +38,7 @@ async function main(): Promise<void> {
   setActionOutput('head-sha', inputs.sha);
   if (inputs.baseSha) setActionOutput('base-sha', inputs.baseSha);
 
-  const safeDiffPath = validateActionDiffPath(inputs.diff);
+  const safeDiffPath = await validateActionDiffPath(inputs.diff);
 
   const actionPolicy = determineActionPolicy(inputs);
   if (actionPolicy.degraded) {

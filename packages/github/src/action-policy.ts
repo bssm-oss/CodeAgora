@@ -1,5 +1,5 @@
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
-import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
+import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
 export interface ActionInputs {
   diff: string;
@@ -114,15 +114,20 @@ export function isStaleHead(expectedHeadSha: string, currentHeadSha: string | un
   return Boolean(currentHeadSha && currentHeadSha !== expectedHeadSha);
 }
 
-export function validateActionDiffPath(
+export async function validateActionDiffPath(
   diffPath: string,
   workspaceRoot: string = process.cwd(),
-): string {
-  const validation = validateDiffPath(diffPath, {
-    allowedRoots: [workspaceRoot, '/tmp'],
-  });
-  if (!validation.success) {
-    throw new Error(`Action diff path rejected: ${validation.error}`);
+): Promise<string> {
+  const allowedRoots = [workspaceRoot, '/tmp'];
+  let lastError = 'Path is outside allowed roots';
+
+  for (const root of allowedRoots) {
+    const validation = await validatePathWithinRoot(diffPath, root);
+    if (validation.success) {
+      return validation.data;
+    }
+    lastError = validation.error;
   }
-  return validation.data;
+
+  throw new Error(`Action diff path rejected: ${lastError}`);
 }
