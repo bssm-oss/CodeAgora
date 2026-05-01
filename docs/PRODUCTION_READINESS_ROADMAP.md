@@ -147,7 +147,7 @@ Make quality claims evidence-based instead of anecdotal.
 - High-severity seeded findings meet the agreed recall threshold before release.
 - FP regression fixtures remain clean within the agreed tolerance.
 - No accepted production candidate fabricates files, line ranges, or code quotes in benchmark output.
-- CI blocks benchmark schema regressions and flags material quality regressions.
+- CI blocks benchmark schema regressions and flags material quality regressions with `pnpm bench:ci`, a provider-free gate that validates fixture schemas and the 20-fixture reference file.
 
 ## Phase 5: Security And Abuse Resistance
 
@@ -186,7 +186,7 @@ Make install, first run, upgrade, and release boring.
 
 ### Acceptance Gate
 
-- Clean checkout: `pnpm install`, `pnpm build`, `pnpm typecheck`, and `pnpm test` pass.
+- Clean checkout: `pnpm install`, `pnpm build`, `pnpm typecheck`, `pnpm test`, and `pnpm bench:ci` pass.
 - Package dry-run includes only intended files and working binaries.
 - Global install smoke runs `agora --help`, `agora init --yes`, and a minimal review path.
 - MCP smoke starts via package command and lists tools.
@@ -219,7 +219,7 @@ A production release candidate requires all of the following:
 - Phase 0 through Phase 6 acceptance gates complete.
 - `pnpm typecheck`, `pnpm build`, `pnpm test`, and action bundle build pass on clean checkout.
 - CLI, GitHub Action, and MCP manual QA pass through their real user surfaces.
-- Latest benchmark report is linked from README or release notes.
+- Latest benchmark report is linked from README or release notes, and live `bench:fn:run` result directories are treated as uploaded artifacts rather than committed `bench-out*` directories.
 - Known limits are documented, especially provider nondeterminism, cost variance, language coverage, and fork-secret behavior.
 - No retired surface is required for setup, review execution, or result inspection.
 

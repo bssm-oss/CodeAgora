@@ -102,6 +102,8 @@ An initial private scaffold lives in `packages/desktop` while the desktop MVP ta
 
 Tools: `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`, `config_get`, `config_set`.
 
+Package-local MCP onboarding: [`packages/mcp/README.md`](packages/mcp/README.md).
+
 ---
 
 ## Extensions
@@ -198,14 +200,24 @@ pnpm dev review path/to/diff.patch
 
 ## Benchmarks
 
-Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative measurement framework (see #472).
+Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative and FP-regression framework (see #472). The current deterministic RC gate covers 20 fixtures: 14 recall cases and 6 FP-regression cases.
+
+**Required offline gate** (fast, no API calls):
+
+```bash
+pnpm bench:ci                                      # schema + reference gate for CI
+pnpm bench:fn -- --validate-only                   # schema-check fixtures
+pnpm bench:reference -- --validate-only            # validate the 20-fixture reference gate
+```
+
+The required gate is provider-free. Live benchmark runs are manual evidence artifacts, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead.
 
 **Score pre-computed results** (fast, no API calls):
 
 ```bash
-pnpm bench:fn -- --validate-only                     # schema-check fixtures
 pnpm bench:fn -- --results path/to/results-dir       # score against pre-computed review output
 pnpm bench:fn -- --results path/to/results-dir --json  # CI-friendly JSON report
+pnpm bench:fn:compare -- --baseline old-results --candidate new-results
 ```
 
 **Run the live pipeline against every fixture** (produces the results dir above):
@@ -223,7 +235,7 @@ Two fixture kinds live side by side:
 - **Recall cases** (`expectedFindings` non-empty) — review must surface each listed bug. Misses count as FN.
 - **FP regression cases** (`expectedFindings` is `[]`) — review must report nothing. Any finding is a regression.
 
-Current seed fixtures: 8 recall cases (10 expected findings total) + 4 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format.
+Current reference fixtures: 14 recall cases + 6 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format and reference-gate semantics.
 
 ### Latest low-cost diverse aggregate (2026-04-28 KST)
 
