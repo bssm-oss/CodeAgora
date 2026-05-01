@@ -1,13 +1,25 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "../..",
+    "baseUrl": "../..",
+    "paths": {
+      "@codeagora/shared": ["./packages/shared/src/index.ts"],
+      "@codeagora/shared/*": ["./packages/shared/src/*"],
+      "@codeagora/core": ["./packages/core/src/index.ts"],
+      "@codeagora/core/*": ["./packages/core/src/*"],
+      "@codeagora/github": ["./packages/github/src/index.ts"],
+      "@codeagora/github/*": ["./packages/github/src/*"],
+      "@codeagora/cli": ["./packages/cli/src/index.ts"],
+      "@codeagora/cli/*": ["./packages/cli/src/*"],
+      "@codeagora/mcp": ["./packages/mcp/src/index.ts"],
+      "@codeagora/mcp/*": ["./packages/mcp/src/*"]
+    }
   },
-  "references": [
-    { "path": "../core" },
-    { "path": "../shared" },
-    { "path": "../cli" }
-  ],
-  "include": ["./src/**/*.ts"]
+  "include": ["./src/**/*.ts", "../core/src/**/*.ts", "../shared/src/**/*.ts", "../cli/src/**/*.ts", "../github/src/**/*.ts"],
+  "exclude": ["../core/src/tests/**/*.ts", "../shared/src/tests/**/*.ts", "../cli/src/tests/**/*.ts", "../github/src/tests/**/*.ts", "./src/tests/**/*.ts"]
 }
