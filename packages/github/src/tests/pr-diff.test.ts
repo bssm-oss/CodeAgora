@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { fetchPrDiff } from '../pr-diff.js';
+import { fetchPrDiff, fetchPrMetadata } from '../pr-diff.js';
 import type { GitHubConfig } from '../client.js';
 
 // ============================================================================
@@ -57,6 +57,32 @@ function makeOctokit(options: {
 // ============================================================================
 // fetchPrDiff
 // ============================================================================
+
+describe('fetchPrMetadata', () => {
+  it('returns PR metadata without fetching the raw diff', async () => {
+    const octokit = makeOctokit({
+      prData: {
+        number: 7,
+        title: 'Fresh head',
+        base: { ref: 'main', sha: 'base1', repo: { full_name: 'test-owner/test-repo' } },
+        head: { ref: 'feature', sha: 'head1', repo: { full_name: 'fork-owner/test-repo' } },
+      },
+    });
+
+    const result = await fetchPrMetadata(makeConfig(), 7, octokit as never);
+
+    expect(result).toEqual(expect.objectContaining({
+      number: 7,
+      title: 'Fresh head',
+      baseSha: 'base1',
+      headSha: 'head1',
+      baseRepoFullName: 'test-owner/test-repo',
+      headRepoFullName: 'fork-owner/test-repo',
+      isFork: true,
+    }));
+    expect(octokit.pulls.get).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('fetchPrDiff', () => {
   it('returns PR number, title, baseBranch, headBranch, and diff', async () => {
