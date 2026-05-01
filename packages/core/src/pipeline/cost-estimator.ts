@@ -30,10 +30,34 @@ let _pricingCache: Record<string, PricingEntry> | null = null;
 
 async function getPricing(): Promise<Record<string, PricingEntry>> {
   if (!_pricingCache) {
-    const raw = await readFile(path.join(__dirname, '../../../shared/src/data/pricing.json'), 'utf-8');
+    const raw = await readPricingFile();
     _pricingCache = JSON.parse(raw);
   }
   return _pricingCache!;
+}
+
+async function readPricingFile(): Promise<string> {
+  const candidates = [
+    path.join(__dirname, '../../../shared/src/data/pricing.json'),
+    path.join(__dirname, '../../../shared/dist/data/pricing.json'),
+    path.join(__dirname, '../../shared/src/data/pricing.json'),
+    path.join(__dirname, '../../shared/dist/data/pricing.json'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, 'utf-8');
+    } catch (error) {
+      if (!isFileNotFound(error)) throw error;
+    }
+  }
+
+  const sharedPricingUrl = new URL(import.meta.resolve('@codeagora/shared/data/pricing.json'));
+  return readFile(sharedPricingUrl, 'utf-8');
+}
+
+function isFileNotFound(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
 // Load pricing table from data/pricing.json
