@@ -1,4 +1,5 @@
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
 
 export interface ActionInputs {
   diff: string;
@@ -111,4 +112,17 @@ export function determineActionPolicy(
 
 export function isStaleHead(expectedHeadSha: string, currentHeadSha: string | undefined): boolean {
   return Boolean(currentHeadSha && currentHeadSha !== expectedHeadSha);
+}
+
+export function validateActionDiffPath(
+  diffPath: string,
+  workspaceRoot: string = process.cwd(),
+): string {
+  const validation = validateDiffPath(diffPath, {
+    allowedRoots: [workspaceRoot, '/tmp'],
+  });
+  if (!validation.success) {
+    throw new Error(`Action diff path rejected: ${validation.error}`);
+  }
+  return validation.data;
 }

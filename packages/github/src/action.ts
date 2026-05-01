@@ -20,7 +20,7 @@ import { fetchPrMetadata } from './pr-diff.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
 import { loadConfigFrom } from '@codeagora/core/config/loader.js';
 import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
-import { determineActionPolicy, isStaleHead, parseActionInputs } from './action-policy.js';
+import { determineActionPolicy, isStaleHead, parseActionInputs, validateActionDiffPath } from './action-policy.js';
 
 // ============================================================================
 // Main
@@ -38,6 +38,8 @@ async function main(): Promise<void> {
   setActionOutput('head-sha', inputs.sha);
   if (inputs.baseSha) setActionOutput('base-sha', inputs.baseSha);
 
+  const safeDiffPath = validateActionDiffPath(inputs.diff);
+
   const actionPolicy = determineActionPolicy(inputs);
   if (actionPolicy.degraded) {
     setActionOutput('degraded', 'true');
@@ -54,7 +56,7 @@ async function main(): Promise<void> {
 
   // Check diff line count
   if (inputs.maxDiffLines > 0) {
-    const diffContent = await fs.readFile(inputs.diff, 'utf-8');
+    const diffContent = await fs.readFile(safeDiffPath, 'utf-8');
     const lineCount = diffContent.split('\n').length;
     if (lineCount > inputs.maxDiffLines) {
       console.log(`::warning::Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}). Skipping review.`);
@@ -72,7 +74,7 @@ async function main(): Promise<void> {
 
   // Run pipeline (#259: pass repoPath for surrounding code context)
   console.log('::group::Running CodeAgora review pipeline');
-  const result = await runPipeline({ diffPath: inputs.diff, repoPath: process.cwd() });
+  const result = await runPipeline({ diffPath: safeDiffPath, repoPath: process.cwd() });
   console.log('::endgroup::');
 
   if (result.status === 'error') {
@@ -88,7 +90,7 @@ async function main(): Promise<void> {
   }
 
   // Read diff for position index
-  const diffContent = await fs.readFile(inputs.diff, 'utf-8');
+  const diffContent = await fs.readFile(safeDiffPath, 'utf-8');
   const positionIndex = buildDiffPositionIndex(diffContent);
 
   // Use full evidence docs, discussions, and reviewer map from pipeline result
