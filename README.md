@@ -176,6 +176,7 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 | [Architecture](docs/ARCHITECTURE.md) | Pipeline design and project structure |
 | [Extensions](docs/EXTENSIONS.md) | MCP and desktop direction |
 | [Product Surface Plan](docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md) | Current surfaces and lightweight roadmap |
+| [Production Readiness Roadmap](docs/PRODUCTION_READINESS_ROADMAP.md) | Gates for production-ready CLI, GitHub Action, and MCP releases |
 | [Agent Contract](docs/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
 | [FAQ](docs/FAQ.md) | Frequently asked questions |
