@@ -7,6 +7,7 @@ import path from 'path';
 import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
+import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 const execFile = promisify(execFileCb);
 
@@ -46,7 +47,7 @@ export function mcpErrorResponse(
   details?: Record<string, unknown>,
 ): McpToolResponse {
   return {
-    content: [{ type: 'text', text: JSON.stringify(createStructuredError(code, message, details), null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(redactDeep(createStructuredError(code, message, details)), null, 2) }],
     isError: true,
   };
 }

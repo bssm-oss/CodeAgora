@@ -11,6 +11,7 @@ import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import { formatCompact, type CompactReviewResult } from '@codeagora/core/pipeline/compact-formatter.js';
 import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
+import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 const execFile = promisify(execFileCb);
 
@@ -108,7 +109,7 @@ export async function runReviewRaw(
 
   try {
     const { runPipeline } = await import('@codeagora/core/pipeline/orchestrator.js');
-    return await runPipeline(mapToPipelineInput(tmpFile, options));
+    return redactDeep(await runPipeline(mapToPipelineInput(tmpFile, options)));
   } finally {
     await fs.unlink(tmpFile).catch((error: unknown) => {
       void error;
@@ -135,7 +136,7 @@ export async function runReviewCompact(
     };
   }
 
-  return formatCompact({
+  return redactDeep(formatCompact({
     decision: result.summary.decision,
     reasoning: result.summary.reasoning,
     evidenceDocs: result.evidenceDocs ?? [],
@@ -143,6 +144,6 @@ export async function runReviewCompact(
     reviewerMap: result.reviewerMap,
     reviewerOpinions: result.reviewerOpinions,
     sessionId: `${result.date}/${result.sessionId}`,
-  });
+  }));
 }
 
