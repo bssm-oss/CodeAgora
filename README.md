@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@codeagora/review"><img src="https://img.shields.io/npm/v/@codeagora/review?color=%2305A6B9" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-3168%20passing-%23191A51" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-vitest-%23191A51" alt="Tests">
   <img src="https://img.shields.io/badge/node-%3E%3D20-%2305A6B9" alt="Node">
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
@@ -100,7 +100,7 @@ An initial private scaffold lives in `packages/desktop` while the desktop MVP ta
 }
 ```
 
-Tools: `review_diff`, `review_pr`, `review_staged`, `session_list`, `session_detail`, `explain_session`, `config_get`, `config_set`, `health_check`.
+Tools: `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`, `config_get`, `config_set`.
 
 ---
 
@@ -186,10 +186,10 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 
 ```bash
 pnpm install && pnpm build
-pnpm test          # 3386 tests
+pnpm test          # run the Vitest suite
 pnpm test:coverage # with coverage report
 pnpm typecheck
-pnpm cli review path/to/diff.patch
+pnpm dev review path/to/diff.patch
 ```
 
 ---

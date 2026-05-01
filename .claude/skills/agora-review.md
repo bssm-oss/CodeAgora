@@ -31,7 +31,7 @@ git diff --staged > /tmp/codeagora-review-$(date +%s).diff
 
 V3 core pipeline CLI 실행:
 ```bash
-node src/dist/cli/index.js review <diff-path>
+pnpm dev review <diff-path>
 ```
 
 이 명령은 L0→L1→L2→L3 파이프라인을 실행합니다:
@@ -91,7 +91,7 @@ node src/dist/cli/index.js review <diff-path>
 - Discussion settings (maxRounds, thresholds)
 - Error handling (maxRetries, forfeitThreshold)
 
-검증: `node src/dist/cli/index.js config`
+검증: `pnpm dev config`
 
 ---
 

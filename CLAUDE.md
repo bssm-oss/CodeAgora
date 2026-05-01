@@ -88,18 +88,14 @@ packages/
 - Integration: sample diff → full pipeline execution
 - Parallelization: concurrency limits and partial failure scenarios
 - Hallucination filter: false positive rate validation
-- Total: 228 test files, 3386 tests (2026-04-13 기준)
+- Test suite spans root `src/tests/` and package-local `packages/*/src/tests/` files
 
 ### Key Commands
-- `pnpm dev` — dev mode (CLI package)
-- `pnpm build` — build root package
-- `pnpm build:ws` — build all workspace packages
-- `pnpm test` — run tests (root)
-- `pnpm test:ws` — run tests across all packages
-- `pnpm typecheck` — type check (root)
-- `pnpm typecheck:ws` — type check all workspace packages
-- `pnpm lint` — lint
-- `pnpm cli` — run CLI directly via tsx
+- `pnpm dev <command>` — run the CLI package in dev mode
+- `pnpm build` — build workspace packages recursively
+- `pnpm test` — run the root Vitest config
+- `pnpm typecheck` — type-check package sources
+- `pnpm --filter <package> lint` — lint packages that define a lint script
 
 ## Implementation Notes
 
