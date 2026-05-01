@@ -8,6 +8,7 @@ import path from 'path';
 import { parse as parseYaml } from 'yaml';
 import { Config, validateConfig, type AgentConfig, type ReviewerEntry, type DeclarativeReviewers } from '../types/config.js';
 import { readJson, CA_ROOT } from '@codeagora/shared/utils/fs.js';
+import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
 // ============================================================================
 // Config Loader
@@ -55,13 +56,19 @@ export async function loadConfigFrom(baseDir: string): Promise<Config> {
 /**
  * Load config from an explicit JSON/YAML file path.
  */
-export async function loadConfigFile(filePath: string): Promise<Config> {
-  const ext = path.extname(filePath).toLowerCase();
+export async function loadConfigFile(
+  filePath: string,
+  options?: { rootDir?: string },
+): Promise<Config> {
+  const safePath = options?.rootDir
+    ? await validateExplicitConfigPath(filePath, options.rootDir)
+    : filePath;
+  const ext = path.extname(safePath).toLowerCase();
   if (ext === '.yaml' || ext === '.yml') {
-    return loadYamlConfig(filePath);
+    return loadYamlConfig(safePath);
   }
 
-  const data = await readJson(filePath);
+  const data = await readJson(safePath);
   return validateConfig(data);
 }
 
@@ -100,6 +107,14 @@ async function fileExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function validateExplicitConfigPath(filePath: string, rootDir: string): Promise<string> {
+  const validation = await validatePathWithinRoot(filePath, rootDir);
+  if (!validation.success) {
+    throw new Error(`Config path rejected: ${validation.error}`);
+  }
+  return validation.data;
 }
 
 async function loadYamlConfig(filePath: string): Promise<Config> {
