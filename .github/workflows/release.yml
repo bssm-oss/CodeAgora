@@ -25,17 +25,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test --no-file-parallelism
+      - run: pnpm bench:ci
 
-      # Smoke test: pack and verify CLI works
-      - name: Smoke test
-        run: |
-          npm pack
-          SMOKE_DIR="$(mktemp -d)"
-          cd "$SMOKE_DIR"
-          npm init -y
-          npm i $GITHUB_WORKSPACE/codeagora-review-*.tgz
-          npx agora --version
-          npx agora doctor || echo "::warning::doctor check failed (expected without API keys)"
+      # Non-publishing RC gate: package dry-runs, CLI help, MCP tools/list, Action bundle.
+      - name: Release candidate smoke
+        run: pnpm release:rc-smoke
 
       # Publish review package
       - name: Publish @codeagora/review

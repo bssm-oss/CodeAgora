@@ -14,7 +14,7 @@ See `scripts/bench-fn.ts` (scorer) and `scripts/bench-fn-run.ts` (live-pipeline 
 
 The Phase 2 reference dataset currently contains 20 fixtures: 14 recall cases and 6 FP-regression cases.
 
-The read-only reference set lives at `benchmarks/references/phase2-quality-gate.json`:
+The read-only reference set lives at `benchmarks/references/phase2-quality-gate.json`. It is the deterministic offline RC contract for the current 20-fixture corpus: required gates validate fixture schemas and the reference file without provider keys or network calls. Live provider runs are optional evidence artifacts; score those precomputed result directories separately when comparing model changes.
 
 ```bash
 pnpm bench:reference -- --validate-only
