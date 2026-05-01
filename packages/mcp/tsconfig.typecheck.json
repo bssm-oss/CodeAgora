@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.json",
-  "include": [
-    "../../packages/mcp/src/**/*.ts",
-    "../../packages/shared/src/**/*.ts",
-    "../../packages/core/src/**/*.ts",
-    "../../packages/cli/src/**/*.ts"
-  ]
-}
