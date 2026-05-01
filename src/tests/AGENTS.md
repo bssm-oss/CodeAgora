@@ -58,13 +58,12 @@ Tests are **centralized**, not colocated with source. This enables:
 
 **Run tests:**
 ```bash
-pnpm test           # Run all tests (uses vitest at root)
-pnpm test:ws        # Run tests across all workspaces
+pnpm test           # Run root and package-local tests through vitest.config.ts
 ```
 
 **Vitest configuration** (`vitest.config.ts` at repo root):
 - **Globals enabled**: `describe`, `it`, `expect`, `beforeEach`, `afterEach` available without imports
-- **Include pattern**: `src/tests/**/*.test.ts` and `src/tests/**/*.test.tsx`
+- **Include pattern**: `src/tests/**/*.test.ts`, `src/tests/**/*.test.tsx`, and `packages/*/src/tests/**/*.test.ts`
 - **Pool strategy**:
   - Default: unit tests use shared process (faster)
   - E2E tests (`e2e-*.test.ts`): use `forks` pool for isolation (prevents state leakage)

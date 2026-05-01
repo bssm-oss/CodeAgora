@@ -26,14 +26,14 @@ Monorepo workspace containing scoped packages (`@codeagora/*`) that implement th
 - Package interdependencies use `workspace:*` protocol
 
 **Build & Test:**
-- `pnpm build:ws` — build all packages (calls tsup per-package, or `echo skip` if no build)
-- `pnpm typecheck:ws` — type-check all packages
-- `pnpm test:ws` — run tests across all packages (tests live in root `src/tests/`, not in packages)
-- `pnpm lint` — lint all packages via eslint
+- `pnpm build` — build workspace packages recursively
+- `pnpm typecheck` — type-check package sources through the root TypeScript config
+- `pnpm test` — run the root Vitest config, including root and package-local tests
+- Package lint scripts exist on selected packages; run them with `pnpm --filter <package> lint`
 
 **Development:**
 - `pnpm dev` — run CLI in dev mode via tsx
-- `pnpm cli` — run CLI directly
+- `pnpm dev <command>` — run the CLI package directly
 - Each package has its own `package.json` with `main`, `types`, and `bin` (if applicable)
 
 **Dependencies Flow:**

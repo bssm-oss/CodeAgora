@@ -17,7 +17,7 @@ MCP server implementation exposing CodeAgora pipeline as tools for Claude and ot
 
 | Directory | Purpose |
 |-----------|---------|
-| `tools/` | 7 tool implementations: review-quick, review-full, review-pr, dry-run, explain, leaderboard, stats |
+| `tools/` | 9 tool implementations: review-quick, review-full, review-pr, dry-run, explain, leaderboard, stats, config-get, config-set |
 
 ## For AI Agents
 
