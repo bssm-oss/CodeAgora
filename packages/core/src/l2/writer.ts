@@ -7,6 +7,7 @@ import type { DiscussionRound, DiscussionVerdict, ModeratorReport, EvidenceDocum
 import { writeMarkdown, getDiscussionsDir, getSuggestionsPath, getReportPath } from '@codeagora/shared/utils/fs.js';
 import path from 'path';
 import { writeFile } from 'fs/promises';
+import { redactDeep, redactSecrets } from '@codeagora/shared/utils/redaction.js';
 
 // Type for selected supporter (imported from moderator.ts logic)
 interface SelectedSupporter {
@@ -36,7 +37,7 @@ export async function writeDiscussionRound(
   const { ensureDir } = await import('@codeagora/shared/utils/fs.js');
   await ensureDir(discussionDir);
 
-  const content = formatDiscussionRound(round);
+  const content = redactSecrets(formatDiscussionRound(round));
   await writeMarkdown(roundFile, content);
 }
 
@@ -56,7 +57,7 @@ export async function writeDiscussionVerdict(
   const { ensureDir } = await import('@codeagora/shared/utils/fs.js');
   await ensureDir(discussionDir);
 
-  const content = formatVerdict(verdict);
+  const content = redactSecrets(formatVerdict(verdict));
   await writeMarkdown(verdictFile, content);
 }
 
@@ -85,7 +86,7 @@ export async function writeSuggestions(
     lines.push('');
   }
 
-  await writeMarkdown(suggestionsPath, lines.join('\n'));
+  await writeMarkdown(suggestionsPath, redactSecrets(lines.join('\n')));
 }
 
 /**
@@ -98,7 +99,7 @@ export async function writeModeratorReport(
 ): Promise<void> {
   const reportPath = getReportPath(date, sessionId);
 
-  const content = formatModeratorReport(report);
+  const content = redactSecrets(formatModeratorReport(report));
   await writeMarkdown(reportPath, content);
 }
 
@@ -138,7 +139,7 @@ export async function writeSupportersLog(
     combination: `${models} / ${personas}`,
   };
 
-  await writeFile(supportersFile, JSON.stringify(log, null, 2), 'utf-8');
+  await writeFile(supportersFile, JSON.stringify(redactDeep(log), null, 2), 'utf-8');
 }
 
 // ============================================================================

@@ -5,6 +5,7 @@
 
 import type { ReviewOutput, EvidenceDocument } from '../types/core.js';
 import { writeMarkdown, getReviewsDir } from '@codeagora/shared/utils/fs.js';
+import { redactSecrets } from '@codeagora/shared/utils/redaction.js';
 import path from 'path';
 
 // ============================================================================
@@ -25,7 +26,7 @@ export async function writeReviewOutput(
   const filename = `${review.reviewerId}${chunkSuffix}-${sanitizedModel}.md`;
   const filePath = path.join(reviewsDir, filename);
 
-  const content = formatReviewOutput(review);
+  const content = redactSecrets(formatReviewOutput(review));
   await writeMarkdown(filePath, content);
 
   return filePath;

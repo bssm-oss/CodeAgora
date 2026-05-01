@@ -5,6 +5,7 @@
 
 import type { HeadVerdict } from '../types/core.js';
 import { writeMarkdown, getResultPath } from '@codeagora/shared/utils/fs.js';
+import { redactSecrets } from '@codeagora/shared/utils/redaction.js';
 
 /**
  * Write head verdict to result.md
@@ -16,7 +17,7 @@ export async function writeHeadVerdict(
 ): Promise<void> {
   const resultPath = getResultPath(date, sessionId);
 
-  const content = formatHeadVerdict(verdict);
+  const content = redactSecrets(formatHeadVerdict(verdict));
   await writeMarkdown(resultPath, content);
 }
 
