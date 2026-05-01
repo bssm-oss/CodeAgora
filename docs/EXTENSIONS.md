@@ -16,7 +16,7 @@ The replacement direction is a single cross-platform Tauri desktop app that owns
 
 Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code, Cursor, Windsurf, and VS Code.
 
-**9 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain`, `leaderboard`, `stats`, `config_get`, `config_set`
+**9 tools:** `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`, `config_get`, `config_set`
 
 ```json
 {
@@ -30,4 +30,4 @@ Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code
 }
 ```
 
-`review_quick` runs L1 only for fast feedback. `review_full` runs the complete L1 > L2 > L3 pipeline. `config_get`/`config_set` manage reviewer configuration without leaving the MCP session.
+`review_quick` runs L1 only for fast feedback. `review_full` runs the complete L1 > L2 > L3 pipeline. `review_pr` reviews a GitHub PR by URL or number. Review tools accept `repo_path` for surrounding code context, but explicit paths must stay inside the MCP server cwd/repository root. Failures return MCP `isError: true` with JSON `{ "status": "error", "code": string, "message": string, "details"?: object }`. `config_get`/`config_set` manage reviewer configuration without leaving the MCP session.

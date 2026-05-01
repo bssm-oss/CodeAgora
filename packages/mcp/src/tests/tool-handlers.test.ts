@@ -5,6 +5,10 @@
  * McpServer stub and capturing the handler function.
  */
 
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { promisify } from 'util';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -63,6 +67,7 @@ vi.mock('../helpers.js', () => ({
 
 vi.mock('../post-actions.js', () => ({
   formatReviewResult: vi.fn(),
+  postToGitHub: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -123,6 +128,117 @@ describe('config_get handler', () => {
     const result = await getHandler('config_get')({});
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('no config');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// review_pr
+// ---------------------------------------------------------------------------
+
+describe('review_pr handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('uses repo_path as cwd when resolving PR number and fetching diff', async () => {
+    const cwd = await fs.realpath(process.cwd());
+    const execCalls: Array<[string, string[], unknown]> = [];
+    const execFile = vi.fn((cmd: string, args: string[], optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
+      if (typeof callback !== 'function') {
+        throw new Error('missing callback');
+      }
+      if (cmd === 'git' && args[0] === 'rev-parse') {
+        callback(null, `${cwd}\n`, '');
+        return;
+      }
+      if (cmd === 'git') {
+        callback(null, 'https://github.com/owner/repo.git\n', '');
+        return;
+      }
+      if (cmd === 'gh') {
+        callback(null, 'diff --git a/file.ts b/file.ts\n+change\n', '');
+        return;
+      }
+      callback(new Error(`unexpected command ${cmd}`), '', '');
+    });
+    Object.assign(execFile, {
+      [promisify.custom]: async (cmd: string, args: string[], options?: unknown) => {
+        execCalls.push([cmd, args, options]);
+        if (cmd === 'git' && args[0] === 'rev-parse') {
+          return { stdout: `${cwd}\n`, stderr: '' };
+        }
+        if (cmd === 'git') {
+          return { stdout: 'https://github.com/owner/repo.git\n', stderr: '' };
+        }
+        if (cmd === 'gh') {
+          return { stdout: 'diff --git a/file.ts b/file.ts\n+change\n', stderr: '' };
+        }
+        throw new Error(`unexpected command ${cmd} ${String(options)}`);
+      },
+    });
+    vi.doMock('child_process', () => ({ execFile }));
+
+    const { runReviewCompact } = await import('../helpers.js');
+    vi.mocked(runReviewCompact).mockResolvedValue({
+      decision: 'ACCEPT', reasoning: 'OK', issues: [], summary: 'ok', sessionId: '001',
+    });
+
+    const { registerReviewPr } = await import('../tools/review-pr.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewPr(server as never);
+
+    const result = await getHandler('review_pr')({ pr_number: 7, repo_path: process.cwd() });
+
+    if (result.isError) {
+      throw new Error(result.content[0].text);
+    }
+    expect(result.isError).toBeUndefined();
+    expect(execCalls).toContainEqual(['git', ['remote', 'get-url', 'origin'], { cwd }]);
+    expect(execCalls).toContainEqual(['gh', ['pr', 'diff', 'https://github.com/owner/repo/pull/7'], { cwd }]);
+    expect(runReviewCompact).toHaveBeenCalledWith(expect.stringContaining('diff --git'), expect.objectContaining({ repoPath: cwd }));
+  });
+
+  it('returns structured error when post_review fails', async () => {
+    const execFile = vi.fn((cmd: string, _args: string[], optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
+      if (typeof callback !== 'function') {
+        throw new Error('missing callback');
+      }
+      if (cmd === 'gh') {
+        callback(null, 'diff --git a/file.ts b/file.ts\n+change\n', '');
+        return;
+      }
+      callback(new Error(`unexpected command ${cmd}`), '', '');
+    });
+    Object.assign(execFile, {
+      [promisify.custom]: async (cmd: string) => {
+        if (cmd === 'gh') {
+          return { stdout: 'diff --git a/file.ts b/file.ts\n+change\n', stderr: '' };
+        }
+        throw new Error(`unexpected command ${cmd}`);
+      },
+    });
+    vi.doMock('child_process', () => ({ execFile }));
+
+    const { runReviewRaw } = await import('../helpers.js');
+    const { postToGitHub } = await import('../post-actions.js');
+    vi.mocked(runReviewRaw).mockResolvedValue({ status: 'success', summary: { decision: 'ACCEPT' } } as never);
+    vi.mocked(postToGitHub).mockRejectedValue(new Error('posting failed'));
+
+    const { registerReviewPr } = await import('../tools/review-pr.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewPr(server as never);
+
+    const result = await getHandler('review_pr')({ pr_url: 'https://github.com/owner/repo/pull/7', post_review: true });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'REVIEW_PR_FAILED',
+      message: 'Failed to review PR: posting failed',
+    });
   });
 });
 
@@ -248,6 +364,24 @@ describe('review_quick handler', () => {
     expect(result.content[0].text).toContain('required');
   });
 
+  it('returns structured error for whitespace-only diff without running review', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewQuick(server as never);
+
+    const result = await getHandler('review_quick')({ diff: '   ' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      message: 'Either diff or staged=true is required',
+    });
+    expect(runReviewCompact).not.toHaveBeenCalled();
+  });
+
   it('runs compact review with diff', async () => {
     const { runReviewCompact } = await import('../helpers.js');
     vi.mocked(runReviewCompact).mockResolvedValue({
@@ -324,6 +458,90 @@ describe('review_quick handler', () => {
       timeoutSeconds: 60,
     }));
   });
+
+  it('returns structured error for invalid repo_path without running review', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewQuick(server as never);
+
+    const result = await getHandler('review_quick')({ diff: '+x', repo_path: path.parse(process.cwd()).root });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_REPO_PATH',
+    });
+    expect(parsed.message).toContain('repo_path');
+    expect(runReviewCompact).not.toHaveBeenCalled();
+  });
+
+  it('forwards valid repo_path to the review pipeline', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    vi.mocked(runReviewCompact).mockResolvedValue({
+      decision: 'ACCEPT', reasoning: 'OK', issues: [], summary: 'ok', sessionId: '001',
+    });
+
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewQuick(server as never);
+
+    await getHandler('review_quick')({ diff: '+x', repo_path: process.cwd() });
+
+    expect(runReviewCompact).toHaveBeenCalledWith('+x', expect.objectContaining({
+      repoPath: await fs.realpath(process.cwd()),
+    }));
+  });
+
+  it('rejects symlink repo_path before running review', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-mcp-symlink-'));
+    const outsideDir = path.join(tempDir, 'outside');
+    const linkPath = path.join(process.cwd(), `.codeagora-mcp-test-link-${Date.now()}`);
+    await fs.mkdir(outsideDir);
+    await fs.symlink(outsideDir, linkPath);
+
+    try {
+      const { runReviewCompact } = await import('../helpers.js');
+      const { registerReviewQuick } = await import('../tools/review-quick.js');
+      const { server, getHandler } = createServerStub();
+      registerReviewQuick(server as never);
+
+      const result = await getHandler('review_quick')({ diff: '+x', repo_path: linkPath });
+      const parsed = JSON.parse(result.content[0].text);
+
+      expect(result.isError).toBe(true);
+      expect(parsed).toMatchObject({
+        status: 'error',
+        code: 'INVALID_REPO_PATH',
+        message: 'repo_path must not be a symbolic link',
+      });
+      expect(runReviewCompact).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(linkPath, { force: true }).catch((error: unknown) => {
+        void error;
+      });
+      await fs.rm(tempDir, { recursive: true, force: true }).catch((error: unknown) => {
+        void error;
+      });
+    }
+  });
+
+  it('uses repo_path as cwd for staged diffs', async () => {
+    const { runReviewCompact, getStagedDiff } = await import('../helpers.js');
+    vi.mocked(getStagedDiff).mockResolvedValue('+staged change');
+    vi.mocked(runReviewCompact).mockResolvedValue({
+      decision: 'ACCEPT', reasoning: 'OK', issues: [], summary: 'ok', sessionId: '001',
+    });
+
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewQuick(server as never);
+
+    await getHandler('review_quick')({ staged: true, repo_path: process.cwd() });
+
+    expect(getStagedDiff).toHaveBeenCalledWith(await fs.realpath(process.cwd()));
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -340,6 +558,24 @@ describe('review_full handler', () => {
 
     const result = await getHandler('review_full')({});
     expect(result.isError).toBe(true);
+  });
+
+  it('returns structured error for whitespace-only diff without running review', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    const { registerReviewFull } = await import('../tools/review-full.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewFull(server as never);
+
+    const result = await getHandler('review_full')({ diff: '   ' });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      message: 'Either diff or staged=true is required',
+    });
+    expect(runReviewCompact).not.toHaveBeenCalled();
   });
 
   it('runs compact review with diff', async () => {

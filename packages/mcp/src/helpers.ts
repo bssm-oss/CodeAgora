@@ -84,9 +84,9 @@ async function createTempDiffFile(diff: string): Promise<string> {
  * Get staged changes via `git diff --staged`.
  * Throws if no staged changes exist.
  */
-export async function getStagedDiff(): Promise<string> {
-  const { stdout } = await execFile('git', ['diff', '--staged']);
-  const diff = stdout.trim();
+export async function getStagedDiff(repoPath?: string): Promise<string> {
+  const { stdout } = await execFile('git', ['diff', '--staged'], repoPath ? { cwd: repoPath } : undefined);
+  const diff = String(stdout).trim();
   if (!diff) {
     throw new Error('No staged changes found. Stage files with `git add` first.');
   }
@@ -110,7 +110,9 @@ export async function runReviewRaw(
     const { runPipeline } = await import('@codeagora/core/pipeline/orchestrator.js');
     return await runPipeline(mapToPipelineInput(tmpFile, options));
   } finally {
-    await fs.unlink(tmpFile).catch(() => {});
+    await fs.unlink(tmpFile).catch((error: unknown) => {
+      void error;
+    });
   }
 }
 

@@ -207,10 +207,79 @@ importers:
 
   packages/mcp:
     dependencies:
+      '@ai-sdk/anthropic':
+        specifier: ^3.0.58
+        version: 3.0.58(zod@3.25.76)
+      '@ai-sdk/baseten':
+        specifier: ^1.0.38
+        version: 1.0.38(zod@3.25.76)
+      '@ai-sdk/cohere':
+        specifier: ^3.0.25
+        version: 3.0.25(zod@3.25.76)
+      '@ai-sdk/deepinfra':
+        specifier: ^2.0.39
+        version: 2.0.39(zod@3.25.76)
+      '@ai-sdk/fireworks':
+        specifier: ^2.0.40
+        version: 2.0.40(zod@3.25.76)
+      '@ai-sdk/google':
+        specifier: ^3.0.43
+        version: 3.0.43(zod@3.25.76)
+      '@ai-sdk/groq':
+        specifier: ^3.0.27
+        version: 3.0.29(zod@3.25.76)
+      '@ai-sdk/huggingface':
+        specifier: ^1.0.37
+        version: 1.0.37(zod@3.25.76)
+      '@ai-sdk/moonshotai':
+        specifier: ^2.0.10
+        version: 2.0.10(zod@3.25.76)
+      '@ai-sdk/openai':
+        specifier: ^3.0.41
+        version: 3.0.41(zod@3.25.76)
+      '@ai-sdk/openai-compatible':
+        specifier: ^2.0.33
+        version: 2.0.35(zod@3.25.76)
+      '@ai-sdk/perplexity':
+        specifier: ^3.0.23
+        version: 3.0.23(zod@3.25.76)
+      '@clack/prompts':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.27.1(zod@3.25.76)
+      '@octokit/auth-app':
+        specifier: ^8.2.0
+        version: 8.2.0
+      '@octokit/rest':
+        specifier: ^22.0.1
+        version: 22.0.1
+      '@openrouter/ai-sdk-provider':
+        specifier: ^2.2.3
+        version: 2.3.1(ai@6.0.116(zod@3.25.76))(zod@3.25.76)
+      ai:
+        specifier: ^6.0.111
+        version: 6.0.116(zod@3.25.76)
+      commander:
+        specifier: ^14.0.3
+        version: 14.0.3
+      ora:
+        specifier: ^9.3.0
+        version: 9.3.0
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
+      yaml:
+        specifier: ^2.8.2
+        version: 2.8.2
+      zod:
+        specifier: ^3.22.4
+        version: 3.25.76
     devDependencies:
+      '@codeagora/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@codeagora/core':
         specifier: workspace:*
         version: link:../core

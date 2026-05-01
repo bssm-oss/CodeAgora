@@ -151,7 +151,9 @@ Session JSON is intentionally smaller than review JSON, but uses the same contra
 
 ## MCP Alignment
 
-MCP review tools default to compact output to preserve agent context.
+MCP review tools default to compact output to preserve agent context. `review_quick` and `review_full` accept either `diff` or `staged: true`; `review_pr` accepts `pr_url` or `pr_number`; review tools also accept shared options such as `reviewer_count`, `reviewer_names`, `provider`, `model`, `timeout_seconds`, `reviewer_timeout_seconds`, `no_cache`, `context_lines`, `repo_path`, and `output_format`.
+
+When `repo_path` is supplied, the MCP server validates that it resolves to an accessible directory inside the server cwd/repository root before invoking the review pipeline.
 
 Default compact response shape:
 
@@ -168,6 +170,21 @@ Default compact response shape:
 For compact MCP output, `decision` is `ACCEPT`, `REJECT`, `NEEDS_HUMAN`, or `ERROR`; `issues` is an array of compact finding objects; `summary` is a short string; and `sessionId` is the review session identifier when available.
 
 When a caller requests `output_format: "json"`, MCP delegates to the same CLI JSON formatter and therefore includes `schemaVersion: "codeagora.review.v1"`.
+
+MCP tool failures keep MCP protocol `isError: true` and return a structured JSON body:
+
+```json
+{
+  "status": "error",
+  "code": "INVALID_REPO_PATH",
+  "message": "repo_path is outside the allowed repository boundary",
+  "details": {
+    "repoPath": "/tmp/outside-repo"
+  }
+}
+```
+
+Review tool error codes are stable strings such as `INVALID_INPUT`, `INVALID_REPO_PATH`, `REVIEW_FAILED`, `REVIEW_PR_FAILED`, and `DRY_RUN_FAILED`. Consumers should branch on `status` and `code`; `details` is optional diagnostic context.
 
 Supported non-compact review output formats:
 

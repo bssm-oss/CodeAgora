@@ -280,8 +280,72 @@ describe('M-12: dry_run with large diff input', () => {
     expect(typeof result.estimatedReviewCost).toBe('string');
   });
 
+  it('dry_run tool returns structured error for empty diff', async () => {
+    vi.resetModules();
+
+    const { registerDryRun } = await import('../tools/dry-run.js');
+
+    let capturedHandler: ((args: { diff: string }) => Promise<unknown>) | null = null;
+    const mockServer = {
+      tool: vi.fn((_name: string, _desc: string, _schema: unknown, handler: (args: { diff: string }) => Promise<unknown>) => {
+        capturedHandler = handler;
+      }),
+    };
+
+    registerDryRun(mockServer as never);
+    expect(capturedHandler).not.toBeNull();
+
+    const result = await capturedHandler!({ diff: '   ' }) as {
+      content: Array<{ text: string }>;
+      isError?: boolean;
+    };
+    const parsed = JSON.parse(result.content[0].text) as Record<string, unknown>;
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      message: 'diff must not be empty',
+    });
+  });
+
+  it('dry_run tool returns structured error when complexity estimation fails', async () => {
+    vi.resetModules();
+    vi.doMock('@codeagora/core/pipeline/diff-complexity.js', () => ({
+      estimateDiffComplexity: vi.fn(() => {
+        throw new Error('complexity failed');
+      }),
+    }));
+
+    const { registerDryRun } = await import('../tools/dry-run.js');
+
+    let capturedHandler: ((args: { diff: string }) => Promise<unknown>) | null = null;
+    const mockServer = {
+      tool: vi.fn((_name: string, _desc: string, _schema: unknown, handler: (args: { diff: string }) => Promise<unknown>) => {
+        capturedHandler = handler;
+      }),
+    };
+
+    registerDryRun(mockServer as never);
+    expect(capturedHandler).not.toBeNull();
+
+    const result = await capturedHandler!({ diff: '+x' }) as {
+      content: Array<{ text: string }>;
+      isError?: boolean;
+    };
+    const parsed = JSON.parse(result.content[0].text) as Record<string, unknown>;
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'DRY_RUN_FAILED',
+      message: 'complexity failed',
+    });
+  });
+
   it('dry_run tool returns valid JSON content for 1MB diff', async () => {
     vi.resetModules();
+    vi.doUnmock('@codeagora/core/pipeline/diff-complexity.js');
 
     const { registerDryRun } = await import('../tools/dry-run.js');
 

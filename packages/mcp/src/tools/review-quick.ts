@@ -8,6 +8,7 @@ import { runReviewCompact, getStagedDiff, type ReviewOptions } from '../helpers.
 import { formatReviewResult, type OutputFormat } from '../post-actions.js';
 import { runReviewRaw } from '../helpers.js';
 import { reviewOptionsSchema, stagedSchema } from './shared-schema.js';
+import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
 
 export function registerReviewQuick(server: McpServer): void {
   server.tool(
@@ -20,12 +21,14 @@ export function registerReviewQuick(server: McpServer): void {
     },
     async (params) => {
       try {
-        const diff = params.staged ? await getStagedDiff() : params.diff;
-        if (!diff) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either diff or staged=true is required' }) }],
-            isError: true,
-          };
+        const repoPath = await resolveRepoPathOrError(params.repo_path);
+        if (!repoPath.ok) {
+          return mcpErrorResponse(repoPath.error.code, repoPath.error.message, repoPath.error.details);
+        }
+
+        const diff = params.staged ? await getStagedDiff(repoPath.repoPath) : params.diff;
+        if (!diff || diff.trim().length === 0) {
+          return mcpErrorResponse('INVALID_INPUT', 'Either diff or staged=true is required');
         }
 
         const options: ReviewOptions = {
@@ -38,7 +41,7 @@ export function registerReviewQuick(server: McpServer): void {
           ...(params.timeout_seconds != null && { timeoutSeconds: params.timeout_seconds }),
           ...(params.reviewer_timeout_seconds != null && { reviewerTimeoutSeconds: params.reviewer_timeout_seconds }),
           ...(params.no_cache != null && { noCache: params.no_cache }),
-          ...(params.repo_path && { repoPath: params.repo_path }),
+          ...(repoPath.repoPath && { repoPath: repoPath.repoPath }),
           ...(params.context_lines != null && { contextLines: params.context_lines }),
         };
 
@@ -53,8 +56,7 @@ export function registerReviewQuick(server: McpServer): void {
         const result = await runReviewCompact(diff, options);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: msg }) }], isError: true };
+        return mcpErrorResponse('REVIEW_FAILED', errorMessage(err));
       }
     },
   );
