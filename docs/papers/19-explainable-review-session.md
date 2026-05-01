@@ -22,7 +22,7 @@
 ## 근거와 소스 앵커
 
 - `docs/EXTENSIONS.md`
-- `docs/WEB_API.md`
+- `docs/DESKTOP_APP_CONSOLIDATION.md`
 - `src/tests/cli-sessions*`
 - `src/tests/session*`
 - `src/tests/confidence*`
@@ -62,7 +62,7 @@ CodeAgora는 리뷰를 session 단위로 저장하고, 각 finding의 생성자,
 
 Explainable session은 네 종류의 정보를 보존한다. 첫째, reviewer output provenance는 어떤 모델과 backend가 finding을 생성했는지 기록한다. 둘째, evidence provenance는 finding이 어떤 파일과 diff hunk에 연결되는지 기록한다. 셋째, confidence trace는 보정 전후의 score와 이유를 기록한다. 넷째, debate trace는 finding이 L2에서 지지, 반박, 기각된 과정을 기록한다.
 
-`explain_session`은 이 정보를 사람이 이해할 수 있는 설명으로 재구성하는 interface다. MCP나 CLI에서 session id를 입력하면, 시스템은 최종 verdict뿐 아니라 주요 finding의 의사결정 경로를 요약할 수 있다. Web dashboard는 동일 정보를 시각적으로 탐색하는 경로가 될 수 있다.
+`explain_session`은 이 정보를 사람이 이해할 수 있는 설명으로 재구성하는 interface다. MCP나 CLI에서 session id를 입력하면, 시스템은 최종 verdict뿐 아니라 주요 finding의 의사결정 경로를 요약할 수 있다. Desktop app은 동일 정보를 시각적으로 탐색하는 경로가 될 수 있다.
 
 ### 4. 평가 계획
 

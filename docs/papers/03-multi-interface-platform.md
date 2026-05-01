@@ -2,11 +2,11 @@
 
 ## 초록 초안
 
-본 논문은 CodeAgora가 동일한 코드 리뷰 파이프라인을 CLI, GitHub Action, MCP, TUI, Web dashboard로 노출하는 방식을 다룬다. 핵심은 기능을 UI마다 재구현하는 것이 아니라, 리뷰 세션과 파이프라인을 공통 도메인 모델로 유지하고 인터페이스별 entrypoint를 분리하는 것이다.
+본 논문은 CodeAgora가 동일한 코드 리뷰 파이프라인을 CLI, GitHub Action, MCP, desktop app으로 노출하는 방식을 다룬다. 핵심은 기능을 UI마다 재구현하는 것이 아니라, 리뷰 세션과 파이프라인을 공통 도메인 모델로 유지하고 인터페이스별 entrypoint를 분리하는 것이다.
 
 ## 핵심 연구 질문
 
-CLI, GitHub Action, MCP, TUI, Web dashboard를 하나의 코드 리뷰 경험으로 통합하려면 어떤 경계가 필요한가?
+CLI, GitHub Action, MCP, desktop app을 하나의 코드 리뷰 경험으로 통합하려면 어떤 경계가 필요한가?
 
 ## 주장
 
@@ -17,14 +17,14 @@ CLI, GitHub Action, MCP, TUI, Web dashboard를 하나의 코드 리뷰 경험으
 - CLI는 batch review와 session browsing을 담당한다.
 - GitHub Action은 PR 자동화와 annotation을 담당한다.
 - MCP는 AI IDE tool interface를 제공한다.
-- TUI와 Web은 interactive review exploration을 제공한다.
+- Desktop app은 retired UI packages의 interactive review exploration 역할을 통합한다.
 
 ## 근거와 소스 앵커
 
 - `docs/EXTENSIONS.md`
-- `docs/WEB_API.md`
+- `docs/DESKTOP_APP_CONSOLIDATION.md`
 - `docs/5_GITHUB_INTEGRATION.md`
-- `docs/6_WEB_AND_UX_EXPANSION.md`
+- `docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md`
 - `packages/mcp/`
 
 ## 실험 설계
@@ -46,12 +46,12 @@ CLI, GitHub Action, MCP, TUI, Web dashboard를 하나의 코드 리뷰 경험으
 
 ## 확장 본문 초안
 
-개발자는 하나의 인터페이스만 사용하지 않는다. 빠른 로컬 확인은 CLI에서 수행하고, 팀 협업은 GitHub PR에서 이루어지며, 긴 session 탐색은 Web dashboard가 유리하고, AI IDE에서는 MCP tool 호출이 자연스럽다. CodeAgora는 이러한 다양한 접점을 별도 제품으로 분리하지 않고, 동일한 review pipeline을 여러 adapter로 노출하는 방식을 취한다.
+개발자는 하나의 인터페이스만 사용하지 않는다. 빠른 로컬 확인은 CLI에서 수행하고, 팀 협업은 GitHub PR에서 이루어지며, 긴 session 탐색은 desktop app이 담당하고, AI IDE에서는 MCP tool 호출이 자연스럽다. CodeAgora는 이러한 다양한 접점을 별도 제품으로 분리하지 않고, 동일한 review pipeline을 여러 adapter로 노출하는 방식을 취한다.
 
-멀티 인터페이스 설계에서 공유되어야 하는 것은 pipeline core, config, session model, finding schema다. 분리되어야 하는 것은 user interaction, rendering, authentication context, trigger mechanism이다. CLI 중심 도구는 자동화와 scriptability가 강하지만 긴 결과를 탐색하기 어렵다. Web UI는 탐색성이 좋지만 terminal workflow와 떨어질 수 있다. GitHub Action은 협업에 좋지만 PR 생성 이전의 빠른 feedback에는 적합하지 않다. MCP는 AI IDE와 자연스럽지만 표준 tool schema와 packaging 안정성을 요구한다.
+멀티 인터페이스 설계에서 공유되어야 하는 것은 pipeline core, config, session model, finding schema다. 분리되어야 하는 것은 user interaction, rendering, authentication context, trigger mechanism이다. CLI 중심 도구는 자동화와 scriptability가 강하지만 긴 결과를 탐색하기 어렵다. Desktop UI는 탐색성이 좋지만 terminal workflow와 떨어질 수 있다. GitHub Action은 협업에 좋지만 PR 생성 이전의 빠른 feedback에는 적합하지 않다. MCP는 AI IDE와 자연스럽지만 표준 tool schema와 packaging 안정성을 요구한다.
 
-CodeAgora는 이 문제를 interface adapter 패턴으로 다룬다. CLI는 `agora review`, `agora sessions`, `agora dashboard` 같은 명령으로 batch와 탐색 workflow를 제공한다. GitHub Action은 PR diff를 생성하고 결과를 comment/status/SARIF로 변환한다. MCP는 review 기능을 tool 단위로 나누어 agent가 호출할 수 있게 한다. Web dashboard는 session history, model leaderboard, discussion trace를 시각화한다.
+CodeAgora는 이 문제를 interface adapter 패턴으로 다룬다. CLI는 `agora review`, `agora sessions` 같은 명령으로 batch와 탐색 workflow를 제공한다. GitHub Action은 PR diff를 생성하고 결과를 comment/status/SARIF로 변환한다. MCP는 review 기능을 tool 단위로 나누어 agent가 호출할 수 있게 한다. Desktop app은 session history, model leaderboard, discussion trace를 시각화한다.
 
-공통 session model은 interface 간 일관성을 만든다. CLI에서 생성한 session을 Web에서 탐색하거나, MCP의 `explain_session`이 같은 session을 설명할 수 있다면 사용자 경험은 분절되지 않는다. 평가는 task별 interface 적합성을 비교해야 한다. “현재 diff 빠른 확인”, “PR 리뷰 자동화”, “이전 session 원인 분석”, “AI IDE에서 설정 확인” 같은 task를 정의하고 각 interface의 time-to-completion과 오류율을 측정할 수 있다.
+공통 session model은 interface 간 일관성을 만든다. CLI에서 생성한 session을 desktop app에서 탐색하거나, MCP의 `explain_session`이 같은 session을 설명할 수 있다면 사용자 경험은 분절되지 않는다. 평가는 task별 interface 적합성을 비교해야 한다. “현재 diff 빠른 확인”, “PR 리뷰 자동화”, “이전 session 원인 분석”, “AI IDE에서 설정 확인” 같은 task를 정의하고 각 interface의 time-to-completion과 오류율을 측정할 수 있다.
 
 멀티 인터페이스는 유지보수 비용을 높인다. Core schema가 흔들리면 모든 adapter가 영향을 받는다. 따라서 schema versioning과 interface contract test가 중요하다.
