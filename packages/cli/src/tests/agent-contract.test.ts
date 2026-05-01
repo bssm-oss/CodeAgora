@@ -10,6 +10,7 @@ import {
   shouldFailOnSeverity,
   withAgentContract,
 } from '../utils/agent-contract.js';
+import { redactDeep, redactSecrets } from '@codeagora/shared/utils/redaction.js';
 import { classifyCliErrorExitCode, formatError } from '../utils/errors.js';
 
 function makeResult(overrides: Partial<PipelineResult> = {}): PipelineResult {
@@ -96,6 +97,33 @@ describe('agent contract helpers', () => {
     expect(line).not.toContain('\n');
   });
 
+  it('keeps canonical contract fields from being overridden by payload fields', () => {
+    const resultWithCollision = {
+      ...makeResult(),
+      schemaVersion: 'wrong.version',
+      type: 'progress',
+    } as PipelineResult & { schemaVersion: string; type: string };
+    const progressWithCollision = {
+      stage: 'review',
+      event: 'stage-update',
+      progress: 40,
+      message: 'working',
+      timestamp: 1777248000000,
+      schemaVersion: 'wrong.version',
+      type: 'result',
+    } as ProgressEvent & { schemaVersion: string; type: string };
+
+    const json = JSON.parse(formatAgentJson(resultWithCollision)) as Record<string, unknown>;
+    const resultLine = JSON.parse(formatResultNdjsonEvent(resultWithCollision)) as Record<string, unknown>;
+    const progressLine = JSON.parse(formatProgressNdjsonEvent(progressWithCollision)) as Record<string, unknown>;
+
+    expect(json['schemaVersion']).toBe('codeagora.review.v1');
+    expect(resultLine['schemaVersion']).toBe('codeagora.review.v1');
+    expect(resultLine['type']).toBe('result');
+    expect(progressLine['schemaVersion']).toBe('codeagora.review.v1');
+    expect(progressLine['type']).toBe('progress');
+  });
+
   it('redacts secrets from JSON and NDJSON contract output without breaking parsing', () => {
     const result = makeResult({
       error: 'OPENAI_API_KEY=sk-secret123456789 failed',
@@ -134,6 +162,37 @@ describe('agent contract helpers', () => {
       expect(output).not.toContain('ghp_secret123456789');
       expect(output).not.toContain('hunter2');
     }
+  });
+
+  it('redacts quoted and encoded secret values', () => {
+    const base64Secret = Buffer.from('sk-secret123456789').toString('base64');
+    const urlSecret = 'ghp%5Fsecret123456789';
+    const output = redactSecrets([
+      'API_KEY="sk-secret123456789"',
+      base64Secret,
+      urlSecret,
+    ].join(' '));
+
+    expect(output).toContain('API_KEY=[REDACTED]');
+    expect(output).not.toContain('sk-secret123456789');
+    expect(output).not.toContain(base64Secret);
+    expect(output).not.toContain(urlSecret);
+  });
+
+  it('keeps circular redaction input serializable', () => {
+    interface CircularRecord {
+      secret: string;
+      self?: CircularRecord;
+    }
+    const value: CircularRecord = { secret: 'OPENAI_API_KEY=sk-secret123456789' };
+    value.self = value;
+
+    const redacted = redactDeep(value);
+    const output = JSON.stringify(redacted);
+
+    expect(output).toContain('[Circular]');
+    expect(output).toContain('[REDACTED]');
+    expect(output).not.toContain('sk-secret123456789');
   });
 });
 

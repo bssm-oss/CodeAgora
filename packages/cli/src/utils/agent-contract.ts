@@ -39,8 +39,8 @@ export const REVIEW_SEVERITY_ORDER = [
 export function withAgentContract(result: PipelineResult): AgentJsonResult {
   const redactedResult = redactDeep(result);
   return {
-    schemaVersion: AGENT_CONTRACT_VERSION,
     ...redactedResult,
+    schemaVersion: AGENT_CONTRACT_VERSION,
   };
 }
 
@@ -51,16 +51,18 @@ export function formatAgentJson(result: PipelineResult): string {
 export function formatProgressNdjsonEvent(event: ProgressEvent): string {
   const redactedEvent = redactDeep(event);
   return JSON.stringify({
+    ...redactedEvent,
     schemaVersion: AGENT_CONTRACT_VERSION,
     type: 'progress',
-    ...redactedEvent,
   } satisfies AgentProgressNdjsonEvent);
 }
 
 export function formatResultNdjsonEvent(result: PipelineResult): string {
+  const redactedResult = redactDeep(result);
   return JSON.stringify({
+    ...redactedResult,
+    schemaVersion: AGENT_CONTRACT_VERSION,
     type: 'result',
-    ...withAgentContract(result),
   } satisfies AgentResultNdjsonEvent);
 }
 
