@@ -32,6 +32,7 @@ agora review --post-review --pr 123          # Post back to PR
 | `--context-lines <n>` | Surrounding code context (0 = disabled) | `20` |
 | `--json-stream` | Stream NDJSON events | — |
 | `--no-cache` | Skip result caching | — |
+| `--fail-on-severity <level>` | Exit 1 when any issue is at or above `SUGGESTION`, `WARNING`, `CRITICAL`, or `HARSHLY_CRITICAL` | — |
 | `--pr <url-or-number>` | GitHub PR URL or number | — |
 | `--post-review` | Post comments back to PR (requires `--pr`) | — |
 | `--dry-run` | Validate config only | — |
@@ -47,7 +48,7 @@ agora review --post-review --pr 123          # Post back to PR
 | `2` | Setup, input, or config error |
 | `3` | Runtime or pipeline failure, including `status: "error"` JSON results |
 
-`--output json` and `--json-stream` use the stable agent contract documented in [Agent Contract](AGENT_CONTRACT.md). JSON result objects include `schemaVersion: "codeagora.review.v1"`; NDJSON stream lines include a `type` discriminator (`progress` or `result`).
+`--output json` and `--json-stream` use the stable agent contract documented in [Agent Contract](AGENT_CONTRACT.md). JSON result objects include `schemaVersion: "codeagora.review.v1"`; NDJSON stream lines include a `type` discriminator (`progress` or `result`). Presentation formats such as `text`, `md`, `github`, `html`, `junit`, and `sarif` remain beta-changing renderers, not stable machine contracts.
 
 ## `agora init`
 

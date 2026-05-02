@@ -68,6 +68,8 @@ Deterministic benchmark CI gates such as `pnpm bench:ci` do not require live pro
 - `config_get`: read current reviewer configuration.
 - `config_set`: update supported configuration fields.
 
+Default MCP review responses are compact to preserve agent context. Request `output_format: "json"` from review tools when you need the versioned `codeagora.review.v1` machine contract.
+
 ## Troubleshooting
 
 - If the server exits immediately, run `pnpm --filter @codeagora/mcp build` and confirm `packages/mcp/dist/index.js` exists.

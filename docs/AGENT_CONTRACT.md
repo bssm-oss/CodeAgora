@@ -16,6 +16,8 @@ The current contract marker is:
 codeagora.review.v1
 ```
 
+Only the versioned JSON/NDJSON surfaces in this document are stable machine contracts. Compact MCP output and presentation renderers such as text, Markdown, GitHub-flavored Markdown, HTML, JUnit, and SARIF may change during beta unless they are explicitly versioned here.
+
 ## JSON Result
 
 `agora review --output json` writes one JSON object to stdout.
