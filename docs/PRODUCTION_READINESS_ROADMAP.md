@@ -223,6 +223,18 @@ A beta release requires all of the following. Passing this gate does not imply a
 - Known limits are documented, especially provider nondeterminism, cost variance, language coverage, and fork-secret behavior.
 - No retired surface is required for setup, review execution, or result inspection.
 
+## Beta-to-Stable Work Queue
+
+Use this queue after a beta release and before calling a stable candidate:
+
+1. Keep the public docs beta-first: README, onboarding, and release notes must say CLI, GitHub Actions, and MCP are the supported surfaces; desktop remains private preview.
+2. Freeze the stable contract: CLI JSON/NDJSON schemas, exit codes, MCP tool output, GitHub Action inputs, and documented config behavior must not change without a migration note.
+3. Keep `pnpm bench:ci` as the deterministic offline release gate, separate from live `bench:fn:run` evidence artifacts.
+4. Attach at least one stable-candidate live benchmark report with provider/model set, TP/FP/FN, latency, cost or token availability, and provider failure notes.
+5. Keep research and paper drafts labeled as evidence-needed until they include result tables, repeated runs, or an explicit benchmark/test anchor.
+6. Run clean-checkout release validation: install, build, typecheck, test, `bench:ci`, package dry-runs, CLI smoke, MCP smoke, and Action bundle smoke.
+7. Only after the above stays green through a release-candidate cycle should `latest` dist-tag promotion or stable release wording be considered.
+
 ## Non-Goals Before Production Readiness
 
 - Hosted service, billing, teams, or enterprise admin features.
