@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-beta.0 (planned)
+
+### Beta Release Readiness
+- Promote the supported release line from alpha readiness to `0.1.0-beta.0` across workspace package metadata.
+- Keep CLI, GitHub Action, and MCP as the supported beta surfaces for broader user feedback.
+
+### Release Safety
+- Publish prerelease packages with an explicit `beta` npm dist-tag in the tag-triggered release workflow.
+- Add manual npm dist-tag safeguards so prerelease versions cannot be promoted to `latest`.
+
+### Verification
+- Required gates: `pnpm typecheck`, `pnpm test --no-file-parallelism`, `pnpm bench:ci`, and `pnpm release:beta-smoke`.
+- Final `v0.1.0-beta.0` tag push and npm publication remain explicit release approval steps.
+
 ## 0.1.0-alpha.1 (2026-04-29)
 
 ### Product Surface Reset

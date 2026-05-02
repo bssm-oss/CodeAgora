@@ -20,6 +20,7 @@ on:
         type: choice
         options:
           - alpha
+          - beta
           - legacy
           - latest
 
@@ -38,6 +39,16 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Guard dist-tag safety
+        run: |
+          if [ "$TAG" = "latest" ] && [[ "$VERSION" == *-* ]]; then
+            echo "::error::Prerelease versions must not be assigned the latest dist-tag"
+            exit 1
+          fi
+        env:
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
 
       - name: Add npm dist-tag
         run: pnpm dist-tag add "${PACKAGE}@${VERSION}" "${TAG}"

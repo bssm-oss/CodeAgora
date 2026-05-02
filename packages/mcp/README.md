@@ -4,7 +4,7 @@ CodeAgora MCP server for Claude Code, Cursor, and other MCP-compatible clients.
 
 ## Install
 
-Release-candidate local smoke uses a packed tarball instead of publishing:
+Beta local smoke uses a packed tarball instead of publishing:
 
 ```bash
 pnpm --filter @codeagora/mcp build
@@ -30,7 +30,7 @@ npx -y @codeagora/mcp
 }
 ```
 
-For local RC validation, point your client at the built workspace binary instead:
+For local beta validation, point your client at the built workspace binary instead:
 
 ```json
 {
@@ -73,4 +73,4 @@ Deterministic benchmark CI gates such as `pnpm bench:ci` do not require live pro
 - If the server exits immediately, run `pnpm --filter @codeagora/mcp build` and confirm `packages/mcp/dist/index.js` exists.
 - If review tools return missing-provider errors, set the provider key for the configured reviewer backend.
 - If `repo_path` is rejected, pass a real directory inside the current repository boundary. Symlinks and paths outside the repo are intentionally rejected.
-- If a client cannot find the command, use an absolute `node` path and an absolute `dist/index.js` path for local RC smoke.
+- If a client cannot find the command, use an absolute `node` path and an absolute `dist/index.js` path for local beta smoke.
