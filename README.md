@@ -76,9 +76,9 @@ git diff | agora review
 
 ## Desktop App
 
-The old web dashboard and terminal TUI are being consolidated into a single cross-platform Tauri desktop app.
+The old web dashboard and terminal TUI are being consolidated toward a planned cross-platform Tauri desktop app.
 
-The CLI remains the primary automation surface for LLM agents and CI. The desktop app will become the human-facing local UI for review history, configuration, progress, costs, and result exploration.
+The CLI remains the primary automation surface for LLM agents and CI. The desktop app is intended to become the human-facing local UI for review history, configuration, progress, costs, and result exploration, but it is not part of the stable support surface yet.
 
 An initial private scaffold lives in `packages/desktop` while the desktop MVP takes shape.
 
@@ -201,7 +201,7 @@ pnpm dev review path/to/diff.patch
 
 ## Benchmarks
 
-Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative and FP-regression framework (see #472). The current deterministic beta gate covers 20 fixtures: 14 recall cases and 6 FP-regression cases.
+Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative and FP-regression framework (see #472). The current deterministic offline gate covers 20 fixtures: 14 recall cases and 6 FP-regression cases.
 
 **Required offline gate** (fast, no API calls):
 
@@ -211,7 +211,7 @@ pnpm bench:fn -- --validate-only                   # schema-check fixtures
 pnpm bench:reference -- --validate-only            # validate the 20-fixture reference gate
 ```
 
-The required gate is provider-free. Live benchmark runs are manual evidence artifacts, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead.
+The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead.
 
 **Score pre-computed results** (fast, no API calls):
 
