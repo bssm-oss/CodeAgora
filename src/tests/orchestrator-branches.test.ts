@@ -253,6 +253,29 @@ describe('Orchestrator Branches', () => {
     expect(mockSession.setStatus).toHaveBeenCalledWith('failed');
   });
 
+  it('forfeit threshold error includes reviewer failure diagnostics when present', async () => {
+    (checkForfeitThreshold as Mock).mockReturnValue({ passed: false, forfeitRate: 1 });
+    (executeReviewers as Mock).mockResolvedValue([
+      {
+        reviewerId: 'r1',
+        model: 'test',
+        provider: 'groq',
+        group: 'root',
+        evidenceDocs: [],
+        rawResponse: '',
+        status: 'forfeit' as const,
+        error: 'Circuit open for groq/test',
+      },
+    ]);
+
+    const result = await runPipeline({ diffPath: '/tmp/test.diff' });
+
+    expect(result.status).toBe('error');
+    expect(result.error).toContain('provider/API failures');
+    expect(result.error).toContain('r1 (groq/test): circuit-open');
+    expect(result.error).toContain('agora doctor --live');
+  });
+
   // --------------------------------------------------------------------------
   // 3. Promoted unconfirmed issues (lines 178-190)
   // --------------------------------------------------------------------------

@@ -13,7 +13,7 @@ import { estimateTokens } from './chunker.js';
 import { createLogger } from '@codeagora/shared/utils/logger.js';
 import { writeHeadVerdict } from '../l3/writer.js';
 import { QualityTracker } from '../l0/quality-tracker.js';
-import type { EvidenceDocument, DiscussionVerdict } from '../types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, ReviewOutput } from '../types/core.js';
 import { SEVERITY_ORDER } from '../types/core.js';
 import type { ProgressEmitter } from './progress.js';
 import { chunkDiffWithMetadata } from './chunker.js';
@@ -33,6 +33,7 @@ import { buildReviewerMap, buildReviewerOpinions, buildSupporterModelMap, mergeR
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
 import fs from 'fs/promises';
 import type { ModeratorReport } from '../types/core.js';
+import { classifyError, type ErrorKind } from '../l1/error-classifier.js';
 
 // ============================================================================
 // Main Pipeline
@@ -106,6 +107,38 @@ export interface PipelineResult {
   supporterModelMap?: Record<string, string>;
   /** True when the result was served from cache (#109) */
   cached?: boolean;
+}
+
+// ============================================================================
+// Failure Diagnostics
+// ============================================================================
+
+function buildReviewerFailureMessage(failures: ReviewOutput[], date: string, sessionId: string): string {
+  const failuresWithErrors = failures.filter((result) => result.error && result.error.trim().length > 0);
+  if (failuresWithErrors.length === 0) {
+    return `All reviewers failed (forfeited or errored). ` +
+      `Check API keys with 'agora doctor --live' or review session logs at .ca/sessions/${date}/${sessionId}/`;
+  }
+
+  const details = failuresWithErrors
+    .slice(0, 5)
+    .map((result) => {
+      const kind = classifyReviewerFailure(result.error ?? 'Unknown error');
+      const provider = result.provider ?? 'unknown';
+      return `- ${result.reviewerId} (${provider}/${result.model}): ${kind}: ${result.error}`;
+    })
+    .join('\n');
+  const omitted = failuresWithErrors.length > 5
+    ? `\n- ... ${failuresWithErrors.length - 5} more reviewer failure(s)`
+    : '';
+
+  return `All reviewers failed (forfeited or errored) due to provider/API failures.\n${details}${omitted}\n` +
+    `Recovery hint: check provider API keys, quota/rate limits, network connectivity, and circuit breaker status with 'agora doctor --live'; review session logs at .ca/sessions/${date}/${sessionId}/`;
+}
+
+function classifyReviewerFailure(message: string): ErrorKind | 'circuit-open' {
+  if (/circuit open/i.test(message)) return 'circuit-open';
+  return classifyError(new Error(message)).kind;
 }
 
 // ============================================================================
@@ -293,7 +326,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // === L1 REVIEWERS: Chunk Processing ===
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
     const l1Start = Date.now();
-    const { allReviewResults, allReviewerInputs } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress);
+    const { allReviewResults, allReviewerInputs, forfeitFailures } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress);
     const l1Elapsed = Date.now() - l1Start;
     for (const r of allReviewResults) {
       telemetry.record({
@@ -315,8 +348,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         sessionId,
         date,
         status: 'error',
-        error: `All reviewers failed (forfeited or errored). ` +
-          `Check API keys with 'agora doctor --live' or review session logs at .ca/sessions/${date}/${sessionId}/`,
+        error: buildReviewerFailureMessage(forfeitFailures, date, sessionId),
       };
     }
 

@@ -32,9 +32,10 @@ export async function executeL1Reviews(
   projectContext?: string,
   enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
   progress?: import('./progress.js').ProgressEmitter,
-): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[] }> {
+): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[]; forfeitFailures: ReviewOutput[] }> {
   const allReviewResults: ReviewOutput[] = [];
   const allReviewerInputs: ReviewerInput[] = [];
+  const forfeitFailures: ReviewOutput[] = [];
 
   const processChunk = async (chunk: typeof chunks[number]) => {
     const fileGroups = groupDiff(chunk.diffContent);
@@ -102,7 +103,7 @@ export async function executeL1Reviews(
       reviewResults,
       config.errorHandling.forfeitThreshold
     );
-    if (!forfeitCheck.passed) return null;
+    if (!forfeitCheck.passed) return { reviewResults: [], reviewerInputs, forfeitFailures: reviewResults };
 
     if (chunks.length > 1) {
       for (const result of reviewResults) {
@@ -124,6 +125,7 @@ export async function executeL1Reviews(
       if (out) {
         allReviewResults.push(...out.reviewResults);
         allReviewerInputs.push(...out.reviewerInputs);
+        forfeitFailures.push(...(out.forfeitFailures ?? []));
       }
     }
   } else {
@@ -136,12 +138,13 @@ export async function executeL1Reviews(
       if (result.status === 'fulfilled' && result.value) {
         allReviewResults.push(...result.value.reviewResults);
         allReviewerInputs.push(...result.value.reviewerInputs);
+        forfeitFailures.push(...(result.value.forfeitFailures ?? []));
       }
       // rejected chunks are silently skipped (same as forfeit skip)
     }
   }
 
-  return { allReviewResults, allReviewerInputs };
+  return { allReviewResults, allReviewerInputs, forfeitFailures };
 }
 
 /**

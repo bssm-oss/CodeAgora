@@ -204,13 +204,15 @@ const mockConfig = {
   errorHandling: { maxRetries: 2, forfeitThreshold: 0.5 },
 };
 
-const makeReviewResult = (id: string, status: 'success' | 'forfeit' = 'success') => ({
+const makeReviewResult = (id: string, status: 'success' | 'forfeit' = 'success', error?: string) => ({
   reviewerId: id,
   model: 'test',
+  provider: 'groq',
   group: 'root',
   evidenceDocs: [],
   rawResponse: '',
   status,
+  ...(error ? { error } : {}),
 });
 
 const mockModeratorReport = {
@@ -303,6 +305,25 @@ describe('ORCH-01 — all reviewers fail returns error', () => {
     await runPipeline({ diffPath: '/tmp/test.diff', noCache: true });
 
     expect(runModerator).not.toHaveBeenCalled();
+  });
+
+  it('surfaces provider failure details when reviewer errors are available', async () => {
+    (checkForfeitThreshold as Mock).mockReturnValue({ passed: false, forfeitRate: 1.0 });
+    (executeReviewers as Mock).mockResolvedValue([
+      makeReviewResult('r1', 'forfeit', 'Auth error (permanent): API key invalid'),
+      makeReviewResult('r2', 'forfeit', 'Provider quota exceeded'),
+      makeReviewResult('r3', 'forfeit', 'Request timeout after 120000ms'),
+    ]);
+
+    const result = await runPipeline({ diffPath: '/tmp/test.diff', noCache: true });
+
+    expect(result.status).toBe('error');
+    expect(result.error).toContain('provider/API failures');
+    expect(result.error).toContain('r1 (groq/test): auth');
+    expect(result.error).toContain('r2 (groq/test): rate-limited');
+    expect(result.error).toContain('r3 (groq/test): transient');
+    expect(result.error).toContain('agora doctor --live');
+    expect(result.error).toContain('.ca/sessions/2026-01-15/001/');
   });
 });
 
