@@ -82,7 +82,7 @@ Note: Evidence deduplication is in L2 (`deduplication.ts`). Confidence-based tri
 
 ## Project Structure
 
-pnpm monorepo with four supported product surfaces: CLI, MCP, GitHub Actions, and the upcoming desktop app.
+pnpm monorepo with three current supported product surfaces: CLI, MCP, and GitHub Actions. The upcoming desktop app is a private preview surface.
 
 ```
 packages/
@@ -93,7 +93,7 @@ packages/
 └── mcp/            # @codeagora/mcp — MCP server (9 tools)
 ```
 
-The former web, TUI, and notifications packages are retired as first-class surfaces. Their human-facing responsibilities move into the upcoming Tauri desktop app.
+The former web, TUI, and notifications packages are retired as first-class surfaces. Their human-facing responsibilities are planned to move into the upcoming Tauri desktop app once it graduates from preview.
 
 ## Session Storage
 

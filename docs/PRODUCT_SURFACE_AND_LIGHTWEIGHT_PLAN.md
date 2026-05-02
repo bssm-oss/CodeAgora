@@ -36,14 +36,15 @@ Same Agora brain.
 
 ## Supported Product Surfaces
 
-The supported product surfaces are:
+The current supported surfaces are:
 
 ```txt
 CLI
 MCP
 GitHub Actions
-Desktop App
 ```
+
+The desktop app is a private preview surface until its packaging, release, and parity gates are ready.
 
 ### CLI
 
@@ -85,7 +86,7 @@ It should not own local UI concerns.
 
 ### Desktop App
 
-The desktop app is the single human-facing local UI.
+The desktop app is the planned single human-facing local UI.
 
 It replaces:
 
@@ -93,7 +94,7 @@ It replaces:
 - old terminal TUI
 - old notification package surface
 
-The desktop app should own:
+Once promoted beyond preview, the desktop app should own:
 
 - session browsing
 - result exploration
@@ -304,7 +305,7 @@ Exit criteria:
 
 Exit criteria:
 
-- docs consistently describe four surfaces
+- docs consistently describe CLI, MCP, and GitHub Actions as current supported surfaces, with desktop as private preview
 - no stale product surface references outside archive/history
 - tests do not import retired packages
 
@@ -332,7 +333,7 @@ Exit criteria:
 
 Exit criteria:
 
-- desktop replaces the old dashboard/TUI for the basic local human workflow
+- desktop can be considered for promotion from private preview to supported human-facing surface
 
 ### Phase E: opencode Integration
 
