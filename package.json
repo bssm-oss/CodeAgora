@@ -44,7 +44,7 @@
     "test:coverage": "vitest run --coverage",
     "dev": "pnpm --filter @codeagora/cli dev",
     "build:action": "node scripts/build-action.mjs",
-    "release:rc-smoke": "node scripts/rc-smoke.mjs",
+    "release:beta-smoke": "node scripts/beta-smoke.mjs",
     "bench:fn": "tsx scripts/bench-fn.ts",
     "bench:fn:run": "tsx scripts/bench-fn-run.ts",
     "bench:fn:compare": "tsx scripts/bench-fn-compare.ts",
