@@ -35,7 +35,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         with:
           fetch-depth: 0
