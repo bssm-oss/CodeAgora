@@ -1,41 +1,59 @@
-/**
- * Tests for SARIF output path validation in github-action.ts
- * Issue #107: validate sarifOutputPath to prevent path traversal
- */
-
-import { describe, it, expect } from 'vitest';
-import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { validateActionOutputPath } from '@codeagora/github/action-policy.js';
 
 describe('SARIF output path validation', () => {
-  const allowedRoots = ['/workspace/project', '/tmp'];
+  let workspaceRoot: string;
+  let outsideRoot: string;
+  const tempRoots: string[] = [];
 
-  it('accepts default /tmp path', () => {
-    const result = validateDiffPath('/tmp/codeagora-results.sarif', { allowedRoots });
-    expect(result.success).toBe(true);
+  beforeEach(async () => {
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-sarif-workspace-'));
+    outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-sarif-outside-'));
+    await fs.mkdir(path.join(workspaceRoot, '.ca'), { recursive: true });
+    tempRoots.push(workspaceRoot, outsideRoot);
   });
 
-  it('accepts path under project root', () => {
-    const result = validateDiffPath('/workspace/project/.ca/results.sarif', { allowedRoots });
-    expect(result.success).toBe(true);
+  afterEach(async () => {
+    await Promise.all(tempRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true })));
   });
 
-  it('rejects path outside allowed roots', () => {
-    const result = validateDiffPath('/etc/evil.sarif', { allowedRoots });
-    expect(result.success).toBe(false);
+  it('accepts default /tmp path', async () => {
+    const result = await validateActionOutputPath('/tmp/codeagora-results.sarif', workspaceRoot);
+
+    expect(result).toBe(path.resolve('/tmp/codeagora-results.sarif'));
   });
 
-  it('rejects path with traversal segments', () => {
-    const result = validateDiffPath('/tmp/../etc/passwd', { allowedRoots });
-    expect(result.success).toBe(false);
+  it('accepts path under project root', async () => {
+    const result = await validateActionOutputPath(path.join(workspaceRoot, '.ca', 'results.sarif'), workspaceRoot);
+
+    expect(result).toBe(path.join(workspaceRoot, '.ca', 'results.sarif'));
   });
 
-  it('rejects path with null bytes', () => {
-    const result = validateDiffPath('/tmp/safe.sarif\x00.evil', { allowedRoots });
-    expect(result.success).toBe(false);
+  it('rejects path outside allowed roots', async () => {
+    await expect(validateActionOutputPath('/etc/evil.sarif', workspaceRoot)).rejects.toThrow(/Action output path rejected/);
   });
 
-  it('rejects empty path', () => {
-    const result = validateDiffPath('', { allowedRoots });
-    expect(result.success).toBe(false);
+  it('rejects path with traversal segments', async () => {
+    await expect(validateActionOutputPath('/tmp/../etc/passwd', workspaceRoot)).rejects.toThrow(/Action output path rejected/);
+  });
+
+  it('rejects path with null bytes', async () => {
+    await expect(validateActionOutputPath('/tmp/safe.sarif\x00.evil', workspaceRoot)).rejects.toThrow(/Action output path rejected/);
+  });
+
+  it('rejects empty path', async () => {
+    await expect(validateActionOutputPath('', workspaceRoot)).rejects.toThrow(/Action output path rejected/);
+  });
+
+  it('rejects existing symlink output targets', async () => {
+    const outsideFile = path.join(outsideRoot, 'results.sarif');
+    const linkPath = path.join(workspaceRoot, 'linked.sarif');
+    await fs.writeFile(outsideFile, '{}');
+    await fs.symlink(outsideFile, linkPath);
+
+    await expect(validateActionOutputPath(linkPath, workspaceRoot)).rejects.toThrow(/Action output path rejected/);
   });
 });
