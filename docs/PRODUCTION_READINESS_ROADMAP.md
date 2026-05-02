@@ -22,7 +22,7 @@ CodeAgora is production-ready when all of these are true:
 
 ## Supported Surfaces
 
-The supported product surfaces remain CLI, GitHub Actions, MCP, and the private/upcoming desktop app.
+The current stable-readiness surfaces are CLI, GitHub Actions, and MCP. The desktop app remains a private/upcoming preview surface.
 
 Production readiness gates apply to these automation and agent surfaces only:
 
@@ -214,7 +214,7 @@ Add a human-facing local UI only after the core product can stand on its own.
 
 ## Beta Gate
 
-A beta release requires all of the following:
+A beta release requires all of the following. Passing this gate does not imply a stable release; stable readiness requires keeping the contracts and evidence above green over a release-candidate cycle:
 
 - Phase 0 through Phase 6 acceptance gates complete.
 - `pnpm typecheck`, `pnpm build`, `pnpm test`, and action bundle build pass on clean checkout.

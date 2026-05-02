@@ -65,7 +65,7 @@ MCP onboarding is now package-local in `packages/mcp/README.md`, and the MCP ser
 
 ## Beta Positioning
 
-Beta means the CLI, GitHub Action, and MCP package are ready for broader user feedback on the supported surfaces, while APIs, benchmark thresholds, and provider behavior may still change before a stable release. Actual npm publishing, GitHub release creation, tag creation, and dist-tag promotion remain separate approval steps, and prerelease npm publishes must use the `beta` dist-tag.
+Beta means the CLI, GitHub Action, and MCP package are ready for broader user feedback on the supported surfaces, while APIs, benchmark thresholds, and provider behavior may still change before a stable release. The desktop app remains a private preview outside the beta support claim. Actual npm publishing, GitHub release creation, tag creation, and dist-tag promotion remain separate approval steps, and prerelease npm publishes must use the `beta` dist-tag.
 
 ## Verification Evidence
 
