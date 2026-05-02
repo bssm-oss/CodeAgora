@@ -2,17 +2,76 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
+const SENSITIVE_ENV_KEYS = new Set([
+  'ANTHROPIC_API_KEY',
+  'CEREBRAS_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'GITHUB_TOKEN',
+  'GOOGLE_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GROQ_API_KEY',
+  'MISTRAL_API_KEY',
+  'NODE_AUTH_TOKEN',
+  'NPM_TOKEN',
+  'NVIDIA_API_KEY',
+  'OPENAI_API_KEY',
+  'OPENROUTER_API_KEY',
+  'QWEN_API_KEY',
+  'TOGETHER_API_KEY',
+  'XAI_API_KEY',
+  'ZAI_API_KEY',
+]);
+const SENSITIVE_ENV_PATTERN = /(?:^|_)(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)(?:_|$)/i;
+
+function packEnv() {
+  const env = { ...process.env, npm_config_ignore_scripts: 'true' };
+  for (const key of Object.keys(env)) {
+    if (SENSITIVE_ENV_KEYS.has(key) || SENSITIVE_ENV_PATTERN.test(key)) {
+      env[key] = '';
+    }
+  }
+  return env;
+}
+
+function parsePackOutput(output, cwd) {
+  const trimmed = output.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (firstError) {
+    const start = trimmed.indexOf('[');
+    const end = trimmed.lastIndexOf(']');
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1));
+      } catch (secondError) {
+        throw new Error(`npm pack returned invalid JSON for ${cwd}. parse=${firstError.message} fallback=${secondError.message}`);
+      }
+    }
+    throw new Error(`npm pack returned invalid JSON for ${cwd}. parse=${firstError.message}`);
+  }
+}
+
+function normalizePackPath(file) {
+  return file.replace(/\\/g, '/');
+}
+
 function packFiles(cwd) {
-  const output = execFileSync('npm', ['pack', '--dry-run', '--json'], {
+  const output = execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
     cwd,
     encoding: 'utf-8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: packEnv(),
   });
-  const parsed = JSON.parse(output);
+  const parsed = parsePackOutput(output, cwd);
   if (!Array.isArray(parsed) || parsed.length === 0 || !Array.isArray(parsed[0].files)) {
     throw new Error(`Unexpected npm pack output for ${cwd}`);
   }
-  return parsed[0].files.map((file) => file.path).sort();
+  return parsed[0].files.map((file) => {
+    if (typeof file.path !== 'string') {
+      throw new Error(`Unexpected npm pack file entry for ${cwd}`);
+    }
+    return normalizePackPath(file.path);
+  }).sort();
 }
 
 function assertIncludes(files, expected, label) {
@@ -25,7 +84,7 @@ function assertIncludes(files, expected, label) {
 
 function assertExcludes(files, forbidden, label) {
   for (const pattern of forbidden) {
-    const match = files.find((file) => pattern.test(file));
+    const match = files.find((file) => pattern.test(normalizePackPath(file)));
     if (match) {
       throw new Error(`${label} package includes forbidden file ${match}`);
     }
