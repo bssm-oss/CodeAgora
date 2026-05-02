@@ -2,11 +2,11 @@ import fs from 'fs';
 import { describe, expect, it } from 'vitest';
 
 describe('release package content verification', () => {
-  it('has package-content verification wired into rc smoke', () => {
+  it('has package-content verification wired into beta smoke', () => {
     const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8')) as { scripts: Record<string, string> };
-    const smoke = fs.readFileSync('scripts/rc-smoke.mjs', 'utf-8');
+    const smoke = fs.readFileSync('scripts/beta-smoke.mjs', 'utf-8');
 
-    expect(pkg.scripts['release:rc-smoke']).toBe('node scripts/rc-smoke.mjs');
+    expect(pkg.scripts['release:beta-smoke']).toBe('node scripts/beta-smoke.mjs');
     expect(smoke).toContain('scripts/verify-package-contents.mjs');
   });
 

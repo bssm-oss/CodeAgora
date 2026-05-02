@@ -212,9 +212,9 @@ Add a human-facing local UI only after the core product can stand on its own.
 - Desktop config editing round-trips through the same schemas used by CLI and MCP.
 - Desktop does not change review outcomes compared with CLI for the same diff/config.
 
-## Release Candidate Gate
+## Beta Gate
 
-A production release candidate requires all of the following:
+A beta release requires all of the following:
 
 - Phase 0 through Phase 6 acceptance gates complete.
 - `pnpm typecheck`, `pnpm build`, `pnpm test`, and action bundle build pass on clean checkout.

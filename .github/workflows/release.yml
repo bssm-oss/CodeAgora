@@ -27,9 +27,9 @@ jobs:
       - run: pnpm test --no-file-parallelism
       - run: pnpm bench:ci
 
-      # Non-publishing RC gate: package dry-runs, CLI help, MCP tools/list, Action bundle.
-      - name: Release candidate smoke
-        run: pnpm release:rc-smoke
+      # Non-publishing beta gate: package dry-runs, CLI help, MCP tools/list, Action bundle.
+      - name: Beta smoke
+        run: pnpm release:beta-smoke
 
       # Publish review package
       - name: Publish @codeagora/review

@@ -25,7 +25,7 @@ The final confirmed low-cost diverse aggregate reached full benchmark coverage o
 
 No API key values were inspected or recorded. Only key presence and behavior were validated during the run.
 
-Current RC note: this historical live-run report remains benchmark evidence, but required CI now uses the deterministic 20-fixture offline gate: `pnpm bench:ci`, which runs fixture schema validation and `benchmarks/references/phase2-quality-gate.json` reference validation without provider keys. New `bench-out*` live result directories should remain uncommitted and be uploaded as workflow artifacts when needed.
+Current beta note: this historical live-run report remains benchmark evidence, but required CI now uses the deterministic 20-fixture offline gate: `pnpm bench:ci`, which runs fixture schema validation and `benchmarks/references/phase2-quality-gate.json` reference validation without provider keys. New `bench-out*` live result directories should remain uncommitted and be uploaded as workflow artifacts when needed.
 
 ## Benchmark Scope
 

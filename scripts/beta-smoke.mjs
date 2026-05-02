@@ -162,7 +162,7 @@ async function smokeMcpServer() {
   });
 
   const messages = [
-    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'codeagora-rc-smoke', version: '0.0.0' } } },
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'codeagora-beta-smoke', version: '0.0.0' } } },
     { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
     { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
   ];
@@ -193,4 +193,4 @@ if (!help.includes('CodeAgora') && !help.includes('agora')) {
 console.log('OK: CLI help smoke passed');
 
 await smokeMcpServer();
-console.log('OK: release candidate smoke passed');
+console.log('OK: beta smoke passed');
