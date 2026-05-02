@@ -1,8 +1,8 @@
 # Configuration
 
-CodeAgora reads `.ca/config.json` (or `.ca/config.yaml`) from the current working directory.
+CodeAgora reads `.ca/config.json`, `.ca/config.yaml`, or `.ca/config.yml` from the current working directory.
 
-Run `agora init` to generate a starter config, or create one manually.
+If multiple config files exist, load precedence is `config.json` > `config.yaml` > `config.yml`. Run `agora init` to generate a starter config, or create one manually.
 
 ## Example Config
 
@@ -170,7 +170,9 @@ tests/fixtures/**
 
 ```bash
 agora config                           # Display loaded config
-agora config-set discussion.maxRounds 3 # Set value (dot notation)
-agora config-edit                      # Open in $EDITOR
+agora config-set discussion.maxRounds 3 # Set value in .ca/config.json (dot notation)
+agora config-edit                      # Open config in $EDITOR
 agora language ko                      # Switch to Korean
 ```
+
+`agora config-set` currently mutates `.ca/config.json` only. If the active config is YAML, edit it manually or convert it to JSON before using `config-set`.

@@ -35,10 +35,10 @@ The L3 head agent makes the final ACCEPT/REJECT/NEEDS_HUMAN verdict based on all
 ## Configuration
 
 ### Where is the config file?
-`.ca/config.json` (or `.ca/config.yaml`) in your project root. Created by `agora init`.
+`.ca/config.json`, `.ca/config.yaml`, or `.ca/config.yml` in your project root. Created by `agora init`.
 
 ### Can I use YAML instead of JSON?
-Yes. CodeAgora supports both `.ca/config.json` and `.ca/config.yaml`. JSON takes precedence if both exist.
+Yes. CodeAgora supports `.ca/config.json`, `.ca/config.yaml`, and `.ca/config.yml`. If multiple exist, precedence is `config.json` > `config.yaml` > `config.yml`.
 
 ### How do I change the number of reviewers?
 In config: set `reviewers.count`. Or per-review: `agora review --reviewers 5`.
