@@ -67,10 +67,10 @@ export function classifyError(error: unknown): ErrorClassification {
     return { kind: 'transient' };
   }
 
-  if (/\b(401|403)\b/.test(message)) {
+  if (/\b(401|403)\b|auth(?:entication)? error|unauthori[sz]ed|forbidden|api key|invalid key|missing key/i.test(message)) {
     return { kind: 'auth' };
   }
-  if (/429|rate.?limit|too many/i.test(message)) {
+  if (/429|rate.?limit|too many|quota/i.test(message)) {
     return { kind: 'rate-limited', retryAfterMs: DEFAULT_RATE_LIMIT_DELAY_MS };
   }
   if (isRetryableError(error instanceof Error ? error : new Error(message))) {

@@ -104,6 +104,16 @@ describe('classifyError', () => {
     expect(classifyError(error).kind).toBe('auth');
   });
 
+  it('detects auth wrapper messages from reviewer forfeits', () => {
+    const error = new Error('Auth error (permanent): API key invalid');
+    expect(classifyError(error).kind).toBe('auth');
+  });
+
+  it('detects quota messages as rate-limited', () => {
+    const error = new Error('Provider quota exceeded for this billing period');
+    expect(classifyError(error).kind).toBe('rate-limited');
+  });
+
   it('detects AbortError as transient', () => {
     const error = new DOMException('aborted', 'AbortError');
     expect(classifyError(error).kind).toBe('transient');
