@@ -179,6 +179,7 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 | [Extensions](docs/EXTENSIONS.md) | MCP and desktop direction |
 | [Product Surface Plan](docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md) | Current surfaces and lightweight roadmap |
 | [Production Readiness Roadmap](docs/PRODUCTION_READINESS_ROADMAP.md) | Gates for production-ready CLI, GitHub Action, and MCP releases |
+| [Beta Readiness](docs/BETA_READINESS_P4_P6.md) | P4-P6 beta gates, smoke checks, and release guardrails |
 | [Agent Contract](docs/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
 | [FAQ](docs/FAQ.md) | Frequently asked questions |
@@ -200,7 +201,7 @@ pnpm dev review path/to/diff.patch
 
 ## Benchmarks
 
-Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative and FP-regression framework (see #472). The current deterministic RC gate covers 20 fixtures: 14 recall cases and 6 FP-regression cases.
+Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative and FP-regression framework (see #472). The current deterministic beta gate covers 20 fixtures: 14 recall cases and 6 FP-regression cases.
 
 **Required offline gate** (fast, no API calls):
 
