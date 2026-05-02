@@ -11,7 +11,7 @@ pnpm --filter @codeagora/mcp build
 pnpm --filter @codeagora/mcp pack --dry-run
 ```
 
-After publication, users can run the package with:
+For published installs, users can run the package with:
 
 ```bash
 npx -y @codeagora/mcp
