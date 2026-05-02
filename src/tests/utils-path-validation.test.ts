@@ -3,11 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
-import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
+import { validateDiffPath, validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
 describe('validateDiffPath', () => {
-  // 1. Normal absolute path — success
   it('accepts a normal absolute path /tmp/review.diff', () => {
     const result = validateDiffPath('/tmp/review.diff');
     expect(result.success).toBe(true);
@@ -16,7 +17,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 2. Normal absolute path — success
   it('accepts a normal absolute path /home/user/project/changes.diff', () => {
     const result = validateDiffPath('/home/user/project/changes.diff');
     expect(result.success).toBe(true);
@@ -25,7 +25,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 3. Path traversal '../../../etc/passwd' — error
   it('rejects path traversal ../../../etc/passwd', () => {
     const result = validateDiffPath('../../../etc/passwd');
     expect(result.success).toBe(false);
@@ -34,7 +33,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 4. Path traversal 'foo/../../etc/shadow' — error
   it('rejects path traversal foo/../../etc/shadow', () => {
     const result = validateDiffPath('foo/../../etc/shadow');
     expect(result.success).toBe(false);
@@ -43,7 +41,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 5. Null byte injection — error
   it('rejects null byte injection /tmp/file\\x00.diff', () => {
     const result = validateDiffPath('/tmp/file\x00.diff');
     expect(result.success).toBe(false);
@@ -52,7 +49,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 6. allowedRoots ['/tmp'] + '/tmp/review.diff' — success
   it('accepts path within allowedRoots', () => {
     const result = validateDiffPath('/tmp/review.diff', { allowedRoots: ['/tmp'] });
     expect(result.success).toBe(true);
@@ -61,7 +57,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 7. allowedRoots ['/tmp'] + '/home/user/file.diff' — error (outside allowed roots)
   it('rejects path outside allowedRoots', () => {
     const result = validateDiffPath('/home/user/file.diff', { allowedRoots: ['/tmp'] });
     expect(result.success).toBe(false);
@@ -70,7 +65,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 8. Relative path 'review.diff' → resolve succeeds
   it('resolves relative path and accepts it when valid', () => {
     const result = validateDiffPath('review.diff');
     expect(result.success).toBe(true);
@@ -80,7 +74,6 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 9. Empty string — error
   it('rejects empty string', () => {
     const result = validateDiffPath('');
     expect(result.success).toBe(false);
@@ -89,12 +82,58 @@ describe('validateDiffPath', () => {
     }
   });
 
-  // 10. allowedRoots empty array [] — rejects all paths
   it('rejects all paths when allowedRoots is empty array', () => {
     const result = validateDiffPath('/tmp/review.diff', { allowedRoots: [] });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeTruthy();
+    }
+  });
+});
+
+describe('validatePathWithinRoot', () => {
+  it('accepts real files under the root', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'path-root-'));
+    try {
+      await fs.writeFile(path.join(root, 'review.diff'), 'diff --git a/a b/a');
+
+      const result = await validatePathWithinRoot('review.diff', root);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe(await fs.realpath(path.join(root, 'review.diff')));
+      }
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects traversal before resolving files', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'path-root-'));
+    try {
+      const result = await validatePathWithinRoot('../../.env', root);
+
+      expect(result.success).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects symlinks that resolve outside the root', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'path-root-'));
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'path-outside-'));
+    try {
+      await fs.writeFile(path.join(outside, 'secret.diff'), 'secret');
+      await fs.symlink(path.join(outside, 'secret.diff'), path.join(root, 'linked.diff'));
+
+      const result = await validatePathWithinRoot('linked.diff', root);
+
+      expect(result.success).toBe(false);
+    } finally {
+      await Promise.all([
+        fs.rm(root, { recursive: true, force: true }),
+        fs.rm(outside, { recursive: true, force: true }),
+      ]);
     }
   });
 });

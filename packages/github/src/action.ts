@@ -9,7 +9,6 @@
 
 import crypto from 'crypto';
 import fs from 'fs/promises';
-import path from 'path';
 import { appendFileSync } from 'fs';
 import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
 import { buildDiffPositionIndex } from './diff-parser.js';
@@ -18,9 +17,8 @@ import { postReview, setCommitStatus, handleNeedsHuman } from './poster.js';
 import { createAppOctokit } from './client.js';
 import { fetchPrMetadata } from './pr-diff.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
-import { loadConfigFrom } from '@codeagora/core/config/loader.js';
-import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
-import { determineActionPolicy, isStaleHead, parseActionInputs } from './action-policy.js';
+import { loadConfigFile } from '@codeagora/core/config/loader.js';
+import { determineActionPolicy, isStaleHead, parseActionInputs, validateActionDiffPath, validateActionOutputPath } from './action-policy.js';
 
 // ============================================================================
 // Main
@@ -38,6 +36,8 @@ async function main(): Promise<void> {
   setActionOutput('head-sha', inputs.sha);
   if (inputs.baseSha) setActionOutput('base-sha', inputs.baseSha);
 
+  const safeDiffPath = await validateActionDiffPath(inputs.diff);
+
   const actionPolicy = determineActionPolicy(inputs);
   if (actionPolicy.degraded) {
     setActionOutput('degraded', 'true');
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
 
   // Check diff line count
   if (inputs.maxDiffLines > 0) {
-    const diffContent = await fs.readFile(inputs.diff, 'utf-8');
+    const diffContent = await fs.readFile(safeDiffPath, 'utf-8');
     const lineCount = diffContent.split('\n').length;
     if (lineCount > inputs.maxDiffLines) {
       console.log(`::warning::Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}). Skipping review.`);
@@ -67,12 +67,15 @@ async function main(): Promise<void> {
 
   // Load config early — used for pipeline and mapper options.
   const configPath = process.env['CONFIG_PATH'] || '.ca/config.json';
-  const configBaseDir = path.resolve(process.cwd(), path.dirname(path.dirname(configPath)));
-  const config = await loadConfigFrom(configBaseDir).catch(() => null);
+  const config = await loadConfigFile(configPath, { rootDir: process.cwd() }).catch(() => null);
 
   // Run pipeline (#259: pass repoPath for surrounding code context)
   console.log('::group::Running CodeAgora review pipeline');
-  const result = await runPipeline({ diffPath: inputs.diff, repoPath: process.cwd() });
+  const result = await runPipeline({
+    diffPath: safeDiffPath,
+    repoPath: process.cwd(),
+    configPath: config ? configPath : undefined,
+  });
   console.log('::endgroup::');
 
   if (result.status === 'error') {
@@ -88,7 +91,7 @@ async function main(): Promise<void> {
   }
 
   // Read diff for position index
-  const diffContent = await fs.readFile(inputs.diff, 'utf-8');
+  const diffContent = await fs.readFile(safeDiffPath, 'utf-8');
   const positionIndex = buildDiffPositionIndex(diffContent);
 
   // Use full evidence docs, discussions, and reviewer map from pipeline result
@@ -168,15 +171,14 @@ async function main(): Promise<void> {
 
   // Generate SARIF output — validate path to prevent traversal attacks
   const rawSarifPath = config?.github?.sarifOutputPath ?? '/tmp/codeagora-results.sarif';
-  const sarifValidation = validateDiffPath(rawSarifPath, {
-    allowedRoots: [process.cwd(), '/tmp'],
-  });
-  if (sarifValidation.success) {
+  try {
+    const safeSarifPath = await validateActionOutputPath(rawSarifPath, process.cwd());
     const sarifReport = buildSarifReport(evidenceDocs, result.sessionId, result.date);
-    await fs.writeFile(sarifValidation.data, serializeSarif(sarifReport));
-    console.log(`SARIF report written to ${sarifValidation.data}`);
-  } else {
-    console.error(`::warning::SARIF output path rejected: ${sarifValidation.error}`);
+    await fs.writeFile(safeSarifPath, serializeSarif(sarifReport));
+    console.log(`SARIF report written to ${safeSarifPath}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`::warning::SARIF output path rejected: ${message}`);
   }
 
   // Set outputs

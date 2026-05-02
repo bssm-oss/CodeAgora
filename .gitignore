@@ -67,6 +67,9 @@ benchmarks/.ca/model-quality.json
 # OMC
 .omc
 
+# Agent-local planning/evidence
+.sisyphus/
+
 # Archives
 .archive/
 

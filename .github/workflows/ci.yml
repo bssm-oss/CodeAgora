@@ -22,3 +22,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test --no-file-parallelism
+      - name: Deterministic benchmark gate
+        if: matrix.node-version == 20
+        run: pnpm bench:ci

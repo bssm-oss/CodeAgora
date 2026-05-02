@@ -32,5 +32,5 @@
     "maxFalsePositives": 0,
     "maxFalseNegatives": 0
   },
-  "notes": "Read-only reference set for model-change regression checks. Validate with pnpm bench:reference -- --validate-only; score a live result directory with pnpm bench:reference -- --results <dir>."
+  "notes": "Deterministic offline RC reference for the 20-fixture golden-bug corpus. Required gates validate this schema/reference without provider calls; live result directories are evidence artifacts scored with pnpm bench:reference -- --results <dir>."
 }

@@ -1,4 +1,7 @@
+import fs from 'fs/promises';
+import path from 'path';
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
 export interface ActionInputs {
   diff: string;
@@ -111,4 +114,98 @@ export function determineActionPolicy(
 
 export function isStaleHead(expectedHeadSha: string, currentHeadSha: string | undefined): boolean {
   return Boolean(currentHeadSha && currentHeadSha !== expectedHeadSha);
+}
+
+export async function validateActionDiffPath(
+  diffPath: string,
+  workspaceRoot: string = process.cwd(),
+): Promise<string> {
+  const allowedRoots = [workspaceRoot, '/tmp'];
+  let lastError = 'Path is outside allowed roots';
+
+  for (const root of allowedRoots) {
+    if (!isInputPathUnderRoot(diffPath, root)) {
+      continue;
+    }
+
+    const validation = await validatePathWithinRoot(diffPath, root);
+    if (validation.success) {
+      return validation.data;
+    }
+    lastError = validation.error;
+    break;
+  }
+
+  throw new Error(`Action diff path rejected: ${lastError}`);
+}
+
+export async function validateActionOutputPath(
+  outputPath: string,
+  workspaceRoot: string = process.cwd(),
+): Promise<string> {
+  if (outputPath === '') {
+    throw new Error('Action output path rejected: Path must not be empty');
+  }
+  if (outputPath.includes('\x00')) {
+    throw new Error('Action output path rejected: Path must not contain null bytes');
+  }
+  if (outputPath.split(/[\\/]/).includes('..')) {
+    throw new Error('Action output path rejected: Path traversal detected: path contains ".." segments');
+  }
+
+  const allowedRoots = [workspaceRoot, '/tmp'];
+  let lastError = 'Path is outside allowed roots';
+
+  for (const root of allowedRoots) {
+    if (!isInputPathUnderRoot(outputPath, root)) {
+      continue;
+    }
+
+    const resolved = path.isAbsolute(outputPath)
+      ? path.resolve(outputPath)
+      : path.resolve(root, outputPath);
+    const parent = path.dirname(resolved);
+
+    try {
+      const [realRoot, realParent] = await Promise.all([
+        fs.realpath(path.resolve(root)),
+        fs.realpath(parent),
+      ]);
+      if (!isResolvedPathUnderRoot(realParent, realRoot)) {
+        lastError = 'Path resolves outside allowed roots';
+        break;
+      }
+
+      const existing = await fs.lstat(resolved).catch((error: unknown) => {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          return null;
+        }
+        throw error;
+      });
+      if (existing?.isSymbolicLink()) {
+        throw new Error('Path must not be a symlink');
+      }
+
+      return resolved;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      lastError = `Path could not be resolved safely: ${message}`;
+      break;
+    }
+  }
+
+  throw new Error(`Action output path rejected: ${lastError}`);
+}
+
+function isInputPathUnderRoot(inputPath: string, rootDir: string): boolean {
+  const root = path.resolve(rootDir);
+  const resolved = path.isAbsolute(inputPath)
+    ? path.resolve(inputPath)
+    : path.resolve(root, inputPath);
+  return isResolvedPathUnderRoot(resolved, root);
+}
+
+function isResolvedPathUnderRoot(candidate: string, root: string): boolean {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }

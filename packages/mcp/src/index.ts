@@ -15,10 +15,11 @@ import { registerLeaderboard } from './tools/leaderboard.js';
 import { registerStats } from './tools/stats.js';
 import { registerConfigGet } from './tools/config-get.js';
 import { registerConfigSet } from './tools/config-set.js';
+import { readMcpPackageVersion } from './version.js';
 
 const server = new McpServer({
   name: 'codeagora',
-  version: '2.3.4',
+  version: readMcpPackageVersion(),
 });
 
 // Register all tools

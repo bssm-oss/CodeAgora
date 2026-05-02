@@ -44,10 +44,12 @@
     "test:coverage": "vitest run --coverage",
     "dev": "pnpm --filter @codeagora/cli dev",
     "build:action": "node scripts/build-action.mjs",
+    "release:rc-smoke": "node scripts/rc-smoke.mjs",
     "bench:fn": "tsx scripts/bench-fn.ts",
     "bench:fn:run": "tsx scripts/bench-fn-run.ts",
     "bench:fn:compare": "tsx scripts/bench-fn-compare.ts",
     "bench:reference": "tsx scripts/bench-reference-check.ts",
+    "bench:ci": "pnpm bench:fn -- --validate-only && pnpm bench:reference -- --validate-only",
     "bench:rate-limit": "tsx scripts/bench-rate-limit-sim.ts"
   },
   "dependencies": {

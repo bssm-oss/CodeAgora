@@ -131,7 +131,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // Load config and normalize (expand declarative reviewers if needed)
     progress?.stageStart('init', 'Loading config...');
     const rawConfig = input.configPath
-      ? await loadConfigFile(input.configPath)
+      ? await loadConfigFile(input.configPath, { rootDir: input.repoPath ?? process.cwd() })
       : await loadConfig();
     const config = normalizeConfig(rawConfig);
 

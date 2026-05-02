@@ -94,7 +94,7 @@ agora sessions prune --days 30               # Delete old
 
 ## `agora metrics`
 
-Generate local quality/cost artifacts without a web dashboard.
+Generate local quality/cost artifacts without a web dashboard. For release-candidate benchmark gates, use `pnpm bench:ci` for provider-free schema/reference validation and `pnpm bench:fn:compare` to compare precomputed candidate and baseline result directories.
 
 ```bash
 agora metrics benchmark --results ./bench-out-l3-20-20260428
@@ -102,7 +102,7 @@ agora metrics benchmark --results ./bench-out-l3-20-20260428 --json
 agora metrics benchmark --results ./bench-out-l3-20-20260428 --out ./bench-reports/phase2
 ```
 
-`--out` writes `benchmark-metrics.json` and `benchmark-metrics.md`.
+`--out` writes `benchmark-metrics.json` and `benchmark-metrics.md`. Live benchmark result directories such as `bench-out*` are evidence artifacts and should be uploaded or archived outside git rather than committed.
 
 ## `agora research`
 

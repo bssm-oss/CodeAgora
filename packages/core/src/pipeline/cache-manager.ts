@@ -8,6 +8,7 @@ import type { PipelineResult } from './orchestrator.js';
 import { lookupCache, addToCache } from '@codeagora/shared/utils/cache.js';
 import { CA_ROOT } from '@codeagora/shared/utils/fs.js';
 import { computeHash } from '@codeagora/shared/utils/hash.js';
+import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 import fs from 'fs/promises';
 
 /**
@@ -54,7 +55,7 @@ export async function persistResultCache(
 ): Promise<void> {
   try {
     const resultJsonPath = `${CA_ROOT}/sessions/${date}/${sessionId}/result.json`;
-    await fs.writeFile(resultJsonPath, JSON.stringify(pipelineResult, null, 2), 'utf-8');
+    await fs.writeFile(resultJsonPath, JSON.stringify(redactDeep(pipelineResult), null, 2), 'utf-8');
     if (!noCache) {
       await addToCache(CA_ROOT, cacheKey, `${date}/${sessionId}`);
     }
