@@ -73,8 +73,8 @@ describe('writeGitHubWorkflow()', () => {
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('actions/checkout@v4');
-    expect(content).toContain('actions/setup-node@v4');
+    expect(content).toContain('actions/checkout@v6');
+    expect(content).toContain('actions/setup-node@v6');
   });
 
   it('does not overwrite existing workflow when force is false', async () => {

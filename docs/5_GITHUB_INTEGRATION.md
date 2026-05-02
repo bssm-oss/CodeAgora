@@ -190,12 +190,12 @@ runs:
   using: composite
   steps:
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '22'
 
     - name: Install pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@v6
       with:
         version: 10
 
@@ -460,7 +460,7 @@ upload is enabled:
 
 ```yaml
 - name: Upload SARIF artifact
-  uses: actions/upload-artifact@v4
+  uses: actions/upload-artifact@v7
   with:
     name: codeagora-sarif
     path: /tmp/codeagora-results.sarif

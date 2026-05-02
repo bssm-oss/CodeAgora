@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Pin to SHA for production use. Major tags used here for readability.
-      - uses: actions/checkout@v4  # Consider SHA pinning for production
+      - uses: actions/checkout@v6  # Consider SHA pinning for production
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4  # Consider SHA pinning for production
+      - uses: actions/setup-node@v6  # Consider SHA pinning for production
         with:
           node-version: '20'
 
@@ -33,7 +33,7 @@ jobs:
 
       - name: Post review comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
