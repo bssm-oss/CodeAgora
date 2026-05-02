@@ -5,7 +5,7 @@
 
 ## Summary
 
-CodeAgora is consolidating three separate human-facing surfaces into one cross-platform desktop app:
+CodeAgora is consolidating three separate human-facing surfaces toward one planned cross-platform desktop app:
 
 - old web dashboard
 - old Ink/React terminal TUI
@@ -13,7 +13,7 @@ CodeAgora is consolidating three separate human-facing surfaces into one cross-p
 
 The CLI remains. The GitHub Action remains. MCP remains. Those are agent/automation surfaces.
 
-The desktop app becomes the primary surface for humans who want to inspect review history, configure providers, watch pipeline progress, review model/cost information, and receive local alerts.
+The desktop app is intended to become the primary surface for humans who want to inspect review history, configure providers, watch pipeline progress, review model/cost information, and receive local alerts. It remains a private preview until packaging, release, and parity gates are ready.
 
 ```txt
 Automation / agent surfaces:
@@ -45,7 +45,7 @@ The new product split is cleaner:
 - **CLI**: command surface for LLM agents, scripts, CI, and power users
 - **GitHub Action**: PR automation surface
 - **MCP**: AI IDE/agent integration surface
-- **Desktop app**: human-facing local UI
+- **Desktop app**: planned human-facing local UI, currently private preview
 
 ## What Was Removed
 
@@ -169,7 +169,7 @@ Tauri UI
   -> Tauri UI reads session/result files
 ```
 
-This is less elegant than a pure in-process library call, but it keeps the first desktop app simple and preserves CLI parity. The CLI is already the agent-facing API; the desktop app can use it as a stable local backend until a cleaner library boundary is needed.
+This is less elegant than a pure in-process library call, but it keeps the first desktop app simple and preserves CLI parity. The CLI is the agent-facing API; the desktop app can use it as the local backend until a cleaner library boundary is needed.
 
 Later version:
 
@@ -223,7 +223,7 @@ The desktop app should not replace the CLI. It should sit beside it.
 
 ## Product Principle
 
-CodeAgora should have one human local UI.
+CodeAgora should eventually have one human local UI.
 
 ```txt
 Before:
@@ -235,6 +235,6 @@ After:
 
 This keeps the product easier to explain:
 
-> Use CodeAgora from the CLI, in CI, through MCP, or as a desktop app.
+> Use CodeAgora from the CLI, in CI, through MCP, or, once promoted, as a desktop app.
 
 That is enough surface area. More than that starts to feel like product fog.

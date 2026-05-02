@@ -1,8 +1,8 @@
 # CodeAgora Desktop
 
-Initial Tauri desktop scaffold for the human-facing CodeAgora surface.
+Initial Tauri desktop scaffold for the planned human-facing CodeAgora surface.
 
-This package is intentionally private while the app shape stabilizes. It provides:
+This package is intentionally private and not part of the stable support surface while the app shape stabilizes. It provides:
 
 - recent session list
 - session detail view
