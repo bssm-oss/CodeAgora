@@ -158,24 +158,19 @@ inputs:
     required: false
     default: 'true'
 
-  sarif-upload:
-    description: Upload SARIF results to GitHub Code Scanning
-    required: false
-    default: 'false'
-
   max-diff-lines:
     description: Skip review if diff exceeds this line count (0 = unlimited)
     required: false
     default: '5000'
 
-  comment-dedup-label:
-    description: Label added to existing review comments to identify CodeAgora runs
+  post-results:
+    description: Post review comments and commit status to GitHub
     required: false
-    default: 'codeagora-v3'
+    default: 'true'
 
 outputs:
   verdict:
-    description: Final verdict — ACCEPT, REJECT, or NEEDS_HUMAN
+    description: Final verdict — ACCEPT, REJECT, NEEDS_HUMAN, or SKIPPED
     value: ${{ steps.review.outputs.verdict }}
 
   review-url:
@@ -186,61 +181,76 @@ outputs:
     description: CodeAgora session ID for audit trail
     value: ${{ steps.review.outputs.session-id }}
 
+  degraded:
+    description: Whether the action ran in degraded or skipped mode
+    value: ${{ steps.review.outputs.degraded }}
+
+  degraded-reason:
+    description: Reason for degraded or skipped mode
+    value: ${{ steps.review.outputs.degraded-reason }}
+
+  head-sha:
+    description: Pull request head SHA reviewed by CodeAgora
+    value: ${{ steps.review.outputs.head-sha }}
+
+  base-sha:
+    description: Pull request base SHA used for diff acquisition
+    value: ${{ steps.review.outputs.base-sha }}
+
 runs:
   using: composite
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
-        node-version: '22'
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v6
-      with:
-        version: 10
-
-    - name: Install CodeAgora
-      shell: bash
-      run: pnpm install --frozen-lockfile
-      working-directory: ${{ github.action_path }}
+        node-version: '20'
 
     - name: Fetch PR diff
       shell: bash
       run: |
-        gh pr diff ${{ github.event.pull_request.number }} \
-          --repo ${{ github.repository }} \
-          > /tmp/codeagora-pr.diff
+        gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/codeagora-pr.diff
       env:
         GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
 
     - name: Run CodeAgora review
       id: review
       shell: bash
       run: |
-        node ${{ github.action_path }}/dist/github-action.js \
+        node "$ACTION_PATH/dist/action.js" \
           --diff /tmp/codeagora-pr.diff \
-          --config ${{ inputs.config-path }} \
-          --pr ${{ github.event.pull_request.number }} \
-          --sha ${{ github.event.pull_request.head.sha }} \
-          --repo ${{ github.repository }} \
-          --fail-on-reject ${{ inputs.fail-on-reject }} \
-          --sarif-upload ${{ inputs.sarif-upload }} \
-          --dedup-label ${{ inputs.comment-dedup-label }} \
-          --max-diff-lines ${{ inputs.max-diff-lines }}
+          --pr "$PR_NUMBER" \
+          --sha "$HEAD_SHA" \
+          --repo "$REPO" \
+          --fail-on-reject "$FAIL_ON_REJECT" \
+          --max-diff-lines "$MAX_DIFF_LINES" \
+          --post-results "$POST_RESULTS" \
+          --base-sha "$BASE_SHA" \
+          --base-repo "$BASE_REPO" \
+          --head-repo "$HEAD_REPO"
       env:
+        ACTION_PATH: ${{ github.action_path }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        REPO: ${{ github.repository }}
+        FAIL_ON_REJECT: ${{ inputs.fail-on-reject }}
+        MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
+        POST_RESULTS: ${{ inputs.post-results }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        CONFIG_PATH: ${{ inputs.config-path }}
 ```
+
+When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs.
 
 ### 3.2 How the Action Gets the Diff
 
-**PR diff (preferred):** `gh pr diff {number}` returns the unified diff of all
-files changed in the PR — this is the same diff a reviewer sees in the GitHub
-UI. It strips binary files automatically.
+**PR diff (preferred):** `gh pr diff {number}` returns the unified diff of all files changed in the PR. This is the same diff a reviewer sees in the GitHub UI, and it strips binary files automatically.
 
-**Commit diff (fallback for push events):** `git diff {base_sha}..{head_sha}`
-for non-PR triggers such as `push` to a branch with a required status check.
-
-The action always uses the PR diff when `github.event_name == 'pull_request'`.
+**Local fallback:** if GitHub API diff retrieval fails, the action falls back to local `git diff` using the pull request base and head SHAs. This fallback requires a `pull_request` event context and an earlier `actions/checkout` step.
 
 ### 3.3 Comment Deduplication
 
