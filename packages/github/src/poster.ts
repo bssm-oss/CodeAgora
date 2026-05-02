@@ -188,9 +188,9 @@ async function postReviewWithRetry(
         owner: config.owner,
         repo: config.repo,
         pull_number: prNumber,
-        commit_id: review.commit_id,
+        commit_id: safeReview.commit_id,
         event: effectiveEvent,
-        body: review.body,
+        body: safeReview.body,
         comments: [],
       });
       return response.data;
