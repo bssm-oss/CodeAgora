@@ -17,10 +17,14 @@ try {
   version = pkg.version;
 } catch {}
 
-const isRC = version.includes('rc');
+const prereleaseLabel = version.includes('beta')
+  ? `${red}${bold}(Beta)${reset}`
+  : version.includes('rc')
+    ? `${red}${bold}(Release Candidate)${reset}`
+    : '';
 
 console.log('');
-console.log(`  ${cyan}${bold}CodeAgora${reset} ${dim}v${version}${isRC ? ` ${red}${bold}(Release Candidate)${reset}` : ''}${reset}`);
+console.log(`  ${cyan}${bold}CodeAgora${reset} ${dim}v${version}${prereleaseLabel ? ` ${prereleaseLabel}` : ''}${reset}`);
 console.log(`  ${dim}Multi-LLM collaborative code review${reset}`);
 console.log('');
 console.log(`  ${green}Get started:${reset}`);
