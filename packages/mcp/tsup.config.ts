@@ -25,7 +25,7 @@ function workspaceResolver(): Plugin {
 }
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/version.ts'],
   format: ['esm'],
   dts: false,
   clean: true,

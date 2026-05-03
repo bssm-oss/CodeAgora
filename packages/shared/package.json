@@ -3,11 +3,9 @@
   "version": "0.1.0-beta.0",
   "type": "module",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.js"
     },
     "./*.js": {
       "development": "./src/*.ts",

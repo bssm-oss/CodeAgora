@@ -25,6 +25,10 @@
     ".": {
       "development": "./src/index.ts",
       "import": "./dist/index.js"
+    },
+    "./version.js": {
+      "development": "./src/version.ts",
+      "import": "./dist/version.js"
     }
   },
   "bin": {
