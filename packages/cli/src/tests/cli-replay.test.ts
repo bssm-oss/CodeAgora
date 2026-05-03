@@ -89,6 +89,19 @@ describe('loadSessionForReplay', () => {
     expect(result.decision).toBe('APPROVE');
   });
 
+  it('uses result.json summary decision when head verdict is missing', async () => {
+    const fs = await getFsMock();
+    fs.readFile
+      .mockResolvedValueOnce(JSON.stringify({ status: 'completed' }))
+      .mockRejectedValueOnce(new Error('ENOENT'))
+      .mockResolvedValueOnce(JSON.stringify({ summary: { decision: 'ACCEPT' }, evidenceDocs: [] }));
+
+    const result = await loadSessionForReplay('/base', '2024-01-15/001');
+
+    expect(result.decision).toBe('ACCEPT');
+    expect(result.evidenceDocs).toEqual([]);
+  });
+
   it('returns evidenceDocs from result.json when present', async () => {
     const fs = await getFsMock();
     const evidenceDocs = [{ id: 'doc1', content: 'some content' }];
