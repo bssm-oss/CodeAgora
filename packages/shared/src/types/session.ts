@@ -2,6 +2,8 @@
  * Session Metadata type
  */
 
+import type { CacheMetadata } from '../utils/cache.js';
+
 export interface SessionMetadata {
   sessionId: string; // 001, 002, etc.
   date: string; // YYYY-MM-DD
@@ -32,4 +34,6 @@ export interface SessionMetadata {
   diffHash?: string;
   /** SHA-256 prefix of the reviewer config (cache key component) */
   configHash?: string;
+  /** Machine-readable cache lookup/write metadata. No raw config, providers, or source context. */
+  cache?: CacheMetadata;
 }

@@ -27,13 +27,14 @@ import { matchRules } from '../rules/matcher.js';
 import { DiscussionEmitter } from '../l2/event-emitter.js';
 import { estimateDiffComplexity } from './diff-complexity.js';
 import { PipelineTelemetry } from './telemetry.js';
-import { computeCacheKey, checkAndLoadCache, persistResultCache } from './cache-manager.js';
+import { buildReviewCacheContext, computeCacheKey, checkAndLoadCache, persistResultCache } from './cache-manager.js';
 import { detectProjectContext } from './session-recovery.js';
 import { buildReviewerMap, buildReviewerOpinions, buildSupporterModelMap, mergeReviewOutputsByReviewer, trackDA, generatePerformanceText } from './pipeline-helpers.js';
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
 import fs from 'fs/promises';
 import type { ModeratorReport } from '../types/core.js';
 import { classifyError, type ErrorKind } from '../l1/error-classifier.js';
+import type { CacheMetadata } from '@codeagora/shared/utils/cache.js';
 
 // ============================================================================
 // Main Pipeline
@@ -107,6 +108,8 @@ export interface PipelineResult {
   supporterModelMap?: Record<string, string>;
   /** True when the result was served from cache (#109) */
   cached?: boolean;
+  /** Machine-readable cache metadata. Contains hashes/keys only, never raw provider or source context. */
+  cache?: CacheMetadata;
 }
 
 // ============================================================================
@@ -228,8 +231,19 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     progress?.stageComplete('init', 'Config loaded');
 
-    // === CACHE: Check for identical diff + config (#109) ===
-    const cacheKey = computeCacheKey(diffContent, config);
+    // === CACHE: Check for identical review-meaning inputs (#109) ===
+    const cacheContext = await buildReviewCacheContext({
+      repoPath: input.repoPath,
+      surroundingContext,
+    });
+    const cacheKey = computeCacheKey(diffContent, config, cacheContext);
+    await session.setMetadata({
+      cache: {
+        schemaVersion: cacheContext.schemaVersion,
+        key: cacheKey,
+        hit: false,
+      },
+    }).catch(() => {});
     if (!input.noCache) {
       const cached = await checkAndLoadCache(cacheKey, session);
       if (cached) return cached;
@@ -591,6 +605,11 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       reviewerOpinions: buildReviewerOpinions(allReviewResults),
       devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
       supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
+      cache: {
+        schemaVersion: cacheContext.schemaVersion,
+        key: cacheKey,
+        hit: false,
+      },
     };
 
     // === CACHE: Persist result and update cache index (#109) ===
