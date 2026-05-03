@@ -8,6 +8,8 @@ describe('release package content verification', () => {
 
     expect(pkg.scripts['release:beta-smoke']).toBe('node scripts/beta-smoke.mjs');
     expect(smoke).toContain('scripts/verify-package-contents.mjs');
+    expect(smoke).toContain('init --yes');
+    expect(smoke).toContain('.ca/config.json');
   });
 
   it('asserts root and MCP package include/exclude rules', () => {

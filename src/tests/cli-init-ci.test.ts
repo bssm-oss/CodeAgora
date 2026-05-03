@@ -7,8 +7,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
+import { parse as parseYaml } from 'yaml';
 
 import { writeGitHubWorkflow, runInit } from '@codeagora/cli/commands/init.js';
+import { validateConfig } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // writeGitHubWorkflow
@@ -100,6 +102,75 @@ describe('writeGitHubWorkflow()', () => {
     const content = await fs.readFile(workflowPath, 'utf-8');
     expect(content).not.toBe('existing content');
     expect(content).toContain('npx codeagora review');
+  });
+});
+
+// ============================================================================
+// runInit with --ci flag
+// ============================================================================
+
+describe('runInit() config artifacts', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-init-config-test-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes parseable JSON config that validates against the real schema', async () => {
+    const result = await runInit({ format: 'json', force: false, baseDir: tmpDir });
+
+    const configPath = path.join(tmpDir, '.ca', 'config.json');
+    expect(result.created).toContain(configPath);
+
+    const raw = await fs.readFile(configPath, 'utf-8');
+    const parsed = JSON.parse(raw) as unknown;
+    const config = validateConfig(parsed);
+
+    expect(config.reviewers.length).toBeGreaterThan(0);
+    expect(config.supporters.pool).toBeDefined();
+  });
+
+  it('writes parseable YAML config that validates against the real schema', async () => {
+    const result = await runInit({ format: 'yaml', force: false, baseDir: tmpDir });
+
+    const configPath = path.join(tmpDir, '.ca', 'config.yaml');
+    expect(result.created).toContain(configPath);
+
+    const raw = await fs.readFile(configPath, 'utf-8');
+    const parsed = parseYaml(raw) as unknown;
+    const config = validateConfig(parsed);
+
+    expect(config.reviewers.length).toBeGreaterThan(0);
+    expect(config.discussion.maxRounds).toBeGreaterThan(0);
+  });
+
+  it('preserves existing .ca/config.json when force is false', async () => {
+    const configPath = path.join(tmpDir, '.ca', 'config.json');
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(configPath, '{"sentinel":true}', 'utf-8');
+
+    const result = await runInit({ format: 'json', force: false, baseDir: tmpDir });
+
+    expect(await fs.readFile(configPath, 'utf-8')).toBe('{"sentinel":true}');
+    expect(result.skipped).toContain(configPath);
+    expect(result.created).not.toContain(configPath);
+  });
+
+  it('overwrites existing .ca/config.json when force is true', async () => {
+    const configPath = path.join(tmpDir, '.ca', 'config.json');
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(configPath, '{"sentinel":true}', 'utf-8');
+
+    const result = await runInit({ format: 'json', force: true, baseDir: tmpDir });
+
+    const raw = await fs.readFile(configPath, 'utf-8');
+    expect(raw).not.toBe('{"sentinel":true}');
+    expect(result.created).toContain(configPath);
+    expect(() => validateConfig(JSON.parse(raw) as unknown)).not.toThrow();
   });
 });
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 
 const SENSITIVE_ENV_KEYS = new Set([
@@ -23,6 +26,7 @@ const SENSITIVE_ENV_KEYS = new Set([
 const SENSITIVE_ENV_PATTERN = /(?:^|_)(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)(?:_|$)/i;
 const MCP_TIMEOUT_MS = 5_000;
 const CHILD_EXIT_GRACE_MS = 2_000;
+const CLI_DIST_PATH = path.resolve('packages/cli/dist/index.js');
 
 function smokeEnv(extra = {}) {
   const env = { ...process.env, ...extra };
@@ -186,11 +190,55 @@ run('pnpm', ['build']);
 run('pnpm', ['build:action']);
 run('pnpm', ['exec', 'node', 'scripts/verify-package-contents.mjs']);
 
-const help = runCapture(process.execPath, ['packages/cli/dist/index.js', '--help']);
+const help = runCapture(process.execPath, [CLI_DIST_PATH, '--help']);
 if (!help.includes('CodeAgora') && !help.includes('agora')) {
   throw new Error('CLI help smoke failed');
 }
 console.log('OK: CLI help smoke passed');
+
+const initDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-beta-smoke-'));
+try {
+  console.log(`$ node ${CLI_DIST_PATH} init --yes  # CLI init smoke`);
+  runCapture(process.execPath, [CLI_DIST_PATH, 'init', '--yes'], {
+    cwd: initDir,
+    env: smokeEnv({
+      HOME: initDir,
+      TMPDIR: initDir,
+      XDG_CONFIG_HOME: initDir,
+    }),
+  });
+
+  // Smoke verifies .ca/config.json is created in the temp dir.
+  const configPath = path.join(initDir, '.ca', 'config.json');
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`CLI init smoke failed: missing ${configPath}`);
+  }
+
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw new Error('CLI init smoke failed: config root is not an object');
+  }
+  if (!Array.isArray(config.reviewers) || config.reviewers.length === 0) {
+    throw new Error('CLI init smoke failed: reviewers array missing or empty');
+  }
+  for (const reviewer of config.reviewers) {
+    if (!reviewer || typeof reviewer !== 'object' || Array.isArray(reviewer)) {
+      throw new Error('CLI init smoke failed: reviewer entry is not an object');
+    }
+    if (typeof reviewer.provider !== 'string' || reviewer.provider.length === 0) {
+      throw new Error('CLI init smoke failed: reviewer provider missing');
+    }
+    if (typeof reviewer.backend !== 'string' || reviewer.backend.length === 0) {
+      throw new Error('CLI init smoke failed: reviewer backend missing');
+    }
+    if (typeof reviewer.model !== 'string' || reviewer.model.length === 0) {
+      throw new Error('CLI init smoke failed: reviewer model missing');
+    }
+  }
+  console.log('OK: CLI init smoke passed');
+} finally {
+  fs.rmSync(initDir, { recursive: true, force: true });
+}
 
 await smokeMcpServer();
 console.log('OK: beta smoke passed');
