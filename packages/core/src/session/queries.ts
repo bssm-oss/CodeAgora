@@ -6,6 +6,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
 
 // ============================================================================
@@ -65,6 +66,12 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
   } catch {
     return null;
   }
+}
+
+function classifySessionArtifact(metadata: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!metadata) return null;
+  if (metadata['schemaVersion'] === SESSION_ARTIFACT_SCHEMA_VERSION) return metadata;
+  return { ...metadata, artifactContract: 'legacy/best-effort' };
 }
 
 function extractIssueObjects(verdict: Record<string, unknown>): Array<{ title: string; severity?: string }> {
@@ -324,7 +331,7 @@ export async function showSession(
     throw new Error(`Session not found: ${sessionPath}`);
   }
 
-  const metadata = await readJsonFile(path.join(dirPath, 'metadata.json')) ?? undefined;
+  const metadata = classifySessionArtifact(await readJsonFile(path.join(dirPath, 'metadata.json'))) ?? undefined;
   const verdict = await readJsonFile(path.join(dirPath, 'head-verdict.json')) ?? undefined;
 
   const status = metadata && typeof metadata['status'] === 'string'

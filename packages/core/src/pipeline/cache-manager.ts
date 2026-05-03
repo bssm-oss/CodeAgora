@@ -9,7 +9,7 @@ import { lookupCache, addToCache, type CacheMetadata } from '@codeagora/shared/u
 import { CA_ROOT } from '@codeagora/shared/utils/fs.js';
 import { computeHash } from '@codeagora/shared/utils/hash.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
-import { CACHE_METADATA_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
+import { CACHE_METADATA_SCHEMA_VERSION, SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { createRequire } from 'module';
@@ -57,7 +57,7 @@ const REVIEW_RULE_FILENAMES = ['.reviewrules', '.reviewrules.yml', '.reviewrules
 const PACKAGE_VERSION_FALLBACK = 'unknown';
 const requirePackageJson = createRequire(import.meta.url);
 
-type CacheSession = Pick<SessionManager, 'setStatus' | 'setMetadata'>;
+type CacheSession = Pick<SessionManager, 'setStatus' | 'setMetadata'> & Partial<Pick<SessionManager, 'getDate' | 'getSessionId'>>;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -182,6 +182,19 @@ export function computeCacheKey(
   return computeHash(stableStringify(keyMaterial));
 }
 
+export async function writeSessionResult(
+  date: string,
+  sessionId: string,
+  pipelineResult: PipelineResult,
+): Promise<void> {
+  const resultJsonPath = `${CA_ROOT}/sessions/${date}/${sessionId}/result.json`;
+  await fs.writeFile(
+    resultJsonPath,
+    JSON.stringify(redactDeep({ ...pipelineResult, schemaVersion: SESSION_ARTIFACT_SCHEMA_VERSION }), null, 2),
+    'utf-8',
+  );
+}
+
 function buildCacheMetadata(cacheKey: string, sourceSessionPath?: string): CacheMetadata {
   return {
     schemaVersion: CACHE_METADATA_SCHEMA_VERSION,
@@ -207,9 +220,18 @@ export async function checkAndLoadCache(
         const cachedRaw = await fs.readFile(cachedResultPath, 'utf-8');
         const cachedResult = JSON.parse(cachedRaw) as PipelineResult;
         const cache = buildCacheMetadata(cacheKey, cachedSessionPath);
+        const result = {
+          ...cachedResult,
+          schemaVersion: SESSION_ARTIFACT_SCHEMA_VERSION,
+          cached: true,
+          cache,
+        };
         await session.setMetadata({ cache });
+        if (session.getDate && session.getSessionId) {
+          await writeSessionResult(session.getDate(), session.getSessionId(), result);
+        }
         await session.setStatus('completed');
-        return { ...cachedResult, cached: true, cache };
+        return result;
       }
     }
   } catch {
@@ -229,9 +251,8 @@ export async function persistResultCache(
   noCache: boolean,
 ): Promise<void> {
   try {
-    const resultJsonPath = `${CA_ROOT}/sessions/${date}/${sessionId}/result.json`;
     const cache = buildCacheMetadata(cacheKey);
-    await fs.writeFile(resultJsonPath, JSON.stringify(redactDeep({ ...pipelineResult, cache }), null, 2), 'utf-8');
+    await writeSessionResult(date, sessionId, { ...pipelineResult, cache });
     if (!noCache) {
       await addToCache(CA_ROOT, cacheKey, `${date}/${sessionId}`);
     }

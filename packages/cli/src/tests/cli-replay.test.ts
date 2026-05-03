@@ -47,13 +47,16 @@ describe('loadSessionForReplay', () => {
     );
   });
 
-  it('throws when session metadata.json does not exist', async () => {
+  it('classifies missing artifacts as legacy best-effort instead of throwing raw errors', async () => {
     const fs = await getFsMock();
     fs.readFile.mockRejectedValue(new Error('ENOENT'));
+    fs.readdir.mockRejectedValue(new Error('ENOENT'));
 
-    await expect(loadSessionForReplay('/base', '2024-01-15/001')).rejects.toThrow(
-      'Session not found: 2024-01-15/001',
-    );
+    const result = await loadSessionForReplay('/base', '2024-01-15/001');
+
+    expect(result.decision).toBe('legacy/best-effort');
+    expect(result.evidenceDocs).toEqual([]);
+    expect(result.diffContent).toBeNull();
   });
 
   it('returns ReplayResult with decision "unknown" when no head verdict', async () => {

@@ -6,6 +6,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import { SessionMetadata } from '../types/core.js';
 import {
   CA_ROOT,
@@ -42,6 +43,7 @@ export class SessionManager {
     const sessionId = await getNextSessionId(date);
 
     const metadata: SessionMetadata = {
+      schemaVersion: SESSION_ARTIFACT_SCHEMA_VERSION,
       sessionId,
       date,
       timestamp: Date.now(),
@@ -141,6 +143,7 @@ export class SessionManager {
           );
           const metadata: SessionMetadata = {
             ...this.metadata,
+            schemaVersion: SESSION_ARTIFACT_SCHEMA_VERSION,
             status: 'interrupted',
             completedAt: Date.now(),
           };

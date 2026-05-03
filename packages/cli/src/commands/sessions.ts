@@ -180,6 +180,9 @@ export function formatSessionDetail(detail: SessionDetail): string {
 
   if (detail.metadata) {
     const m = detail.metadata;
+    if (typeof m['artifactContract'] === 'string') {
+      lines.push(`Artifact Contract: ${m['artifactContract']}`);
+    }
     if (typeof m['diffPath'] === 'string') {
       lines.push(`Diff:    ${m['diffPath']}`);
     }

@@ -151,6 +151,28 @@ Session JSON is intentionally smaller than review JSON, but uses the same contra
 }
 ```
 
+## Session Artifact Contract
+
+Persisted session artifacts under `.ca/sessions/{YYYY-MM-DD}/{NNN}/` use a dedicated session artifact marker:
+
+```txt
+codeagora.session.v1
+```
+
+New `metadata.json` files include `schemaVersion: "codeagora.session.v1"`. Terminal pipeline paths also persist readable `result.json` with the same marker for normal reviews, lightweight `--skip-head` reviews, cache hits, empty diffs, auto-approvals, degraded reviewer failures, and pipeline errors when a session directory exists.
+
+Readers that encounter missing `schemaVersion`, missing `metadata.json`, or missing `result.json` must treat the session as `legacy/best-effort`: keep rendering whatever artifacts are available, report zero findings or `unknown`/best-effort decisions where needed, and avoid raw stack traces or filesystem parse errors in user-facing CLI/MCP/desktop output.
+
+`agora sessions show --json` may annotate old metadata as:
+
+```json
+{
+  "artifactContract": "legacy/best-effort"
+}
+```
+
+Consumers should branch on the persisted artifact `schemaVersion` when it is present, and otherwise use the legacy/best-effort path without migrating or rewriting user session directories.
+
 ## MCP Alignment
 
 MCP review tools default to compact output to preserve agent context. `review_quick` and `review_full` accept either `diff` or `staged: true`; `review_pr` accepts `pr_url` or `pr_number`; review tools also accept shared options such as `reviewer_count`, `reviewer_names`, `provider`, `model`, `timeout_seconds`, `reviewer_timeout_seconds`, `no_cache`, `context_lines`, `repo_path`, and `output_format`.

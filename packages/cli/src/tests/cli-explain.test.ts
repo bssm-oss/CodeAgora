@@ -43,13 +43,15 @@ describe('explainSession', () => {
     );
   });
 
-  it('throws when session metadata.json does not exist', async () => {
+  it('classifies a missing metadata.json session as legacy best-effort', async () => {
     const fs = await getFsMock();
     fs.readFile.mockRejectedValue(new Error('ENOENT'));
+    fs.readdir.mockRejectedValue(new Error('ENOENT'));
 
-    await expect(explainSession('/base', '2024-01-15/001')).rejects.toThrow(
-      'Session not found: 2024-01-15/001',
-    );
+    const result = await explainSession('/base', '2024-01-15/001');
+
+    expect(result.narrative).toContain('legacy/best-effort');
+    expect(result.narrative).not.toContain('ENOENT');
   });
 
   it('returns ExplainResult with sessionPath and narrative when session exists', async () => {

@@ -5,6 +5,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 export interface ExplainResult {
   sessionPath: string;
@@ -36,11 +37,15 @@ export async function explainSession(baseDir: string, sessionPath: string): Prom
 
   // Read metadata
   let metadata: Record<string, unknown> = {};
+  let artifactContract = 'legacy/best-effort';
   try {
     const raw = await fs.readFile(path.join(sessionDir, 'metadata.json'), 'utf-8');
     metadata = JSON.parse(raw) as Record<string, unknown>;
+    artifactContract = metadata['schemaVersion'] === SESSION_ARTIFACT_SCHEMA_VERSION
+      ? SESSION_ARTIFACT_SCHEMA_VERSION
+      : 'legacy/best-effort';
   } catch {
-    throw new Error(`Session not found: ${sessionPath}`);
+    metadata = { status: 'legacy/best-effort' };
   }
 
   // Read head verdict
@@ -54,6 +59,7 @@ export async function explainSession(baseDir: string, sessionPath: string): Prom
 
   const decision = String(verdict['decision'] ?? metadata['status'] ?? 'unknown');
   lines.push(`Session ${sessionPath} \u2014 ${decision}`);
+  lines.push(`Artifact contract: ${artifactContract}`);
   lines.push('');
 
   // Read reviews

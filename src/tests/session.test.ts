@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SessionManager } from '@codeagora/core/session/manager.js';
 import { readSessionMetadata, getSessionDir } from '@codeagora/shared/utils/fs.js';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import fs from 'fs/promises';
 
 describe('SessionManager', () => {
@@ -31,6 +32,7 @@ describe('SessionManager', () => {
     expect(session.getDate()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     const metadata = session.getMetadata();
+    expect(metadata.schemaVersion).toBe(SESSION_ARTIFACT_SCHEMA_VERSION);
     expect(metadata.status).toBe('in_progress');
     expect(metadata.diffPath).toBe(testDiffPath);
   });
@@ -72,6 +74,7 @@ describe('SessionManager', () => {
       session.getSessionId()
     );
 
+    expect(metadata.schemaVersion).toBe(SESSION_ARTIFACT_SCHEMA_VERSION);
     expect(metadata.status).toBe('completed');
     expect(metadata.completedAt).toBeDefined();
   });

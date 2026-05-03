@@ -2,9 +2,12 @@
  * Session Metadata type
  */
 
+import type { SessionArtifactSchemaVersion } from '../contracts/stable.js';
 import type { CacheMetadata } from '../utils/cache.js';
 
 export interface SessionMetadata {
+  /** Persisted artifact contract marker. Missing means legacy/best-effort. */
+  schemaVersion?: SessionArtifactSchemaVersion;
   sessionId: string; // 001, 002, etc.
   date: string; // YYYY-MM-DD
   timestamp: number;

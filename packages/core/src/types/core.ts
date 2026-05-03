@@ -173,6 +173,8 @@ export interface HeadVerdict {
 // ============================================================================
 
 export interface SessionMetadata {
+  /** Persisted artifact contract marker. Missing means legacy/best-effort. */
+  schemaVersion?: import('@codeagora/shared/contracts/stable.js').SessionArtifactSchemaVersion;
   sessionId: string; // 001, 002, etc.
   date: string; // YYYY-MM-DD
   timestamp: number;

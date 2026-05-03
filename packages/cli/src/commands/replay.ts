@@ -38,15 +38,17 @@ export async function loadSessionForReplay(baseDir: string, sessionPath: string)
 
   // Read metadata to get diff path
   let metadata: Record<string, unknown> = {};
+  let missingMetadata = false;
   try {
     const raw = await fs.readFile(path.join(sessionDir, 'metadata.json'), 'utf-8');
     metadata = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    throw new Error(`Session not found: ${sessionPath}`);
+    metadata = {};
+    missingMetadata = true;
   }
 
   // Read head verdict
-  let decision = 'unknown';
+  let decision = missingMetadata ? 'legacy/best-effort' : 'unknown';
   try {
     const raw = await fs.readFile(path.join(sessionDir, 'head-verdict.json'), 'utf-8');
     const verdict = JSON.parse(raw) as Record<string, unknown>;

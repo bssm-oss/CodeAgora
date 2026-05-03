@@ -90,10 +90,12 @@ describe('traceSession', () => {
     expect(result.output).toContain('No findings in this session.');
   });
 
-  it('throws for missing session', async () => {
-    await expect(
-      traceSession(tmpDir, '2026-04-20/999'),
-    ).rejects.toThrow(/Session result not found/);
+  it('classifies missing result.json as legacy best-effort', async () => {
+    const result = await traceSession(tmpDir, '2026-04-20/999');
+
+    expect(result.findingCount).toBe(0);
+    expect(result.output).toContain('legacy/best-effort');
+    expect(result.output).not.toContain('ENOENT');
   });
 
   it('throws for malformed session path', async () => {
