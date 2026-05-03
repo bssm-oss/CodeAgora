@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { t } from '@codeagora/shared/i18n/index.js';
+import { validateConfig } from '@codeagora/core/types/config.js';
 
 // Allowlist prevents arbitrary command execution via $VISUAL/$EDITOR env injection
 const SAFE_EDITORS = new Set([
@@ -106,6 +107,13 @@ export async function setConfigValue(
 
   const typedValue = parseValue(rawValue);
   setNestedKey(config, key, typedValue);
+
+  try {
+    validateConfig(config);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid config mutation for ${key}: ${message}`);
+  }
 
   await fs.writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }

@@ -38,6 +38,32 @@ async function getSpawnSyncMock() {
   return spawnSync as ReturnType<typeof vi.fn>;
 }
 
+function validConfigJson(extra: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    reviewers: [
+      { id: 'r1', backend: 'api', model: 'test', provider: 'groq', timeout: 120, enabled: true },
+    ],
+    supporters: {
+      pool: [
+        { id: 's1', backend: 'api', model: 'test', provider: 'groq', timeout: 120, enabled: true },
+      ],
+      pickCount: 1,
+      pickStrategy: 'random',
+      devilsAdvocate: { id: 'da', backend: 'api', model: 'test', provider: 'groq', timeout: 120, enabled: true },
+      personaPool: ['.ca/personas/strict.md'],
+      personaAssignment: 'random',
+    },
+    moderator: { backend: 'api', model: 'test', provider: 'groq' },
+    discussion: {
+      maxRounds: 3,
+      registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },
+      codeSnippetRange: 10,
+    },
+    errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
+    ...extra,
+  });
+}
+
 describe('setConfigValue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,7 +91,7 @@ describe('setConfigValue', () => {
   it('writes updated config with string value', async () => {
     const fs = await getFsMock();
     fs.access.mockResolvedValueOnce(undefined); // JSON found
-    fs.readFile.mockResolvedValue(JSON.stringify({ existing: 'value' }));
+    fs.readFile.mockResolvedValue(validConfigJson({ existing: 'value' }));
     fs.writeFile.mockResolvedValue(undefined);
 
     await setConfigValue('/base', 'newKey', 'hello');
@@ -79,7 +105,7 @@ describe('setConfigValue', () => {
   it('coerces boolean string "true" to boolean true', async () => {
     const fs = await getFsMock();
     fs.access.mockResolvedValueOnce(undefined);
-    fs.readFile.mockResolvedValue(JSON.stringify({}));
+    fs.readFile.mockResolvedValue(validConfigJson());
     fs.writeFile.mockResolvedValue(undefined);
 
     await setConfigValue('/base', 'flag', 'true');
@@ -91,7 +117,7 @@ describe('setConfigValue', () => {
   it('coerces boolean string "false" to boolean false', async () => {
     const fs = await getFsMock();
     fs.access.mockResolvedValueOnce(undefined);
-    fs.readFile.mockResolvedValue(JSON.stringify({}));
+    fs.readFile.mockResolvedValue(validConfigJson());
     fs.writeFile.mockResolvedValue(undefined);
 
     await setConfigValue('/base', 'flag', 'false');
@@ -103,7 +129,7 @@ describe('setConfigValue', () => {
   it('coerces numeric string to number', async () => {
     const fs = await getFsMock();
     fs.access.mockResolvedValueOnce(undefined);
-    fs.readFile.mockResolvedValue(JSON.stringify({}));
+    fs.readFile.mockResolvedValue(validConfigJson());
     fs.writeFile.mockResolvedValue(undefined);
 
     await setConfigValue('/base', 'maxRounds', '5');
@@ -115,13 +141,24 @@ describe('setConfigValue', () => {
   it('sets nested key via dot notation', async () => {
     const fs = await getFsMock();
     fs.access.mockResolvedValueOnce(undefined);
-    fs.readFile.mockResolvedValue(JSON.stringify({}));
+    fs.readFile.mockResolvedValue(validConfigJson());
     fs.writeFile.mockResolvedValue(undefined);
 
     await setConfigValue('/base', 'discussion.maxRounds', '3');
 
     const written = JSON.parse((fs.writeFile.mock.calls[0] as any[])[1] as string);
     expect(written.discussion.maxRounds).toBe(3);
+  });
+
+  it('rejects invalid mutations without writing partial config', async () => {
+    const fs = await getFsMock();
+    fs.access.mockResolvedValueOnce(undefined);
+    fs.readFile.mockResolvedValue(validConfigJson());
+    fs.writeFile.mockResolvedValue(undefined);
+
+    await expect(setConfigValue('/base', 'discussion.maxRounds', '0')).rejects.toThrow(/invalid|validation/i);
+
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 });
 

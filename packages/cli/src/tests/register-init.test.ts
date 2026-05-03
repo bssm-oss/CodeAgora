@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import { registerInitCommand } from '../commands/register-init.js';
 import * as init from '../commands/init.js';
+import { validateConfig } from '@codeagora/core/types/config.js';
 
 describe('registerInitCommand', () => {
   beforeEach(() => {
@@ -44,6 +45,17 @@ describe('registerInitCommand', () => {
       preset: 'budget',
     });
     expect(runInitInteractive).not.toHaveBeenCalled();
+  });
+
+  it('builds schema-valid generated groq config for non-interactive init paths', () => {
+    const generated = init.buildCustomConfig({
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
+      reviewerCount: 3,
+      discussion: true,
+    });
+
+    expect(() => validateConfig(generated)).not.toThrow();
   });
 
   it('exits with code 1 when runInit rejects', async () => {

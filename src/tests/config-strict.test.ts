@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { strictValidateConfig } from '@codeagora/core/config/validator.js';
+import { buildDefaultConfig } from '@codeagora/core/config/loader.js';
 import type { Config } from '@codeagora/core/types/config.js';
 
 // ============================================================================
@@ -51,6 +52,14 @@ function makeConfig(overrides?: Record<string, unknown>): Config {
 // ============================================================================
 
 describe('strictValidateConfig', () => {
+  it('generated groq defaults pass strict validation', () => {
+    const config = buildDefaultConfig('groq');
+    const result = strictValidateConfig(config);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
   // Test 1: valid provider 'groq' — no errors
   it('valid provider groq produces no errors', () => {
     const config = makeConfig();

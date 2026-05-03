@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { stringify as stringifyYaml } from 'yaml';
 
 // Minimal valid YAML config content
 const validYaml = `reviewers:
@@ -136,7 +137,7 @@ afterEach(async () => {
 });
 
 // Import the testable loader function (explicit base dir — no chdir needed)
-import { loadConfigFrom } from '@codeagora/core/config/loader.js';
+import { buildDefaultConfig, loadConfigFile, loadConfigFrom } from '@codeagora/core/config/loader.js';
 
 // ============================================================================
 // Tests
@@ -196,6 +197,17 @@ describe('YAML Config Loading', () => {
     await fs.writeFile(path.join(tmpDir, '.ca', 'config.yaml'), invalidSchemaYaml, 'utf-8');
 
     await expect(loadConfigFrom(tmpDir)).rejects.toThrow();
+  });
+
+  it('should load YAML serialized from generated groq defaults', async () => {
+    const generated = buildDefaultConfig('groq');
+    const yamlPath = path.join(tmpDir, '.ca', 'generated-default.yaml');
+    await fs.writeFile(yamlPath, stringifyYaml(generated), 'utf-8');
+
+    const config = await loadConfigFile(yamlPath);
+
+    expect(config.supporters.devilsAdvocate.provider).toBe('groq');
+    expect(config.discussion.registrationThreshold.SUGGESTION).toBeNull();
   });
 
   it('should preserve original error message when neither JSON nor YAML exists', async () => {
