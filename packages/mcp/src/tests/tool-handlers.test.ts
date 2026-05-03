@@ -10,6 +10,7 @@ import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MCP_ERROR_CODES } from '@codeagora/shared/contracts/stable.js';
 
 // ---------------------------------------------------------------------------
 // McpServer stub — captures handler for direct invocation
@@ -344,6 +345,20 @@ describe('get_stats handler', () => {
     const result = await getHandler('get_stats')({});
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('no sessions dir');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// review_quick
+// ---------------------------------------------------------------------------
+
+describe('stable MCP error contract', () => {
+  it('registers every structured review_quick error code used by this suite', () => {
+    expect(MCP_ERROR_CODES).toEqual(expect.arrayContaining([
+      'INVALID_INPUT',
+      'INVALID_REPO_PATH',
+      'REVIEW_FAILED',
+    ]));
   });
 });
 

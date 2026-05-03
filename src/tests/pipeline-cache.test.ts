@@ -15,6 +15,7 @@ import {
   addToCache,
   type CacheIndex,
 } from '@codeagora/shared/utils/cache.js';
+import { CACHE_METADATA_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Test Helpers
@@ -139,6 +140,16 @@ describe('lookupCache', () => {
     // Entry should have been removed from the index
     const updatedIndex = await readCacheIndex(tmpDir);
     expect(updatedIndex['stale-key']).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// addToCache
+// ============================================================================
+
+describe('stable cache metadata contract', () => {
+  it('declares a versioned cache metadata schema marker', () => {
+    expect(CACHE_METADATA_SCHEMA_VERSION).toBe('codeagora.cache.v1');
   });
 });
 

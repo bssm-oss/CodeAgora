@@ -8,6 +8,7 @@ import { listSessions, getSessionStats } from '@codeagora/core/session/queries.j
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Test Helpers
@@ -28,6 +29,16 @@ async function createSession(
     await fs.writeFile(path.join(sessionDir, 'head-verdict.json'), JSON.stringify(verdict), 'utf-8');
   }
 }
+
+// ============================================================================
+// listSessions
+// ============================================================================
+
+describe('stable session artifact contract', () => {
+  it('declares a versioned session artifact schema marker', () => {
+    expect(SESSION_ARTIFACT_SCHEMA_VERSION).toBe('codeagora.session.v1');
+  });
+});
 
 // ============================================================================
 // listSessions

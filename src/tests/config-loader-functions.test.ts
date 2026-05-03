@@ -14,6 +14,7 @@ import {
   normalizeConfig,
 } from '@codeagora/core/config/loader.js';
 import type { Config, DeclarativeReviewers } from '@codeagora/core/types/config.js';
+import { CONFIG_DEFAULT_CONTRACT } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Shared fixtures
@@ -387,5 +388,27 @@ describe('normalizeConfig', () => {
     const original = config.reviewers;
     normalizeConfig(config);
     expect(config.reviewers).toBe(original);
+  });
+});
+
+// ============================================================================
+// Stable config default contract
+// ============================================================================
+
+describe('stable config default contract', () => {
+  it('declares required default sections and discussion thresholds', () => {
+    expect(CONFIG_DEFAULT_CONTRACT.requiredSections).toEqual([
+      'reviewers',
+      'supporters',
+      'moderator',
+      'discussion',
+      'errorHandling',
+    ]);
+    expect(CONFIG_DEFAULT_CONTRACT.discussionThresholds).toEqual([
+      'HARSHLY_CRITICAL',
+      'CRITICAL',
+      'WARNING',
+      'SUGGESTION',
+    ]);
   });
 });
