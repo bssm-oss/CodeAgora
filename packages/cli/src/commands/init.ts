@@ -651,6 +651,8 @@ function isKorean(): boolean {
 // GitHub Actions workflow
 // ============================================================================
 
+const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-beta.0';
+
 /**
  * Write the GitHub Actions workflow template to {baseDir}/.github/workflows/codeagora-review.yml.
  * Creates .github/workflows/ if it does not exist.
@@ -1241,13 +1243,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: CodeAgora Review
-        uses: bssm-oss/CodeAgora@v2
+        uses: ${CODEAGORA_ACTION_REF}
         with:
           github-token: \${{ secrets.GITHUB_TOKEN }}
-          fail-on-reject: 'false'
+          fail-on-reject: 'true'
           max-diff-lines: '5000'
         env:
 ${envLines}

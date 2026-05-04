@@ -122,7 +122,7 @@ The core `codeagora` CLI includes everything needed for command-line reviews and
 
 ## GitHub Actions
 
-Add CodeAgora to any repo in 2 steps:
+Add CodeAgora to any repo in 3 steps:
 
 **1. Create `.ca/config.json`** (or run `agora init`):
 
@@ -154,8 +154,8 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: bssm-oss/CodeAgora@v2
+      - uses: actions/checkout@v6
+      - uses: bssm-oss/CodeAgora@v0.1.0-beta.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
@@ -166,7 +166,7 @@ jobs:
 
 Every PR gets inline review comments, a summary verdict, and a commit status check. Add `review:skip` label to any PR to bypass.
 
-Note: The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
+Note: Use the `v0.1.0-beta.0` Action tag for the scoped beta package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
 
 ---
 

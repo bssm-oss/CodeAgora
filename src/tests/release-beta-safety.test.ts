@@ -35,4 +35,21 @@ describe('beta release safety', () => {
     expect(rootVersion).toBe('0.1.0-beta.0');
     expect(mcpVersion).toBe(rootVersion);
   });
+
+  it('keeps public and generated Action examples on the beta ref, not legacy v2', () => {
+    const rootVersion = readPackageVersion('package.json');
+    const actionRef = `bssm-oss/CodeAgora@v${rootVersion}`;
+    const files = [
+      'README.md',
+      'packages/cli/src/commands/init.ts',
+      'packages/shared/src/data/github-actions-template.yml',
+      'docs/RELEASE_CHECKLIST.md',
+    ];
+
+    for (const file of files) {
+      const content = readText(file);
+      expect(content, `${file} should mention the beta Action ref`).toContain(actionRef);
+      expect(content, `${file} should not use the legacy v2 Action ref`).not.toContain('uses: bssm-oss/CodeAgora@v2');
+    }
+  });
 });

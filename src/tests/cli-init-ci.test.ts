@@ -54,29 +54,31 @@ describe('writeGitHubWorkflow()', () => {
     expect(content).toContain('synchronize');
   });
 
-  it('written file contains npx codeagora review step', async () => {
+  it('written file uses the beta CodeAgora Action ref', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-beta.0');
+    expect(content).not.toContain('bssm-oss/CodeAgora@v2');
+    expect(content).not.toContain('npx codeagora');
   });
 
-  it('written file contains codeagora-review marker', async () => {
+  it('written file contains caller-owned review:skip label guard', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('<!-- codeagora-v3 -->');
+    expect(content).toContain("!contains(github.event.pull_request.labels.*.name, 'review:skip')");
   });
 
-  it('written file contains actions/checkout and actions/setup-node steps', async () => {
+  it('written file checks out the repo and lets the composite Action own Node setup', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
     expect(content).toContain('actions/checkout@v6');
-    expect(content).toContain('actions/setup-node@v6');
+    expect(content).not.toContain('actions/setup-node@v6');
   });
 
   it('does not overwrite existing workflow when force is false', async () => {
@@ -101,7 +103,7 @@ describe('writeGitHubWorkflow()', () => {
 
     const content = await fs.readFile(workflowPath, 'utf-8');
     expect(content).not.toBe('existing content');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-beta.0');
   });
 });
 
@@ -246,6 +248,6 @@ describe('runInit() with ci: true', () => {
 
     expect(result.created).toContain(workflowPath);
     const content = await fs.readFile(workflowPath, 'utf-8');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-beta.0');
   });
 });

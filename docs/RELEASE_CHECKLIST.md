@@ -27,7 +27,7 @@ Before the final `v0.1.0-beta.0` tag is pushed, confirm the intended package ver
 9. Run the GitHub Action smoke path through `pnpm build:action` and the release smoke script.
 10. Confirm `.github/workflows/release.yml` computes a prerelease publish tag and runs npm publish with `--tag beta` for beta versions.
 11. Confirm `.github/workflows/npm-dist-tags.yml` offers `beta` and blocks assigning prerelease versions to `latest`.
-12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements.
+12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-beta.0` for beta Action examples rather than legacy `@v2` or stable-looking refs.
 13. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
 14. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
 
