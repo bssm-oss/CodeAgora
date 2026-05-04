@@ -34,3 +34,23 @@ Before the final `v0.1.0-beta.0` tag is pushed, confirm the intended package ver
 ## Evidence
 
 Capture command output under `.sisyphus/evidence/` for typecheck, test, build, `bench:ci`, `release:beta-smoke`, root package dry-run, MCP package dry-run, release-safety tests, and security regression tests.
+
+Use the following stable filenames for locally captured release-candidate evidence:
+
+| Evidence | Filename | Command |
+|----------|----------|---------|
+| Typecheck | `typecheck.log` | `pnpm typecheck` |
+| Build | `build.log` | `pnpm build` |
+| Full deterministic tests | `test.log` | `pnpm test --no-file-parallelism` |
+| Cross-surface parity | `cross-surface-parity.log` | `pnpm vitest run src/tests/cross-surface-parity.test.ts` |
+| Deterministic benchmark gate | `bench-ci.log` | `pnpm bench:ci` |
+| Beta package and Action smoke | `beta-smoke.log` | `pnpm release:beta-smoke` |
+| Root package dry-run | `package-root-dry-run.log` | `pnpm pack --dry-run` |
+| MCP package dry-run | `package-mcp-dry-run.log` | `pnpm --filter @codeagora/mcp pack --dry-run` |
+| Action smoke bundle | `action-smoke.log` | `pnpm build:action && pnpm release:beta-smoke` |
+| MCP smoke | `mcp-smoke.log` | covered by `pnpm release:beta-smoke` |
+| Security regression gate | `security-regression.log` | `pnpm test:security` |
+| Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider secrets |
+| Evidence manifest | `evidence-manifest.json` | generated or filled during release prep |
+
+`cross-surface-parity.log` must show the deterministic CLI/MCP/GitHub Action parity fixture passing. `beta-smoke.log` remains the provider-free packed CLI/MCP/Action runtime smoke.

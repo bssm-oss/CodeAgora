@@ -4,6 +4,7 @@
  */
 
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 // ============================================================================
 // SARIF Type Definitions
@@ -108,7 +109,8 @@ export function buildSarifReport(
   version: string = '1.0.0',
   discussionMeta?: Map<string, SarifDiscussionMeta>,
 ): SarifReport {
-  const results: SarifResult[] = evidenceDocs.map((doc) => {
+  const safeDocs = redactDeep(evidenceDocs);
+  const results: SarifResult[] = safeDocs.map((doc) => {
     const mapping = SEVERITY_TO_SARIF[doc.severity] ?? { level: 'note' as const, ruleId: 'CA004' };
 
     const markdown = [
