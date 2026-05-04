@@ -236,4 +236,57 @@ describe('review command production gates', () => {
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('No config and no API keys found. Run `agora init` to set up.');
   });
+
+  it('does not mutate explicit diff file when using --scope', async () => {
+    const cwd = await createTempProject('ca-review-scope-file-mutation-');
+    await writeValidConfig(cwd);
+    const diffContent = [
+      'diff --git a/foo.ts b/foo.ts',
+      '--- a/foo.ts',
+      '+++ b/foo.ts',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+      '',
+      'diff --git a/bar.ts b/bar.ts',
+      '--- a/bar.ts',
+      '+++ b/bar.ts',
+      '@@ -1 +1 @@',
+      '-before',
+      '+after',
+      '',
+    ].join('\n');
+    const patchPath = path.join(cwd, 'change.patch');
+    await writeFile(patchPath, diffContent, 'utf-8');
+
+    const result = await runAgoraReview(cwd, ['change.patch', '--scope', 'foo.ts', '--dry-run', '--quiet']);
+    const afterContent = await (await import('fs/promises')).readFile(patchPath, 'utf-8');
+    expect(result.code).toBe(0);
+    expect(afterContent).toBe(diffContent);
+    expect(result.stdout).toContain('Included files: 1');
+    expect(result.stdout).toContain('- foo.ts');
+    expect(result.stdout).not.toContain('bar.ts');
+  });
+
+  it('does not mutate explicit diff file when --scope has no matching changes', async () => {
+    const cwd = await createTempProject('ca-review-scope-missing-file-mutation-');
+    await writeValidConfig(cwd);
+    const diffContent = [
+      'diff --git a/foo.ts b/foo.ts',
+      '--- a/foo.ts',
+      '+++ b/foo.ts',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+      '',
+    ].join('\n');
+    const patchPath = path.join(cwd, 'change.patch');
+    await writeFile(patchPath, diffContent, 'utf-8');
+
+    const result = await runAgoraReview(cwd, ['change.patch', '--scope', 'missing.ts', '--dry-run', '--quiet']);
+    const afterContent = await (await import('fs/promises')).readFile(patchPath, 'utf-8');
+    expect(result.code).toBe(0);
+    expect(afterContent).toBe(diffContent);
+    expect(result.stderr).toContain('No changes found in scope: missing.ts');
+  });
 });
