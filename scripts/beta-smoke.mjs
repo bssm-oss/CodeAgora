@@ -186,6 +186,93 @@ async function smokeMcpServer() {
   console.log('OK: MCP tools/list smoke passed');
 }
 
+// --- Provider-free tool smoke for config_get via tools/call ---
+async function smokeMcpConfigGet() {
+  console.log('$ node packages/mcp/dist/index.js  # MCP config_get tool smoke');
+  const child = spawn(process.execPath, ['packages/mcp/dist/index.js'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: smokeEnv(),
+  });
+
+  let stdout = '';
+  let stderr = '';
+  let responses = [];
+  let parseError = null;
+  child.stdout.setEncoding('utf-8');
+  child.stderr.setEncoding('utf-8');
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk;
+    for (const line of chunk.split('\n')) {
+      if (line.trim().startsWith('{')) {
+        try {
+          const msg = JSON.parse(line);
+          responses.push(msg);
+        } catch (err) {
+          parseError = `MCP config_get stdout parse error: ${err instanceof Error ? err.message : String(err)} line=${line}`;
+        }
+      }
+    }
+  });
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+
+  const messages = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'codeagora-beta-smoke', version: '0.0.0' } } },
+    { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
+    // Correct protocol: tools/call for config_get
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'config_get', arguments: {} } },
+  ];
+
+  let errorToLog = null;
+  try {
+    for (const message of messages) {
+      await writeJsonLine(child, message);
+    }
+    // Wait for config_get response or timeout
+    const start = Date.now();
+    let found = false;
+    while (Date.now() - start < MCP_TIMEOUT_MS) {
+      await delay(50);
+      const configResp = responses.find(r => r.id === 3);
+      if (configResp) {
+        found = true;
+        if (configResp.error) {
+          errorToLog = `MCP config_get returned error: ${JSON.stringify(configResp.error)}`;
+          break;
+        }
+        if (!configResp.result || typeof configResp.result !== 'object') {
+          errorToLog = `MCP config_get returned invalid result: ${JSON.stringify(configResp)}`;
+          break;
+        }
+        // Expect at least a reviewers array or config object
+        if (!('content' in configResp.result) && !('reviewers' in configResp.result)) {
+          errorToLog = `MCP config_get result missing expected keys: ${JSON.stringify(configResp.result)}`;
+          break;
+        }
+        // Passed!
+        break;
+      }
+    }
+    if (!found) {
+      errorToLog = `MCP config_get smoke timed out. stdout=${stdout} stderr=${stderr}`;
+    }
+    if (!errorToLog && parseError) {
+      errorToLog = parseError;
+    }
+    if (errorToLog) {
+      // Write RED evidence log
+      const evidencePath = path.join('.sisyphus', 'evidence', 'task-8-mcp-package-red.log');
+      fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+      fs.writeFileSync(evidencePath, errorToLog + `\nstdout=${stdout}\nstderr=${stderr}`);
+      throw new Error(errorToLog);
+    }
+  } finally {
+    await closeChild(child);
+  }
+  console.log('OK: MCP config_get smoke passed');
+}
+
 run('pnpm', ['build']);
 run('pnpm', ['build:action']);
 run('pnpm', ['exec', 'node', 'scripts/verify-package-contents.mjs']);
@@ -241,4 +328,5 @@ try {
 }
 
 await smokeMcpServer();
+await smokeMcpConfigGet();
 console.log('OK: beta smoke passed');
