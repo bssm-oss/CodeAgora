@@ -53,6 +53,7 @@ Use the following stable filenames for locally captured release-candidate eviden
 | MCP smoke | `mcp-smoke.log` | covered by `pnpm release:beta-smoke` |
 | Security regression gate | `security-regression.log` | `pnpm test:security` |
 | Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider secrets |
+| Live GitHub Action PR smoke | `live-github-action-pr-smoke.md` | same-repository PR smoke plus degraded-path evidence |
 | Evidence manifest | `evidence-manifest.json` | generated or filled during release prep |
 
 `cross-surface-parity.log` must show the deterministic CLI/MCP/GitHub Action parity fixture passing. `beta-smoke.log` remains the provider-free packed CLI/MCP/Action runtime smoke.

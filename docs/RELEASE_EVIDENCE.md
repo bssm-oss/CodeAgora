@@ -44,12 +44,22 @@ artifacts are required only for stable claims that depend on live behavior.
 | Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider secrets | stable |
 | Live GitHub Action PR smoke | `live-github-action-pr-smoke.md` | manual same-repo/fork/stale-head Action matrix | stable |
 
+## Current Live Captures
+
+The 2026-05-04 readiness branch has stable-candidate live evidence captured in
+GitHub Actions:
+
+| Evidence | Location | Result |
+|----------|----------|--------|
+| Live GitHub Action PR smoke | `docs/live-github-action-pr-smoke.md` | Normal same-repo PR #532 posted an `ACCEPT` PR review; oversized PR #531 skipped with a structured diff-limit warning |
+| Live benchmark report | `docs/live-benchmark-report.md` | Run 25317360402 completed 20/20 fixtures with 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions |
+
 ## Skipped And Live-Only Register
 
 | Gate | Location | Classification | Enablement | Stable impact |
 |------|----------|----------------|------------|---------------|
 | Full live pipeline E2E | `src/tests/e2e-full-pipeline.test.ts` | live-only Vitest suite | `CODEAGORA_RUN_LIVE_E2E=1`, `GROQ_API_KEY`, and `claude` CLI in `PATH` | Required before stable live quality claims; non-blocking for deterministic beta gates |
-| Golden-bug live benchmark | `.github/workflows/bench-fn.yml` / `pnpm bench:fn:run` | live-only workflow | `OPENROUTER_API_KEY` secret and selected fixture matrix | Required before stable accuracy or `latest` quality claims |
+| Golden-bug live benchmark | `.github/workflows/bench-fn.yml` / `pnpm bench:fn:run` | live-only workflow | provider credentials or GitHub Models `models: read` permission, selected fixture matrix, and optional rate-limit throttle | Required before stable accuracy or `latest` quality claims |
 | Live GitHub Action PR smoke | external PR workflow run | live-only manual smoke | same-repo PR, fork PR, stale-head, oversized diff, provider-failure, and 422 scenarios | Required before stable GitHub Action support claim |
 
 Default `pnpm test` results must not be described as live E2E evidence. Release

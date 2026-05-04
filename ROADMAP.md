@@ -88,8 +88,8 @@ closed.
 
 ### P2 Evidence And Stable Claims
 
-- [ ] Run and capture a representative live GitHub Action PR smoke.
-- [ ] Produce a fresh stable-candidate live benchmark report with full metadata.
+- [x] Run and capture a representative live GitHub Action PR smoke.
+- [x] Produce a fresh stable-candidate live benchmark report with full metadata.
 - [x] Add deterministic CLI/MCP/Action cross-surface parity evidence.
 - [x] Classify skipped and live-only tests in release evidence.
 - [x] Standardize release evidence filenames and add an evidence manifest.
@@ -106,7 +106,9 @@ closed.
 
 ## Status Notes
 
-- 2026-05-04: P0/P1 local correctness and public-surface gates were closed with regression coverage and docs updates. The remaining P2 blockers are live evidence only: representative GitHub Action PR smoke and a fresh stable-candidate live benchmark report.
+- 2026-05-04: P0/P1 local correctness and public-surface gates were closed with regression coverage and docs updates. The final P2 live evidence gates were later closed with GitHub Action PR smoke and a stable-candidate live benchmark artifact.
+- 2026-05-04: Live GitHub Action evidence was captured in PR #532 (`review` run 25317789874, review 4219826536, verdict `ACCEPT`) and oversized-diff behavior was captured in PR #531 (`review` run 25317537322).
+- 2026-05-04: Stable-candidate live benchmark evidence was captured in run 25317360402 with 20/20 successful fixtures, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
 - 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/RELEASE_CHECKLIST.md`, `docs/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
 - 2026-05-04: Desktop scope hygiene was re-checked across README, changelog, release docs, architecture docs, extension docs, and postinstall messaging. Desktop remains a private preview outside stable CLI/GitHub/MCP release gates.
 
