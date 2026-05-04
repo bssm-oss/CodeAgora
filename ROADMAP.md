@@ -100,9 +100,15 @@ closed.
 
 ### P3 Scope Hygiene
 
-- [ ] Keep desktop explicitly private preview across public docs.
-- [ ] Clean public TODO/draft signals and mark research TODOs as non-release backlog.
-- [ ] Prevent roadmap drift by syncing completed gates back to authoritative docs.
+- [x] Keep desktop explicitly private preview across public docs.
+- [x] Clean public TODO/draft signals and mark research TODOs as non-release backlog.
+- [x] Prevent roadmap drift by syncing completed gates back to authoritative docs.
+
+## Status Notes
+
+- 2026-05-04: P0/P1 local correctness and public-surface gates were closed with regression coverage and docs updates. The remaining P2 blockers are live evidence only: representative GitHub Action PR smoke and a fresh stable-candidate live benchmark report.
+- 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/RELEASE_CHECKLIST.md`, `docs/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
+- 2026-05-04: Desktop scope hygiene was re-checked across README, changelog, release docs, architecture docs, extension docs, and postinstall messaging. Desktop remains a private preview outside stable CLI/GitHub/MCP release gates.
 
 ## P0: Release-Blocking Correctness
 

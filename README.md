@@ -14,9 +14,6 @@
 
 Multiple LLMs review your code in parallel, debate conflicting opinions, then a head agent delivers the final verdict. Different models catch different bugs — consensus filters the noise.
 
-<!-- TODO: demo GIF here -->
-<!-- ![demo](assets/demo.gif) -->
-
 ---
 
 ## Quick Start
@@ -80,7 +77,7 @@ The old web dashboard and terminal TUI are being consolidated toward a planned c
 
 The CLI remains the primary automation surface for LLM agents and CI. The desktop app is intended to become the human-facing local UI for review history, configuration, progress, costs, and result exploration, but it is not part of the stable support surface yet.
 
-An initial private scaffold lives in `packages/desktop` while the desktop MVP takes shape.
+An initial private preview scaffold lives in `packages/desktop` while the desktop MVP takes shape.
 
 ---
 

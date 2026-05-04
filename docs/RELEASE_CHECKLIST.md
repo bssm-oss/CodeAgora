@@ -16,7 +16,7 @@ Before the final `v0.1.0-beta.0` tag is pushed, confirm the intended package ver
 
 ## Beta Gates
 
-1. Confirm package version consistency between release notes, root `package.json`, workspace package manifests, desktop metadata, and `packages/mcp/package.json`.
+1. Confirm package version consistency between release notes, root `package.json`, supported workspace package manifests, and `packages/mcp/package.json`; note desktop private-preview metadata separately if touched.
 2. Run `pnpm typecheck`.
 3. Run `pnpm test --no-file-parallelism`.
 4. Run `pnpm build`.
