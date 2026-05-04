@@ -66,7 +66,10 @@ async function main(): Promise<void> {
   }
 
   // Load config early — used for pipeline and mapper options.
-  const configPath = process.env['CONFIG_PATH'] || '.ca/config.json';
+  // Use the normalized input value (CLI > env > default) rather than reading
+  // directly from process.env. Any failure to load the config is handled
+  // by loadConfigFile and surfaced via degraded outputs.
+  const configPath = inputs.configPath;
   const config = await loadConfigFile(configPath, { rootDir: process.cwd() }).catch(() => null);
 
   // Run pipeline (#259: pass repoPath for surrounding code context)

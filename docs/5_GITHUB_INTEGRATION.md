@@ -228,7 +228,8 @@ runs:
           --post-results "$POST_RESULTS" \
           --base-sha "$BASE_SHA" \
           --base-repo "$BASE_REPO" \
-          --head-repo "$HEAD_REPO"
+          --head-repo "$HEAD_REPO" \
+          --config-path "$CONFIG_PATH"
       env:
         ACTION_PATH: ${{ github.action_path }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -244,7 +245,7 @@ runs:
         CONFIG_PATH: ${{ inputs.config-path }}
 ```
 
-When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs.
+When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs. Failures to read or validate the config file are surfaced via `degraded`/`degraded-reason`, but the input precedence remains: CLI flag > CONFIG_PATH env > default (`.ca/config.json`).
 
 ### 3.2 How the Action Gets the Diff
 

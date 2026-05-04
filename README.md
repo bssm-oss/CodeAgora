@@ -166,6 +166,8 @@ jobs:
 
 Every PR gets inline review comments, a summary verdict, and a commit status check. Add `review:skip` label to any PR to bypass.
 
+Note: The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
+
 ---
 
 ## Documentation

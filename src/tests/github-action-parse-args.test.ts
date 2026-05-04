@@ -81,6 +81,22 @@ describe('github-action parseActionInputs', () => {
     const result = parseActionInputs(validArgv, env());
     expect(result.token).toBe('');
   });
+
+  it('CLI --config-path overrides env and default', () => {
+    const argv = [...validArgv, '--config-path', 'custom.json'];
+    const result = parseActionInputs(argv, env({ GITHUB_TOKEN: TOKEN, CONFIG_PATH: 'fromenv.json' }));
+    expect(result.configPath).toBe('custom.json');
+  });
+
+  it('CONFIG_PATH env is used when CLI flag not present', () => {
+    const result = parseActionInputs(validArgv, env({ GITHUB_TOKEN: TOKEN, CONFIG_PATH: 'fromenv.json' }));
+    expect(result.configPath).toBe('fromenv.json');
+  });
+
+  it('defaults configPath to .ca/config.json if neither CLI arg nor env present', () => {
+    const result = parseActionInputs(validArgv, env({ GITHUB_TOKEN: TOKEN }));
+    expect(result.configPath).toBe('.ca/config.json');
+  });
 });
 
 describe('github-action production policy', () => {
