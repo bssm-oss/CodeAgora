@@ -143,11 +143,17 @@ Make quality claims evidence-based instead of anecdotal.
 
 ### Acceptance Gate
 
-- Benchmark methodology and latest production candidate results are published in docs.
+- Benchmark methodology and latest production candidate results are published in docs; the current stable-candidate capture is `docs/live-benchmark-report.md`.
 - High-severity seeded findings meet the agreed recall threshold before release.
 - FP regression fixtures remain clean within the agreed tolerance.
 - No accepted production candidate fabricates files, line ranges, or code quotes in benchmark output.
 - CI blocks benchmark schema regressions and flags material quality regressions with `pnpm bench:ci`, a provider-free gate that validates fixture schemas and the 20-fixture reference file.
+
+### Current Evidence
+
+- Deterministic gate: `pnpm bench:ci`, validating 20 fixtures against `benchmarks/references/phase2-quality-gate.json`.
+- Stable-candidate live run: GitHub Actions run 25317360402, documented in `docs/live-benchmark-report.md`.
+- Live result summary: 20/20 fixtures completed, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
 
 ## Phase 5: Security And Abuse Resistance
 

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = process.cwd();
@@ -34,5 +35,37 @@ describe('GitHub Actions runtime readiness', () => {
         expect(content, `${file} should not contain deprecated action pin ${pin}`).not.toContain(pin);
       }
     }
+  });
+
+  it('documents SARIF as generated output with caller-owned upload', () => {
+    const docs = readText('docs/5_GITHUB_INTEGRATION.md');
+
+    expect(docs).toContain('it does not upload that file to');
+    expect(docs).toContain('github/codeql-action/upload-sarif@v4');
+    expect(docs).not.toContain('uploadSarif()');
+    expect(docs).not.toContain('POST /code-scanning/sarifs');
+  });
+
+  it('keeps the generated Action bundle syntactically valid on Node 20', () => {
+    const bundlePath = path.join(repoRoot, 'dist/action.js');
+    const bundle = readText('dist/action.js');
+
+    expect(bundle).toContain('__codeagoraCreateRequire');
+    expect(bundle).not.toContain('import { createRequire } from "module"; const require = createRequire(import.meta.url);');
+    execFileSync(process.execPath, ['--check', bundlePath], { stdio: 'pipe' });
+  });
+
+  it('uses GitHub Models for live PR and benchmark smoke paths without external provider quota', () => {
+    const review = readText('.github/workflows/review.yml');
+    const bench = readText('.github/workflows/bench-fn.yml');
+
+    expect(review).toContain('models: read');
+    expect(review).toContain('"provider": "github-models"');
+    expect(review).toContain('"model": "gpt-4o-mini"');
+    expect(bench).toContain('models: read');
+    expect(bench).toContain('config.github-models.json');
+    expect(bench).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(bench).toContain('BENCH_DELAY_MS');
+    expect(bench).toContain('--delay-ms "$BENCH_DELAY_MS"');
   });
 });

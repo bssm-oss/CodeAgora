@@ -14,9 +14,6 @@
 
 Multiple LLMs review your code in parallel, debate conflicting opinions, then a head agent delivers the final verdict. Different models catch different bugs — consensus filters the noise.
 
-<!-- TODO: demo GIF here -->
-<!-- ![demo](assets/demo.gif) -->
-
 ---
 
 ## Quick Start
@@ -80,7 +77,7 @@ The old web dashboard and terminal TUI are being consolidated toward a planned c
 
 The CLI remains the primary automation surface for LLM agents and CI. The desktop app is intended to become the human-facing local UI for review history, configuration, progress, costs, and result exploration, but it is not part of the stable support surface yet.
 
-An initial private scaffold lives in `packages/desktop` while the desktop MVP takes shape.
+An initial private preview scaffold lives in `packages/desktop` while the desktop MVP takes shape.
 
 ---
 
@@ -122,7 +119,7 @@ The core `codeagora` CLI includes everything needed for command-line reviews and
 
 ## GitHub Actions
 
-Add CodeAgora to any repo in 2 steps:
+Add CodeAgora to any repo in 3 steps:
 
 **1. Create `.ca/config.json`** (or run `agora init`):
 
@@ -154,8 +151,8 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: bssm-oss/CodeAgora@v2
+      - uses: actions/checkout@v6
+      - uses: bssm-oss/CodeAgora@v0.1.0-beta.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
@@ -165,6 +162,8 @@ jobs:
 **3. Add `GROQ_API_KEY`** to your repo's Settings > Secrets > Actions.
 
 Every PR gets inline review comments, a summary verdict, and a commit status check. Add `review:skip` label to any PR to bypass.
+
+Note: Use the `v0.1.0-beta.0` Action tag for the scoped beta package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
 
 ---
 
@@ -211,7 +210,7 @@ pnpm bench:fn -- --validate-only                   # schema-check fixtures
 pnpm bench:reference -- --validate-only            # validate the 20-fixture reference gate
 ```
 
-The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead.
+The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead. The latest stable-candidate live benchmark capture is [docs/live-benchmark-report.md](docs/live-benchmark-report.md).
 
 **Score pre-computed results** (fast, no API calls):
 

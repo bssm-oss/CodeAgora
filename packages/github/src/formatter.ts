@@ -8,6 +8,7 @@ import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpin
 import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
+import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 // ============================================================================
 // Constants
@@ -96,19 +97,23 @@ export interface MapperOptions {
  * Map a single EvidenceDocument to an inline comment body string.
  */
 export function mapToInlineCommentBody(
-  doc: EvidenceDocument,
-  discussion?: DiscussionVerdict,
+  inputDoc: EvidenceDocument,
+  inputDiscussion?: DiscussionVerdict,
   reviewerIds?: string[],
   options?: MapperOptions,
   /** Per-round debate data for this discussion (1.2) */
-  rounds?: DiscussionRound[],
+  inputRounds?: DiscussionRound[],
   /** Per-reviewer individual opinions for this location */
-  opinions?: ReviewerOpinion[],
+  inputOpinions?: ReviewerOpinion[],
   /** Devil's Advocate supporter ID for annotation */
   devilsAdvocateId?: string,
   /** Maps supporterId → model name */
   supporterModelMap?: Map<string, string>,
 ): string {
+  const doc = redactDeep(inputDoc);
+  const discussion = inputDiscussion ? redactDeep(inputDiscussion) : undefined;
+  const rounds = inputRounds ? redactDeep(inputRounds) : undefined;
+  const opinions = inputOpinions ? redactDeep(inputOpinions) : undefined;
   const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\u26AA', label: doc.severity };
   const lines: string[] = [];
 
@@ -254,7 +259,8 @@ export function buildSummaryBody(params: {
   /** Maps supporterId → model name */
   supporterModelMap?: Map<string, string>;
 }): string {
-  const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = params;
+  const safeParams = redactDeep(params);
+  const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = safeParams;
   const lines: string[] = [];
 
   lines.push(MARKER);

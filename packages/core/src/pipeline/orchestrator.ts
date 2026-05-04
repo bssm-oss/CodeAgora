@@ -27,13 +27,14 @@ import { matchRules } from '../rules/matcher.js';
 import { DiscussionEmitter } from '../l2/event-emitter.js';
 import { estimateDiffComplexity } from './diff-complexity.js';
 import { PipelineTelemetry } from './telemetry.js';
-import { computeCacheKey, checkAndLoadCache, persistResultCache } from './cache-manager.js';
+import { buildReviewCacheContext, computeCacheKey, checkAndLoadCache, persistResultCache, writeSessionResult } from './cache-manager.js';
 import { detectProjectContext } from './session-recovery.js';
 import { buildReviewerMap, buildReviewerOpinions, buildSupporterModelMap, mergeReviewOutputsByReviewer, trackDA, generatePerformanceText } from './pipeline-helpers.js';
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
 import fs from 'fs/promises';
 import type { ModeratorReport } from '../types/core.js';
 import { classifyError, type ErrorKind } from '../l1/error-classifier.js';
+import type { CacheMetadata } from '@codeagora/shared/utils/cache.js';
 
 // ============================================================================
 // Main Pipeline
@@ -107,6 +108,19 @@ export interface PipelineResult {
   supporterModelMap?: Record<string, string>;
   /** True when the result was served from cache (#109) */
   cached?: boolean;
+  /** Machine-readable cache metadata. Contains hashes/keys only, never raw provider or source context. */
+  cache?: CacheMetadata;
+}
+
+// ============================================================================
+// Session Result Artifacts
+// ============================================================================
+
+async function persistTerminalResult(result: PipelineResult): Promise<PipelineResult> {
+  if (result.date !== 'unknown' && result.sessionId !== 'unknown') {
+    await writeSessionResult(result.date, result.sessionId, result).catch(() => {});
+  }
+  return result;
 }
 
 // ============================================================================
@@ -228,8 +242,19 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     progress?.stageComplete('init', 'Config loaded');
 
-    // === CACHE: Check for identical diff + config (#109) ===
-    const cacheKey = computeCacheKey(diffContent, config);
+    // === CACHE: Check for identical review-meaning inputs (#109) ===
+    const cacheContext = await buildReviewCacheContext({
+      repoPath: input.repoPath,
+      surroundingContext,
+    });
+    const cacheKey = computeCacheKey(diffContent, config, cacheContext);
+    await session.setMetadata({
+      cache: {
+        schemaVersion: cacheContext.schemaVersion,
+        key: cacheKey,
+        hit: false,
+      },
+    }).catch(() => {});
     if (!input.noCache) {
       const cached = await checkAndLoadCache(cacheKey, session);
       if (cached) return cached;
@@ -241,7 +266,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       if (trivialResult.isTrivial) {
         const reason = trivialResult.reason ?? 'trivial-diff';
         await session.setStatus('completed');
-        return {
+        return persistTerminalResult({
           sessionId,
           date,
           status: 'success',
@@ -256,7 +281,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
             resolved: 0,
             escalated: 0,
           },
-        };
+        });
       }
     }
 
@@ -281,7 +306,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // Guard: empty diff produces no chunks
     if (chunks.length === 0) {
       await session.setStatus('completed');
-      return {
+      return persistTerminalResult({
         sessionId,
         date,
         status: 'success',
@@ -298,7 +323,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         },
         evidenceDocs: [],
         discussions: [],
-      };
+      });
     }
 
     // === PROJECT CONTEXT: Detect for false-positive prevention (#237) ===
@@ -344,12 +369,12 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // Empty pipeline guard — all chunks failed
     if (allReviewResults.length === 0) {
       await session.setStatus('failed');
-      return {
+      return persistTerminalResult({
         sessionId,
         date,
         status: 'error',
         error: buildReviewerFailureMessage(forfeitFailures, date, sessionId),
-      };
+      });
     }
 
     // Write review outputs (once, after all chunks)
@@ -505,7 +530,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       for (const doc of allEvidenceDocs) {
         severityCounts[doc.severity] = (severityCounts[doc.severity] ?? 0) + 1;
       }
-      return {
+      return persistTerminalResult({
         sessionId, date, status: 'success',
         summary: {
           decision: 'NEEDS_HUMAN', reasoning: 'Lightweight mode — no head verdict',
@@ -526,7 +551,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
         reviewerOpinions: buildReviewerOpinions(allReviewResults),
         devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
         supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
-      };
+      });
     }
 
     // === L3 HEAD: Final Verdict ===
@@ -591,6 +616,11 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       reviewerOpinions: buildReviewerOpinions(allReviewResults),
       devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
       supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
+      cache: {
+        schemaVersion: cacheContext.schemaVersion,
+        key: cacheKey,
+        hit: false,
+      },
     };
 
     // === CACHE: Persist result and update cache index (#109) ===
@@ -603,12 +633,12 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
       await session.setStatus('failed').catch(() => {});
     }
 
-    return {
+    return persistTerminalResult({
       sessionId: session?.getSessionId() ?? 'unknown',
       date: session?.getDate() ?? 'unknown',
       status: 'error',
       error: error instanceof Error ? error.message : String(error),
-    };
+    });
   }
 }
 

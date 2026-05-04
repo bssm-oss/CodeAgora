@@ -46,7 +46,8 @@ export function redactSecrets(input: string): string {
 }
 
 export function redactDeep<T>(value: T): T {
-  const seen = new WeakSet<object>();
+  const active = new WeakSet<object>();
+  const cloned = new WeakMap<object, unknown>();
 
   function visit<V>(entry: V): V {
     if (typeof entry === 'string') {
@@ -54,20 +55,39 @@ export function redactDeep<T>(value: T): T {
     }
 
     if (Array.isArray(entry)) {
-      if (seen.has(entry)) {
+      if (active.has(entry)) {
         return '[Circular]' as V;
       }
-      seen.add(entry);
-      return entry.map((item) => visit(item)) as V;
+      const cached = cloned.get(entry);
+      if (cached) {
+        return cached as V;
+      }
+      const output: unknown[] = [];
+      cloned.set(entry, output);
+      active.add(entry);
+      for (const item of entry) {
+        output.push(visit(item));
+      }
+      active.delete(entry);
+      return output as V;
     }
 
     if (entry && typeof entry === 'object') {
-      if (seen.has(entry)) {
+      if (active.has(entry)) {
         return '[Circular]' as V;
       }
-      seen.add(entry);
-      const entries = Object.entries(entry).map(([key, item]) => [key, visit(item)] as const);
-      return Object.fromEntries(entries) as V;
+      const cached = cloned.get(entry);
+      if (cached) {
+        return cached as V;
+      }
+      const output: Record<string, unknown> = {};
+      cloned.set(entry, output);
+      active.add(entry);
+      for (const [key, item] of Object.entries(entry)) {
+        output[key] = visit(item);
+      }
+      active.delete(entry);
+      return output as V;
     }
 
     return entry;

@@ -147,16 +147,15 @@ describe('postReview()', () => {
     expect(callArgs.comments.length).toBeLessThanOrEqual(50);
   });
 
-  it('falls back via bisection on 422 position error, preserving valid comments', async () => {
+  it('falls back to summary-only review on 422 position error without duplicate probe reviews', async () => {
     const positionError = Object.assign(new Error('Unprocessable Entity'), { status: 422 });
     const octokit = makeOctokit();
 
-    // First call (all comments) → 422
-    // Bisection probe (single comment) → 422 (comment is bad)
-    // Final review (no surviving comments) → success
+    // First call with inline comments → 422.
+    // Second call posts the summary only. There are no successful probe reviews,
+    // because successful probes would create duplicate review side effects.
     octokit.pulls.createReview
       .mockRejectedValueOnce(positionError)  // initial attempt
-      .mockRejectedValueOnce(positionError)  // bisection probe of single comment
       .mockResolvedValue({                   // final review with empty survivors
         data: {
           id: 777,
@@ -165,14 +164,18 @@ describe('postReview()', () => {
       });
 
     const review = makeReview({
-      comments: [{ path: 'src/foo.ts', position: 1, side: 'RIGHT', body: 'issue' }],
+      comments: [
+        { path: 'src/foo.ts', position: 1, side: 'RIGHT', body: 'issue 1' },
+        { path: 'src/bar.ts', position: 2, side: 'RIGHT', body: 'issue 2' },
+      ],
     });
 
     const result = await postReview(makeConfig(), 1, review, octokit as never);
     expect(result.reviewId).toBe(777);
-    // Final call should have empty comments (the single bad comment was dropped)
+    expect(octokit.pulls.createReview).toHaveBeenCalledTimes(2);
     const lastCall = octokit.pulls.createReview.mock.calls[octokit.pulls.createReview.mock.calls.length - 1][0];
     expect(lastCall.comments).toEqual([]);
+    expect(lastCall.body).toContain('could not place 2 inline review comments');
   });
 
   it('throws for non-position API errors', async () => {
@@ -225,17 +228,15 @@ describe('postReview()', () => {
 
   it('does NOT downgrade for unrelated 422 errors on APPROVE', async () => {
     // A 422 without the "not permitted to approve" message should NOT
-    // trigger the APPROVE→COMMENT downgrade; it should enter bisection.
+    // trigger the APPROVE→COMMENT downgrade; it should retry summary-only.
     const positionError = Object.assign(
       new Error('Unprocessable Entity: invalid position'),
       { status: 422 },
     );
     const octokit = makeOctokit();
 
-    // First call → 422 (position), bisection probe → 422 (probe fails),
-    // final with empty comments → success.
+    // First call → 422 (position), final with empty comments → success.
     octokit.pulls.createReview
-      .mockRejectedValueOnce(positionError)
       .mockRejectedValueOnce(positionError)
       .mockResolvedValue({
         data: { id: 555, html_url: 'https://github.com/test-owner/test-repo/pull/1#pullrequestreview-555' },
@@ -253,5 +254,7 @@ describe('postReview()', () => {
     // the specific permission error, not arbitrary 422s).
     const finalCall = octokit.pulls.createReview.mock.calls[octokit.pulls.createReview.mock.calls.length - 1][0];
     expect(finalCall.event).toBe('APPROVE');
+    expect(finalCall.comments).toEqual([]);
+    expect(finalCall.body).toContain('could not place 1 inline review comment');
   });
 });

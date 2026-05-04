@@ -1,9 +1,18 @@
 name: CodeAgora Review
+# Multi-agent debate-driven code review for pull requests
+#
+# CONTRACT NOTES:
+# - The `review:skip` label is always caller-owned. The Action NEVER mutates skip labels.
+# - The action exposes `degraded` and `degraded-reason` outputs for any degraded or skipped run
+#   (examples: missing credentials, diff too large, posting failures, stale PR head). Loading
+#   the repository config uses a default path; failures to load the config are surfaced via
+#   degraded outputs but do not change input precedence (CLI > env > default).
+#
 description: Multi-agent debate-driven code review for pull requests
 
 inputs:
   config-path:
-    description: Path to .ca/config.json relative to repo root
+    description: Path to .ca/config.json relative to repo root. CLI flag wins, then $CONFIG_PATH env, otherwise default used.
     required: false
     default: .ca/config.json
 
@@ -28,7 +37,9 @@ inputs:
 
 outputs:
   verdict:
-    description: Final verdict — ACCEPT, REJECT, or NEEDS_HUMAN
+    description: >
+      Final verdict — ACCEPT, REJECT, NEEDS_HUMAN, or SKIPPED.
+      SKIPPED is returned if the skip label is present or config-path is missing/invalid.
     value: ${{ steps.review.outputs.verdict }}
 
   review-url:
@@ -40,11 +51,18 @@ outputs:
     value: ${{ steps.review.outputs.session-id }}
 
   degraded:
-    description: Whether the action ran in degraded or skipped mode
+    description: >
+      Whether the action ran in degraded or skipped mode (true if SKIPPED or degraded).
+      All skip and config-path failures set this to true.
     value: ${{ steps.review.outputs.degraded }}
 
   degraded-reason:
-    description: Reason for degraded or skipped mode
+    description: >
+      Stable reason code for degraded or skipped mode.
+      Values include missing-github-token, missing-provider-secrets, fork-missing-provider-secrets,
+      posting-disabled, diff-too-large, config-load-failed, stale-head-sha,
+      github-post-failed, and sarif-write-failed.
+      Always set if degraded is true.
     value: ${{ steps.review.outputs.degraded-reason }}
 
   head-sha:
@@ -105,7 +123,8 @@ runs:
           --post-results "$POST_RESULTS" \
           --base-sha "$BASE_SHA" \
           --base-repo "$BASE_REPO" \
-          --head-repo "$HEAD_REPO"
+          --head-repo "$HEAD_REPO" \
+          --config-path "$CONFIG_PATH"
       env:
         ACTION_PATH: ${{ github.action_path }}
         GITHUB_TOKEN: ${{ inputs.github-token }}

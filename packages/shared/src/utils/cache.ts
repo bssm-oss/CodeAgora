@@ -7,10 +7,18 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
+import type { CacheMetadataSchemaVersion } from '../contracts/stable.js';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+export interface CacheMetadata {
+  schemaVersion: CacheMetadataSchemaVersion;
+  key: string;
+  hit: boolean;
+  sourceSessionPath?: string;
+}
 
 export interface CacheEntry {
   sessionPath: string;

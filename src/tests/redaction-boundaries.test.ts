@@ -59,6 +59,18 @@ describe('redaction utilities', () => {
     expect(redacted.verdict).toBe('REJECT');
     expect(redacted.token).toBe('OPENAI_API_KEY=[REDACTED]');
   });
+
+  it('preserves repeated structured references without treating them as circular', () => {
+    const lineRange: [number, number] = [12, 12];
+    const redacted = redactDeep({
+      summary: { topIssues: [{ filePath: 'src/auth.ts', lineRange }] },
+      evidenceDocs: [{ filePath: 'src/auth.ts', lineRange, token: rawSecret }],
+    });
+
+    expect(redacted.summary.topIssues[0].lineRange).toEqual([12, 12]);
+    expect(redacted.evidenceDocs[0].lineRange).toEqual([12, 12]);
+    expect(redacted.evidenceDocs[0].token).toBe('OPENAI_API_KEY=[REDACTED]');
+  });
 });
 
 describe('persisted review artifact redaction', () => {

@@ -4,6 +4,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getModelLeaderboard, formatLeaderboard } from '@codeagora/core/l0/leaderboard.js';
+import { errorMessage, mcpErrorResponse } from './shared-response.js';
 
 export function registerLeaderboard(server: McpServer): void {
   server.tool(
@@ -15,8 +16,7 @@ export function registerLeaderboard(server: McpServer): void {
         const entries = await getModelLeaderboard();
         return { content: [{ type: 'text' as const, text: formatLeaderboard(entries) }] };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text' as const, text: `Error: ${msg}` }], isError: true };
+        return mcpErrorResponse('LEADERBOARD_FAILED', errorMessage(err));
       }
     },
   );

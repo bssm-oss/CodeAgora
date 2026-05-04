@@ -84,13 +84,33 @@ export async function loadConfig(): Promise<Config> {
  * Uses the given provider with 3 auto-selected reviewers.
  */
 export function buildDefaultConfig(provider: string = 'groq'): Config {
+  const defaultAgent = { model: 'auto', backend: 'api' as const, provider, enabled: true, timeout: 120 };
+
   return validateConfig({
     mode: 'pragmatic',
     reviewers: {
       count: 3,
       constraints: { minFamilies: 1 },
     },
-    discussion: { maxRounds: 2 },
+    supporters: {
+      pool: [{ id: 's1', ...defaultAgent }],
+      pickCount: 1,
+      pickStrategy: 'random',
+      devilsAdvocate: { id: 'da', ...defaultAgent },
+      personaPool: ['.ca/personas/strict.md'],
+      personaAssignment: 'random',
+    },
+    moderator: { provider, model: 'auto', backend: 'api' },
+    discussion: {
+      maxRounds: 2,
+      registrationThreshold: {
+        HARSHLY_CRITICAL: 1,
+        CRITICAL: 1,
+        WARNING: 2,
+        SUGGESTION: null,
+      },
+      codeSnippetRange: 10,
+    },
     head: { provider, model: 'auto', backend: 'api', enabled: true },
     errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
   });

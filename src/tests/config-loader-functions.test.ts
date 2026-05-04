@@ -12,8 +12,10 @@ import {
   isDeclarativeReviewers,
   expandDeclarativeReviewers,
   normalizeConfig,
+  buildDefaultConfig,
 } from '@codeagora/core/config/loader.js';
 import type { Config, DeclarativeReviewers } from '@codeagora/core/types/config.js';
+import { CONFIG_DEFAULT_CONTRACT } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Shared fixtures
@@ -387,5 +389,42 @@ describe('normalizeConfig', () => {
     const original = config.reviewers;
     normalizeConfig(config);
     expect(config.reviewers).toBe(original);
+  });
+});
+
+// ============================================================================
+// Stable config default contract
+// ============================================================================
+
+describe('stable config default contract', () => {
+  it('builds schema-valid groq defaults with every required section', () => {
+    const config = buildDefaultConfig('groq');
+
+    expect(config.reviewers).toMatchObject({ count: 3 });
+    expect(config.supporters.pool).toHaveLength(1);
+    expect(config.supporters.devilsAdvocate.provider).toBe('groq');
+    expect(config.supporters.personaPool.length).toBeGreaterThan(0);
+    expect(config.discussion.registrationThreshold).toEqual({
+      HARSHLY_CRITICAL: 1,
+      CRITICAL: 1,
+      WARNING: 2,
+      SUGGESTION: null,
+    });
+  });
+
+  it('declares required default sections and discussion thresholds', () => {
+    expect(CONFIG_DEFAULT_CONTRACT.requiredSections).toEqual([
+      'reviewers',
+      'supporters',
+      'moderator',
+      'discussion',
+      'errorHandling',
+    ]);
+    expect(CONFIG_DEFAULT_CONTRACT.discussionThresholds).toEqual([
+      'HARSHLY_CRITICAL',
+      'CRITICAL',
+      'WARNING',
+      'SUGGESTION',
+    ]);
   });
 });

@@ -10,57 +10,17 @@ permissions:
 
 jobs:
   review:
+    if: "!contains(github.event.pull_request.labels.*.name, 'review:skip')"
     runs-on: ubuntu-latest
     steps:
       # Pin to SHA for production use. Major tags used here for readability.
       - uses: actions/checkout@v6  # Consider SHA pinning for production
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v6  # Consider SHA pinning for production
-        with:
-          node-version: '20'
-
-      - name: Generate PR diff
-        run: |
-          git diff origin/${{ github.base_ref }}...HEAD > /tmp/pr.diff
 
       - name: Run CodeAgora review
+        uses: bssm-oss/CodeAgora@v0.1.0-beta.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fail-on-reject: 'true'
+          max-diff-lines: '5000'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: |
-          npx codeagora review /tmp/pr.diff --output github --quiet > /tmp/review-output.md
-
-      - name: Post review comment
-        if: always()
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const output = fs.readFileSync('/tmp/review-output.md', 'utf8');
-            const marker = '<!-- codeagora-v3 -->';
-
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const existing = comments.find(c => c.body?.includes(marker));
-            const body = marker + '\n\n' + output;
-
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }

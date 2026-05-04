@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { z } from 'zod';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '../contracts/stable.js';
 import type { SessionMetadata } from '../types/session.js';
 
 // ============================================================================
@@ -230,13 +231,22 @@ export async function getNextSessionId(date: string): Promise<string> {
 // Metadata Operations
 // ============================================================================
 
+export function withSessionArtifactSchemaVersion(metadata: SessionMetadata): SessionMetadata {
+  return {
+    ...metadata,
+    sessionId: metadata.sessionId,
+    date: metadata.date,
+    schemaVersion: SESSION_ARTIFACT_SCHEMA_VERSION,
+  };
+}
+
 export async function writeSessionMetadata(
   date: string,
   sessionId: string,
   metadata: SessionMetadata
 ): Promise<void> {
   const metadataPath = getMetadataPath(date, sessionId);
-  await writeJson(metadataPath, metadata);
+  await writeJson(metadataPath, withSessionArtifactSchemaVersion(metadata));
 }
 
 export async function readSessionMetadata(

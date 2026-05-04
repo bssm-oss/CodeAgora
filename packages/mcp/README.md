@@ -70,6 +70,18 @@ Deterministic benchmark CI gates such as `pnpm bench:ci` do not require live pro
 
 Default MCP review responses are compact to preserve agent context. Request `output_format: "json"` from review tools when you need the versioned `codeagora.review.v1` machine contract.
 
+Tool failures use MCP protocol `isError: true` with a structured JSON body:
+
+```json
+{
+  "status": "error",
+  "code": "INVALID_INPUT",
+  "message": "Either diff or staged=true is required"
+}
+```
+
+Stable error codes include `INVALID_INPUT`, `INVALID_REPO_PATH`, `REVIEW_FAILED`, `REVIEW_PR_FAILED`, `DRY_RUN_FAILED`, `CONFIG_GET_FAILED`, `CONFIG_SET_FAILED`, `EXPLAIN_SESSION_FAILED`, `LEADERBOARD_FAILED`, and `STATS_FAILED`.
+
 ## Troubleshooting
 
 - If the server exits immediately, run `pnpm --filter @codeagora/mcp build` and confirm `packages/mcp/dist/index.js` exists.

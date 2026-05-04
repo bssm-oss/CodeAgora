@@ -2,7 +2,12 @@
  * Session Metadata type
  */
 
+import type { SessionArtifactSchemaVersion } from '../contracts/stable.js';
+import type { CacheMetadata } from '../utils/cache.js';
+
 export interface SessionMetadata {
+  /** Persisted artifact contract marker. Missing means legacy/best-effort. */
+  schemaVersion?: SessionArtifactSchemaVersion;
   sessionId: string; // 001, 002, etc.
   date: string; // YYYY-MM-DD
   timestamp: number;
@@ -32,4 +37,6 @@ export interface SessionMetadata {
   diffHash?: string;
   /** SHA-256 prefix of the reviewer config (cache key component) */
   configHash?: string;
+  /** Machine-readable cache lookup/write metadata. No raw config, providers, or source context. */
+  cache?: CacheMetadata;
 }

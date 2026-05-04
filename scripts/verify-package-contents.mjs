@@ -121,6 +121,18 @@ assertExcludes(mcpFiles, [
   /\.test\.[cm]?[jt]s$/,
 ], 'mcp');
 
+// Ensure shared package bundles runtime model/pricing data used by core
+const sharedRoot = path.join(repoRoot, 'packages/shared');
+const sharedFiles = packFiles(sharedRoot);
+assertIncludes(sharedFiles, [
+  'package.json',
+  'dist/index.js',
+  'dist/data/model-rankings.json',
+  'dist/data/groq-models.json',
+  'dist/data/pricing.json',
+], 'shared');
+
 console.log('OK: package dry-run contents verified');
 console.log(`root files: ${rootFiles.length}`);
 console.log(`mcp files: ${mcpFiles.length}`);
+console.log(`shared files: ${sharedFiles.length}`);

@@ -16,7 +16,7 @@ Before the final `v0.1.0-beta.0` tag is pushed, confirm the intended package ver
 
 ## Beta Gates
 
-1. Confirm package version consistency between release notes, root `package.json`, workspace package manifests, desktop metadata, and `packages/mcp/package.json`.
+1. Confirm package version consistency between release notes, root `package.json`, supported workspace package manifests, and `packages/mcp/package.json`; note desktop private-preview metadata separately if touched.
 2. Run `pnpm typecheck`.
 3. Run `pnpm test --no-file-parallelism`.
 4. Run `pnpm build`.
@@ -27,10 +27,42 @@ Before the final `v0.1.0-beta.0` tag is pushed, confirm the intended package ver
 9. Run the GitHub Action smoke path through `pnpm build:action` and the release smoke script.
 10. Confirm `.github/workflows/release.yml` computes a prerelease publish tag and runs npm publish with `--tag beta` for beta versions.
 11. Confirm `.github/workflows/npm-dist-tags.yml` offers `beta` and blocks assigning prerelease versions to `latest`.
-12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements.
-13. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
-14. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
+12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-beta.0` for beta Action examples rather than legacy `@v2` or stable-looking refs.
+13. Confirm release workflow publish jobs require the `npm-publish` environment, npm provenance, npm version preflight, and uploaded release evidence artifacts.
+14. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
+15. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
 
 ## Evidence
 
 Capture command output under `.sisyphus/evidence/` for typecheck, test, build, `bench:ci`, `release:beta-smoke`, root package dry-run, MCP package dry-run, release-safety tests, and security regression tests.
+
+Use the following stable filenames for locally captured release-candidate evidence:
+
+| Evidence | Filename | Command |
+|----------|----------|---------|
+| Typecheck | `typecheck.log` | `pnpm typecheck` |
+| Lint | `lint.log` | `pnpm lint` |
+| Build | `build.log` | `pnpm build` |
+| Full deterministic tests | `test.log` | `pnpm test --no-file-parallelism` |
+| Cross-surface parity | `cross-surface-parity.log` | `pnpm vitest run src/tests/cross-surface-parity.test.ts` |
+| Deterministic benchmark gate | `bench-ci.log` | `pnpm bench:ci` |
+| Beta package and Action smoke | `beta-smoke.log` | `pnpm release:beta-smoke` |
+| Root package dry-run | `package-root-dry-run.log` | `pnpm pack --dry-run` |
+| MCP package dry-run | `package-mcp-dry-run.log` | `pnpm --filter @codeagora/mcp pack --dry-run` |
+| Action smoke bundle | `action-smoke.log` | `pnpm build:action && pnpm release:beta-smoke` |
+| MCP smoke | `mcp-smoke.log` | covered by `pnpm release:beta-smoke` |
+| Security regression gate | `security-regression.log` | `pnpm test:security` |
+| Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider credentials or GitHub Models |
+| Live GitHub Action PR smoke | `live-github-action-pr-smoke.md` | same-repository PR smoke plus degraded-path evidence |
+| Evidence manifest | `evidence-manifest.json` | generated or filled during release prep |
+
+`cross-surface-parity.log` must show the deterministic CLI/MCP/GitHub Action parity fixture passing. `beta-smoke.log` remains the provider-free packed CLI/MCP/Action runtime smoke.
+
+Generate the manifest after the logs are captured:
+
+```bash
+pnpm evidence:manifest -- --require=beta
+```
+
+See `docs/RELEASE_EVIDENCE.md` for the skipped/live-only register and stricter
+`--require=rc` / `--require=stable` promotion checks.

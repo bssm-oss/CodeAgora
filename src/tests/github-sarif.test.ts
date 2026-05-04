@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import { SARIF_SEVERITY_RULES } from '@codeagora/shared/contracts/stable.js';
 
 const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   issueTitle: 'SQL injection vulnerability',
@@ -11,6 +12,17 @@ const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   filePath: 'src/db/queries.ts',
   lineRange: [42, 45] as [number, number],
   ...overrides,
+});
+
+describe('stable SARIF output contract', () => {
+  it('declares the shared severity to SARIF rule mapping', () => {
+    expect(SARIF_SEVERITY_RULES).toMatchObject({
+      HARSHLY_CRITICAL: { level: 'error', ruleId: 'CA001' },
+      CRITICAL: { level: 'error', ruleId: 'CA002' },
+      WARNING: { level: 'warning', ruleId: 'CA003' },
+      SUGGESTION: { level: 'note', ruleId: 'CA004' },
+    });
+  });
 });
 
 describe('buildSarifReport', () => {

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 
 const SENSITIVE_ENV_KEYS = new Set([
@@ -23,6 +26,7 @@ const SENSITIVE_ENV_KEYS = new Set([
 const SENSITIVE_ENV_PATTERN = /(?:^|_)(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)(?:_|$)/i;
 const MCP_TIMEOUT_MS = 5_000;
 const CHILD_EXIT_GRACE_MS = 2_000;
+const CLI_DIST_PATH = path.resolve('packages/cli/dist/index.js');
 
 function smokeEnv(extra = {}) {
   const env = { ...process.env, ...extra };
@@ -182,15 +186,147 @@ async function smokeMcpServer() {
   console.log('OK: MCP tools/list smoke passed');
 }
 
+// --- Provider-free tool smoke for config_get via tools/call ---
+async function smokeMcpConfigGet() {
+  console.log('$ node packages/mcp/dist/index.js  # MCP config_get tool smoke');
+  const child = spawn(process.execPath, ['packages/mcp/dist/index.js'], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: smokeEnv(),
+  });
+
+  let stdout = '';
+  let stderr = '';
+  let responses = [];
+  let parseError = null;
+  child.stdout.setEncoding('utf-8');
+  child.stderr.setEncoding('utf-8');
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk;
+    for (const line of chunk.split('\n')) {
+      if (line.trim().startsWith('{')) {
+        try {
+          const msg = JSON.parse(line);
+          responses.push(msg);
+        } catch (err) {
+          parseError = `MCP config_get stdout parse error: ${err instanceof Error ? err.message : String(err)} line=${line}`;
+        }
+      }
+    }
+  });
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+
+  const messages = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'codeagora-beta-smoke', version: '0.0.0' } } },
+    { jsonrpc: '2.0', method: 'notifications/initialized', params: {} },
+    // Correct protocol: tools/call for config_get
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'config_get', arguments: {} } },
+  ];
+
+  let errorToLog = null;
+  try {
+    for (const message of messages) {
+      await writeJsonLine(child, message);
+    }
+    // Wait for config_get response or timeout
+    const start = Date.now();
+    let found = false;
+    while (Date.now() - start < MCP_TIMEOUT_MS) {
+      await delay(50);
+      const configResp = responses.find(r => r.id === 3);
+      if (configResp) {
+        found = true;
+        if (configResp.error) {
+          errorToLog = `MCP config_get returned error: ${JSON.stringify(configResp.error)}`;
+          break;
+        }
+        if (!configResp.result || typeof configResp.result !== 'object') {
+          errorToLog = `MCP config_get returned invalid result: ${JSON.stringify(configResp)}`;
+          break;
+        }
+        // Expect at least a reviewers array or config object
+        if (!('content' in configResp.result) && !('reviewers' in configResp.result)) {
+          errorToLog = `MCP config_get result missing expected keys: ${JSON.stringify(configResp.result)}`;
+          break;
+        }
+        // Passed!
+        break;
+      }
+    }
+    if (!found) {
+      errorToLog = `MCP config_get smoke timed out. stdout=${stdout} stderr=${stderr}`;
+    }
+    if (!errorToLog && parseError) {
+      errorToLog = parseError;
+    }
+    if (errorToLog) {
+      // Write RED evidence log
+      const evidencePath = path.join('.sisyphus', 'evidence', 'task-8-mcp-package-red.log');
+      fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+      fs.writeFileSync(evidencePath, errorToLog + `\nstdout=${stdout}\nstderr=${stderr}`);
+      throw new Error(errorToLog);
+    }
+  } finally {
+    await closeChild(child);
+  }
+  console.log('OK: MCP config_get smoke passed');
+}
+
 run('pnpm', ['build']);
 run('pnpm', ['build:action']);
 run('pnpm', ['exec', 'node', 'scripts/verify-package-contents.mjs']);
 
-const help = runCapture(process.execPath, ['packages/cli/dist/index.js', '--help']);
+const help = runCapture(process.execPath, [CLI_DIST_PATH, '--help']);
 if (!help.includes('CodeAgora') && !help.includes('agora')) {
   throw new Error('CLI help smoke failed');
 }
 console.log('OK: CLI help smoke passed');
 
+const initDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-beta-smoke-'));
+try {
+  console.log(`$ node ${CLI_DIST_PATH} init --yes  # CLI init smoke`);
+  runCapture(process.execPath, [CLI_DIST_PATH, 'init', '--yes'], {
+    cwd: initDir,
+    env: smokeEnv({
+      HOME: initDir,
+      TMPDIR: initDir,
+      XDG_CONFIG_HOME: initDir,
+    }),
+  });
+
+  // Smoke verifies .ca/config.json is created in the temp dir.
+  const configPath = path.join(initDir, '.ca', 'config.json');
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`CLI init smoke failed: missing ${configPath}`);
+  }
+
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw new Error('CLI init smoke failed: config root is not an object');
+  }
+  if (!Array.isArray(config.reviewers) || config.reviewers.length === 0) {
+    throw new Error('CLI init smoke failed: reviewers array missing or empty');
+  }
+  for (const reviewer of config.reviewers) {
+    if (!reviewer || typeof reviewer !== 'object' || Array.isArray(reviewer)) {
+      throw new Error('CLI init smoke failed: reviewer entry is not an object');
+    }
+    if (typeof reviewer.provider !== 'string' || reviewer.provider.length === 0) {
+      throw new Error('CLI init smoke failed: reviewer provider missing');
+    }
+    if (typeof reviewer.backend !== 'string' || reviewer.backend.length === 0) {
+      throw new Error('CLI init smoke failed: reviewer backend missing');
+    }
+    if (typeof reviewer.model !== 'string' || reviewer.model.length === 0) {
+      throw new Error('CLI init smoke failed: reviewer model missing');
+    }
+  }
+  console.log('OK: CLI init smoke passed');
+} finally {
+  fs.rmSync(initDir, { recursive: true, force: true });
+}
+
 await smokeMcpServer();
+await smokeMcpConfigGet();
 console.log('OK: beta smoke passed');

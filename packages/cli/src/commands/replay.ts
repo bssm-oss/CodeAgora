@@ -38,28 +38,38 @@ export async function loadSessionForReplay(baseDir: string, sessionPath: string)
 
   // Read metadata to get diff path
   let metadata: Record<string, unknown> = {};
+  let missingMetadata = false;
   try {
     const raw = await fs.readFile(path.join(sessionDir, 'metadata.json'), 'utf-8');
     metadata = JSON.parse(raw) as Record<string, unknown>;
   } catch {
-    throw new Error(`Session not found: ${sessionPath}`);
+    metadata = {};
+    missingMetadata = true;
   }
 
   // Read head verdict
-  let decision = 'unknown';
+  let decision = missingMetadata ? 'legacy/best-effort' : 'unknown';
+  let hasHeadVerdictDecision = false;
   try {
     const raw = await fs.readFile(path.join(sessionDir, 'head-verdict.json'), 'utf-8');
     const verdict = JSON.parse(raw) as Record<string, unknown>;
-    decision = String(verdict['decision'] ?? 'unknown');
+    if (verdict['decision'] !== undefined) {
+      decision = String(verdict['decision']);
+      hasHeadVerdictDecision = true;
+    }
   } catch {
     // No verdict
   }
 
-  // Read evidence docs from result
+  // Read evidence docs and fallback decision from result
   let evidenceDocs: EvidenceDocument[] = [];
   try {
     const raw = await fs.readFile(path.join(sessionDir, 'result.json'), 'utf-8');
     const result = JSON.parse(raw) as Record<string, unknown>;
+    const summary = result['summary'] as Record<string, unknown> | undefined;
+    if (!hasHeadVerdictDecision && typeof summary?.['decision'] === 'string') {
+      decision = summary['decision'];
+    }
     evidenceDocs = (result['evidenceDocs'] as EvidenceDocument[]) ?? [];
   } catch {
     // Try reading individual review files

@@ -72,20 +72,22 @@ export async function traceSession(
   const resultPath = path.join(sessionDir, 'result.json');
 
   let result: MinimalSessionResult;
+  let legacyBestEffort = false;
   try {
     const raw = await fs.readFile(resultPath, 'utf-8');
     result = JSON.parse(raw) as MinimalSessionResult;
-  } catch (err) {
-    const msg = (err as NodeJS.ErrnoException).code === 'ENOENT'
-      ? `Session result not found: ${sessionPath} (no result.json at ${resultPath})`
-      : `Failed to read session result: ${(err as Error).message}`;
-    throw new Error(msg);
+  } catch {
+    result = { summary: { decision: 'legacy/best-effort' }, evidenceDocs: [] };
+    legacyBestEffort = true;
   }
 
   const docs = result.evidenceDocs ?? [];
   const lines: string[] = [];
   const decision = result.summary?.decision ?? 'unknown';
   lines.push(`Session ${sessionPath} — ${decision} (${docs.length} finding${docs.length === 1 ? '' : 's'})`);
+  if (legacyBestEffort) {
+    lines.push('Artifact contract: legacy/best-effort');
+  }
   lines.push('');
 
   if (docs.length === 0) {

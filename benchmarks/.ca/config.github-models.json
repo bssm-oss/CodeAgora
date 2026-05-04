@@ -1,0 +1,27 @@
+{
+  "mode": "pragmatic",
+  "language": "en",
+  "reviewers": [
+    { "id": "r1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+    { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+    { "id": "r3", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+  ],
+  "supporters": {
+    "pool": [
+      { "id": "s1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+    ],
+    "pickCount": 1,
+    "pickStrategy": "random",
+    "devilsAdvocate": { "id": "da", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+    "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
+    "personaAssignment": "random"
+  },
+  "moderator": { "model": "gpt-4o-mini", "backend": "api", "provider": "github-models" },
+  "discussion": {
+    "maxRounds": 1,
+    "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null },
+    "codeSnippetRange": 10
+  },
+  "head": { "backend": "api", "model": "gpt-4o-mini", "provider": "github-models", "enabled": true },
+  "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+}

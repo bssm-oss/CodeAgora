@@ -15,6 +15,13 @@ import {
   addToCache,
   type CacheIndex,
 } from '@codeagora/shared/utils/cache.js';
+import {
+  buildReviewCacheContext,
+  computeCacheKey,
+  REVIEW_CACHE_ANALYZERS,
+  type ReviewCacheContext,
+} from '@codeagora/core/pipeline/cache-manager.js';
+import { CACHE_METADATA_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Test Helpers
@@ -146,6 +153,16 @@ describe('lookupCache', () => {
 // addToCache
 // ============================================================================
 
+describe('stable cache metadata contract', () => {
+  it('declares a versioned cache metadata schema marker', () => {
+    expect(CACHE_METADATA_SCHEMA_VERSION).toBe('codeagora.cache.v1');
+  });
+});
+
+// ============================================================================
+// addToCache
+// ============================================================================
+
 describe('addToCache', () => {
   it('adds a new entry', async () => {
     await addToCache(tmpDir, 'key1', '2026-03-20/001');
@@ -208,30 +225,90 @@ describe('addToCache', () => {
 describe('cache key semantics', () => {
   const diff1 = 'diff --git a/foo.ts b/foo.ts\n+const x = 1;\n';
   const diff2 = 'diff --git a/bar.ts b/bar.ts\n+const y = 2;\n';
-  const config1 = JSON.stringify([{ id: 'r1', provider: 'groq', model: 'llama-3' }]);
-  const config2 = JSON.stringify([{ id: 'r2', provider: 'openai', model: 'gpt-4o' }]);
+  const config1 = { reviewers: [{ id: 'r1', provider: 'groq', model: 'llama-3' }] };
+  const config2 = { reviewers: [{ id: 'r2', provider: 'openai', model: 'gpt-4o' }] };
 
-  it('same diff + same config → same cacheKey', () => {
-    const key1 = computeHash(diff1 + config1);
-    const key2 = computeHash(diff1 + config1);
+  function cacheContext(overrides: Partial<ReviewCacheContext> = {}): ReviewCacheContext {
+    return {
+      schemaVersion: CACHE_METADATA_SCHEMA_VERSION,
+      codeagoraVersion: '0.1.0-test',
+      analyzerVersions: REVIEW_CACHE_ANALYZERS,
+      reviewIgnore: null,
+      reviewRules: [],
+      learnedSuppressions: [],
+      surroundingContextHash: null,
+      ...overrides,
+    };
+  }
+
+  it('same review-meaning inputs produce the same cacheKey', () => {
+    const key1 = computeCacheKey(diff1, config1, cacheContext());
+    const key2 = computeCacheKey(diff1, config1, cacheContext());
     expect(key1).toBe(key2);
   });
 
-  it('same diff + different config → different cacheKey', () => {
-    const key1 = computeHash(diff1 + config1);
-    const key2 = computeHash(diff1 + config2);
+  it('different diff invalidates the cache key', () => {
+    const key1 = computeCacheKey(diff1, config1, cacheContext());
+    const key2 = computeCacheKey(diff2, config1, cacheContext());
     expect(key1).not.toBe(key2);
   });
 
-  it('different diff + same config → different cacheKey', () => {
-    const key1 = computeHash(diff1 + config1);
-    const key2 = computeHash(diff2 + config1);
+  it('different config invalidates the cache key', () => {
+    const key1 = computeCacheKey(diff1, config1, cacheContext());
+    const key2 = computeCacheKey(diff1, config2, cacheContext());
     expect(key1).not.toBe(key2);
   });
 
-  it('different diff + different config → different cacheKey', () => {
-    const key1 = computeHash(diff1 + config1);
-    const key2 = computeHash(diff2 + config2);
-    expect(key1).not.toBe(key2);
+  it('review context files, learned suppressions, source context, analyzer IDs, and package version invalidate cache keys', () => {
+    const baseline = computeCacheKey(diff1, config1, cacheContext());
+
+    const changedInputs: ReviewCacheContext[] = [
+      cacheContext({ reviewIgnore: { path: '.reviewignore', hash: computeHash('ignored.ts\n') } }),
+      cacheContext({ reviewRules: [{ path: '.reviewrules', hash: computeHash('rules:\n  - id: no-console\n') }] }),
+      cacheContext({ learnedSuppressions: [{ pattern: 'false positive', severity: 'WARNING', action: 'suppress' }] }),
+      cacheContext({ surroundingContextHash: computeHash('function nearbyContext() { return 1; }') }),
+      cacheContext({ analyzerVersions: { ...REVIEW_CACHE_ANALYZERS, 'tsc-diagnostics': 'tsc-diagnostics:v999' } }),
+      cacheContext({ codeagoraVersion: '9.9.9' }),
+    ];
+
+    for (const changed of changedInputs) {
+      expect(computeCacheKey(diff1, config1, changed)).not.toBe(baseline);
+    }
+  });
+
+  it('builds deterministic context from .reviewignore, .reviewrules, learned suppressions, and source context without timestamp churn', async () => {
+    await fs.writeFile(path.join(tmpDir, '.reviewignore'), 'ignored.ts\n# comment\n', 'utf-8');
+    await fs.writeFile(path.join(tmpDir, '.reviewrules'), 'rules:\n  - id: no-console\n    pattern: console[.]log\n    severity: WARNING\n    message: avoid console\n', 'utf-8');
+    await fs.mkdir(path.join(tmpDir, '.ca'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, '.ca', 'learned-patterns.json'), JSON.stringify({
+      version: 1,
+      dismissedPatterns: [{
+        pattern: 'false positive',
+        severity: 'WARNING',
+        dismissCount: 5,
+        lastDismissed: '2026-05-03T00:00:00.000Z',
+        action: 'suppress',
+      }],
+    }), 'utf-8');
+
+    const first = await buildReviewCacheContext({ repoPath: tmpDir, surroundingContext: 'nearby source context' });
+    await fs.writeFile(path.join(tmpDir, '.ca', 'learned-patterns.json'), JSON.stringify({
+      version: 1,
+      dismissedPatterns: [{
+        pattern: 'false positive',
+        severity: 'WARNING',
+        dismissCount: 99,
+        lastDismissed: '2026-05-04T00:00:00.000Z',
+        action: 'suppress',
+      }],
+    }), 'utf-8');
+    const second = await buildReviewCacheContext({ repoPath: tmpDir, surroundingContext: 'nearby source context' });
+
+    expect(first.reviewIgnore?.hash).toBe(computeHash('ignored.ts\n# comment\n'));
+    expect(first.reviewRules).toEqual([{ path: '.reviewrules', hash: computeHash('rules:\n  - id: no-console\n    pattern: console[.]log\n    severity: WARNING\n    message: avoid console\n') }]);
+    expect(first.learnedSuppressions).toEqual([{ pattern: 'false positive', severity: 'WARNING', action: 'suppress' }]);
+    expect(first.surroundingContextHash).toBe(computeHash('nearby source context'));
+    expect(second.learnedSuppressions).toEqual(first.learnedSuppressions);
+    expect(computeCacheKey(diff1, config1, first)).toBe(computeCacheKey(diff1, config1, second));
   });
 });

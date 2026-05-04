@@ -11,6 +11,7 @@
 //   pnpm bench:fn:run -- --results <dir> --fixtures id1,id2  # subset
 //   pnpm bench:fn:run -- --results <dir> --config .ca/config.low-cost-diverse.json
 //   pnpm bench:fn:run -- --results <dir> --skip-head         # skip L3 verdict
+//   pnpm bench:fn:run -- --results <dir> --delay-ms 10000    # throttle between fixtures
 //
 // Requirements:
 //   - OPENROUTER_API_KEY in env (matching the default benchmark config)
@@ -42,6 +43,7 @@ interface Args {
   skipHead: boolean;
   dryRun: boolean;
   configPath: string | null;
+  delayMs: number;
 }
 
 interface RunPerformanceSummary {
@@ -98,6 +100,7 @@ function parseArgs(argv: string[]): Args {
     skipHead: false,
     dryRun: false,
     configPath: null,
+    delayMs: 0,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -108,14 +111,27 @@ function parseArgs(argv: string[]): Args {
     } else if (a === '--skip-head') args.skipHead = true;
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--config') args.configPath = argv[++i] ?? null;
+    else if (a === '--delay-ms') {
+      const parsed = Number(argv[++i] ?? '0');
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error('--delay-ms must be a non-negative number');
+      }
+      args.delayMs = parsed;
+    }
     else if (a === '--help' || a === '-h') {
       console.log(
-        'Usage: pnpm bench:fn:run -- --results <dir> [--fixtures id1,id2] [--config <path>] [--skip-head] [--dry-run]',
+        'Usage: pnpm bench:fn:run -- --results <dir> [--fixtures id1,id2] [--config <path>] [--skip-head] [--delay-ms ms] [--dry-run]',
       );
       process.exit(0);
     }
   }
   return args;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function loadFixtures(filter: Set<string> | null): Promise<GoldenBugFixture[]> {
@@ -254,6 +270,7 @@ async function main(): Promise<void> {
   if (args.dryRun) {
     console.log(`[dry-run] would run ${fixtures.length} fixture(s):`);
     console.log(`  config: ${configPath ?? path.join(benchmarkCwd, '.ca', 'config.json')}`);
+    console.log(`  delay: ${args.delayMs}ms`);
     console.log(`  metadata: ${metadataDir}`);
     for (const f of fixtures) console.log(`  - ${f.id} → ${path.join(resultsDir, `${f.id}.json`)}`);
     return;
@@ -267,7 +284,8 @@ async function main(): Promise<void> {
 
   const summary: SummaryEntry[] = [];
   try {
-    for (const fixture of fixtures) {
+    for (let index = 0; index < fixtures.length; index++) {
+      const fixture = fixtures[index]!;
       process.stderr.write(`[${fixture.id}] running... `);
       const started = Date.now();
       const startedAt = new Date(started).toISOString();
@@ -315,6 +333,10 @@ async function main(): Promise<void> {
         await writeFile(path.join(metadataDir, `${fixture.id}.json`), JSON.stringify(metadata, null, 2) + '\n');
         summary.push({ id: fixture.id, findings: 0, status: 'error', durationMs, error: msg });
         process.stderr.write(`ERROR: ${msg}\n`);
+      }
+      if (args.delayMs > 0 && index < fixtures.length - 1) {
+        process.stderr.write(`throttle ${args.delayMs}ms... `);
+        await delay(args.delayMs);
       }
     }
   } finally {

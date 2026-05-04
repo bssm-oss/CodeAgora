@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { ConfidenceTraceSchema } from '@codeagora/shared/types/confidence-trace.js';
+import type { CacheMetadata } from '@codeagora/shared/utils/cache.js';
 import type { TokenUsage } from '../pipeline/telemetry.js';
 
 // ============================================================================
@@ -172,6 +173,8 @@ export interface HeadVerdict {
 // ============================================================================
 
 export interface SessionMetadata {
+  /** Persisted artifact contract marker. Missing means legacy/best-effort. */
+  schemaVersion?: import('@codeagora/shared/contracts/stable.js').SessionArtifactSchemaVersion;
   sessionId: string; // 001, 002, etc.
   date: string; // YYYY-MM-DD
   timestamp: number;
@@ -201,4 +204,6 @@ export interface SessionMetadata {
   diffHash?: string;
   /** SHA-256 prefix of the reviewer config (cache key component) */
   configHash?: string;
+  /** Machine-readable cache lookup/write metadata. No raw config, providers, or source context. */
+  cache?: CacheMetadata;
 }

@@ -2,7 +2,8 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { persistResultCache } from '@codeagora/core/pipeline/cache-manager.js';
+import { checkAndLoadCache, persistResultCache } from '@codeagora/core/pipeline/cache-manager.js';
+import { CACHE_METADATA_SCHEMA_VERSION, SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import type { PipelineResult } from '@codeagora/core/pipeline/orchestrator.js';
 
 const date = '2026-05-02';
@@ -33,8 +34,8 @@ describe('result cache redaction', () => {
     await fs.rm(tmpRoot, { recursive: true, force: true });
   });
 
-  it('redacts secrets before persisting result.json', async () => {
-    const result: PipelineResult = {
+  function makeSecretResult(): PipelineResult {
+    return {
       sessionId,
       date,
       status: 'success',
@@ -75,13 +76,62 @@ describe('result cache redaction', () => {
         }],
       },
     };
+  }
+
+  it('redacts secrets before persisting result.json', async () => {
+    const result = makeSecretResult();
 
     await persistResultCache(date, sessionId, 'cache-key', result, true);
 
     const persisted = await fs.readFile(path.join('.ca', 'sessions', date, sessionId, 'result.json'), 'utf-8');
+    expect(persisted).toContain(`"schemaVersion": "${SESSION_ARTIFACT_SCHEMA_VERSION}"`);
     expectNoRawSecrets(persisted);
     expect(persisted).toContain('OPENAI_API_KEY=[REDACTED]');
     expect(persisted).toContain('Authorization: Bearer [REDACTED]');
     expect(persisted).toContain('Bearer [REDACTED]');
+  });
+
+  it('persists and returns redacted machine-readable cache metadata for cache hits', async () => {
+    const result = makeSecretResult();
+    await persistResultCache(date, sessionId, 'cache-key', result, false);
+
+    const hitSessionDir = path.join('.ca', 'sessions', date, 'cache-hit-session');
+    await fs.mkdir(hitSessionDir, { recursive: true });
+    const metadataUpdates: unknown[] = [];
+    const fakeSession = {
+      getDate: () => date,
+      getSessionId: () => 'cache-hit-session',
+      setStatus: async () => {},
+      setMetadata: async (metadata: unknown) => {
+        metadataUpdates.push(metadata);
+      },
+    };
+
+    const cached = await checkAndLoadCache('cache-key', fakeSession);
+
+    expect(cached?.cached).toBe(true);
+    expect(cached?.cache).toEqual({
+      schemaVersion: CACHE_METADATA_SCHEMA_VERSION,
+      key: 'cache-key',
+      hit: true,
+      sourceSessionPath: `${date}/${sessionId}`,
+    });
+    expect(metadataUpdates).toContainEqual({
+      cache: {
+        schemaVersion: CACHE_METADATA_SCHEMA_VERSION,
+        key: 'cache-key',
+        hit: true,
+        sourceSessionPath: `${date}/${sessionId}`,
+      },
+    });
+
+    const persisted = await fs.readFile(path.join('.ca', 'sessions', date, sessionId, 'result.json'), 'utf-8');
+    expect(persisted).toContain('"schemaVersion": "codeagora.session.v1"');
+    expect(persisted).toContain('"schemaVersion": "codeagora.cache.v1"');
+    const hitPersisted = await fs.readFile(path.join('.ca', 'sessions', date, 'cache-hit-session', 'result.json'), 'utf-8');
+    expect(hitPersisted).toContain('"cached": true');
+    expect(hitPersisted).toContain('"schemaVersion": "codeagora.session.v1"');
+    expectNoRawSecrets(JSON.stringify(cached));
+    expectNoRawSecrets(JSON.stringify(metadataUpdates));
   });
 });

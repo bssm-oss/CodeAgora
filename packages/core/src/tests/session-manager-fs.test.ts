@@ -9,6 +9,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { rm, readFile, access } from 'fs/promises';
 import path from 'path';
 import { SessionManager } from '../session/manager.js';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 describe('SessionManager (real fs)', () => {
   const cwd = process.cwd();
@@ -38,6 +39,7 @@ describe('SessionManager (real fs)', () => {
     const metaPath = path.join(cwd, sm.getDir(), 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
 
+    expect(meta.schemaVersion).toBe(SESSION_ARTIFACT_SCHEMA_VERSION);
     expect(meta.diffPath).toBe(diffPath);
     expect(meta.status).toBe('in_progress');
     expect(meta.startedAt).toBeGreaterThanOrEqual(before);
@@ -63,6 +65,7 @@ describe('SessionManager (real fs)', () => {
 
     const metaPath = path.join(cwd, sm.getDir(), 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
+    expect(meta.schemaVersion).toBe(SESSION_ARTIFACT_SCHEMA_VERSION);
     expect(meta.status).toBe('completed');
     expect(typeof meta.completedAt).toBe('number');
   });

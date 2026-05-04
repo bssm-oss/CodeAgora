@@ -7,10 +7,12 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: npm-publish
     steps:
       - uses: actions/checkout@v6
 
@@ -23,51 +25,102 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test --no-file-parallelism
-      - run: pnpm bench:ci
 
-      # Non-publishing beta gate: package dry-runs, CLI help, MCP tools/list, Action bundle.
+      - name: Prepare evidence directory
+        run: mkdir -p .sisyphus/evidence
+
+      - name: Typecheck
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee .sisyphus/evidence/typecheck.log
+
+      - name: Lint
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee .sisyphus/evidence/lint.log
+
+      - name: Build
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee .sisyphus/evidence/build.log
+
+      - name: Test
+        run: |
+          set -o pipefail
+          pnpm test --no-file-parallelism 2>&1 | tee .sisyphus/evidence/test.log
+
+      - name: Cross-surface parity
+        run: |
+          set -o pipefail
+          pnpm vitest run src/tests/cross-surface-parity.test.ts 2>&1 | tee .sisyphus/evidence/cross-surface-parity.log
+
+      - name: Security regression gate
+        run: |
+          set -o pipefail
+          pnpm test:security 2>&1 | tee .sisyphus/evidence/security-regression.log
+
+      - name: Deterministic benchmark gate
+        run: |
+          set -o pipefail
+          pnpm bench:ci 2>&1 | tee .sisyphus/evidence/bench-ci.log
+
       - name: Beta smoke
-        run: pnpm release:beta-smoke
+        run: |
+          set -o pipefail
+          pnpm release:beta-smoke 2>&1 | tee .sisyphus/evidence/beta-smoke.log
+          cp .sisyphus/evidence/beta-smoke.log .sisyphus/evidence/action-smoke.log
+          cp .sisyphus/evidence/beta-smoke.log .sisyphus/evidence/mcp-smoke.log
 
-      # Publish review package. Prereleases must not become npm latest.
+      - name: Root package dry-run
+        run: |
+          set -o pipefail
+          pnpm pack --dry-run 2>&1 | tee .sisyphus/evidence/package-root-dry-run.log
+
+      - name: MCP package dry-run
+        run: |
+          set -o pipefail
+          pnpm --filter @codeagora/mcp pack --dry-run 2>&1 | tee .sisyphus/evidence/package-mcp-dry-run.log
+
+      - name: Generate evidence manifest
+        run: pnpm evidence:manifest -- --require=rc
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.ref_name }}
+          path: .sisyphus/evidence/
+          retention-days: 30
+
+      - name: Preflight npm version availability
+        run: |
+          set -euo pipefail
+          root_version=$(node -e "const { readFileSync } = require('node:fs'); process.stdout.write(JSON.parse(readFileSync('package.json', 'utf8')).version)")
+          mcp_version=$(node -e "const { readFileSync } = require('node:fs'); process.stdout.write(JSON.parse(readFileSync('packages/mcp/package.json', 'utf8')).version)")
+          for spec in "@codeagora/review@$root_version" "@codeagora/mcp@$mcp_version"; do
+            if npm view "$spec" version >/dev/null 2>&1; then
+              echo "::error::$spec is already published"
+              exit 1
+            fi
+          done
+
       - name: Publish @codeagora/review
-        id: publish-core
-        continue-on-error: true
         run: |
           PUBLISH_TAG=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-') ? 'beta' : 'latest');")
-          npm publish --access public --tag "$PUBLISH_TAG"
+          npm publish --provenance --access public --tag "$PUBLISH_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @codeagora/mcp
-        id: publish-mcp
-        continue-on-error: true
         run: |
           PUBLISH_TAG=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('packages/mcp/package.json', 'utf8')).version; process.stdout.write(version.includes('-') ? 'beta' : 'latest');")
-          cd packages/mcp && npm publish --access public --tag "$PUBLISH_TAG"
+          cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish summary
-        if: always()
-        run: |
-          failed=0
-          for result in \
-            "${{ steps.publish-core.outcome }}" \
-            "${{ steps.publish-mcp.outcome }}"; do
-            if [ "$result" = "failure" ]; then
-              failed=$((failed + 1))
-            fi
-          done
-          if [ "$failed" -gt 0 ]; then
-            echo "::error::$failed package(s) failed to publish"
-            exit 1
-          fi
-          echo "All packages published successfully"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          body: |
+            Release evidence artifact: `release-evidence-${{ github.ref_name }}`

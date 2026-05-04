@@ -225,6 +225,61 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       }
     }
 
+    // --scope: filter diff to only include changes in specified paths
+    if (options.scope) {
+      const scopes = options.scope
+        .split(',')
+        .map((scope) => scope.trim().replace(/^\.\//, '').replace(/\/$/, ''))
+        .filter(Boolean);
+      const diffContent = await fs.readFile(resolvedPath, 'utf-8');
+      const filteredLines: string[] = [];
+      let currentHunk: string[] = [];
+      let currentFile: string | undefined;
+      const isInScope = (filePath: string) => {
+        const normalizedPath = filePath.replace(/^\.\//, '');
+        return scopes.some((scope) => normalizedPath === scope || normalizedPath.startsWith(`${scope}/`));
+      };
+      const pushIfScoped = () => {
+        if (currentFile && isInScope(currentFile)) {
+          filteredLines.push(...currentHunk);
+        }
+        currentHunk = [];
+        currentFile = undefined;
+      };
+      for (const line of diffContent.split('\n')) {
+        if (line.startsWith('diff --git')) {
+          pushIfScoped();
+          const match = line.match(/diff --git a\/(.*?) b\/(.*)$/);
+          currentFile = match ? match[2] : undefined;
+        }
+        currentHunk.push(line);
+      }
+      pushIfScoped();
+      if (filteredLines.length === 0) {
+        console.error(dim(`No changes found in scope: ${options.scope}`));
+        return;
+      }
+      const filteredDiff = filteredLines.join('\n');
+      // Only mutate temp files (stdin, staged, PR), never explicit user files
+      const isExplicitInput = diffPath && path.resolve(diffPath) === resolvedPath && !stdinTmpPath;
+      if (isExplicitInput) {
+        // Write filtered diff to a temp file and use that for the rest of the pipeline
+        const tmpDir = path.join(process.cwd(), '.ca', 'tmp');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const tmpScopedPath = path.join(tmpDir, `scoped-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.diff`);
+        await fs.writeFile(tmpScopedPath, filteredDiff, 'utf-8');
+        resolvedPath = tmpScopedPath;
+        stdinTmpPath = tmpScopedPath; // ensure cleanup
+      } else {
+        // Safe to overwrite temp file
+        await fs.writeFile(resolvedPath, filteredDiff, 'utf-8');
+      }
+      resolvedDiffContent = filteredDiff;
+      if (!options.quiet) {
+        console.error(dim(`Scoped to: ${options.scope}`));
+      }
+    }
+
     if (options.dryRun) {
       const config = await loadConfig();
       const diffContent = resolvedDiffContent;
@@ -259,27 +314,6 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     }
 
     // Build pipeline options from CLI flags
-    // --scope: filter diff to only include changes in specified paths
-    if (options.scope) {
-      const scopes = options.scope.split(',').map((s) => s.trim());
-      const diffContent = await fs.readFile(resolvedPath, 'utf-8');
-      const filteredLines: string[] = [];
-      let include = false;
-      for (const line of diffContent.split('\n')) {
-        if (line.startsWith('diff --git')) {
-          include = scopes.some((scope) => line.includes(`b/${scope}`));
-        }
-        if (include) filteredLines.push(line);
-      }
-      if (filteredLines.length === 0) {
-        console.error(dim(`No changes found in scope: ${options.scope}`));
-        return;
-      }
-      await fs.writeFile(resolvedPath, filteredLines.join('\n'), 'utf-8');
-      if (!options.quiet) {
-        console.error(dim(`Scoped to: ${options.scope}`));
-      }
-    }
 
     const pipelineOptions = {
       diffPath: resolvedPath,

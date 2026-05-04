@@ -1,6 +1,6 @@
 # P4-P6 Beta Readiness Summary
 
-Updated: 2026-05-02
+Updated: 2026-05-04
 
 This document summarizes the beta-readiness gates added for the production-readiness P4-P6 track. The current target is `0.1.0-beta.0`. Readiness validation is intentionally separated from irreversible release operations: final tag creation, GitHub Release creation, npm publishing, npm dist-tag promotion, and marketplace distribution remain explicit approval stops.
 
@@ -21,6 +21,15 @@ Current reference contract:
 - 6 FP-regression fixtures
 - Reference file: `benchmarks/references/phase2-quality-gate.json`
 - Fixture format notes: `benchmarks/golden-bugs/README.md`
+
+Stable-candidate live evidence is now captured separately from the offline beta
+gate:
+
+- Report: `docs/live-benchmark-report.md`
+- GitHub Actions run: https://github.com/bssm-oss/CodeAgora/actions/runs/25317360402
+- Config: `benchmarks/.ca/config.github-models.json`
+- Result: 20/20 fixtures completed, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
+- Artifact policy: the uploaded `bench-out` artifact is the auditable evidence; raw provider transcripts and `bench-out*` directories are not committed.
 
 ## P5: Security Boundaries
 
@@ -80,13 +89,14 @@ pnpm release:beta-smoke
 pnpm exec node scripts/verify-package-contents.mjs
 ```
 
-Observed results on merged `main`:
+Observed results for the 2026-05-04 readiness branch:
 
 - `pnpm typecheck`: passed
 - `pnpm build`: passed via beta smoke
 - `pnpm bench:ci`: passed; 20 fixtures validated
-- `pnpm test`: 205 files passed, 1 skipped; 3411 tests passed, 21 skipped
+- targeted release/docs readiness tests: passed
 - `pnpm release:beta-smoke`: passed; package dry-run, CLI smoke, MCP smoke all passed
 - `verify-package-contents`: passed; root files 12, MCP files 3
+- live `bench:fn:run`: passed in GitHub Actions run 25317360402; see `docs/live-benchmark-report.md`
 
-Evidence logs may be stored under `.sisyphus/evidence/` for local audit and are not required release artifacts.
+Evidence logs may be stored under `.sisyphus/evidence/` for local audit. Stable-candidate live evidence should be linked to GitHub Actions artifacts or concise docs summaries rather than committed raw provider output.

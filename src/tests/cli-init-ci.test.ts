@@ -7,8 +7,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
+import { parse as parseYaml } from 'yaml';
 
 import { writeGitHubWorkflow, runInit } from '@codeagora/cli/commands/init.js';
+import { validateConfig } from '@codeagora/core/types/config.js';
 
 // ============================================================================
 // writeGitHubWorkflow
@@ -52,29 +54,31 @@ describe('writeGitHubWorkflow()', () => {
     expect(content).toContain('synchronize');
   });
 
-  it('written file contains npx codeagora review step', async () => {
+  it('written file uses the beta CodeAgora Action ref', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-beta.0');
+    expect(content).not.toContain('bssm-oss/CodeAgora@v2');
+    expect(content).not.toContain('npx codeagora');
   });
 
-  it('written file contains codeagora-review marker', async () => {
+  it('written file contains caller-owned review:skip label guard', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('<!-- codeagora-v3 -->');
+    expect(content).toContain("!contains(github.event.pull_request.labels.*.name, 'review:skip')");
   });
 
-  it('written file contains actions/checkout and actions/setup-node steps', async () => {
+  it('written file checks out the repo and lets the composite Action own Node setup', async () => {
     await writeGitHubWorkflow(tmpDir);
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
     expect(content).toContain('actions/checkout@v6');
-    expect(content).toContain('actions/setup-node@v6');
+    expect(content).not.toContain('actions/setup-node@v6');
   });
 
   it('does not overwrite existing workflow when force is false', async () => {
@@ -99,7 +103,76 @@ describe('writeGitHubWorkflow()', () => {
 
     const content = await fs.readFile(workflowPath, 'utf-8');
     expect(content).not.toBe('existing content');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-beta.0');
+  });
+});
+
+// ============================================================================
+// runInit with --ci flag
+// ============================================================================
+
+describe('runInit() config artifacts', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-init-config-test-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes parseable JSON config that validates against the real schema', async () => {
+    const result = await runInit({ format: 'json', force: false, baseDir: tmpDir });
+
+    const configPath = path.join(tmpDir, '.ca', 'config.json');
+    expect(result.created).toContain(configPath);
+
+    const raw = await fs.readFile(configPath, 'utf-8');
+    const parsed = JSON.parse(raw) as unknown;
+    const config = validateConfig(parsed);
+
+    expect(config.reviewers.length).toBeGreaterThan(0);
+    expect(config.supporters.pool).toBeDefined();
+  });
+
+  it('writes parseable YAML config that validates against the real schema', async () => {
+    const result = await runInit({ format: 'yaml', force: false, baseDir: tmpDir });
+
+    const configPath = path.join(tmpDir, '.ca', 'config.yaml');
+    expect(result.created).toContain(configPath);
+
+    const raw = await fs.readFile(configPath, 'utf-8');
+    const parsed = parseYaml(raw) as unknown;
+    const config = validateConfig(parsed);
+
+    expect(config.reviewers.length).toBeGreaterThan(0);
+    expect(config.discussion.maxRounds).toBeGreaterThan(0);
+  });
+
+  it('preserves existing .ca/config.json when force is false', async () => {
+    const configPath = path.join(tmpDir, '.ca', 'config.json');
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(configPath, '{"sentinel":true}', 'utf-8');
+
+    const result = await runInit({ format: 'json', force: false, baseDir: tmpDir });
+
+    expect(await fs.readFile(configPath, 'utf-8')).toBe('{"sentinel":true}');
+    expect(result.skipped).toContain(configPath);
+    expect(result.created).not.toContain(configPath);
+  });
+
+  it('overwrites existing .ca/config.json when force is true', async () => {
+    const configPath = path.join(tmpDir, '.ca', 'config.json');
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(configPath, '{"sentinel":true}', 'utf-8');
+
+    const result = await runInit({ format: 'json', force: true, baseDir: tmpDir });
+
+    const raw = await fs.readFile(configPath, 'utf-8');
+    expect(raw).not.toBe('{"sentinel":true}');
+    expect(result.created).toContain(configPath);
+    expect(() => validateConfig(JSON.parse(raw) as unknown)).not.toThrow();
   });
 });
 
@@ -175,6 +248,6 @@ describe('runInit() with ci: true', () => {
 
     expect(result.created).toContain(workflowPath);
     const content = await fs.readFile(workflowPath, 'utf-8');
-    expect(content).toContain('npx codeagora review');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-beta.0');
   });
 });

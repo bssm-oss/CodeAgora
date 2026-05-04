@@ -47,13 +47,16 @@ describe('loadSessionForReplay', () => {
     );
   });
 
-  it('throws when session metadata.json does not exist', async () => {
+  it('classifies missing artifacts as legacy best-effort instead of throwing raw errors', async () => {
     const fs = await getFsMock();
     fs.readFile.mockRejectedValue(new Error('ENOENT'));
+    fs.readdir.mockRejectedValue(new Error('ENOENT'));
 
-    await expect(loadSessionForReplay('/base', '2024-01-15/001')).rejects.toThrow(
-      'Session not found: 2024-01-15/001',
-    );
+    const result = await loadSessionForReplay('/base', '2024-01-15/001');
+
+    expect(result.decision).toBe('legacy/best-effort');
+    expect(result.evidenceDocs).toEqual([]);
+    expect(result.diffContent).toBeNull();
   });
 
   it('returns ReplayResult with decision "unknown" when no head verdict', async () => {
@@ -84,6 +87,19 @@ describe('loadSessionForReplay', () => {
 
     const result = await loadSessionForReplay('/base', '2024-01-15/001');
     expect(result.decision).toBe('APPROVE');
+  });
+
+  it('uses result.json summary decision when head verdict is missing', async () => {
+    const fs = await getFsMock();
+    fs.readFile
+      .mockResolvedValueOnce(JSON.stringify({ status: 'completed' }))
+      .mockRejectedValueOnce(new Error('ENOENT'))
+      .mockResolvedValueOnce(JSON.stringify({ summary: { decision: 'ACCEPT' }, evidenceDocs: [] }));
+
+    const result = await loadSessionForReplay('/base', '2024-01-15/001');
+
+    expect(result.decision).toBe('ACCEPT');
+    expect(result.evidenceDocs).toEqual([]);
   });
 
   it('returns evidenceDocs from result.json when present', async () => {

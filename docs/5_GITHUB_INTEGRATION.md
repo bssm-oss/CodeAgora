@@ -1,7 +1,7 @@
 # CodeAgora v3 — GitHub Integration Design
 
 > Complete specification for PR review comments, GitHub Actions, SARIF output, and UX design.
-> Last updated: 2026-03-09
+> Last updated: 2026-05-04
 
 ---
 
@@ -27,7 +27,7 @@ github/mapper.ts          ← maps domain types → GitHub API shapes
         ├── createReviewComments()   → POST /repos/{owner}/{repo}/pulls/{pr}/reviews
         ├── createSummaryComment()   → POST /repos/{owner}/{repo}/issues/{pr}/comments
         ├── setCommitStatus()        → POST /repos/{owner}/{repo}/statuses/{sha}
-        └── uploadSarif()           → POST /repos/{owner}/{repo}/code-scanning/sarifs
+        └── writeSarifFile()         → local SARIF file for caller-managed upload
 ```
 
 The mapper is the sole boundary between CodeAgora domain types and GitHub API
@@ -186,7 +186,7 @@ outputs:
     value: ${{ steps.review.outputs.degraded }}
 
   degraded-reason:
-    description: Reason for degraded or skipped mode
+    description: Stable reason code for degraded or skipped mode
     value: ${{ steps.review.outputs.degraded-reason }}
 
   head-sha:
@@ -228,7 +228,8 @@ runs:
           --post-results "$POST_RESULTS" \
           --base-sha "$BASE_SHA" \
           --base-repo "$BASE_REPO" \
-          --head-repo "$HEAD_REPO"
+          --head-repo "$HEAD_REPO" \
+          --config-path "$CONFIG_PATH"
       env:
         ACTION_PATH: ${{ github.action_path }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -244,7 +245,21 @@ runs:
         CONFIG_PATH: ${{ inputs.config-path }}
 ```
 
-When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs.
+When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs. Failures to read or validate the config file are surfaced via `degraded`/`degraded-reason`, but the input precedence remains: CLI flag > CONFIG_PATH env > default (`.ca/config.json`).
+
+Stable `degraded-reason` values:
+
+```txt
+missing-github-token
+missing-provider-secrets
+fork-missing-provider-secrets
+posting-disabled
+diff-too-large
+config-load-failed
+stale-head-sha
+github-post-failed
+sarif-write-failed
+```
 
 ### 3.2 How the Action Gets the Diff
 
@@ -285,7 +300,15 @@ duplicate review comments from a prior run.
 Note: dismissed reviews remain visible in the GitHub UI under "Outdated reviews"
 — they are not deleted, which preserves the audit trail.
 
-### 3.4 Status Check Integration
+### 3.4 422 Inline Position Fallback
+
+If GitHub rejects the review with a 422 inline-position validation error,
+CodeAgora retries once without inline comments and appends the dropped inline
+comment count to the summary body. It does not probe subsets of comments with
+successful `createReview` calls, because those probes create real PR review
+side effects and can duplicate comments.
+
+### 3.5 Status Check Integration
 
 ```typescript
 // POST /repos/{owner}/{repo}/statuses/{sha}
@@ -437,36 +460,38 @@ to mark the required check as failed.
 }
 ```
 
-### 4.3 SARIF Upload API Call
+### 4.3 Downstream SARIF Upload
 
-```typescript
-import { readFileSync } from 'fs';
+The CodeAgora Action generates a SARIF file, but it does not upload that file to
+GitHub Code Scanning. Caller workflows own that handoff so repositories can
+choose between Code Scanning upload, artifact upload, both, or neither.
 
-// Must be gzipped + base64-encoded
-const sarifContent = readFileSync('/tmp/codeagora-results.sarif', 'utf-8');
-const gzipped = await gzip(Buffer.from(sarifContent));
-const encoded = gzipped.toString('base64');
+Default path:
 
-// POST /repos/{owner}/{repo}/code-scanning/sarifs
-await octokit.request('POST /repos/{owner}/{repo}/code-scanning/sarifs', {
-  owner,
-  repo,
-  commit_sha: headSha,
-  ref: `refs/pull/${prNumber}/head`,
-  sarif: encoded,
-  tool_name: 'CodeAgora',
-  checkout_uri: `https://github.com/${owner}/${repo}`,
-});
+```txt
+/tmp/codeagora-results.sarif
 ```
 
-Requirement: Code Scanning must be enabled on the repository (free for public
-repos; requires GitHub Advanced Security for private repos).
+The path can be overridden with `github.sarifOutputPath` in `.ca/config.json`.
+CodeAgora validates this path before writing the file.
+
+Example downstream Code Scanning upload:
+
+```yaml
+- uses: github/codeql-action/upload-sarif@v4
+  if: always()
+  with:
+    sarif_file: /tmp/codeagora-results.sarif
+```
+
+Requirement: Code Scanning must be enabled on the repository. It is free for
+public repositories and requires GitHub Advanced Security for private
+repositories.
 
 ### 4.4 VS Code SARIF Viewer Compatibility
 
 The SARIF Viewer extension reads SARIF 2.1.0 files. To support local dev
-workflows, the action writes the SARIF file as an artifact regardless of whether
-upload is enabled:
+workflows, caller workflows can upload the generated SARIF file as an artifact:
 
 ```yaml
 - name: Upload SARIF artifact
@@ -936,7 +961,7 @@ export function buildSummaryBody(params: {
     // Collapse discussion logs in summary comment by default
     "collapseDiscussions": true,
 
-    // Generate SARIF output file (local) regardless of upload setting
+    // Generate a local SARIF output file for caller-managed upload/artifacts
     "sarifOutputPath": "/tmp/codeagora-results.sarif"
   }
 }
@@ -956,9 +981,10 @@ users. A typical CodeAgora run makes these calls:
 | `POST /pulls/{pr}/reviews` (with N inline comments) | 1 |
 | `POST /pulls/{pr}/requested_reviewers` (NEEDS_HUMAN only) | 0–1 |
 | `POST /issues/{pr}/labels` (NEEDS_HUMAN only) | 0–1 |
-| `POST /code-scanning/sarifs` (if enabled) | 0–1 |
+| Code Scanning SARIF upload | 0 unless the caller workflow adds an upload step |
 
-**Total: 4–7 API calls per run.** Rate limits are not a concern.
+**Total: 4–6 CodeAgora API calls per run.** Caller-owned SARIF upload steps add
+their own GitHub API usage. Rate limits are not a concern for typical runs.
 
 ---
 

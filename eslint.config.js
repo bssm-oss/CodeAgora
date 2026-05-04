@@ -26,6 +26,18 @@ export default tseslint.config(
     },
   },
   {
+    files: ['scripts/**/*.{js,mjs,ts}', '*.config.js', '*.config.ts'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly',
+        clearTimeout: 'readonly',
+        console: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+      },
+    },
+  },
+  {
     // Test files: relax unused-vars to warn (many intentional unused imports)
     files: ['src/tests/**/*.ts', 'packages/*/src/tests/**/*.ts', 'tools/tests/**/*.ts'],
     rules: {

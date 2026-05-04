@@ -4,7 +4,7 @@
 
 ### Beta Release Readiness
 - Promote the supported release line from alpha readiness to `0.1.0-beta.0` across workspace package metadata.
-- Keep CLI, GitHub Action, and MCP as the supported beta surfaces for broader user feedback.
+- Keep CLI, GitHub Action, and MCP as the supported beta surfaces for broader user feedback; desktop remains a private preview outside the beta support claim.
 
 ### Release Safety
 - Publish prerelease packages with an explicit `beta` npm dist-tag in the tag-triggered release workflow.
@@ -17,7 +17,7 @@
 ## 0.1.0-alpha.1 (2026-04-29)
 
 ### Product Surface Reset
-- Keep supported surfaces focused on CLI, MCP, GitHub Actions, and Desktop App.
+- Keep supported surfaces focused on CLI, MCP, and GitHub Actions, with desktop as a private preview scaffold.
 - Retired web, TUI, and notification surfaces remain out of the active release path.
 
 ### Operational Hygiene

@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import type { ActionDegradedReason } from '@codeagora/shared/contracts/stable.js';
 import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
 export interface ActionInputs {
@@ -12,6 +13,7 @@ export interface ActionInputs {
   failOnReject: boolean;
   maxDiffLines: number;
   postResults: boolean;
+  configPath: string;
   baseSha?: string;
   baseRepo?: string;
   headRepo?: string;
@@ -21,7 +23,7 @@ export interface ActionPolicy {
   shouldRunReview: boolean;
   shouldPostResults: boolean;
   degraded: boolean;
-  degradedReason?: string;
+  degradedReason?: ActionDegradedReason;
   verdictOverride?: 'SKIPPED';
 }
 
@@ -48,6 +50,16 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
   const failOnReject = parseBoolean(args['fail-on-reject'], false);
   const maxDiffLines = parseInt(args['max-diff-lines'] ?? '5000', 10);
   const postResults = parseBoolean(args['post-results'], true);
+
+  // configPath normalization: CLI > env > default
+  let configPath = args['config-path'];
+  if (!configPath || configPath.trim() === '') {
+    configPath = env['CONFIG_PATH'] ?? '';
+  }
+  if (!configPath || configPath.trim() === '') {
+    configPath = '.ca/config.json';
+  }
+
   const baseSha = args['base-sha'];
   const baseRepo = args['base-repo'];
   const headRepo = args['head-repo'];
@@ -58,7 +70,7 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
   if (!repo || !repo.includes('/')) throw new Error('--repo must be in owner/repo format');
   if (isNaN(maxDiffLines)) throw new Error('--max-diff-lines must be a valid number');
 
-  return { diff, pr, sha, repo, token, failOnReject, maxDiffLines, postResults, baseSha, baseRepo, headRepo };
+  return { diff, pr, sha, repo, token, failOnReject, maxDiffLines, postResults, configPath, baseSha, baseRepo, headRepo };
 }
 
 export function hasProviderCredentials(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -95,6 +107,11 @@ export function determineActionPolicy(
       verdictOverride: 'SKIPPED',
     };
   }
+
+  // configPath is normalized by the input parser (CLI > env > default).
+  // Any failures loading the file are handled at load time by the caller
+  // (action.ts) and surfaced via degraded outputs. Therefore we do not
+  // treat a missing configPath as an actionable policy decision here.
 
   if (!inputs.postResults) {
     return {

@@ -4,10 +4,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { listSessions, getSessionStats } from '@codeagora/core/session/queries.js';
+import { listSessions, getSessionStats, showSession } from '@codeagora/core/session/queries.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Test Helpers
@@ -28,6 +29,16 @@ async function createSession(
     await fs.writeFile(path.join(sessionDir, 'head-verdict.json'), JSON.stringify(verdict), 'utf-8');
   }
 }
+
+// ============================================================================
+// listSessions
+// ============================================================================
+
+describe('stable session artifact contract', () => {
+  it('declares a versioned session artifact schema marker', () => {
+    expect(SESSION_ARTIFACT_SCHEMA_VERSION).toBe('codeagora.session.v1');
+  });
+});
 
 // ============================================================================
 // listSessions
@@ -122,6 +133,15 @@ describe('listSessions', () => {
     const result = await listSessions(TEST_BASE, { limit: 5 });
     expect(result).toHaveLength(1);
     expect(result[0].status).toBe('unknown');
+  });
+
+  it('classifies sessions without schemaVersion as legacy best-effort in details', async () => {
+    await createSession('2026-01-21', '001', { status: 'completed', diffPath: '/tmp/legacy.diff' });
+
+    const detail = await showSession(TEST_BASE, '2026-01-21/001');
+
+    expect(detail.metadata?.['schemaVersion']).toBeUndefined();
+    expect(detail.metadata?.['artifactContract']).toBe('legacy/best-effort');
   });
 
   it('sorts by status when sort=status', async () => {
