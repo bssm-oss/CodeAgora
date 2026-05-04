@@ -9,6 +9,7 @@ permissions:
   pull-requests: write
   statuses: write
   issues: write
+  models: read
 
 jobs:
   review:
@@ -31,8 +32,7 @@ jobs:
         if: steps.fork-check.outputs.skip != 'true'
         run: |
           if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ] && [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
-            echo "::warning::No API key configured. Set OPENROUTER_API_KEY or GROQ_API_KEY in repo secrets."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No external provider key configured; using GitHub Models with the workflow GITHUB_TOKEN."
           fi
 
       - uses: actions/checkout@v6
@@ -44,62 +44,31 @@ jobs:
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         run: |
           mkdir -p .ca
-          if [ -n "${{ secrets.OPENROUTER_API_KEY }}" ]; then
-            cat > .ca/config.json << 'CONF'
+          cat > .ca/config.json << 'CONF'
           {
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "x-ai/grok-code-fast-1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              { "id": "r2", "model": "qwen/qwen3-coder",      "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              { "id": "r3", "model": "minimax/minimax-m2.5",  "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              { "id": "r4", "model": "openai/gpt-5-mini",     "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              { "id": "r5", "model": "z-ai/glm-4.6",          "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
+              { "id": "r1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+              { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+              { "id": "r3", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
             ],
             "supporters": {
               "pool": [
-                { "id": "s1", "model": "qwen/qwen3.6-plus",   "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-                { "id": "s2", "model": "moonshotai/kimi-k2",  "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 }
-              ],
-              "pickCount": 2,
-              "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da", "model": "deepseek/deepseek-r1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 120 },
-              "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
-              "personaAssignment": "random"
-            },
-            "moderator": { "model": "deepseek/deepseek-v3.2", "backend": "api", "provider": "openrouter" },
-            "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
-            "head": { "backend": "api", "model": "openai/gpt-5.4-mini", "provider": "openrouter", "enabled": true },
-            "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
-          }
-          CONF
-          else
-            cat > .ca/config.json << 'CONF'
-          {
-            "mode": "pragmatic",
-            "language": "en",
-            "reviewers": [
-              { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
-              { "id": "r2", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
-              { "id": "r3", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
-            ],
-            "supporters": {
-              "pool": [
-                { "id": "s1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+                { "id": "s1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
               ],
               "pickCount": 1,
               "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
+              "devilsAdvocate": { "id": "da", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
               "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
               "personaAssignment": "random"
             },
-            "moderator": { "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq" },
+            "moderator": { "model": "gpt-4o-mini", "backend": "api", "provider": "github-models" },
             "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
-            "head": { "backend": "api", "model": "llama-3.3-70b-versatile", "provider": "groq", "enabled": true },
+            "head": { "backend": "api", "model": "gpt-4o-mini", "provider": "github-models", "enabled": true },
             "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
           }
           CONF
-          fi
 
       - name: CodeAgora Review
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'

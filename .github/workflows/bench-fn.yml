@@ -16,9 +16,14 @@ on:
         required: false
         type: boolean
         default: false
+      config:
+        description: 'Benchmark config path'
+        required: false
+        default: 'benchmarks/.ca/config.github-models.json'
 
 permissions:
   contents: read
+  models: read
 
 jobs:
   bench:
@@ -27,8 +32,8 @@ jobs:
     steps:
       - name: Check API key
         run: |
-          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
-            echo "::error::OPENROUTER_API_KEY secret is not configured"
+          if [[ "${{ inputs.config }}" != *"config.github-models.json" ]] && [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+            echo "::error::OPENROUTER_API_KEY secret is not configured for non-GitHub-Models benchmark config"
             exit 1
           fi
 
@@ -46,14 +51,19 @@ jobs:
       - name: Run live pipeline on fixtures
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
           BENCH_FIXTURES: ${{ inputs.fixtures }}
           BENCH_SKIP_HEAD: ${{ inputs.skip_head }}
+          BENCH_CONFIG: ${{ inputs.config }}
           BENCH_RESULTS: ${{ github.workspace }}/bench-out
         run: |
           set -euo pipefail
           # Build args as an array to avoid word-splitting surprises from
           # workflow_dispatch user input.
           ARGS=(--results "$BENCH_RESULTS")
+          if [ -n "$BENCH_CONFIG" ]; then
+            ARGS+=(--config "$BENCH_CONFIG")
+          fi
           if [ -n "$BENCH_FIXTURES" ]; then
             ARGS+=(--fixtures "$BENCH_FIXTURES")
           fi

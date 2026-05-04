@@ -54,4 +54,16 @@ describe('GitHub Actions runtime readiness', () => {
     expect(bundle).not.toContain('import { createRequire } from "module"; const require = createRequire(import.meta.url);');
     execFileSync(process.execPath, ['--check', bundlePath], { stdio: 'pipe' });
   });
+
+  it('uses GitHub Models for live PR and benchmark smoke paths without external provider quota', () => {
+    const review = readText('.github/workflows/review.yml');
+    const bench = readText('.github/workflows/bench-fn.yml');
+
+    expect(review).toContain('models: read');
+    expect(review).toContain('"provider": "github-models"');
+    expect(review).toContain('"model": "gpt-4o-mini"');
+    expect(bench).toContain('models: read');
+    expect(bench).toContain('config.github-models.json');
+    expect(bench).toContain('GITHUB_TOKEN: ${{ github.token }}');
+  });
 });
