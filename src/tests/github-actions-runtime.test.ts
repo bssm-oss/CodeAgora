@@ -65,5 +65,7 @@ describe('GitHub Actions runtime readiness', () => {
     expect(bench).toContain('models: read');
     expect(bench).toContain('config.github-models.json');
     expect(bench).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(bench).toContain('BENCH_DELAY_MS');
+    expect(bench).toContain('--delay-ms "$BENCH_DELAY_MS"');
   });
 });

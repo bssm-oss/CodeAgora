@@ -20,6 +20,10 @@ on:
         description: 'Benchmark config path'
         required: false
         default: 'benchmarks/.ca/config.github-models.json'
+      delay_ms:
+        description: 'Delay between fixtures in milliseconds'
+        required: false
+        default: '10000'
 
 permissions:
   contents: read
@@ -55,6 +59,7 @@ jobs:
           BENCH_FIXTURES: ${{ inputs.fixtures }}
           BENCH_SKIP_HEAD: ${{ inputs.skip_head }}
           BENCH_CONFIG: ${{ inputs.config }}
+          BENCH_DELAY_MS: ${{ inputs.delay_ms }}
           BENCH_RESULTS: ${{ github.workspace }}/bench-out
         run: |
           set -euo pipefail
@@ -63,6 +68,9 @@ jobs:
           ARGS=(--results "$BENCH_RESULTS")
           if [ -n "$BENCH_CONFIG" ]; then
             ARGS+=(--config "$BENCH_CONFIG")
+          fi
+          if [ -n "$BENCH_DELAY_MS" ]; then
+            ARGS+=(--delay-ms "$BENCH_DELAY_MS")
           fi
           if [ -n "$BENCH_FIXTURES" ]; then
             ARGS+=(--fixtures "$BENCH_FIXTURES")
