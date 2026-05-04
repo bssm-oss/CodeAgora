@@ -16,8 +16,8 @@ describe('beta release safety', () => {
 
     expect(workflow).toContain('PUBLISH_TAG=$(node -e');
     expect(workflow).toContain("version.includes('-') ? 'beta' : 'latest'");
-    expect(workflow).toContain('npm publish --access public --tag "$PUBLISH_TAG"');
-    expect(workflow).toContain('cd packages/mcp && npm publish --access public --tag "$PUBLISH_TAG"');
+    expect(workflow).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
+    expect(workflow).toContain('cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"');
   });
 
   it('allows manual beta dist-tagging but blocks prereleases from latest', () => {
