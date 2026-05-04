@@ -210,7 +210,7 @@ pnpm bench:fn -- --validate-only                   # schema-check fixtures
 pnpm bench:reference -- --validate-only            # validate the 20-fixture reference gate
 ```
 
-The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead.
+The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead. The latest stable-candidate live benchmark capture is [docs/live-benchmark-report.md](docs/live-benchmark-report.md).
 
 **Score pre-computed results** (fast, no API calls):
 

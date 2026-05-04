@@ -41,14 +41,14 @@ Stable production readiness is not complete yet. The main remaining work is not 
 
 | Area | Current state | Stable gap |
 |------|---------------|------------|
-| Core pipeline | Implemented and well-tested through deterministic paths | Default config bug, cache soundness, session artifact contract, degraded diagnostics, and live quality evidence |
-| CLI | Primary supported surface; build/test/smoke pass | No-config setup path, non-mutating input handling, config mutation validation, docs/help parity, and packed/global smoke need stronger proof |
-| GitHub Action | Implemented with bundled Action smoke | Needs live PR/fork/stale-head evidence, advertised input wiring, skip/default/output contract clarity, and SARIF behavior clarity |
-| MCP | 9 advertised tools implemented; package smoke passes | Needs parity evidence, all-tool error contract, lazy runtime data smoke, and published-package startup proof |
+| Core pipeline | Implemented and covered through deterministic readiness gates | Keep contract and live-quality evidence green through a release-candidate cycle |
+| CLI | Primary supported surface; setup, input handling, docs/help parity, package smoke, and config mutation gates closed | Keep packed/global smoke evidence current for release candidates |
+| GitHub Action | Bundled Action, live small-PR smoke, oversized-diff behavior, degraded/output contracts, and SARIF handoff are documented | Fork/stale-head/provider-failure scenarios remain release-candidate regression checks |
+| MCP | 9 advertised tools implemented with parity evidence, structured errors, package smoke, and runtime data coverage | Keep published-package startup smoke current for release candidates |
 | Desktop | Private preview scaffold | Keep outside stable claims until CLI/GitHub/MCP are stable |
-| Packaging | Root/MCP package dry-run smoke exists | Core/shared package entrypoint/type metadata, tarball install smoke, runtime data paths, and provenance must match reality |
-| Benchmarks | Deterministic 20-fixture gate exists | Fresh live stable-candidate run, skipped-test accounting, and artifact policy required |
-| Docs | Main release docs mostly aligned | README Action version, SARIF wording, TODO/draft signals need cleanup |
+| Packaging | Root/MCP package dry-run, entrypoint/type contracts, runtime data paths, and provenance gates are aligned | Re-run package dry-runs before publish approval |
+| Benchmarks | Deterministic 20-fixture gate and 2026-05-04 live stable-candidate report exist | Re-run live benchmark when model pools, severity semantics, or stable wording change |
+| Docs | Release, Action, SARIF, desktop-preview, evidence, and roadmap drift gates are aligned | Keep docs synchronized before each release candidate |
 
 ## How To Use This Roadmap
 
