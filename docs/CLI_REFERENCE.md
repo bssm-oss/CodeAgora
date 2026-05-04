@@ -32,6 +32,7 @@ agora review --post-review --pr 123          # Post back to PR
 | `--context-lines <n>` | Surrounding code context (0 = disabled) | `20` |
 | `--json-stream` | Stream NDJSON events | — |
 | `--no-cache` | Skip result caching | — |
+| `--scope <paths>` | Only review changes in these paths (comma-separated, e.g. "packages/github,packages/core") | — |
 | `--fail-on-severity <level>` | Exit 1 when any issue is at or above `SUGGESTION`, `WARNING`, `CRITICAL`, or `HARSHLY_CRITICAL` | — |
 | `--pr <url-or-number>` | GitHub PR URL or number | — |
 | `--post-review` | Post comments back to PR (requires `--pr`) | — |
