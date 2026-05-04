@@ -9,6 +9,7 @@ const RELEASE_TIERS = ['beta', 'rc', 'stable'];
 
 const EXPECTED_EVIDENCE = [
   { name: 'typecheck', filename: 'typecheck.log', command: 'pnpm typecheck', tier: 'beta', redactionStatus: 'safe-to-publish' },
+  { name: 'lint', filename: 'lint.log', command: 'pnpm lint', tier: 'beta', redactionStatus: 'safe-to-publish' },
   { name: 'build', filename: 'build.log', command: 'pnpm build', tier: 'beta', redactionStatus: 'safe-to-publish' },
   { name: 'test', filename: 'test.log', command: 'pnpm test --no-file-parallelism', tier: 'beta', redactionStatus: 'safe-to-publish' },
   { name: 'cross-surface-parity', filename: 'cross-surface-parity.log', command: 'pnpm vitest run src/tests/cross-surface-parity.test.ts', tier: 'rc', redactionStatus: 'safe-to-publish' },

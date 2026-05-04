@@ -30,6 +30,7 @@ artifacts are required only for stable claims that depend on live behavior.
 | Evidence | Filename | Command | Tier |
 |----------|----------|---------|------|
 | Typecheck | `typecheck.log` | `pnpm typecheck` | beta |
+| Lint | `lint.log` | `pnpm lint` | beta |
 | Build | `build.log` | `pnpm build` | beta |
 | Full deterministic tests | `test.log` | `pnpm test --no-file-parallelism` | beta |
 | Cross-surface parity | `cross-surface-parity.log` | `pnpm vitest run src/tests/cross-surface-parity.test.ts` | rc |

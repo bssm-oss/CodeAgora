@@ -39,6 +39,7 @@
     "postinstall": "node scripts/postinstall.cjs",
     "build": "pnpm -r build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint \"packages/*/src/**/*.ts\" \"src/tests/**/*.ts\" \"scripts/**/*.{js,mjs,ts}\" \"vitest.config.ts\" \"eslint.config.js\" --quiet",
     "test": "vitest run",
     "test:all": "vitest run",
     "test:coverage": "vitest run --coverage",

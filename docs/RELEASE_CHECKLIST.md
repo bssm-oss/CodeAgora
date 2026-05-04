@@ -28,8 +28,9 @@ Before the final `v0.1.0-beta.0` tag is pushed, confirm the intended package ver
 10. Confirm `.github/workflows/release.yml` computes a prerelease publish tag and runs npm publish with `--tag beta` for beta versions.
 11. Confirm `.github/workflows/npm-dist-tags.yml` offers `beta` and blocks assigning prerelease versions to `latest`.
 12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-beta.0` for beta Action examples rather than legacy `@v2` or stable-looking refs.
-13. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
-14. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
+13. Confirm release workflow publish jobs require the `npm-publish` environment, npm provenance, npm version preflight, and uploaded release evidence artifacts.
+14. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
+15. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
 
 ## Evidence
 
@@ -40,6 +41,7 @@ Use the following stable filenames for locally captured release-candidate eviden
 | Evidence | Filename | Command |
 |----------|----------|---------|
 | Typecheck | `typecheck.log` | `pnpm typecheck` |
+| Lint | `lint.log` | `pnpm lint` |
 | Build | `build.log` | `pnpm build` |
 | Full deterministic tests | `test.log` | `pnpm test --no-file-parallelism` |
 | Cross-surface parity | `cross-surface-parity.log` | `pnpm vitest run src/tests/cross-surface-parity.test.ts` |

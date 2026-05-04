@@ -93,9 +93,9 @@ closed.
 - [x] Add deterministic CLI/MCP/Action cross-surface parity evidence.
 - [x] Classify skipped and live-only tests in release evidence.
 - [x] Standardize release evidence filenames and add an evidence manifest.
-- [ ] Align CI/release/lint/runtime-matrix gates.
-- [ ] Harden release automation with approval, provenance, and prepublish checks.
-- [ ] Upload release evidence artifacts automatically.
+- [x] Align CI/release/lint/runtime-matrix gates.
+- [x] Harden release automation with approval, provenance, and prepublish checks.
+- [x] Upload release evidence artifacts automatically.
 - [x] Promote the security regression suite to a named stable gate.
 
 ### P3 Scope Hygiene

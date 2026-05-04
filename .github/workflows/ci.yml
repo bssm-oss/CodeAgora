@@ -21,7 +21,12 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
       - run: pnpm test --no-file-parallelism
+      - name: Security regression gate
+        if: matrix.node-version == 20
+        run: pnpm test:security
       - name: Deterministic benchmark gate
         if: matrix.node-version == 20
         run: pnpm bench:ci
