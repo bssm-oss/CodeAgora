@@ -82,7 +82,7 @@ closed.
 - [x] Align README, init workflow templates, and release docs on the beta Action ref.
 - [x] Wire and document Action `config-path`, skip/default/output, and degraded contracts.
 - [x] Clarify SARIF as generated output with caller-owned Code Scanning upload.
-- [ ] Prove GitHub Action 422 retry safety and no duplicate posting side effects.
+- [x] Prove GitHub Action 422 retry safety and no duplicate posting side effects.
 - [x] Normalize degraded reason codes across CLI, Action, MCP, and session artifacts.
 - [x] Make every MCP tool return contract-compliant structured errors.
 

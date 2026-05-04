@@ -120,11 +120,12 @@ async function createReviewWithRateLimit(
 }
 
 /**
- * Post review with bisection retry for 422 errors.
+ * Post review with side-effect-safe retry for 422 errors.
  *
- * When GitHub returns 422 (invalid position), instead of dropping ALL inline
- * comments, we bisect: split the comments in half, retry each half independently.
- * This preserves the maximum number of valid comments.
+ * GitHub does not provide a dry-run endpoint for review comment positions. A
+ * "probe" createReview call that succeeds creates real PR review side effects.
+ * Therefore, when GitHub returns a 422 for invalid inline positions, retry once
+ * with no inline comments and surface the dropped count in the review body.
  */
 async function postReviewWithRetry(
   kit: Octokit,
@@ -180,10 +181,11 @@ async function postReviewWithRetry(
       }
     }
 
-    // 422: at least one comment has a bad position — bisect to find valid ones
+    // 422: at least one comment has a bad position. Retrying subsets would create
+    // duplicate real reviews/comments for successful probes, so fall back to a
+    // summary-only review and make the dropped inline count explicit.
     const totalCount = safeInlineComments.length;
     if (totalCount === 0) {
-      // No comments to bisect — post without inline comments
       const response = await createReviewWithRateLimit(kit, {
         owner: config.owner,
         repo: config.repo,
@@ -196,28 +198,24 @@ async function postReviewWithRetry(
       return response.data;
     }
 
-    console.warn(`[GitHub] 422 error with ${totalCount} inline comment(s). Attempting bisection retry to preserve valid comments.`);
-
-    // Bisect: try each half independently, collect survivors
-    const survivors = await bisectComments(kit, config, prNumber, safeReview, safeInlineComments);
-    const droppedCount = totalCount - survivors.length;
-
-    if (droppedCount > 0) {
-      console.warn(`[GitHub] Bisection complete: ${survivors.length}/${totalCount} comments preserved, ${droppedCount} dropped due to invalid positions.`);
-    }
-
-    // Post final review with surviving comments
+    console.warn(`[GitHub] 422 error with ${totalCount} inline comment(s). Retrying once without inline comments to avoid duplicate probe side effects.`);
     const response = await createReviewWithRateLimit(kit, {
       owner: config.owner,
       repo: config.repo,
       pull_number: prNumber,
       commit_id: safeReview.commit_id,
       event: effectiveEvent,
-      body: safeReview.body,
-      comments: survivors,
+      body: appendDroppedInlineCommentNotice(safeReview.body, totalCount),
+      comments: [],
     });
     return response.data;
   }
+}
+
+function appendDroppedInlineCommentNotice(body: string, droppedCount: number): string {
+  return `${body}\n\n---\n\n` +
+    `CodeAgora could not place ${droppedCount} inline review comment${droppedCount === 1 ? '' : 's'} ` +
+    'because GitHub rejected one or more diff positions. The summary above is still posted; rerun after rebasing if inline placement is required.';
 }
 
 function redactGitHubReview(review: GitHubReview): GitHubReview {
@@ -229,62 +227,6 @@ function redactGitHubReview(review: GitHubReview): GitHubReview {
       body: redactSecrets(comment.body),
     })),
   };
-}
-
-/**
- * Recursively bisect comments to find valid ones when GitHub returns 422.
- * Returns the subset of comments that can be posted successfully.
- */
-async function bisectComments(
-  kit: Octokit,
-  config: GitHubConfig,
-  prNumber: number,
-  review: GitHubReview,
-  batch: Array<{ path: string; position: number; body: string }>,
-): Promise<Array<{ path: string; position: number; body: string }>> {
-  if (batch.length === 0) return [];
-
-  // Base case: single comment — test it individually
-  if (batch.length === 1) {
-    try {
-      await createReviewWithRateLimit(kit, {
-        owner: config.owner,
-        repo: config.repo,
-        pull_number: prNumber,
-        commit_id: review.commit_id,
-        event: 'COMMENT', // Use COMMENT for probe to avoid side effects
-        body: '',
-        comments: batch,
-      });
-      return batch;
-    } catch {
-      return []; // This single comment is invalid
-    }
-  }
-
-  // Try the whole batch first
-  try {
-    await createReviewWithRateLimit(kit, {
-      owner: config.owner,
-      repo: config.repo,
-      pull_number: prNumber,
-      commit_id: review.commit_id,
-      event: 'COMMENT',
-      body: '',
-      comments: batch,
-    });
-    return batch; // Entire batch is valid
-  } catch (err: unknown) {
-    if (!is422Error(err)) throw err; // Non-422 errors propagate
-
-    // Split and recurse
-    const mid = Math.floor(batch.length / 2);
-    const [left, right] = await Promise.all([
-      bisectComments(kit, config, prNumber, review, batch.slice(0, mid)),
-      bisectComments(kit, config, prNumber, review, batch.slice(mid)),
-    ]);
-    return [...left, ...right];
-  }
 }
 
 /**

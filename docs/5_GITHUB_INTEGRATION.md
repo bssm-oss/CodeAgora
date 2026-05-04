@@ -300,7 +300,15 @@ duplicate review comments from a prior run.
 Note: dismissed reviews remain visible in the GitHub UI under "Outdated reviews"
 — they are not deleted, which preserves the audit trail.
 
-### 3.4 Status Check Integration
+### 3.4 422 Inline Position Fallback
+
+If GitHub rejects the review with a 422 inline-position validation error,
+CodeAgora retries once without inline comments and appends the dropped inline
+comment count to the summary body. It does not probe subsets of comments with
+successful `createReview` calls, because those probes create real PR review
+side effects and can duplicate comments.
+
+### 3.5 Status Check Integration
 
 ```typescript
 // POST /repos/{owner}/{repo}/statuses/{sha}
