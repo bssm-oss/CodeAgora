@@ -91,8 +91,8 @@ closed.
 - [ ] Run and capture a representative live GitHub Action PR smoke.
 - [ ] Produce a fresh stable-candidate live benchmark report with full metadata.
 - [x] Add deterministic CLI/MCP/Action cross-surface parity evidence.
-- [ ] Classify skipped and live-only tests in release evidence.
-- [ ] Standardize release evidence filenames and add an evidence manifest.
+- [x] Classify skipped and live-only tests in release evidence.
+- [x] Standardize release evidence filenames and add an evidence manifest.
 - [ ] Align CI/release/lint/runtime-matrix gates.
 - [ ] Harden release automation with approval, provenance, and prepublish checks.
 - [ ] Upload release evidence artifacts automatically.

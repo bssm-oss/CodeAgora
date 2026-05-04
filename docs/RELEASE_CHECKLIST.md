@@ -54,3 +54,12 @@ Use the following stable filenames for locally captured release-candidate eviden
 | Evidence manifest | `evidence-manifest.json` | generated or filled during release prep |
 
 `cross-surface-parity.log` must show the deterministic CLI/MCP/GitHub Action parity fixture passing. `beta-smoke.log` remains the provider-free packed CLI/MCP/Action runtime smoke.
+
+Generate the manifest after the logs are captured:
+
+```bash
+pnpm evidence:manifest -- --require=beta
+```
+
+See `docs/RELEASE_EVIDENCE.md` for the skipped/live-only register and stricter
+`--require=rc` / `--require=stable` promotion checks.
