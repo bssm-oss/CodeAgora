@@ -5,6 +5,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { explainSession } from '@codeagora/cli/commands/explain.js';
+import { errorMessage, mcpErrorResponse } from './shared-response.js';
 
 export function registerExplain(server: McpServer): void {
   server.tool(
@@ -18,8 +19,7 @@ export function registerExplain(server: McpServer): void {
         const result = await explainSession(process.cwd(), session);
         return { content: [{ type: 'text' as const, text: result.narrative }] };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text' as const, text: `Error: ${msg}` }], isError: true };
+        return mcpErrorResponse('EXPLAIN_SESSION_FAILED', errorMessage(err), { session });
       }
     },
   );

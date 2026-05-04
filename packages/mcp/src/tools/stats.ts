@@ -4,6 +4,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getSessionStats, formatSessionStats } from '@codeagora/core/session/queries.js';
+import { errorMessage, mcpErrorResponse } from './shared-response.js';
 
 export function registerStats(server: McpServer): void {
   server.tool(
@@ -15,8 +16,7 @@ export function registerStats(server: McpServer): void {
         const stats = await getSessionStats(process.cwd());
         return { content: [{ type: 'text' as const, text: formatSessionStats(stats) }] };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text' as const, text: `Error: ${msg}` }], isError: true };
+        return mcpErrorResponse('STATS_FAILED', errorMessage(err));
       }
     },
   );

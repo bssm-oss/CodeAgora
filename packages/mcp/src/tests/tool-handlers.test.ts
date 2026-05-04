@@ -21,6 +21,10 @@ type ToolHandler = (params: Record<string, unknown>) => Promise<{
   isError?: boolean;
 }>;
 
+function parseToolJson(result: { content: Array<{ text: string }> }): Record<string, unknown> {
+  return JSON.parse(result.content[0]!.text) as Record<string, unknown>;
+}
+
 function createServerStub() {
   const handlers = new Map<string, ToolHandler>();
 
@@ -114,8 +118,14 @@ describe('config_get handler', () => {
     registerConfigGet(server as never);
 
     const result = await getHandler('config_get')({ key: 'missing.key' });
+    const parsed = parseToolJson(result);
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('not found');
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'CONFIG_GET_FAILED',
+      message: 'Key "missing.key" not found in config',
+      details: { key: 'missing.key' },
+    });
   });
 
   it('returns error when loadConfig throws', async () => {
@@ -127,8 +137,13 @@ describe('config_get handler', () => {
     registerConfigGet(server as never);
 
     const result = await getHandler('config_get')({});
+    const parsed = parseToolJson(result);
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('no config');
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'CONFIG_GET_FAILED',
+      message: 'no config',
+    });
   });
 });
 
@@ -274,8 +289,14 @@ describe('config_set handler', () => {
     registerConfigSet(server as never);
 
     const result = await getHandler('config_set')({ key: 'bad.key', value: 'x' });
+    const parsed = parseToolJson(result);
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('invalid key');
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'CONFIG_SET_FAILED',
+      message: 'invalid key',
+      details: { key: 'bad.key' },
+    });
   });
 });
 
@@ -309,8 +330,13 @@ describe('get_leaderboard handler', () => {
     registerLeaderboard(server as never);
 
     const result = await getHandler('get_leaderboard')({});
+    const parsed = parseToolJson(result);
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('no data');
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'LEADERBOARD_FAILED',
+      message: 'no data',
+    });
   });
 });
 
@@ -343,8 +369,13 @@ describe('get_stats handler', () => {
     registerStats(server as never);
 
     const result = await getHandler('get_stats')({});
+    const parsed = parseToolJson(result);
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('no sessions dir');
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'STATS_FAILED',
+      message: 'no sessions dir',
+    });
   });
 });
 
@@ -353,12 +384,31 @@ describe('get_stats handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('stable MCP error contract', () => {
-  it('registers every structured review_quick error code used by this suite', () => {
+  it('registers every structured MCP error code used by stable tools', () => {
     expect(MCP_ERROR_CODES).toEqual(expect.arrayContaining([
       'INVALID_INPUT',
       'INVALID_REPO_PATH',
       'REVIEW_FAILED',
+      'REVIEW_PR_FAILED',
+      'DRY_RUN_FAILED',
+      'CONFIG_GET_FAILED',
+      'CONFIG_SET_FAILED',
+      'EXPLAIN_SESSION_FAILED',
+      'LEADERBOARD_FAILED',
+      'STATS_FAILED',
     ]));
+  });
+
+  it('keeps tool implementations off ad-hoc text and unversioned error bodies', async () => {
+    const toolDir = path.join(process.cwd(), 'packages', 'mcp', 'src', 'tools');
+    const entries = await fs.readdir(toolDir);
+    const toolFiles = entries.filter((entry) => entry.endsWith('.ts') && !entry.startsWith('shared-'));
+
+    for (const entry of toolFiles) {
+      const content = await fs.readFile(path.join(toolDir, entry), 'utf-8');
+      expect(content, `${entry} should not return plain Error: text`).not.toContain('`Error:');
+      expect(content, `${entry} should not return unversioned { error } JSON`).not.toContain('JSON.stringify({ error');
+    }
   });
 });
 

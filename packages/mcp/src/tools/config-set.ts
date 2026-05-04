@@ -4,6 +4,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { errorMessage, mcpErrorResponse } from './shared-response.js';
 
 export function registerConfigSet(server: McpServer): void {
   server.tool(
@@ -21,8 +22,7 @@ export function registerConfigSet(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ status: 'updated', key, value }) }],
         };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: msg }) }], isError: true };
+        return mcpErrorResponse('CONFIG_SET_FAILED', errorMessage(err), { key });
       }
     },
   );

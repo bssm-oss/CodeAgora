@@ -4,6 +4,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { errorMessage, mcpErrorResponse } from './shared-response.js';
 
 /**
  * Get a nested value from an object using dot notation.
@@ -37,18 +38,14 @@ export function registerConfigGet(server: McpServer): void {
         if (key) {
           const value = getNestedKey(config as unknown as Record<string, unknown>, key);
           if (value === undefined) {
-            return {
-              content: [{ type: 'text' as const, text: JSON.stringify({ error: `Key "${key}" not found in config` }) }],
-              isError: true,
-            };
+            return mcpErrorResponse('CONFIG_GET_FAILED', `Key "${key}" not found in config`, { key });
           }
           return { content: [{ type: 'text' as const, text: JSON.stringify({ key, value }, null, 2) }] };
         }
 
         return { content: [{ type: 'text' as const, text: JSON.stringify(config, null, 2) }] };
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: msg }) }], isError: true };
+        return mcpErrorResponse('CONFIG_GET_FAILED', errorMessage(err));
       }
     },
   );

@@ -43,6 +43,9 @@ export const MCP_ERROR_CODES = [
   'DRY_RUN_FAILED',
   'CONFIG_GET_FAILED',
   'CONFIG_SET_FAILED',
+  'EXPLAIN_SESSION_FAILED',
+  'LEADERBOARD_FAILED',
+  'STATS_FAILED',
 ] as const;
 
 export type McpErrorCode = typeof MCP_ERROR_CODES[number];

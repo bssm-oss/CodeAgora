@@ -208,7 +208,7 @@ MCP tool failures keep MCP protocol `isError: true` and return a structured JSON
 }
 ```
 
-Review tool error codes are stable strings such as `INVALID_INPUT`, `INVALID_REPO_PATH`, `REVIEW_FAILED`, `REVIEW_PR_FAILED`, and `DRY_RUN_FAILED`. Consumers should branch on `status` and `code`; `details` is optional diagnostic context.
+MCP error codes are stable strings such as `INVALID_INPUT`, `INVALID_REPO_PATH`, `REVIEW_FAILED`, `REVIEW_PR_FAILED`, `DRY_RUN_FAILED`, `CONFIG_GET_FAILED`, `CONFIG_SET_FAILED`, `EXPLAIN_SESSION_FAILED`, `LEADERBOARD_FAILED`, and `STATS_FAILED`. Consumers should branch on `status` and `code`; `details` is optional diagnostic context.
 
 Supported non-compact review output formats:
 
