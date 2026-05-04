@@ -58,7 +58,10 @@ outputs:
 
   degraded-reason:
     description: >
-      Reason for degraded or skipped mode (e.g., skip label present, config-path missing/invalid, diff too large, credentials missing).
+      Stable reason code for degraded or skipped mode.
+      Values include missing-github-token, missing-provider-secrets, fork-missing-provider-secrets,
+      posting-disabled, diff-too-large, config-load-failed, stale-head-sha,
+      github-post-failed, and sarif-write-failed.
       Always set if degraded is true.
     value: ${{ steps.review.outputs.degraded-reason }}
 

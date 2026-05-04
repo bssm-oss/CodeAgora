@@ -186,7 +186,7 @@ outputs:
     value: ${{ steps.review.outputs.degraded }}
 
   degraded-reason:
-    description: Reason for degraded or skipped mode
+    description: Stable reason code for degraded or skipped mode
     value: ${{ steps.review.outputs.degraded-reason }}
 
   head-sha:
@@ -246,6 +246,20 @@ runs:
 ```
 
 When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs. Failures to read or validate the config file are surfaced via `degraded`/`degraded-reason`, but the input precedence remains: CLI flag > CONFIG_PATH env > default (`.ca/config.json`).
+
+Stable `degraded-reason` values:
+
+```txt
+missing-github-token
+missing-provider-secrets
+fork-missing-provider-secrets
+posting-disabled
+diff-too-large
+config-load-failed
+stale-head-sha
+github-post-failed
+sarif-write-failed
+```
 
 ### 3.2 How the Action Gets the Diff
 

@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import type { ActionDegradedReason } from '@codeagora/shared/contracts/stable.js';
 import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
 export interface ActionInputs {
@@ -22,7 +23,7 @@ export interface ActionPolicy {
   shouldRunReview: boolean;
   shouldPostResults: boolean;
   degraded: boolean;
-  degradedReason?: string;
+  degradedReason?: ActionDegradedReason;
   verdictOverride?: 'SKIPPED';
 }
 

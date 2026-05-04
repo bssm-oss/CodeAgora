@@ -55,6 +55,11 @@ export const ACTION_DEGRADED_REASONS = [
   'missing-provider-secrets',
   'fork-missing-provider-secrets',
   'posting-disabled',
+  'diff-too-large',
+  'config-load-failed',
+  'stale-head-sha',
+  'github-post-failed',
+  'sarif-write-failed',
 ] as const;
 
 export type ActionDegradedReason = typeof ACTION_DEGRADED_REASONS[number];

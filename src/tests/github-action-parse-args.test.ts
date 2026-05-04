@@ -2,7 +2,9 @@
  * GitHub Action input and policy tests.
  */
 
+import fs from 'fs';
 import { describe, it, expect } from 'vitest';
+import { ACTION_DEGRADED_REASONS } from '@codeagora/shared/contracts/stable.js';
 import {
   determineActionPolicy,
   hasProviderCredentials,
@@ -169,5 +171,39 @@ describe('github-action production policy', () => {
   it('detects stale head SHAs before posting', () => {
     expect(isStaleHead('head123', 'head123')).toBe(false);
     expect(isStaleHead('head123', 'head456')).toBe(true);
+  });
+
+  it('registers every degraded reason emitted by the Action runtime', () => {
+    expect(ACTION_DEGRADED_REASONS).toEqual(expect.arrayContaining([
+      'missing-github-token',
+      'missing-provider-secrets',
+      'fork-missing-provider-secrets',
+      'posting-disabled',
+      'diff-too-large',
+      'config-load-failed',
+      'stale-head-sha',
+      'github-post-failed',
+      'sarif-write-failed',
+    ]));
+  });
+
+  it('does not emit degraded reasons outside the shared registry', () => {
+    const registry = new Set<string>(ACTION_DEGRADED_REASONS);
+    const sourceFiles = [
+      'packages/github/src/action-policy.ts',
+      'packages/github/src/action.ts',
+    ];
+
+    for (const file of sourceFiles) {
+      const source = fs.readFileSync(file, 'utf-8');
+      const emittedReasons = [
+        ...source.matchAll(/degradedReason:\s*'([^']+)'/g),
+        ...source.matchAll(/setActionDegraded\('([^']+)'\)/g),
+      ].map((match) => match[1]);
+
+      for (const reason of emittedReasons) {
+        expect(registry.has(reason), `${file} emits unregistered degraded reason: ${reason}`).toBe(true);
+      }
+    }
   });
 });

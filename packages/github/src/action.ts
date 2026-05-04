@@ -19,6 +19,7 @@ import { fetchPrMetadata } from './pr-diff.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
 import { loadConfigFile } from '@codeagora/core/config/loader.js';
 import { determineActionPolicy, isStaleHead, parseActionInputs, validateActionDiffPath, validateActionOutputPath } from './action-policy.js';
+import type { ActionDegradedReason } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
 // Main
@@ -40,8 +41,7 @@ async function main(): Promise<void> {
 
   const actionPolicy = determineActionPolicy(inputs);
   if (actionPolicy.degraded) {
-    setActionOutput('degraded', 'true');
-    if (actionPolicy.degradedReason) setActionOutput('degraded-reason', actionPolicy.degradedReason);
+    if (actionPolicy.degradedReason) setActionDegraded(actionPolicy.degradedReason);
   } else {
     setActionOutput('degraded', 'false');
   }
@@ -58,8 +58,7 @@ async function main(): Promise<void> {
     const lineCount = diffContent.split('\n').length;
     if (lineCount > inputs.maxDiffLines) {
       console.log(`::warning::Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}). Skipping review.`);
-      setActionOutput('degraded', 'true');
-      setActionOutput('degraded-reason', 'diff-too-large');
+      setActionDegraded('diff-too-large');
       setActionOutput('verdict', 'SKIPPED');
       return;
     }
@@ -70,7 +69,12 @@ async function main(): Promise<void> {
   // directly from process.env. Any failure to load the config is handled
   // by loadConfigFile and surfaced via degraded outputs.
   const configPath = inputs.configPath;
-  const config = await loadConfigFile(configPath, { rootDir: process.cwd() }).catch(() => null);
+  const config = await loadConfigFile(configPath, { rootDir: process.cwd() }).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`::warning::Config load degraded: ${message}`);
+    setActionDegraded('config-load-failed');
+    return null;
+  });
 
   // Run pipeline (#259: pass repoPath for surrounding code context)
   console.log('::group::Running CodeAgora review pipeline');
@@ -140,8 +144,7 @@ async function main(): Promise<void> {
     const currentPr = await fetchPrMetadata(ghConfig, inputs.pr, appKit ?? undefined);
     if (isStaleHead(inputs.sha, currentPr.headSha)) {
       console.log(`::warning::PR head changed from ${inputs.sha} to ${currentPr.headSha}; skipping stale posting.`);
-      setActionOutput('degraded', 'true');
-      setActionOutput('degraded-reason', 'stale-head-sha');
+      setActionDegraded('stale-head-sha');
       setActionOutput('verdict', 'SKIPPED');
       console.log('::endgroup::');
       return;
@@ -164,8 +167,7 @@ async function main(): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.log(`::warning::GitHub posting degraded: ${message}`);
-      setActionOutput('degraded', 'true');
-      setActionOutput('degraded-reason', 'github-post-failed');
+      setActionDegraded('github-post-failed');
     }
     console.log('::endgroup::');
   } else {
@@ -182,6 +184,7 @@ async function main(): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`::warning::SARIF output path rejected: ${message}`);
+    setActionDegraded('sarif-write-failed');
   }
 
   // Set outputs
@@ -220,6 +223,11 @@ function setActionOutput(name: string, value: string): void {
     // Fallback for older runners
     console.log(`::set-output name=${name}::${value}`);
   }
+}
+
+function setActionDegraded(reason: ActionDegradedReason): void {
+  setActionOutput('degraded', 'true');
+  setActionOutput('degraded-reason', reason);
 }
 
 main().catch((err) => {
