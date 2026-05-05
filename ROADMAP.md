@@ -368,7 +368,7 @@ closed.
 
 ### Align README and Action versioning
 
-**Finding:** README examples still show `uses: bssm-oss/CodeAgora@v2` while the current package line is `@codeagora/review@0.1.0-beta.0` and docs position `codeagora@2.x` as legacy.
+**Finding:** README examples still show `uses: bssm-oss/CodeAgora@v2` while the current package line is `@codeagora/review@0.1.0-beta.1` and docs position `codeagora@2.x` as legacy.
 
 **Surface:** README, Action onboarding, release notes.
 
