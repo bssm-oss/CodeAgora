@@ -90,7 +90,7 @@ Recommended sequence:
 ```txt
 @codeagora/review@0.1.0-alpha.0  first package rename / surface cleanup prerelease
 @codeagora/review@0.1.0-alpha.1  desktop scaffold and docs
-@codeagora/review@0.1.0-beta.0   CLI/GitHub/MCP stabilization
+@codeagora/review@0.1.0-beta.1   CLI/GitHub/MCP stabilization
 @codeagora/review@0.1.0          first public review-focused release
 @codeagora/review@0.2.0          desktop MVP
 @codeagora/review@0.3.0          opencode / agent workflow expansion

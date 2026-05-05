@@ -32,7 +32,7 @@ describe('beta release safety', () => {
     const rootVersion = readPackageVersion('package.json');
     const mcpVersion = readPackageVersion('packages/mcp/package.json');
 
-    expect(rootVersion).toBe('0.1.0-beta.0');
+    expect(rootVersion).toBe('0.1.0-beta.1');
     expect(mcpVersion).toBe(rootVersion);
   });
 

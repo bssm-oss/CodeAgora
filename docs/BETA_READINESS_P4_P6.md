@@ -2,7 +2,7 @@
 
 Updated: 2026-05-04
 
-This document summarizes the beta-readiness gates added for the production-readiness P4-P6 track. The current target is `0.1.0-beta.0`. Readiness validation is intentionally separated from irreversible release operations: final tag creation, GitHub Release creation, npm publishing, npm dist-tag promotion, and marketplace distribution remain explicit approval stops.
+This document summarizes the beta-readiness gates added for the production-readiness P4-P6 track. The current target is `0.1.0-beta.1`. Readiness validation is intentionally separated from irreversible release operations: final tag creation, GitHub Release creation, npm publishing, npm dist-tag promotion, and marketplace distribution remain explicit approval stops.
 
 ## P4: Benchmark Gate
 

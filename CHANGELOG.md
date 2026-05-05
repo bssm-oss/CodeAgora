@@ -1,9 +1,9 @@
 # Changelog
 
-## 0.1.0-beta.0 (planned)
+## 0.1.0-beta.1 (planned)
 
 ### Beta Release Readiness
-- Promote the supported release line from alpha readiness to `0.1.0-beta.0` across workspace package metadata.
+- Promote the supported release line from alpha readiness to `0.1.0-beta.1` across workspace package metadata.
 - Keep CLI, GitHub Action, and MCP as the supported beta surfaces for broader user feedback; desktop remains a private preview outside the beta support claim.
 
 ### Release Safety
@@ -12,7 +12,7 @@
 
 ### Verification
 - Required gates: `pnpm typecheck`, `pnpm test --no-file-parallelism`, `pnpm bench:ci`, and `pnpm release:beta-smoke`.
-- Final `v0.1.0-beta.0` tag push and npm publication remain explicit release approval steps.
+- Final `v0.1.0-beta.1` tag push and npm publication remain explicit release approval steps.
 
 ## 0.1.0-alpha.1 (2026-04-29)
 
