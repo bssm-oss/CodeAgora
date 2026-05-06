@@ -22,7 +22,7 @@ CodeAgora is production-ready when all of these are true:
 
 ## Supported Surfaces
 
-The current stable-readiness surfaces are CLI, GitHub Actions, and MCP. The desktop app remains a private/upcoming preview surface.
+The current stable-readiness surfaces are CLI, GitHub Actions, and MCP. The desktop app remains a private-preview surface, not a stable public support surface.
 
 Production readiness gates apply to these automation and agent surfaces only:
 
@@ -32,7 +32,7 @@ GitHub Actions
 MCP
 ```
 
-The desktop app remains outside the production gate for this roadmap. It should consume stable core/CLI behavior after the gates below are green; it should not define new review semantics, config formats, or release promises during this roadmap.
+The desktop app remains outside stable public support for this roadmap. Its private-preview evidence gate is now part of release-candidate handoff, and it must consume stable core/CLI behavior without defining new review semantics, config formats, or release promises.
 
 Retired surfaces remain out of scope:
 
@@ -51,7 +51,7 @@ Freeze the production target so reliability work does not keep expanding sideway
 ### Work
 
 - Declare CLI, GitHub Actions, and MCP as the production gates.
-- Keep desktop documented as the private/upcoming human-facing local UI outside the production gate.
+- Keep desktop documented as the private-preview human-facing local UI outside stable public support, with its RC evidence gate tracked separately.
 - Inventory commands, action inputs, MCP tools, config files, output formats, and environment variables.
 - Mark every undocumented or unsupported behavior as either production scope or explicitly non-goal.
 

@@ -36,6 +36,12 @@ Before any future tag is pushed, confirm the intended package versions, dist-tag
 
 For `0.1.0-beta.1`, the tag, prerelease GitHub Release, and npm `beta` dist-tag publication are complete. For the next candidate, rerun this checklist with the target version and keep stable promotion blocked until the `--require=rc` evidence manifest is complete and the live-only register is current.
 
+Current RC handoff status: on 2026-05-06, `origin/main` `1075f81` passed
+`pnpm rc:desktop-gate`, `pnpm test:security`, and
+`pnpm evidence:manifest -- --require=rc` after PRs #534-#536 merged. The next
+candidate still needs the full release evidence bundle regenerated for the
+target RC version before any tag is cut.
+
 ## Evidence
 
 Capture command output under `.sisyphus/evidence/` for typecheck, test, build, `bench:ci`, `release:beta-smoke`, root package dry-run, MCP package dry-run, release-safety tests, and security regression tests.

@@ -6,7 +6,7 @@ This roadmap is the root-level readiness queue for CodeAgora. It collects the co
 
 This document is not a product wishlist. It focuses on correctness blockers, packaging/API contract gaps, public-surface accuracy, evidence quality, and release confidence for the supported surfaces.
 
-After `v0.1.0-beta.1`, the next production step is the Tauri desktop private-preview production track. Release-candidate work must not start until the desktop gates in this roadmap are closed and CLI/GitHub/MCP evidence has been refreshed against that integrated product shape.
+After `v0.1.0-beta.1`, the Tauri desktop private-preview production track is closed for release-candidate handoff. RC work can proceed only while desktop, CLI/GitHub/MCP, package, security, benchmark, and live-only evidence stay refreshed against the integrated product shape.
 
 ## Scope
 
@@ -15,14 +15,14 @@ In scope:
 - CLI review flows, setup, config defaults, output contracts, and session behavior.
 - GitHub Action PR review, posting, status checks, SARIF behavior, and degraded/fork paths.
 - MCP server tool parity, package startup, schema validation, and structured errors.
-- Tauri desktop private-preview productionization before the next RC: CLI bridge, repository/session browsing, progress streaming, config studio, provider setup, MCP setup, GitHub Action setup, local evidence views, and packaging smoke.
+- Tauri desktop private-preview evidence before the next RC: CLI bridge, repository/session browsing, progress streaming, config studio, provider setup, MCP setup, GitHub Action setup, local evidence views, and packaging smoke.
 - Package contents, entrypoints, generated types, published-package smoke tests, and release evidence.
 - Benchmark credibility, live evidence artifacts, docs accuracy, and stable-readiness claims.
 
 Out of scope before stable:
 
 - Hosted service, billing, teams, or enterprise admin features.
-- Public desktop launch or stable desktop support claims before private-preview gates are closed.
+- Public desktop launch or stable desktop support claims before desktop graduation gates are closed.
 - Reintroducing retired web dashboard, TUI, or notification package surfaces.
 - Accuracy claims not backed by benchmark evidence.
 - Broad product expansion beyond CLI, GitHub Action, MCP, and the pre-RC Tauri private preview.
@@ -38,7 +38,7 @@ Out of scope before stable:
 
 CodeAgora has cleared the cautious beta line for CLI, GitHub Action, and MCP feedback. Local deterministic gates are strong: typecheck, build, tests, benchmark schema/reference gate, and beta smoke all pass in the latest assessment.
 
-Stable production readiness is not complete yet. The main remaining work is no longer broad CLI/GitHub/MCP feature development; it is finishing the Tauri desktop private preview to a production-quality RC gate, then re-running package, release, and live-evidence checks with the desktop surface included in the release story.
+Stable production readiness is not complete yet. The main remaining work is no longer broad CLI/GitHub/MCP feature development or desktop implementation; it is re-running package, release, security, benchmark, and live-evidence checks with the desktop private-preview surface included in the RC story.
 
 ## Readiness Snapshot
 
@@ -48,7 +48,7 @@ Stable production readiness is not complete yet. The main remaining work is no l
 | CLI | Primary supported surface; setup, input handling, docs/help parity, package smoke, and config mutation gates closed | Keep packed/global smoke evidence current for release candidates |
 | GitHub Action | Bundled Action, live small-PR smoke, oversized-diff behavior, degraded/output contracts, and SARIF handoff are documented | Fork/stale-head/provider-failure scenarios remain release-candidate regression checks |
 | MCP | 9 advertised tools implemented with parity evidence, structured errors, package smoke, and runtime data coverage | Keep published-package startup smoke current for release candidates |
-| Desktop | Private preview scaffold; local `pnpm --filter @codeagora/desktop tauri:check` passes on 2026-05-06 | Complete the desktop production track below before RC; keep outside stable claims until private-preview gates and release evidence are green |
+| Desktop | Private-preview gates closed on 2026-05-06; `pnpm rc:desktop-gate` covers typecheck, smoke, `tauri:check`, Rust app E2E, macOS WebDriver E2E, evidence manifest, and bundle smoke | Keep private-preview evidence green during RC; no stable public desktop support until signing/notarization/updater/public distribution decisions are revisited |
 | Packaging | Root/MCP package dry-run, entrypoint/type contracts, runtime data paths, and provenance gates are aligned | Re-run package dry-runs before publish approval |
 | Benchmarks | Deterministic 20-fixture gate and 2026-05-04 live stable-candidate report exist | Re-run live benchmark when model pools, severity semantics, or stable wording change |
 | Docs | Release, Action, SARIF, desktop-preview, evidence, and roadmap drift gates are aligned | Keep docs synchronized before each release candidate |
@@ -114,8 +114,8 @@ closed.
 - 2026-05-04: Stable-candidate live benchmark evidence was captured in run 25317360402 with 20/20 successful fixtures, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
 - 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/RELEASE_CHECKLIST.md`, `docs/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
 - 2026-05-04: Desktop scope hygiene was re-checked across README, changelog, release docs, architecture docs, extension docs, and postinstall messaging. Desktop remains a private preview outside stable CLI/GitHub/MCP release gates.
-- 2026-05-06: `v0.1.0-beta.1` is published as a GitHub prerelease and npm `beta` dist-tag release. Stable promotion remains blocked; RC evidence is deferred until the Tauri desktop private-preview track is closed.
-- 2026-05-06: The next gate changed from immediate RC evidence to Tauri desktop private-preview completion. Local desktop `tauri:check` passes, but RC work starts only after the desktop production gates below are implemented, documented, and smoked.
+- 2026-05-06: `v0.1.0-beta.1` is published as a GitHub prerelease and npm `beta` dist-tag release. Stable promotion remains blocked until the RC evidence manifest, live-only register, package smokes, and release wording are current.
+- 2026-05-06: PRs #534-#536 merged the desktop release surface, core correctness fixes, and full evidence output fixes onto `origin/main` at `1075f81`. Post-merge `pnpm rc:desktop-gate`, `pnpm test:security`, and `pnpm evidence:manifest -- --require=rc` passed; the next RC gate is full release evidence regeneration and live-only freshness, not desktop implementation.
 
 ## Desktop Production Track Before RC
 
@@ -504,6 +504,8 @@ Desktop must stay a host for the existing CodeAgora system:
 - `pnpm --filter @codeagora/desktop tauri:check` passes.
 - `pnpm --filter @codeagora/desktop smoke` passes as the package-equivalent private-preview app smoke.
 - `pnpm --filter @codeagora/desktop evidence` writes `.sisyphus/evidence/desktop-evidence-manifest.json`.
+- `pnpm --filter @codeagora/desktop macos:webdriver-e2e` passes on macOS preview hardware.
+- `pnpm --filter @codeagora/desktop bundle:smoke` validates the generated private-preview bundle shape.
 - `docs/DESKTOP_PREVIEW.md` and the desktop evidence manifest record signing/notarization/updater decisions as deferred until public desktop launch.
 
 ### D14: Desktop release gates
@@ -531,6 +533,7 @@ Desktop must stay a host for the existing CodeAgora system:
 
 - Desktop evidence manifest exists for the RC candidate.
 - Automated desktop smoke passes from a packaged or package-equivalent app.
+- `pnpm rc:desktop-gate` passes and captures `desktop-gate.log` plus `.sisyphus/evidence/desktop-evidence-manifest.json`.
 - Manual smoke checklist is documented in `docs/DESKTOP_PREVIEW.md` and must be signed off before an RC branch/tag.
 
 ### D15: RC handoff after desktop
@@ -555,8 +558,11 @@ Desktop must stay a host for the existing CodeAgora system:
 - `pnpm --filter @codeagora/desktop typecheck`
 - `pnpm --filter @codeagora/desktop build`
 - `pnpm --filter @codeagora/desktop tauri:check`
+- `pnpm --filter @codeagora/desktop app:e2e`
+- `pnpm --filter @codeagora/desktop macos:webdriver-e2e`
 - `pnpm --filter @codeagora/desktop smoke`
 - `pnpm --filter @codeagora/desktop evidence`
+- `pnpm --filter @codeagora/desktop bundle:smoke`
 - `pnpm rc:desktop-gate`
 - Current release evidence manifest with package, desktop, Action, MCP, CLI, benchmark, and skipped/live-only classifications.
 
@@ -1350,7 +1356,7 @@ Add cross-surface parity tests, produce stable-candidate live benchmark evidence
 
 ### Batch E: Desktop private-preview production and scope hygiene
 
-Clean public TODO/draft signals, complete the desktop private-preview production track, and keep desktop stable-support claims separate from CLI/GitHub/MCP supported-surface claims.
+Keep the completed desktop private-preview production track green, clean public TODO/draft signals, and keep desktop stable-support claims separate from CLI/GitHub/MCP supported-surface claims.
 
 **Exit:** Release-facing docs have no accidental placeholders, desktop private-preview evidence is attached, and desktop remains outside stable support wording until its own graduation gates are met.
 
@@ -1374,6 +1380,14 @@ pnpm release:beta-smoke
 pnpm --filter @codeagora/desktop typecheck
 pnpm --filter @codeagora/desktop build
 pnpm --filter @codeagora/desktop tauri:check
+```
+
+For RC handoff, replace the individual desktop subset above with the full gate:
+
+```bash
+pnpm rc:desktop-gate
+pnpm test:security
+pnpm evidence:manifest -- --require=rc
 ```
 
 Additional verification for stable candidates:
@@ -1401,6 +1415,9 @@ Manual or live evidence required before stable claims:
 - Live benchmark report with provider/model/cost/latency/failure metadata.
 
 ## Execution Order
+
+Steps 0-14 are closed as of `origin/main` `1075f81`; the active RC work starts
+at step 15.
 
 ```txt
 0. Fix default config generation and add regression coverage.

@@ -32,14 +32,16 @@ This runs:
 - `pnpm --filter @codeagora/desktop tauri:check`
 - `pnpm --filter @codeagora/desktop app:e2e`
 - `pnpm --filter @codeagora/desktop macos:webdriver-e2e`
-- `pnpm --filter @codeagora/desktop bundle:smoke`
 - `pnpm --filter @codeagora/desktop evidence`
+- `pnpm --filter @codeagora/desktop bundle:smoke`
 
 The desktop evidence manifest is written to:
 
 ```txt
 .sisyphus/evidence/desktop-evidence-manifest.json
 ```
+
+The post-merge RC gate passed on 2026-05-06 at `origin/main` `1075f81`.
 
 ## Automated Smoke Coverage
 
