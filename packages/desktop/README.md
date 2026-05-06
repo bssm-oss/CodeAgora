@@ -54,6 +54,7 @@ pnpm --filter @codeagora/desktop tauri:check
 pnpm --filter @codeagora/desktop tauri:build
 pnpm --filter @codeagora/desktop tauri:dev
 pnpm --filter @codeagora/desktop smoke
+pnpm --filter @codeagora/desktop app:e2e
 pnpm --filter @codeagora/desktop bundle:smoke
 pnpm --filter @codeagora/desktop evidence
 ```
@@ -65,5 +66,7 @@ For RC handoff, run the root gate:
 ```bash
 pnpm rc:desktop-gate
 ```
+
+`app:e2e` creates a temporary git workspace and drives the Tauri backend through the same session, config, export, GitHub Action, and release-evidence surfaces used by the desktop app. Native WebDriver UI automation is deferred to Linux/Windows CI because macOS WKWebView does not provide the WebDriver target needed by `tauri-driver`.
 
 The generated desktop manifest is written to `.sisyphus/evidence/desktop-evidence-manifest.json`.

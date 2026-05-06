@@ -1137,6 +1137,38 @@ fn evidence_status(root: &Path) -> EvidenceStatus {
     }
 }
 
+fn write_config_for_root(raw: &str, root: &Path) -> Result<DesktopConfig, String> {
+    let validation = validate_config_raw(raw);
+    if !validation.valid {
+        return Err(format!("Invalid config: {}", validation.errors.join("; ")));
+    }
+    let path = match config_path(root) {
+        Some(path) if path.extension().and_then(|value| value.to_str()) == Some("json") => path,
+        Some(path) => {
+            return Err(format!(
+                "Desktop config writes currently support JSON only. Existing config is {}.",
+                path.display()
+            ))
+        }
+        None => root.join(".ca").join("config.json"),
+    };
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let tmp_path = path.with_file_name(format!(
+        "{}.tmp",
+        path.file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("config.json")
+    ));
+    fs::write(&tmp_path, raw).map_err(|error| error.to_string())?;
+    fs::rename(&tmp_path, &path).map_err(|error| error.to_string())?;
+    Ok(DesktopConfig {
+        raw: raw.to_string(),
+        path: path.display().to_string(),
+    })
+}
+
 fn run_agora(root: &Path, args: &[&str]) -> io::Result<std::process::Output> {
     match Command::new("agora").args(args).current_dir(root).output() {
         Ok(output) => Ok(output),
@@ -1577,36 +1609,8 @@ fn get_evidence_status(state: State<'_, WorkspaceState>) -> Result<EvidenceStatu
 
 #[tauri::command]
 fn write_config(raw: String, state: State<'_, WorkspaceState>) -> Result<DesktopConfig, String> {
-    let validation = validate_config_raw(&raw);
-    if !validation.valid {
-        return Err(format!("Invalid config: {}", validation.errors.join("; ")));
-    }
     let root = active_repo_root(&state)?;
-    let path = match config_path(&root) {
-        Some(path) if path.extension().and_then(|value| value.to_str()) == Some("json") => path,
-        Some(path) => {
-            return Err(format!(
-                "Desktop config writes currently support JSON only. Existing config is {}.",
-                path.display()
-            ))
-        }
-        None => root.join(".ca").join("config.json"),
-    };
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    }
-    let tmp_path = path.with_file_name(format!(
-        "{}.tmp",
-        path.file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("config.json")
-    ));
-    fs::write(&tmp_path, &raw).map_err(|error| error.to_string())?;
-    fs::rename(&tmp_path, &path).map_err(|error| error.to_string())?;
-    Ok(DesktopConfig {
-        raw,
-        path: path.display().to_string(),
-    })
+    write_config_for_root(&raw, &root)
 }
 
 fn main() {
@@ -1637,4 +1641,193 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("failed to run CodeAgora desktop app");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TEMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    fn temp_workspace(name: &str) -> PathBuf {
+        let counter = TEMP_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let root = std::env::temp_dir().join(format!(
+            "codeagora-desktop-{name}-{}-{counter}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).expect("create temp workspace");
+        root
+    }
+
+    fn write_file(root: &Path, relative: &str, content: &str) {
+        let path = root.join(relative);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent dir");
+        }
+        fs::write(path, content).expect("write fixture file");
+    }
+
+    fn init_git(root: &Path) {
+        let status = Command::new("git")
+            .args(["init", "--initial-branch", "main"])
+            .current_dir(root)
+            .status()
+            .expect("run git init");
+        assert!(status.success(), "git init should succeed");
+    }
+
+    fn fixture_workspace() -> PathBuf {
+        let root = temp_workspace("e2e");
+        init_git(&root);
+        write_file(&root, "README.md", "# Desktop E2E\n");
+        write_file(
+            &root,
+            ".ca/config.json",
+            r#"{
+  "language": "en",
+  "reviewers": [
+    { "id": "codex", "backend": "opencode", "provider": "openai", "model": "gpt-5" }
+  ],
+  "discussion": { "maxRounds": 2 }
+}
+"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/metadata.json",
+            r#"{ "status": "completed", "startedAt": 1778040000000, "completedAt": 1778040060000 }"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/head-verdict.json",
+            r#"{
+  "decision": "REJECT",
+  "reasoning": "Desktop E2E caught a blocking issue.",
+  "issues": [
+    {
+      "severity": "CRITICAL",
+      "filePath": "src/app.ts",
+      "lineRange": [12, 18],
+      "title": "Blocking desktop E2E finding",
+      "confidence": 93
+    }
+  ]
+}
+"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/report.md",
+            "# Desktop E2E report\n\nDecision: REJECT\n",
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/reviews/model-a.md",
+            "review evidence",
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/discussions/critical.md",
+            "discussion evidence",
+        );
+        write_file(
+            &root,
+            ".github/workflows/codeagora.yml",
+            "name: CodeAgora Review\non:\n  pull_request:\npermissions:\n  contents: read\n  pull-requests: write\njobs:\n  review:\n    steps:\n      - uses: bssm-oss/CodeAgora@v0.1.0-beta.1\n        with:\n          config-path: .ca/config.json\n",
+        );
+        write_file(&root, "docs/RELEASE_EVIDENCE.md", "# Release Evidence\n");
+        write_file(&root, "docs/live-benchmark-report.md", "# Live Benchmark\n");
+        write_file(
+            &root,
+            ".sisyphus/evidence/evidence-manifest.json",
+            r#"{ "schemaVersion": "codeagora.release-evidence.v1" }"#,
+        );
+        root
+    }
+
+    #[test]
+    fn desktop_app_e2e_reads_sessions_exports_and_setup_state() {
+        let root = fixture_workspace();
+
+        let info = repo_info_for_root(&root).expect("repo info");
+        assert!(info.trusted);
+        assert!(info.is_git_repo);
+        assert!(info.has_config);
+        assert_eq!(info.session_count, 1);
+
+        let detail = session_detail_value(&root, "2026-05-06/e2e-001").expect("session detail");
+        assert_eq!(
+            detail.pointer("/entry/decision").and_then(Value::as_str),
+            Some("REJECT")
+        );
+        assert_eq!(
+            detail.pointer("/findings/0/title").and_then(Value::as_str),
+            Some("Blocking desktop E2E finding")
+        );
+        assert!(detail
+            .get("markdown")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .contains("Desktop E2E report"));
+
+        let markdown =
+            export_session_value(&root, "2026-05-06/e2e-001", "markdown").expect("markdown export");
+        assert_eq!(
+            markdown.file_name,
+            "codeagora-session-2026-05-06-e2e-001.md"
+        );
+        assert!(markdown.content.contains("Decision: REJECT"));
+
+        let sarif =
+            export_session_value(&root, "2026-05-06/e2e-001", "sarif").expect("sarif export");
+        assert!(sarif.content.contains("\"ruleId\": \"CRITICAL\""));
+        assert!(sarif.content.contains("\"uri\": \"src/app.ts\""));
+
+        let action = github_action_status(&root);
+        assert_eq!(action.workflow_count, 1);
+        assert_eq!(action.codeagora_workflow_count, 1);
+        assert!(action.workflows[0].has_pull_request_trigger);
+        assert!(action.workflows[0].has_permissions);
+        assert!(action.workflows[0].has_config_path);
+
+        let evidence = evidence_status(&root);
+        assert!(evidence.has_release_evidence);
+        assert!(evidence.has_benchmark_report);
+        assert!(evidence.has_evidence_manifest);
+    }
+
+    #[test]
+    fn desktop_app_e2e_validates_and_writes_json_config_atomically() {
+        let root = fixture_workspace();
+        let invalid = validate_config_raw(r#"{ "reviewers": "codex" }"#);
+        assert!(!invalid.valid);
+        assert!(invalid
+            .errors
+            .iter()
+            .any(|error| error.contains("reviewers must be an array")));
+
+        let updated = r#"{
+  "language": "ko",
+  "reviewers": [
+    { "id": "codex", "backend": "opencode", "provider": "openai", "model": "gpt-5" }
+  ]
+}
+"#;
+        let written = write_config_for_root(updated, &root).expect("write config");
+        assert!(written.path.ends_with(".ca/config.json"));
+        assert_eq!(written.raw, updated);
+        assert_eq!(
+            fs::read_to_string(root.join(".ca/config.json")).unwrap(),
+            updated
+        );
+        assert!(!root.join(".ca/config.json.tmp").exists());
+    }
+
+    #[test]
+    fn desktop_app_e2e_blocks_session_path_traversal() {
+        let root = fixture_workspace();
+        let error = session_detail_value(&root, "../outside").expect_err("invalid session id");
+        assert!(error.contains("Invalid session id"));
+    }
 }
