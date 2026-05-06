@@ -281,6 +281,7 @@ async function executeReviewerWithGuards(
 
       if (useGuards) cb.recordSuccess(provider!, config.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
+      for (const doc of evidenceDocs) doc.reviewerId = config.id;
       // #467: apply model-specific calibration multiplier to each doc's
       // confidence before it enters hallucination filter / corroboration.
       const reviewContext = { calibrateReviewerConfidence: input.calibrateReviewerConfidence };
@@ -381,6 +382,7 @@ async function executeReviewerWithGuards(
 
       if (useFallbackGuards) cb.recordSuccess(fallbackProvider!, fb.model);
       const evidenceDocs = parseEvidenceResponse(response, diffFilePaths);
+      for (const doc of evidenceDocs) doc.reviewerId = config.id;
       // #467: calibrate using the FALLBACK model's tier, not the primary's,
       // since the output came from the fallback.
       const fbConfig = { ...config, model: fb.model, provider: fb.provider } as ReviewerConfig;

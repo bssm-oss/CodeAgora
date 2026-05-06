@@ -112,10 +112,9 @@ describe('extractFileListFromDiff', () => {
     expect(result).toEqual(['benchmarks/golden-bugs/example/diff.patch']);
   });
 
-  it('extracts the "a/" path from a renamed-file diff header', () => {
-    // The regex captures the a/ side: a/src/old-name.ts
+  it('extracts the "b/" path from a renamed-file diff header', () => {
     const result = extractFileListFromDiff(RENAMED_FILE_DIFF);
-    expect(result).toEqual(['src/old-name.ts']);
+    expect(result).toEqual(['src/new-name.ts']);
   });
 });
 

@@ -179,8 +179,8 @@ export function extractFileListFromDiff(diffContent: string): string[] {
   const sections = diffContent.split(/(?=^diff --git )/m);
 
   for (const section of sections) {
-    // Match: diff --git a/path/to/file.ts b/path/to/file.ts
-    const match = section.match(/^diff --git a\/(.+?) b\//m);
+    // Match the new-file side. For renames, findings should point at b/new.
+    const match = section.match(/^diff --git a\/.+? b\/(.+)$/m);
     if (match) {
       files.push(match[1]);
     }

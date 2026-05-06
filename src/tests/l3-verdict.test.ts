@@ -215,6 +215,24 @@ describe('makeHeadVerdict()', () => {
 
       expect(verdict.reasoning.toLowerCase()).toContain('consensus');
     });
+
+    it('routes very low-confidence critical discussions to human review instead of reject', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-low-confidence',
+            finalSeverity: 'CRITICAL',
+            consensusReached: false,
+            avgConfidence: 10,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
+    });
   });
 });
 

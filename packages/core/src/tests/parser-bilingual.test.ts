@@ -487,6 +487,18 @@ describe('computeL1Confidence — corroboration scoring (#432)', () => {
     expect(result).toBeLessThanOrEqual(100); // invariant
   });
 
+  it('counts duplicate co-located findings from one reviewer as one agreeing reviewer', () => {
+    const doc = makeDoc('src/foo.ts', 10, 80);
+    doc.reviewerId = 'r1';
+    const allDocs = [
+      { ...makeDoc('src/foo.ts', 10), reviewerId: 'r1' },
+      { ...makeDoc('src/foo.ts', 11), reviewerId: 'r1' },
+      { ...makeDoc('src/foo.ts', 12), reviewerId: 'r1' },
+    ];
+    const result = computeL1Confidence(doc, allDocs, 1, 100);
+    expect(result).toBe(70);
+  });
+
   it('excludes rule-source docs from agreeing count', () => {
     const doc: EvidenceDocument = {
       issueTitle: 'Test', problem: 'p', evidence: [], severity: 'WARNING',

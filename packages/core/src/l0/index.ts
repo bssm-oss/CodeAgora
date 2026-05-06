@@ -81,6 +81,11 @@ export interface ResolveResult {
   autoCount: number;
 }
 
+function reviewerGroupPairCount(reviewerCount: number, groupCount: number): number {
+  if (reviewerCount === 0 || groupCount === 0) return 0;
+  return Math.max(reviewerCount, groupCount);
+}
+
 /**
  * Resolve reviewer entries into concrete ReviewerInputs.
  * Static reviewers pass through unchanged.
@@ -177,8 +182,9 @@ export async function resolveReviewers(
 
   // Build ReviewerInputs with selectionMeta for auto reviewers
   const inputs: ReviewerInput[] = [];
-  for (let i = 0; i < allConfigs.length; i++) {
-    const config = allConfigs[i];
+  const inputCount = reviewerGroupPairCount(allConfigs.length, fileGroups.length);
+  for (let i = 0; i < inputCount; i++) {
+    const config = allConfigs[i % allConfigs.length];
     const group = fileGroups[i % fileGroups.length];
 
     const selectionEntry = selection.selections.find(
@@ -211,8 +217,10 @@ function buildInputs(
   configs: AgentConfig[],
   fileGroups: Array<{ name: string; diffContent: string; prSummary: string }>
 ): ReviewerInput[] {
-  return configs.map((config, i) => {
+  const inputCount = reviewerGroupPairCount(configs.length, fileGroups.length);
+  return Array.from({ length: inputCount }, (_, i) => {
     const group = fileGroups[i % fileGroups.length];
+    const config = configs[i % configs.length];
     return {
       config,
       groupName: group.name,

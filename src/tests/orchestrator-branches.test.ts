@@ -288,6 +288,7 @@ describe('Orchestrator Branches', () => {
       suggestion: 'Use parameterized queries',
       filePath: 'auth.ts',
       lineRange: [10, 10] as [number, number],
+      confidence: 10,
     };
 
     (scanUnconfirmedQueue as Mock).mockReturnValue({
@@ -321,6 +322,7 @@ describe('Orchestrator Branches', () => {
     expect(promotedDiscussion.discussionId).toBe('promoted-auth.ts:10');
     expect(promotedDiscussion.finalSeverity).toBe('CRITICAL');
     expect(promotedDiscussion.consensusReached).toBe(false);
+    expect(promotedDiscussion.avgConfidence).toBe(10);
 
     // Summary should be updated
     expect(reportArg.summary.escalated).toBe(1);
