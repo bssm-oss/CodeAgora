@@ -19,6 +19,8 @@ const EXPECTED_EVIDENCE = [
   { name: 'package-mcp-dry-run', filename: 'package-mcp-dry-run.log', command: 'pnpm --filter @codeagora/mcp pack --dry-run', tier: 'rc', redactionStatus: 'safe-to-publish' },
   { name: 'action-smoke', filename: 'action-smoke.log', command: 'pnpm build:action && pnpm release:beta-smoke', tier: 'rc', redactionStatus: 'safe-to-publish' },
   { name: 'mcp-smoke', filename: 'mcp-smoke.log', command: 'covered by pnpm release:beta-smoke', tier: 'rc', redactionStatus: 'safe-to-publish' },
+  { name: 'desktop-gate', filename: 'desktop-gate.log', command: 'pnpm rc:desktop-gate', tier: 'rc', redactionStatus: 'safe-to-publish' },
+  { name: 'desktop-evidence-manifest', filename: 'desktop-evidence-manifest.json', command: 'pnpm desktop:evidence', tier: 'rc', redactionStatus: 'safe-to-publish' },
   { name: 'security-regression', filename: 'security-regression.log', command: 'pnpm test:security', tier: 'rc', redactionStatus: 'safe-to-publish' },
   { name: 'live-benchmark-report', filename: 'live-benchmark-report.md', command: 'pnpm bench:fn:run with provider secrets', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
   { name: 'live-github-action-pr-smoke', filename: 'live-github-action-pr-smoke.md', command: 'manual GitHub Action PR smoke matrix', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },

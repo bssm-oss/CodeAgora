@@ -197,19 +197,6 @@ async function loadCommandContract(): Promise<void> {
   render();
 }
 
-async function loadProviders(): Promise<void> {
-  state.busy = true;
-  render();
-  try {
-    state.providers = await getProviderStatus();
-  } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
-  } finally {
-    state.busy = false;
-    render();
-  }
-}
-
 async function loadSetup(): Promise<void> {
   state.busy = true;
   render();
