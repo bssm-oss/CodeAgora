@@ -51,8 +51,10 @@ The preview works without Tauri and uses fallback sample data. Tauri commands ar
 
 ```bash
 pnpm --filter @codeagora/desktop tauri:check
+pnpm --filter @codeagora/desktop tauri:build
 pnpm --filter @codeagora/desktop tauri:dev
 pnpm --filter @codeagora/desktop smoke
+pnpm --filter @codeagora/desktop bundle:smoke
 pnpm --filter @codeagora/desktop evidence
 ```
 

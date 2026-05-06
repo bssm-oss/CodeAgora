@@ -6,15 +6,17 @@
   "description": "CodeAgora desktop app scaffold — human-facing local UI for sessions, config, and review runs",
   "scripts": {
     "build": "tsup && node scripts/copy-assets.mjs",
+    "bundle:smoke": "pnpm tauri:build && node scripts/bundle-smoke.mjs",
     "dev": "pnpm build && echo \"Open packages/desktop/dist/index.html for the scaffold preview\"",
     "evidence": "pnpm smoke && node scripts/evidence.mjs",
     "smoke": "pnpm build && node scripts/smoke.mjs",
+    "tauri:build": "tauri build",
     "tauri:check": "pnpm build && cd src-tauri && cargo check",
     "tauri:dev": "pnpm build && cd src-tauri && cargo run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   }

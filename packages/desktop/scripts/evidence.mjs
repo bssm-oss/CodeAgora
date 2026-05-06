@@ -82,6 +82,7 @@ const manifest = {
     notarization: 'deferred-until-public-desktop-launch',
     updater: 'disabled-for-private-preview',
     packageSmoke: 'pnpm --filter @codeagora/desktop smoke',
+    bundleSmoke: 'pnpm --filter @codeagora/desktop bundle:smoke',
     rcGate: 'pnpm --filter @codeagora/desktop evidence',
   },
   artifacts: [
@@ -97,6 +98,7 @@ const manifest = {
     'pnpm --filter @codeagora/desktop typecheck',
     'pnpm --filter @codeagora/desktop smoke',
     'pnpm --filter @codeagora/desktop tauri:check',
+    'pnpm --filter @codeagora/desktop bundle:smoke',
     'pnpm --filter @codeagora/desktop evidence',
   ],
   manualSmoke: [

@@ -30,6 +30,7 @@ This runs:
 - `pnpm --filter @codeagora/desktop typecheck`
 - `pnpm --filter @codeagora/desktop smoke`
 - `pnpm --filter @codeagora/desktop tauri:check`
+- `pnpm --filter @codeagora/desktop bundle:smoke`
 - `pnpm --filter @codeagora/desktop evidence`
 
 The desktop evidence manifest is written to:
@@ -48,6 +49,8 @@ The desktop smoke checks:
 - command bridge coverage for repository, sessions, review progress, config,
   providers, MCP, GitHub Action setup, release evidence, export, and command
   contract reporting
+- generated Tauri bundle artifacts, including the macOS `.app` executable when
+  running on macOS
 
 ## Manual Smoke Before RC
 
