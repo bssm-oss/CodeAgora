@@ -117,6 +117,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 function button(label: string, onClick: () => void, className = 'button'): HTMLButtonElement {
   const node = el('button', className, label);
   node.type = 'button';
+  node.dataset.testid = `button-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
   node.disabled = state.busy;
   node.addEventListener('click', onClick);
   return node;
@@ -373,6 +374,7 @@ async function exportSelected(format: 'markdown' | 'json' | 'sarif'): Promise<vo
 
 function renderShell(): HTMLElement {
   const shell = el('div', 'shell');
+  shell.dataset.testid = 'desktop-shell';
   const sidebar = el('aside', 'sidebar');
   const brand = el('div', 'brand');
   brand.append(el('div', 'brand-mark', 'CA'));
@@ -437,6 +439,7 @@ function repoSubtitle(): string {
 
 function renderContent(): HTMLElement {
   const content = el('section', 'content');
+  content.dataset.testid = `view-${state.view}`;
   if (state.notice) {
     const notice = el('div', 'notice', state.notice);
     notice.append(button('Dismiss', () => {
@@ -456,9 +459,11 @@ function renderContent(): HTMLElement {
 
 function renderSessions(): HTMLElement {
   const layout = el('div', 'sessions-layout');
+  layout.dataset.testid = 'sessions-layout';
   const listPanel = el('div', 'session-list');
   const controls = el('div', 'session-controls');
   const search = el('input', 'filter-input') as HTMLInputElement;
+  search.dataset.testid = 'session-filter-input';
   search.type = 'search';
   search.placeholder = 'Filter sessions';
   search.value = state.sessionSearch;
@@ -467,6 +472,7 @@ function renderSessions(): HTMLElement {
     render();
   });
   const status = el('select', 'filter-select') as HTMLSelectElement;
+  status.dataset.testid = 'session-status-filter';
   for (const option of ['all', 'completed', 'failed', 'interrupted', 'in_progress', 'unknown'] as const) {
     const node = el('option') as HTMLOptionElement;
     node.value = option;
@@ -491,6 +497,7 @@ function renderSessions(): HTMLElement {
   }
   for (const session of sessions) {
     const item = button('', () => void selectSession(session.id), state.selected?.id === session.id ? 'session-row selected' : 'session-row');
+    item.dataset.testid = `session-row-${session.id.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
     const top = el('div', 'session-row-top');
     top.append(el('strong', '', session.id));
     top.append(el('span', decisionClass(session.decision), session.decision ?? session.status));
@@ -511,6 +518,7 @@ function formatTimestamp(value?: string): string {
 
 function renderSessionDetail(): HTMLElement {
   const detail = el('article', 'detail');
+  detail.dataset.testid = 'session-detail';
   const selected = state.selected;
   if (!selected) {
     detail.append(el('p', 'empty', 'Select a session to inspect its verdict, findings, and report.'));
@@ -570,6 +578,7 @@ function renderSessionDetail(): HTMLElement {
 
 function renderRunReview(): HTMLElement {
   const panel = el('div', 'run-panel');
+  panel.dataset.testid = 'run-panel';
   panel.append(el('h2', '', 'Start a Local Review'));
   panel.append(el('p', '', state.repoPath || 'Current repository'));
   panel.append(renderRepositoryPicker());
@@ -592,6 +601,7 @@ function renderRunReview(): HTMLElement {
 function renderReviewRun(): HTMLElement {
   const run = state.activeRun;
   const section = el('section', 'review-run');
+  section.dataset.testid = 'review-run';
   section.append(el('h3', '', 'Review Progress'));
   if (!run) {
     section.append(el('p', 'empty', 'No desktop-started review is active.'));
@@ -628,6 +638,7 @@ function statusClass(status: string): string {
 function renderRepositoryPicker(): HTMLElement {
   const section = el('section', 'repo-picker');
   const input = el('input', 'repo-path-input') as HTMLInputElement;
+  input.dataset.testid = 'repo-path-input';
   input.type = 'text';
   input.placeholder = '/path/to/repository';
   input.value = state.repoInput || state.repoPath;
@@ -708,9 +719,11 @@ function renderCommandContract(): HTMLElement {
 
 function renderConfig(): HTMLElement {
   const panel = el('div', 'config-panel');
+  panel.dataset.testid = 'config-panel';
   panel.append(el('h2', '', state.configPath));
   panel.append(renderConfigFacts());
   const textarea = el('textarea', 'config-editor') as HTMLTextAreaElement;
+  textarea.dataset.testid = 'config-editor';
   textarea.value = state.configRaw;
   panel.append(textarea);
   panel.append(renderConfigValidation());
@@ -761,6 +774,7 @@ function renderConfigFacts(): HTMLElement {
 
 function renderSetup(): HTMLElement {
   const panel = el('div', 'setup-panel');
+  panel.dataset.testid = 'setup-panel';
   const header = el('div', 'section-head');
   header.append(el('h2', '', 'Providers and Local Backends'));
   header.append(button('Refresh Setup', () => void loadSetup()));

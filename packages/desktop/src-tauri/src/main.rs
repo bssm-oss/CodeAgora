@@ -1614,8 +1614,18 @@ fn write_config(raw: String, state: State<'_, WorkspaceState>) -> Result<Desktop
 }
 
 fn main() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_notification::init())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
+
+    #[cfg(all(debug_assertions, feature = "webdriver-automation"))]
+    let builder = {
+        let mut builder = builder;
+        if std::env::var("CODEAGORA_DESKTOP_WEBDRIVER").as_deref() == Ok("1") {
+            builder = builder.plugin(tauri_plugin_webdriver_automation::init());
+        }
+        builder
+    };
+
+    builder
         .manage(WorkspaceState {
             repo_root: Mutex::new(None),
             review_runs: Mutex::new(HashMap::new()),
