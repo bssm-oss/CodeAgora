@@ -605,8 +605,12 @@ function toEvidenceDoc(issue: {
 // Unified dispatcher
 // ============================================================================
 
+function fullEvidenceDocs(result: PipelineResult, override?: EvidenceDocument[]): EvidenceDocument[] {
+  return override ?? result.evidenceDocs ?? (result.summary?.topIssues.map(toEvidenceDoc) ?? []);
+}
+
 function formatSarif(result: PipelineResult): string {
-  const docs: EvidenceDocument[] = result.summary?.topIssues.map(toEvidenceDoc) ?? [];
+  const docs = fullEvidenceDocs(result);
   const report = buildSarifReport(docs, result.sessionId ?? 'unknown', result.date ?? 'unknown');
   return serializeSarif(report);
 }
@@ -614,9 +618,9 @@ function formatSarif(result: PipelineResult): string {
 /**
  * Format a PipelineResult using the requested output format.
  *
- * For the 'annotated' format, pass diffContent and evidenceDocs via options.
- * v1 limitation: if evidenceDocs is not provided, falls back to summary.topIssues
- * which only contains up to 5 issues.
+ * For the 'annotated' format, pass diffContent via options.
+ * The formatter uses the full pipeline evidenceDocs list when available and
+ * falls back to summary.topIssues only for legacy/minimal results.
  */
 export function formatOutput(
   result: PipelineResult,
@@ -634,9 +638,7 @@ export function formatOutput(
       return formatGithub(result);
     case 'annotated': {
       const diff = options?.diffContent ?? '';
-      // Use provided evidenceDocs; fall back to topIssues mapped explicitly to EvidenceDocument[]
-      const docs: EvidenceDocument[] = options?.evidenceDocs ??
-        (result.summary?.topIssues.map(toEvidenceDoc) ?? []);
+      const docs = fullEvidenceDocs(result, options?.evidenceDocs);
       return formatAnnotated(diff, docs);
     }
     case 'html':

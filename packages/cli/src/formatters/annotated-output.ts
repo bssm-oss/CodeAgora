@@ -2,8 +2,7 @@
  * Annotated Output Formatter
  * Shows diff with inline issue annotations after relevant lines.
  *
- * Note: uses summary.topIssues (top 5 only) as the evidence source for v1.
- * Full EvidenceDocument list would require passing all docs from the pipeline.
+ * The dispatcher passes full pipeline evidence documents when available.
  */
 
 import pc from 'picocolors';

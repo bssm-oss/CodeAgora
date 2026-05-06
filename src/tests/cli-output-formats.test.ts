@@ -253,4 +253,63 @@ describe('formatOutput() dispatcher', () => {
     expect(output).toContain('<?xml');
     expect(output).toContain('<testsuites>');
   });
+
+  it('uses full evidenceDocs for SARIF instead of summary.topIssues', () => {
+    const result = makeSuccessResult({
+      summary: {
+        ...makeSuccessResult().summary!,
+        topIssues: [
+          { severity: 'CRITICAL', filePath: 'src/auth/login.ts', lineRange: [10, 12], title: 'SQL injection vulnerability' },
+        ],
+      },
+      evidenceDocs: [
+        makeEvidenceDoc({ issueTitle: 'First issue', filePath: 'src/one.ts', lineRange: [1, 1] }),
+        makeEvidenceDoc({ issueTitle: 'Second issue', filePath: 'src/two.ts', lineRange: [2, 2] }),
+        makeEvidenceDoc({ issueTitle: 'Third issue', filePath: 'src/three.ts', lineRange: [3, 3] }),
+      ],
+    });
+
+    const sarif = JSON.parse(formatOutput(result, 'sarif'));
+
+    expect(sarif.runs[0].results).toHaveLength(3);
+    expect(sarif.runs[0].results.map((r: { message: { text: string } }) => r.message.text)).toEqual([
+      'First issue',
+      'Second issue',
+      'Third issue',
+    ]);
+  });
+
+  it('uses full evidenceDocs for annotated output instead of summary.topIssues', () => {
+    const diff = `diff --git a/src/one.ts b/src/one.ts
+--- a/src/one.ts
++++ b/src/one.ts
+@@ -1,1 +1,2 @@
+ const one = 1;
++const two = 2;
+diff --git a/src/two.ts b/src/two.ts
+--- a/src/two.ts
++++ b/src/two.ts
+@@ -1,1 +1,2 @@
+ const a = 1;
++const b = 2;
+`;
+    const result = makeSuccessResult({
+      summary: {
+        ...makeSuccessResult().summary!,
+        topIssues: [
+          { severity: 'CRITICAL', filePath: 'src/one.ts', lineRange: [2, 2], title: 'Top issue only' },
+        ],
+      },
+      evidenceDocs: [
+        makeEvidenceDoc({ issueTitle: 'Full first issue', filePath: 'src/one.ts', lineRange: [2, 2] }),
+        makeEvidenceDoc({ issueTitle: 'Full second issue', filePath: 'src/two.ts', lineRange: [2, 2] }),
+      ],
+    });
+
+    const annotated = formatOutput(result, 'annotated', { diffContent: diff });
+
+    expect(annotated).toContain('Full first issue');
+    expect(annotated).toContain('Full second issue');
+    expect(annotated).not.toContain('Top issue only');
+  });
 });
