@@ -50,6 +50,8 @@ export const EvidenceDocumentSchema = z.object({
   suggestion: z.string(),
   filePath: z.string(),
   lineRange: z.tuple([z.number(), z.number()]),
+  /** L1 reviewer that produced this finding. Used for independent-agreement counts. */
+  reviewerId: z.string().optional(),
   source: z.enum(['llm', 'rule']).optional(),
   /**
    * @deprecated Use `confidenceTrace.final` for all downstream reads. The

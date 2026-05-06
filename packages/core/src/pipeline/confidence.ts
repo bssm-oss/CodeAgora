@@ -66,7 +66,8 @@ export function computeL1Confidence(
     d.filePath === doc.filePath &&
     Math.abs(d.lineRange[0] - doc.lineRange[0]) <= 5
   );
-  const agreeing = coLocated.length;
+  const reviewerIds = coLocated.map((d) => d.reviewerId).filter((id): id is string => Boolean(id));
+  const agreeing = reviewerIds.length > 0 ? new Set(reviewerIds).size : coLocated.length;
   const agreementRate = Math.min(100, Math.round((agreeing / activeReviewers) * 100));
 
   let base: number;

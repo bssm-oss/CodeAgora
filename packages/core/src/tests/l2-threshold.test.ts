@@ -123,11 +123,19 @@ describe('applyThreshold — WARNING severity', () => {
   });
 
   it('registers WARNING with two reviewers on the same location', () => {
-    const doc1 = makeDoc({ severity: 'WARNING', filePath: 'src/a.ts', lineRange: [1, 5] });
-    const doc2 = makeDoc({ severity: 'WARNING', filePath: 'src/a.ts', lineRange: [1, 5] });
+    const doc1 = makeDoc({ severity: 'WARNING', filePath: 'src/a.ts', lineRange: [1, 5], reviewerId: 'r1' });
+    const doc2 = makeDoc({ severity: 'WARNING', filePath: 'src/a.ts', lineRange: [1, 5], reviewerId: 'r2' });
     const { discussions } = applyThreshold([doc1, doc2], defaultSettings);
     expect(discussions).toHaveLength(1);
     expect(discussions[0].severity).toBe('WARNING');
+  });
+
+  it('does not register WARNING when duplicate findings come from the same reviewer', () => {
+    const doc1 = makeDoc({ severity: 'WARNING', filePath: 'src/a.ts', lineRange: [1, 5], reviewerId: 'r1' });
+    const doc2 = makeDoc({ severity: 'WARNING', filePath: 'src/a.ts', lineRange: [2, 6], reviewerId: 'r1' });
+    const { discussions, unconfirmed } = applyThreshold([doc1, doc2], defaultSettings);
+    expect(discussions).toHaveLength(0);
+    expect(unconfirmed).toHaveLength(2);
   });
 
   it('assigns sequential Discussion IDs starting from d001', () => {

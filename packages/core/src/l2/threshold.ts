@@ -133,18 +133,23 @@ function groupByLocation(docs: EvidenceDocument[]): LocationGroup[] {
 }
 
 function countBySeverity(docs: EvidenceDocument[]): Record<Severity, number> {
-  const counts: Record<Severity, number> = {
-    HARSHLY_CRITICAL: 0,
-    CRITICAL: 0,
-    WARNING: 0,
-    SUGGESTION: 0,
+  const reviewersBySeverity: Record<Severity, Set<string>> = {
+    HARSHLY_CRITICAL: new Set(),
+    CRITICAL: new Set(),
+    WARNING: new Set(),
+    SUGGESTION: new Set(),
   };
 
-  for (const doc of docs) {
-    counts[doc.severity]++;
-  }
+  docs.forEach((doc, index) => {
+    reviewersBySeverity[doc.severity].add(doc.reviewerId ?? `finding:${index}`);
+  });
 
-  return counts;
+  return {
+    HARSHLY_CRITICAL: reviewersBySeverity.HARSHLY_CRITICAL.size,
+    CRITICAL: reviewersBySeverity.CRITICAL.size,
+    WARNING: reviewersBySeverity.WARNING.size,
+    SUGGESTION: reviewersBySeverity.SUGGESTION.size,
+  };
 }
 
 function severityRank(severity: Severity): number {

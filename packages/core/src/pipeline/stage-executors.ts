@@ -277,6 +277,7 @@ export async function executeL3Verdict(
         reasoning: `Promoted from unconfirmed queue: ${doc.issueTitle}`,
         consensusReached: false,
         rounds: 0,
+        ...(doc.confidence != null && { avgConfidence: doc.confidence }),
       });
     }
     moderatorReport.summary.escalated += promoted.length;
