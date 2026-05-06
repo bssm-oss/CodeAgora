@@ -32,6 +32,7 @@ export async function executeL1Reviews(
   projectContext?: string,
   enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
   progress?: import('./progress.js').ProgressEmitter,
+  reviewerTimeoutMs?: number,
 ): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[]; forfeitFailures: ReviewOutput[] }> {
   const allReviewResults: ReviewOutput[] = [];
   const allReviewerInputs: ReviewerInput[] = [];
@@ -46,6 +47,13 @@ export async function executeL1Reviews(
       fileGroups,
       config.modelRouter
     );
+
+    if (reviewerTimeoutMs) {
+      const timeoutSeconds = Math.max(1, Math.round(reviewerTimeoutMs / 1000));
+      for (const ri of reviewerInputs) {
+        ri.config = { ...ri.config, timeout: timeoutSeconds };
+      }
+    }
 
     // Inject surrounding context into each reviewer input (context-aware review)
     if (surroundingContext) {

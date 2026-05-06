@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -253,16 +253,22 @@ fn review_snapshot(handle: &Arc<ReviewRunHandle>) -> Result<ReviewRunSnapshot, S
         .map(|snapshot| snapshot.clone())
 }
 
-fn spawn_agora(root: &Path, args: &[&str]) -> io::Result<Child> {
+fn spawn_agora(root: &Path, args: &[&str], stdin_input: Option<String>) -> io::Result<Child> {
     let mut command = Command::new("agora");
     command
         .args(args)
         .current_dir(root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if stdin_input.is_some() {
+        command.stdin(Stdio::piped());
+    }
 
     match command.spawn() {
-        Ok(child) => Ok(child),
+        Ok(mut child) => {
+            write_child_stdin(&mut child, stdin_input);
+            Ok(child)
+        }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
             let mut fallback = Command::new("pnpm");
             fallback
@@ -271,9 +277,25 @@ fn spawn_agora(root: &Path, args: &[&str]) -> io::Result<Child> {
                 .current_dir(root)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
-            fallback.spawn()
+            if stdin_input.is_some() {
+                fallback.stdin(Stdio::piped());
+            }
+            let mut child = fallback.spawn()?;
+            write_child_stdin(&mut child, stdin_input);
+            Ok(child)
         }
         Err(error) => Err(error),
+    }
+}
+
+fn write_child_stdin(child: &mut Child, stdin_input: Option<String>) {
+    let Some(stdin_input) = stdin_input else {
+        return;
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        thread::spawn(move || {
+            let _ = stdin.write_all(stdin_input.as_bytes());
+        });
     }
 }
 
@@ -880,9 +902,36 @@ fn validate_config_value(value: &Value) -> ConfigValidation {
         _ => {}
     }
 
-    if let Some(reviewers) = object.get("reviewers") {
-        let Some(reviewers) = reviewers.as_array() else {
-            errors.push("reviewers must be an array when present.".to_string());
+    if let Some(reviewers_value) = object.get("reviewers") {
+        let Some(reviewers) = reviewers_value.as_array() else {
+            if let Some(reviewers_object) = reviewers_value.as_object() {
+                match reviewers_object.get("count").and_then(Value::as_u64) {
+                    Some(count @ 1..=10) => {
+                        if count > 5 {
+                            warnings.push(format!(
+                                "reviewers.count={count}; high counts increase latency and cost."
+                            ));
+                        }
+                    }
+                    Some(count) => errors.push(format!(
+                        "reviewers.count must be between 1 and 10, got {count}."
+                    )),
+                    None => errors
+                        .push("reviewers.count is required for declarative reviewers.".to_string()),
+                }
+                if let Some(static_reviewers) = reviewers_object.get("static") {
+                    if !static_reviewers.is_array() {
+                        errors.push("reviewers.static must be an array when present.".to_string());
+                    }
+                }
+                return ConfigValidation {
+                    valid: errors.is_empty(),
+                    errors,
+                    warnings,
+                };
+            }
+            errors
+                .push("reviewers must be an array or declarative object when present.".to_string());
             return ConfigValidation {
                 valid: false,
                 errors,
@@ -1169,14 +1218,60 @@ fn write_config_for_root(raw: &str, root: &Path) -> Result<DesktopConfig, String
     })
 }
 
-fn run_agora(root: &Path, args: &[&str]) -> io::Result<std::process::Output> {
-    match Command::new("agora").args(args).current_dir(root).output() {
-        Ok(output) => Ok(output),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Command::new("pnpm")
-            .args(["exec", "agora"])
+fn working_tree_diff(root: &Path) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(["diff"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(redact_sensitive(&String::from_utf8_lossy(&output.stderr)));
+    }
+    let diff = String::from_utf8_lossy(&output.stdout).to_string();
+    if diff.trim().is_empty() {
+        return Err("No working tree changes found.".to_string());
+    }
+    Ok(diff)
+}
+
+fn review_invocation(
+    root: &Path,
+    staged: bool,
+) -> Result<(Vec<&'static str>, Option<String>), String> {
+    if staged {
+        return Ok((vec!["review", "--json-stream", "--staged"], None));
+    }
+    Ok((
+        vec!["review", "-", "--json-stream"],
+        Some(working_tree_diff(root)?),
+    ))
+}
+
+fn run_agora(
+    root: &Path,
+    args: &[&str],
+    stdin_input: Option<String>,
+) -> io::Result<std::process::Output> {
+    let run = |program: &str, prefix_args: &[&str]| -> io::Result<std::process::Output> {
+        let mut child = Command::new(program)
+            .args(prefix_args)
             .args(args)
             .current_dir(root)
-            .output(),
+            .stdin(if stdin_input.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        write_child_stdin(&mut child, stdin_input.clone());
+        child.wait_with_output()
+    };
+
+    match run("agora", &[]) {
+        Ok(output) => Ok(output),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => run("pnpm", &["exec", "agora"]),
         Err(error) => Err(error),
     }
 }
@@ -1336,14 +1431,10 @@ fn run_review(
     staged: bool,
     state: State<'_, WorkspaceState>,
 ) -> Result<CommandResult, String> {
-    let mut args = vec!["review", "--json-stream"];
-    if staged {
-        args.push("--staged");
-    }
-
     let root = active_repo_root(&state)?;
     require_trusted_repo(&root)?;
-    let output = run_agora(&root, &args).map_err(|error| error.to_string())?;
+    let (args, stdin_input) = review_invocation(&root, staged)?;
+    let output = run_agora(&root, &args, stdin_input).map_err(|error| error.to_string())?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let session_id = stdout.lines().rev().find_map(|line| {
@@ -1378,12 +1469,9 @@ fn start_review_run(
 ) -> Result<ReviewRunSnapshot, String> {
     let root = active_repo_root(&state)?;
     require_trusted_repo(&root)?;
-    let mut args = vec!["review", "--json-stream"];
-    if staged {
-        args.push("--staged");
-    }
+    let (args, stdin_input) = review_invocation(&root, staged)?;
 
-    let mut child = spawn_agora(&root, &args).map_err(|error| error.to_string())?;
+    let mut child = spawn_agora(&root, &args, stdin_input).map_err(|error| error.to_string())?;
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
     let run_id = review_run_id();
@@ -1827,7 +1915,15 @@ mod tests {
         assert!(invalid
             .errors
             .iter()
-            .any(|error| error.contains("reviewers must be an array")));
+            .any(|error| error.contains("reviewers must be an array or declarative object")));
+
+        let declarative = validate_config_raw(
+            r#"{ "language": "en", "reviewers": { "count": 3, "constraints": { "minFamilies": 1 } } }"#,
+        );
+        assert!(
+            declarative.valid,
+            "declarative reviewers should match core config schema"
+        );
 
         let updated = r#"{
   "language": "ko",
@@ -1844,6 +1940,41 @@ mod tests {
             updated
         );
         assert!(!root.join(".ca/config.json.tmp").exists());
+    }
+
+    #[test]
+    fn desktop_app_e2e_builds_working_tree_review_from_git_diff() {
+        let root = fixture_workspace();
+        let status = Command::new("git")
+            .args(["add", "README.md", ".ca/config.json"])
+            .current_dir(&root)
+            .status()
+            .expect("git add fixture files");
+        assert!(status.success(), "git add should succeed");
+        let status = Command::new("git")
+            .args([
+                "-c",
+                "user.name=CodeAgora Test",
+                "-c",
+                "user.email=codeagora@example.invalid",
+                "commit",
+                "-m",
+                "fixture",
+            ])
+            .current_dir(&root)
+            .status()
+            .expect("git commit fixture files");
+        assert!(status.success(), "git commit should succeed");
+        write_file(&root, "README.md", "# Desktop E2E\n\nchanged\n");
+
+        let (args, stdin_input) = review_invocation(&root, false).expect("working tree invocation");
+        assert_eq!(args, vec!["review", "-", "--json-stream"]);
+        assert!(stdin_input.unwrap().contains("+changed"));
+
+        let (staged_args, staged_stdin) =
+            review_invocation(&root, true).expect("staged invocation");
+        assert_eq!(staged_args, vec!["review", "--json-stream", "--staged"]);
+        assert!(staged_stdin.is_none());
     }
 
     #[test]

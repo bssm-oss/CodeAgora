@@ -4,7 +4,7 @@
  */
 
 import { SessionManager, recoverStaleSessions } from '../session/manager.js';
-import { loadConfig, loadConfigFile, normalizeConfig } from '../config/loader.js';
+import { isDeclarativeReviewers, loadConfig, loadConfigFile, normalizeConfig } from '../config/loader.js';
 import { writeAllReviews } from '../l1/writer.js';
 import { applyThreshold } from '../l2/threshold.js';
 import { writeModeratorReport, writeSuggestions } from '../l2/writer.js';
@@ -35,6 +35,7 @@ import fs from 'fs/promises';
 import type { ModeratorReport } from '../types/core.js';
 import { classifyError, type ErrorKind } from '../l1/error-classifier.js';
 import type { CacheMetadata } from '@codeagora/shared/utils/cache.js';
+import type { Config, ReviewerEntry } from '../types/config.js';
 
 // ============================================================================
 // Main Pipeline
@@ -60,6 +61,11 @@ export interface PipelineInput {
   contextLines?: number;
   /** Explicit config file path. Defaults to process.cwd()/.ca/config.* */
   configPath?: string;
+}
+
+export interface ReviewerSelection {
+  count?: number;
+  names?: string[];
 }
 
 export interface PipelineSummary {
@@ -123,6 +129,92 @@ async function persistTerminalResult(result: PipelineResult): Promise<PipelineRe
   return result;
 }
 
+export function applyReviewerSelectionToConfig(
+  config: Config,
+  selection?: ReviewerSelection,
+): Config {
+  if (!selection) return config;
+
+  const requestedNames = selection.names?.filter((name) => name.trim().length > 0);
+  if (selection.count !== undefined && (!Number.isInteger(selection.count) || selection.count < 1)) {
+    throw new Error(`reviewer count must be >= 1, got ${selection.count}`);
+  }
+
+  if (isDeclarativeReviewers(config.reviewers) && (!requestedNames || requestedNames.length === 0)) {
+    return {
+      ...config,
+      reviewers: {
+        ...config.reviewers,
+        ...(selection.count !== undefined && { count: selection.count }),
+      },
+    };
+  }
+
+  const normalized = normalizeConfig(config);
+  let selected: ReviewerEntry[] = normalized.reviewers.filter((reviewer) => reviewer.enabled);
+
+  if (requestedNames && requestedNames.length > 0) {
+    const byId = new Map(selected.map((reviewer) => [reviewer.id, reviewer]));
+    const missing = requestedNames.filter((name) => !byId.has(name));
+    if (missing.length > 0) {
+      throw new Error(`Unknown reviewer id(s): ${missing.join(', ')}`);
+    }
+    selected = requestedNames.map((name) => byId.get(name)!);
+  }
+
+  if (selection.count !== undefined) {
+    if (selected.length < selection.count) {
+      throw new Error(`Requested ${selection.count} reviewer(s), but only ${selected.length} enabled reviewer(s) are available`);
+    }
+    selected = selected.slice(0, selection.count);
+  }
+
+  if (selected.length === 0) {
+    throw new Error('At least one reviewer must be selected');
+  }
+
+  return {
+    ...normalized,
+    reviewers: selected,
+  };
+}
+
+export function applyPipelineTimeouts(
+  config: Config & { reviewers: ReviewerEntry[] },
+  timeoutMs: number | undefined,
+): void {
+  if (!timeoutMs) return;
+  const timeoutSeconds = Math.max(1, Math.ceil(timeoutMs / 1000));
+  config.errorHandling.maxRetries = Math.min(config.errorHandling.maxRetries, 1);
+  config.supporters.pool = config.supporters.pool.map((supporter) => ({
+    ...supporter,
+    timeout: Math.min(supporter.timeout ?? timeoutSeconds, timeoutSeconds),
+  }));
+  config.supporters.devilsAdvocate = {
+    ...config.supporters.devilsAdvocate,
+    timeout: Math.min(config.supporters.devilsAdvocate.timeout ?? timeoutSeconds, timeoutSeconds),
+  };
+  config.moderator = {
+    ...config.moderator,
+    timeout: Math.min(config.moderator.timeout ?? timeoutSeconds, timeoutSeconds),
+  };
+  if (config.head) {
+    config.head = {
+      ...config.head,
+      timeout: Math.min(config.head.timeout ?? timeoutSeconds, timeoutSeconds),
+    };
+  }
+}
+
+function pipelineTimeoutResult(timeoutMs: number): PipelineResult {
+  return {
+    sessionId: 'unknown',
+    date: 'unknown',
+    status: 'error',
+    error: `Pipeline timed out after ${Math.round(timeoutMs / 1000)}s`,
+  };
+}
+
 // ============================================================================
 // Failure Diagnostics
 // ============================================================================
@@ -163,6 +255,26 @@ function classifyReviewerFailure(message: string): ErrorKind | 'circuit-open' {
  * Run complete V3 pipeline
  */
 export async function runPipeline(input: PipelineInput, progress?: ProgressEmitter): Promise<PipelineResult> {
+  if (!input.timeoutMs) {
+    return runPipelineInternal(input, progress);
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<PipelineResult>((resolve) => {
+    timeoutId = setTimeout(() => {
+      progress?.stageError(progress.getCurrentStage(), `Pipeline timed out after ${Math.round(input.timeoutMs! / 1000)}s`);
+      resolve(pipelineTimeoutResult(input.timeoutMs!));
+    }, input.timeoutMs);
+  });
+
+  try {
+    return await Promise.race([runPipelineInternal(input, progress), timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmitter): Promise<PipelineResult> {
   let session: SessionManager | undefined;
   // D-3: basic pipeline timing telemetry
   const telemetry = new PipelineTelemetry();
@@ -177,10 +289,12 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
 
     // Load config and normalize (expand declarative reviewers if needed)
     progress?.stageStart('init', 'Loading config...');
-    const rawConfig = input.configPath
+    const loadedConfig = input.configPath
       ? await loadConfigFile(input.configPath, { rootDir: input.repoPath ?? process.cwd() })
       : await loadConfig();
+    const rawConfig = applyReviewerSelectionToConfig(loadedConfig, input.reviewerSelection);
     const config = normalizeConfig(rawConfig);
+    applyPipelineTimeouts(config, input.timeoutMs);
 
     // Apply CLI overrides to config
     if (Array.isArray(config.reviewers)) {
@@ -351,7 +465,7 @@ export async function runPipeline(input: PipelineInput, progress?: ProgressEmitt
     // === L1 REVIEWERS: Chunk Processing ===
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
     const l1Start = Date.now();
-    const { allReviewResults, allReviewerInputs, forfeitFailures } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress);
+    const { allReviewResults, allReviewerInputs, forfeitFailures } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress, input.reviewerTimeoutMs);
     const l1Elapsed = Date.now() - l1Start;
     for (const r of allReviewResults) {
       telemetry.record({
