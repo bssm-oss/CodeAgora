@@ -1,0 +1,51 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+
+function readJson(relativePath) {
+  return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
+}
+
+function readText(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8');
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+const packageJson = readJson('package.json');
+const tauriConfig = readJson('src-tauri/tauri.conf.json');
+const main = readText('src-tauri/src/main.rs');
+
+assert(fs.existsSync(path.join(root, 'dist/index.html')), 'dist/index.html is missing');
+assert(fs.existsSync(path.join(root, 'dist/main.js')), 'dist/main.js is missing');
+assert(tauriConfig.version === packageJson.version, 'Tauri config version does not match package version');
+assert(tauriConfig.productName === 'CodeAgora', 'Unexpected Tauri product name');
+
+const requiredCommands = [
+  'open_repository',
+  'get_repo_info',
+  'list_sessions',
+  'get_session_detail',
+  'export_session',
+  'start_review_run',
+  'get_review_run',
+  'cancel_review_run',
+  'read_config',
+  'validate_config',
+  'write_config',
+  'get_provider_status',
+  'get_mcp_status',
+  'get_github_action_status',
+  'get_evidence_status',
+];
+
+for (const command of requiredCommands) {
+  assert(main.includes(command), `Tauri command is missing from bridge: ${command}`);
+}
+
+console.log(`CodeAgora desktop smoke passed (${packageJson.version})`);

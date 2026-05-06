@@ -40,6 +40,8 @@ artifacts are required only for stable claims that depend on live behavior.
 | MCP package dry-run | `package-mcp-dry-run.log` | `pnpm --filter @codeagora/mcp pack --dry-run` | rc |
 | Action smoke bundle | `action-smoke.log` | `pnpm build:action && pnpm release:beta-smoke` | rc |
 | MCP smoke | `mcp-smoke.log` | covered by `pnpm release:beta-smoke` | rc |
+| Desktop private-preview gate | `desktop-gate.log` | `pnpm rc:desktop-gate` | rc |
+| Desktop evidence manifest | `desktop-evidence-manifest.json` | `pnpm desktop:evidence` | rc |
 | Security regression gate | `security-regression.log` | `pnpm test:security` | rc |
 | Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider secrets | stable |
 | Live GitHub Action PR smoke | `live-github-action-pr-smoke.md` | manual same-repo/fork/stale-head Action matrix | stable |
@@ -61,6 +63,7 @@ GitHub Actions:
 | Full live pipeline E2E | `src/tests/e2e-full-pipeline.test.ts` | live-only Vitest suite | `CODEAGORA_RUN_LIVE_E2E=1`, `GROQ_API_KEY`, and `claude` CLI in `PATH` | Required before stable live quality claims; non-blocking for deterministic beta gates |
 | Golden-bug live benchmark | `.github/workflows/bench-fn.yml` / `pnpm bench:fn:run` | live-only workflow | provider credentials or GitHub Models `models: read` permission, selected fixture matrix, and optional rate-limit throttle | Required before stable accuracy or `latest` quality claims |
 | Live GitHub Action PR smoke | external PR workflow run | live-only manual smoke | same-repo PR, fork PR, stale-head, oversized diff, provider-failure, and 422 scenarios | Required before stable GitHub Action support claim |
+| Desktop packaged-app launch | local preview platform | manual/private-preview smoke | launch Tauri shell, open trusted repo, review/cancel, session export, config validation, setup panels, secret redaction | Required before RC handoff that includes desktop private-preview claims; not a stable public desktop launch |
 
 Default `pnpm test` results must not be described as live E2E evidence. Release
 notes should cite deterministic test counts separately from the live-only

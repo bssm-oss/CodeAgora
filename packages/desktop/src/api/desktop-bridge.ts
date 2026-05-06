@@ -29,9 +29,16 @@ export interface SessionSummary {
 }
 
 export interface SessionDetail extends SessionSummary {
+  findings?: TopIssue[];
   markdown?: string;
   evidenceCount?: number;
   discussionsCount?: number;
+}
+
+export interface SessionExport {
+  format: 'markdown' | 'json' | 'sarif' | string;
+  fileName: string;
+  content: string;
 }
 
 export interface RunReviewResult {
@@ -40,13 +47,100 @@ export interface RunReviewResult {
   sessionId?: string;
 }
 
+export type ReviewRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'cancelling';
+
+export interface ReviewRunEvent {
+  kind: string;
+  message: string;
+  timestamp: string;
+  payload?: unknown;
+}
+
+export interface ReviewRunSnapshot {
+  runId: string;
+  staged: boolean;
+  status: ReviewRunStatus;
+  message: string;
+  sessionId?: string;
+  startedAt: string;
+  completedAt?: string;
+  events: ReviewRunEvent[];
+}
+
 export interface DesktopConfig {
   raw: string;
   path: string;
 }
 
+export interface ConfigValidation {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface ProviderStatus {
+  name: string;
+  kind: 'api' | 'cli' | string;
+  envVar?: string;
+  configured: boolean;
+  redactedValue?: string;
+  binary?: string;
+}
+
+export interface McpStatus {
+  command: string;
+  tools: string[];
+  clientSnippet: string;
+}
+
+export interface WorkflowStatus {
+  path: string;
+  mentionsCodeagora: boolean;
+  hasPullRequestTrigger: boolean;
+  hasPermissions: boolean;
+  hasConfigPath: boolean;
+}
+
+export interface GitHubActionStatus {
+  workflowCount: number;
+  codeagoraWorkflowCount: number;
+  workflows: WorkflowStatus[];
+  recommendedSnippet: string;
+}
+
+export interface EvidenceStatus {
+  releaseEvidencePath?: string;
+  benchmarkReportPath?: string;
+  evidenceManifestPath?: string;
+  hasReleaseEvidence: boolean;
+  hasBenchmarkReport: boolean;
+  hasEvidenceManifest: boolean;
+}
+
 export interface RepoInfo {
   path: string;
+  gitRoot?: string;
+  isGitRepo: boolean;
+  branch?: string;
+  headSha?: string;
+  dirtyFileCount: number;
+  hasConfig: boolean;
+  configPath?: string;
+  reviewIgnorePath?: string;
+  reviewRulesPath?: string;
+  sessionsRoot: string;
+  sessionCount: number;
+  trusted: boolean;
+  trustReason: string;
+}
+
+export interface DesktopCommandContract {
+  name: string;
+  classification: 'read-only' | 'process-execution' | 'project-mutation' | string;
+  readsProject: boolean;
+  mutatesProject: boolean;
+  spawnsProcess: boolean;
+  notes: string;
 }
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -73,6 +167,7 @@ interface CliSessionDetail {
   entry?: CliSessionEntry;
   metadata?: JsonObject;
   verdict?: JsonObject;
+  findings?: unknown;
   markdown?: unknown;
   evidenceCount?: unknown;
   discussionsCount?: unknown;
@@ -234,6 +329,7 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
     reasoning,
     severityCounts: entry.severityCounts ?? severityCountsFromVerdict(verdict),
     topIssues: entry.topIssues?.length ? entry.topIssues : normalizeTopIssues(undefined, verdict),
+    findings: normalizeTopIssues(detail.findings, verdict),
     updatedAt: entry.updatedAt ?? timestampFromMetadata(metadata),
     evidenceCount: asNumber(detail.evidenceCount) ?? issues.length,
     discussionsCount: asNumber(detail.discussionsCount) ?? (Array.isArray(verdict?.['discussions']) ? verdict['discussions'].length : undefined),
@@ -277,6 +373,22 @@ export async function getSessionDetail(id: string): Promise<SessionDetail> {
   };
 }
 
+export async function exportSession(id: string, format: 'markdown' | 'json' | 'sarif'): Promise<SessionExport> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<SessionExport>('export_session', { id, format });
+  const detail = await getSessionDetail(id);
+  const content = format === 'json'
+    ? JSON.stringify(detail, null, 2)
+    : format === 'sarif'
+      ? JSON.stringify({ version: '2.1.0', runs: [{ results: detail.findings ?? [] }] }, null, 2)
+      : detail.markdown ?? `# Review ${id}`;
+  return {
+    format,
+    fileName: `codeagora-session-${id.replace('/', '-')}.${format === 'markdown' ? 'md' : format}`,
+    content,
+  };
+}
+
 export async function runReview(staged: boolean): Promise<RunReviewResult> {
   const invoke = getInvoke();
   if (invoke) return invoke<RunReviewResult>('run_review', { staged });
@@ -285,6 +397,56 @@ export async function runReview(staged: boolean): Promise<RunReviewResult> {
     ok: true,
     message: staged ? 'Preview mode: staged review would start.' : 'Preview mode: working tree review would start.',
     sessionId: 'preview',
+  };
+}
+
+export async function startReviewRun(staged: boolean): Promise<ReviewRunSnapshot> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<ReviewRunSnapshot>('start_review_run', { staged });
+  return {
+    runId: `preview-${Date.now()}`,
+    staged,
+    status: 'completed',
+    message: staged ? 'Preview mode: staged review would start.' : 'Preview mode: working tree review would start.',
+    sessionId: 'preview',
+    startedAt: String(Date.now()),
+    completedAt: String(Date.now()),
+    events: [
+      {
+        kind: 'preview',
+        message: 'Browser preview does not run the CLI.',
+        timestamp: String(Date.now()),
+      },
+    ],
+  };
+}
+
+export async function getReviewRun(runId: string): Promise<ReviewRunSnapshot> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<ReviewRunSnapshot>('get_review_run', { runId });
+  return {
+    runId,
+    staged: true,
+    status: 'completed',
+    message: 'Preview run completed.',
+    sessionId: 'preview',
+    startedAt: String(Date.now()),
+    completedAt: String(Date.now()),
+    events: [],
+  };
+}
+
+export async function cancelReviewRun(runId: string): Promise<ReviewRunSnapshot> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<ReviewRunSnapshot>('cancel_review_run', { runId });
+  return {
+    runId,
+    staged: true,
+    status: 'cancelled',
+    message: 'Preview run cancelled.',
+    startedAt: String(Date.now()),
+    completedAt: String(Date.now()),
+    events: [],
   };
 }
 
@@ -304,8 +466,117 @@ export async function writeConfig(raw: string): Promise<DesktopConfig> {
   return { path: '.ca/config.json', raw };
 }
 
+export async function validateConfig(raw: string): Promise<ConfigValidation> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<ConfigValidation>('validate_config', { raw });
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return {
+      valid: typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed),
+      errors: typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? [] : ['Config must be an object.'],
+      warnings: [],
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [error instanceof Error ? error.message : String(error)],
+      warnings: [],
+    };
+  }
+}
+
+export async function getProviderStatus(): Promise<ProviderStatus[]> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<ProviderStatus[]>('get_provider_status');
+  return [
+    { name: 'openai', kind: 'api', envVar: 'OPENAI_API_KEY', configured: false },
+    { name: 'anthropic', kind: 'api', envVar: 'ANTHROPIC_API_KEY', configured: false },
+    { name: 'codex', kind: 'cli', binary: 'codex', configured: false },
+  ];
+}
+
+export async function getMcpStatus(): Promise<McpStatus> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<McpStatus>('get_mcp_status');
+  return {
+    command: 'codeagora-mcp',
+    tools: ['review_quick', 'review_full', 'review_pr', 'dry_run', 'explain_session', 'leaderboard', 'stats', 'config_get', 'config_set'],
+    clientSnippet: JSON.stringify({ mcpServers: { codeagora: { command: 'codeagora-mcp', args: [] } } }, null, 2),
+  };
+}
+
+export async function getGitHubActionStatus(): Promise<GitHubActionStatus> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<GitHubActionStatus>('get_github_action_status');
+  return {
+    workflowCount: 0,
+    codeagoraWorkflowCount: 0,
+    workflows: [],
+    recommendedSnippet: 'name: CodeAgora Review',
+  };
+}
+
+export async function getEvidenceStatus(): Promise<EvidenceStatus> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<EvidenceStatus>('get_evidence_status');
+  return {
+    hasReleaseEvidence: false,
+    hasBenchmarkReport: false,
+    hasEvidenceManifest: false,
+  };
+}
+
 export async function getRepoInfo(): Promise<RepoInfo> {
   const invoke = getInvoke();
   if (invoke) return invoke<RepoInfo>('get_repo_info');
-  return { path: window.location.pathname.includes('/packages/desktop/') ? 'browser preview' : window.location.pathname };
+  return {
+    path: window.location.pathname.includes('/packages/desktop/') ? 'browser preview' : window.location.pathname,
+    gitRoot: undefined,
+    isGitRepo: false,
+    branch: 'preview',
+    headSha: undefined,
+    dirtyFileCount: 0,
+    hasConfig: true,
+    configPath: '.ca/config.json',
+    reviewIgnorePath: undefined,
+    reviewRulesPath: undefined,
+    sessionsRoot: '.ca/sessions',
+    sessionCount: fallbackSessions().length,
+    trusted: false,
+    trustReason: 'Browser preview uses fallback data and cannot execute local reviews.',
+  };
+}
+
+export async function openRepository(path: string): Promise<RepoInfo> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<RepoInfo>('open_repository', { path });
+  return {
+    ...(await getRepoInfo()),
+    path,
+    trusted: false,
+    trustReason: 'Browser preview cannot open local repositories through Tauri.',
+  };
+}
+
+export async function getCommandContract(): Promise<DesktopCommandContract[]> {
+  const invoke = getInvoke();
+  if (invoke) return invoke<DesktopCommandContract[]>('get_command_contract');
+  return [
+    {
+      name: 'get_repo_info',
+      classification: 'read-only',
+      readsProject: true,
+      mutatesProject: false,
+      spawnsProcess: false,
+      notes: 'Browser preview fallback.',
+    },
+    {
+      name: 'run_review',
+      classification: 'process-execution',
+      readsProject: true,
+      mutatesProject: true,
+      spawnsProcess: true,
+      notes: 'Disabled in browser preview.',
+    },
+  ];
 }

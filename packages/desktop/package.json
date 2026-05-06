@@ -7,6 +7,8 @@
   "scripts": {
     "build": "tsup && node scripts/copy-assets.mjs",
     "dev": "pnpm build && echo \"Open packages/desktop/dist/index.html for the scaffold preview\"",
+    "evidence": "pnpm smoke && node scripts/evidence.mjs",
+    "smoke": "pnpm build && node scripts/smoke.mjs",
     "tauri:check": "pnpm build && cd src-tauri && cargo check",
     "tauri:dev": "pnpm build && cd src-tauri && cargo run",
     "typecheck": "tsc --noEmit"
