@@ -39,3 +39,44 @@ describe('CLI/MCP JSON formatting parity', () => {
     expect(mcpJson.schemaVersion).toBe('codeagora.review.v1');
   });
 });
+
+describe('CLI/MCP SARIF formatting parity', () => {
+  it('uses full evidenceDocs through both surfaces', async () => {
+    const result = {
+      ...makePipelineResult(),
+      summary: {
+        ...makePipelineResult().summary!,
+        topIssues: [
+          { severity: 'WARNING', filePath: 'src/top.ts', lineRange: [1, 1] as [number, number], title: 'Top issue only' },
+        ],
+      },
+      evidenceDocs: [
+        {
+          issueTitle: 'Full issue A',
+          problem: 'A',
+          evidence: ['A'],
+          severity: 'WARNING',
+          suggestion: 'Fix A',
+          filePath: 'src/a.ts',
+          lineRange: [1, 1] as [number, number],
+        },
+        {
+          issueTitle: 'Full issue B',
+          problem: 'B',
+          evidence: ['B'],
+          severity: 'CRITICAL',
+          suggestion: 'Fix B',
+          filePath: 'src/b.ts',
+          lineRange: [2, 2] as [number, number],
+        },
+      ],
+    } as PipelineResult;
+
+    const cliSarif = JSON.parse(formatOutput(result, 'sarif'));
+    const mcpSarif = JSON.parse(await formatReviewResult(result, 'sarif'));
+
+    expect(cliSarif.runs[0].results).toHaveLength(2);
+    expect(mcpSarif.runs[0].results).toEqual(cliSarif.runs[0].results);
+    expect(JSON.stringify(cliSarif)).not.toContain('Top issue only');
+  });
+});
