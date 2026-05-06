@@ -111,6 +111,7 @@ closed.
 - 2026-05-04: Stable-candidate live benchmark evidence was captured in run 25317360402 with 20/20 successful fixtures, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
 - 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/RELEASE_CHECKLIST.md`, `docs/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
 - 2026-05-04: Desktop scope hygiene was re-checked across README, changelog, release docs, architecture docs, extension docs, and postinstall messaging. Desktop remains a private preview outside stable CLI/GitHub/MCP release gates.
+- 2026-05-06: `v0.1.0-beta.1` is published as a GitHub prerelease and npm `beta` dist-tag release. The next gate is not stable promotion; it is a release-candidate evidence bundle with tarball-installed package smokes, current release evidence manifest, and refreshed live-only evidence where stable claims depend on it.
 
 ## P0: Release-Blocking Correctness
 
@@ -207,7 +208,7 @@ closed.
 
 - Define versioned required artifacts such as `metadata.json`, `result.json`, verdict/report markdown, telemetry, and optional raw logs.
 - Require every terminal path to persist compatible artifacts: normal review, quick/skip-head, cache hit, empty diff, auto-approve, degraded/error.
-- Add session contract tests for `sessions list/show`, `explain`, `replay`, `trace`, `costs`, MCP explain, and desktop session browsing fixtures.
+- Add session contract tests for `sessions list/show`, `explain`, `replay`, `trace`, `costs`, and MCP explain. Desktop session browsing remains private-preview validation and must not block stable CLI/GitHub/MCP release gates until desktop graduates into the supported surface.
 - Document migration behavior for old sessions or mark old sessions best-effort only.
 
 **Likely files:**

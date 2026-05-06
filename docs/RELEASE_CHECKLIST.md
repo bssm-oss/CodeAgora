@@ -1,12 +1,12 @@
-# Beta Release Checklist
+# Release Checklist
 
-This checklist verifies `0.1.0-beta.1` release readiness and keeps publish operations behind an explicit final approval stop.
+This checklist records the completed `0.1.0-beta.1` prerelease gate and defines the repeatable evidence procedure for the next release-candidate or stable promotion review.
 
 ## Scope Guardrails
 
-The beta readiness gate itself does not create GitHub tags, create GitHub Releases, publish npm packages, promote npm dist-tags, publish to marketplaces, or promote the GitHub Action release ref. Those operations are intentionally separate from readiness verification.
+Readiness verification is separate from any future stable release, npm `latest` dist-tag promotion, marketplace publication, or GitHub Action stable-ref promotion.
 
-Before the final `v0.1.0-beta.1` tag is pushed, confirm the intended package versions, dist-tags, package contents, and npm token availability. Prerelease packages must publish under the `beta` npm dist-tag, never `latest`.
+Before any future tag is pushed, confirm the intended package versions, dist-tags, package contents, and npm token availability. Prerelease packages must publish under the `beta` npm dist-tag, never `latest`.
 
 ## Release Surfaces
 
@@ -31,6 +31,8 @@ Before the final `v0.1.0-beta.1` tag is pushed, confirm the intended package ver
 13. Confirm release workflow publish jobs require the `npm-publish` environment, npm provenance, npm version preflight, and uploaded release evidence artifacts.
 14. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
 15. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
+
+For `0.1.0-beta.1`, the tag, prerelease GitHub Release, and npm `beta` dist-tag publication are complete. For the next candidate, rerun this checklist with the target version and keep stable promotion blocked until the `--require=rc` evidence manifest is complete and the live-only register is current.
 
 ## Evidence
 

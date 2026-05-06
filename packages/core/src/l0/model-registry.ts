@@ -18,11 +18,11 @@ interface RawRankingsData {
     source: string;
     model_id: string;
     name: string;
-    swe_bench?: string;
+    swe_bench?: string | null;
     tier?: string;
     context?: string;
-    aa_intelligence?: number;
-    aa_speed_tps?: number;
+    aa_intelligence?: number | null;
+    aa_speed_tps?: number | null;
     [key: string]: unknown;
   }>;
 }
@@ -42,11 +42,11 @@ const RawRankingsDataSchema = z.object({
     source: z.string(),
     model_id: z.string(),
     name: z.string(),
-    swe_bench: z.string().optional(),
+    swe_bench: z.string().nullable().optional(),
     tier: z.string().optional(),
     context: z.string().optional(),
-    aa_intelligence: z.number().optional(),
-    aa_speed_tps: z.number().optional(),
+    aa_intelligence: z.number().nullable().optional(),
+    aa_speed_tps: z.number().nullable().optional(),
   }).passthrough()),
 });
 
@@ -94,9 +94,9 @@ export function initFromData(
       context: raw.context ?? 'unknown',
       family: extractFamily(modelId),
       isReasoning: isReasoningModel(modelId),
-      sweBench: raw.swe_bench,
-      aaIntelligence: raw.aa_intelligence,
-      aaSpeedTps: raw.aa_speed_tps,
+      sweBench: raw.swe_bench ?? undefined,
+      aaIntelligence: raw.aa_intelligence ?? undefined,
+      aaSpeedTps: raw.aa_speed_tps ?? undefined,
     };
 
     map.set(buildKey(raw.source, modelId), meta);
@@ -127,10 +127,31 @@ export async function loadRegistry(): Promise<void> {
   const path = await import('path');
   const { fileURLToPath } = await import('url');
 
-  const dataDir = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '../../../shared/src/data'
-  );
+  const dirname = path.dirname(fileURLToPath(import.meta.url));
+  const candidateDataDirs = [
+    // Self-contained bundle package: packages/mcp/dist/data
+    path.resolve(dirname, 'data'),
+    // Workspace package build: packages/core/dist/l0 -> packages/shared/src/data
+    path.resolve(dirname, '../../../shared/src/data'),
+    // Bundled root/MCP package build: packages/cli/dist or packages/mcp/dist -> packages/shared/src/data
+    path.resolve(dirname, '../../shared/src/data'),
+  ];
+
+  let dataDir: string | undefined;
+  for (const candidate of candidateDataDirs) {
+    try {
+      await fs.access(path.join(candidate, 'model-rankings.json'));
+      await fs.access(path.join(candidate, 'groq-models.json'));
+      dataDir = candidate;
+      break;
+    } catch {
+      // Try the next runtime layout.
+    }
+  }
+
+  if (!dataDir) {
+    throw new Error('Model registry runtime data files not found');
+  }
 
   const [rankingsRaw, groqRaw] = await Promise.all([
     fs.readFile(path.join(dataDir, 'model-rankings.json'), 'utf-8'),

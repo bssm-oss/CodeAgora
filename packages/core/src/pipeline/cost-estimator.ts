@@ -28,9 +28,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Lazy-loaded pricing cache (avoids blocking readFileSync at module level)
 let _pricingCache: Record<string, PricingEntry> | null = null;
 
+async function readRuntimeDataFile(fileName: string): Promise<string> {
+  const candidates = [
+    // Self-contained bundle package: packages/mcp/dist/data
+    path.join(__dirname, 'data', fileName),
+    // Workspace package build: packages/core/dist/pipeline -> packages/shared/src/data
+    path.join(__dirname, '../../../shared/src/data', fileName),
+    // Bundled root/MCP package build: packages/cli/dist or packages/mcp/dist -> packages/shared/src/data
+    path.join(__dirname, '../../shared/src/data', fileName),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, 'utf-8');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') throw error;
+    }
+  }
+
+  throw new Error(`Runtime data file not found: ${fileName}`);
+}
+
 async function getPricing(): Promise<Record<string, PricingEntry>> {
   if (!_pricingCache) {
-    const raw = await readFile(path.join(__dirname, '../../../shared/src/data/pricing.json'), 'utf-8');
+    const raw = await readRuntimeDataFile('pricing.json');
     _pricingCache = JSON.parse(raw);
   }
   return _pricingCache!;

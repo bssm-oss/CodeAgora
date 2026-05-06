@@ -36,10 +36,11 @@
   },
   "files": [
     "dist/**/*.js",
+    "dist/data/*.json",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && mkdir -p dist/data && cp ../shared/src/data/*.json dist/data/",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

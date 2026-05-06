@@ -114,6 +114,9 @@ assertIncludes(mcpFiles, [
   'package.json',
   'README.md',
   'dist/index.js',
+  'dist/data/model-rankings.json',
+  'dist/data/groq-models.json',
+  'dist/data/pricing.json',
 ], 'mcp');
 assertExcludes(mcpFiles, [
   /^\.env$/,

@@ -1,8 +1,8 @@
 # P4-P6 Beta Readiness Summary
 
-Updated: 2026-05-04
+Updated: 2026-05-06
 
-This document summarizes the beta-readiness gates added for the production-readiness P4-P6 track. The current target is `0.1.0-beta.1`. Readiness validation is intentionally separated from irreversible release operations: final tag creation, GitHub Release creation, npm publishing, npm dist-tag promotion, and marketplace distribution remain explicit approval stops.
+This document summarizes the beta-readiness gates added for the production-readiness P4-P6 track. The `0.1.0-beta.1` release has been published as a prerelease. Stable or `latest` promotion remains separate and requires a fresh release-candidate evidence bundle plus the live-only evidence described below.
 
 ## P4: Benchmark Gate
 
@@ -68,13 +68,13 @@ It verifies:
 - CLI `--help` smoke
 - MCP initialize plus `tools/list` smoke
 
-The release workflow runs the deterministic benchmark gate and beta smoke before publish-capable steps. It also computes npm publish tags from package versions so prereleases publish under `beta` rather than `latest`. The checklist in `docs/RELEASE_CHECKLIST.md` documents manual guardrails for actual release operations.
+The release workflow runs the deterministic benchmark gate and beta smoke before publish-capable steps. It also computes npm publish tags from package versions so prereleases publish under `beta` rather than `latest`. The checklist in `docs/RELEASE_CHECKLIST.md` now serves as the repeatable release-candidate evidence procedure.
 
 MCP onboarding is now package-local in `packages/mcp/README.md`, and the MCP server version is sourced from `packages/mcp/package.json` rather than a hard-coded string.
 
 ## Beta Positioning
 
-Beta means the CLI, GitHub Action, and MCP package are ready for broader user feedback on the supported surfaces, while APIs, benchmark thresholds, and provider behavior may still change before a stable release. The desktop app remains a private preview outside the beta support claim. Actual npm publishing, GitHub release creation, tag creation, and dist-tag promotion remain separate approval steps, and prerelease npm publishes must use the `beta` dist-tag.
+Beta means the CLI, GitHub Action, and MCP package are ready for broader user feedback on the supported surfaces, while APIs, benchmark thresholds, and provider behavior may still change before a stable release. The desktop app remains a private preview outside the beta support claim. Stable npm publishing, GitHub release wording, and `latest` dist-tag promotion remain separate approval steps; prerelease npm publishes must continue to use the `beta` dist-tag.
 
 ## Verification Evidence
 

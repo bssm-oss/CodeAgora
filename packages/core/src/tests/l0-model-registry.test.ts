@@ -83,6 +83,26 @@ describe('initFromData', () => {
     const map = initFromData(noCtx, { source: 'groq', models: [] });
     expect(map.get('openrouter/test/model')?.context).toBe('unknown');
   });
+
+  it('normalizes nullable ranking metrics from harvested model data', () => {
+    const nullableMetrics = {
+      source: 'test',
+      models: [{
+        source: 'openrouter',
+        model_id: 'test/nullable-model',
+        name: 'Nullable Model',
+        swe_bench: null,
+        aa_intelligence: null,
+        aa_speed_tps: null,
+      }],
+    };
+
+    const map = initFromData(nullableMetrics, { source: 'groq', models: [] });
+    const model = map.get('openrouter/test/nullable-model');
+    expect(model?.sweBench).toBeUndefined();
+    expect(model?.aaIntelligence).toBeUndefined();
+    expect(model?.aaSpeedTps).toBeUndefined();
+  });
 });
 
 // ============================================================================
