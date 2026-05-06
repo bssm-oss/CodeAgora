@@ -82,7 +82,9 @@ jobs:
           pnpm --filter @codeagora/mcp pack --dry-run 2>&1 | tee .sisyphus/evidence/package-mcp-dry-run.log
 
       - name: Generate evidence manifest
-        run: pnpm evidence:manifest -- --require=rc
+        run: |
+          REQUIRED_TIER=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-') ? 'beta' : 'stable');")
+          pnpm evidence:manifest -- --require="$REQUIRED_TIER"
 
       - name: Upload release evidence
         if: always()
@@ -121,6 +123,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           body: |
             Release evidence artifact: `release-evidence-${{ github.ref_name }}`

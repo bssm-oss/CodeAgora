@@ -73,9 +73,14 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
   return { diff, pr, sha, repo, token, failOnReject, maxDiffLines, postResults, configPath, baseSha, baseRepo, headRepo };
 }
 
-export function hasProviderCredentials(env: NodeJS.ProcessEnv = process.env): boolean {
+export function hasProviderCredentials(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { allowGitHubTokenAsProvider?: boolean } = {},
+): boolean {
+  const allowGitHubToken = options.allowGitHubTokenAsProvider ?? true;
   return Object.values(PROVIDER_ENV_VARS).some((envVar) => {
-    if (envVar === 'GITHUB_TOKEN' || envVar === 'GITHUB_COPILOT_TOKEN') return false;
+    if (envVar === 'GITHUB_TOKEN' && !allowGitHubToken) return false;
+    if (envVar === 'GITHUB_COPILOT_TOKEN') return false;
     return Boolean(env[envVar]);
   });
 }
@@ -88,6 +93,8 @@ export function determineActionPolicy(
   inputs: ActionInputs,
   env: NodeJS.ProcessEnv = process.env,
 ): ActionPolicy {
+  const fork = isForkContext(inputs);
+
   if (!inputs.token && inputs.postResults) {
     return {
       shouldRunReview: false,
@@ -98,12 +105,12 @@ export function determineActionPolicy(
     };
   }
 
-  if (!hasProviderCredentials(env)) {
+  if (!hasProviderCredentials(env, { allowGitHubTokenAsProvider: !fork })) {
     return {
       shouldRunReview: false,
       shouldPostResults: false,
       degraded: true,
-      degradedReason: isForkContext(inputs) ? 'fork-missing-provider-secrets' : 'missing-provider-secrets',
+      degradedReason: fork ? 'fork-missing-provider-secrets' : 'missing-provider-secrets',
       verdictOverride: 'SKIPPED',
     };
   }

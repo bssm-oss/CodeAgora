@@ -1235,6 +1235,15 @@ fn repo_info_for_root(root: &Path) -> Result<RepoInfo, String> {
     })
 }
 
+fn require_trusted_repo(root: &Path) -> Result<(), String> {
+    let info = repo_info_for_root(root)?;
+    if info.trusted {
+        Ok(())
+    } else {
+        Err(info.trust_reason)
+    }
+}
+
 #[tauri::command]
 fn open_repository(path: String, state: State<'_, WorkspaceState>) -> Result<RepoInfo, String> {
     let root = resolve_workspace_path(&path)?;
@@ -1333,6 +1342,7 @@ fn run_review(
     }
 
     let root = active_repo_root(&state)?;
+    require_trusted_repo(&root)?;
     let output = run_agora(&root, &args).map_err(|error| error.to_string())?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -1367,6 +1377,7 @@ fn start_review_run(
     state: State<'_, WorkspaceState>,
 ) -> Result<ReviewRunSnapshot, String> {
     let root = active_repo_root(&state)?;
+    require_trusted_repo(&root)?;
     let mut args = vec!["review", "--json-stream"];
     if staged {
         args.push("--staged");
@@ -1610,6 +1621,7 @@ fn get_evidence_status(state: State<'_, WorkspaceState>) -> Result<EvidenceStatu
 #[tauri::command]
 fn write_config(raw: String, state: State<'_, WorkspaceState>) -> Result<DesktopConfig, String> {
     let root = active_repo_root(&state)?;
+    require_trusted_repo(&root)?;
     write_config_for_root(&raw, &root)
 }
 
@@ -1839,5 +1851,12 @@ mod tests {
         let root = fixture_workspace();
         let error = session_detail_value(&root, "../outside").expect_err("invalid session id");
         assert!(error.contains("Invalid session id"));
+    }
+
+    #[test]
+    fn desktop_app_e2e_blocks_mutating_commands_for_untrusted_workspace() {
+        let root = temp_workspace("untrusted");
+        let error = require_trusted_repo(&root).expect_err("non-git workspace should be blocked");
+        assert!(error.contains("No git repository detected"));
     }
 }

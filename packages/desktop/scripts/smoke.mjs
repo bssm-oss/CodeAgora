@@ -25,6 +25,7 @@ assert(fs.existsSync(path.join(root, 'dist/index.html')), 'dist/index.html is mi
 assert(fs.existsSync(path.join(root, 'dist/main.js')), 'dist/main.js is missing');
 assert(tauriConfig.version === packageJson.version, 'Tauri config version does not match package version');
 assert(tauriConfig.productName === 'CodeAgora', 'Unexpected Tauri product name');
+assert(typeof tauriConfig.app?.security?.csp === 'string' && tauriConfig.app.security.csp.includes("default-src 'self'"), 'Tauri CSP must be enabled for desktop RC gates');
 
 const requiredCommands = [
   'open_repository',

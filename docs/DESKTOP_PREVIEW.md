@@ -30,6 +30,8 @@ This runs:
 - `pnpm --filter @codeagora/desktop typecheck`
 - `pnpm --filter @codeagora/desktop smoke`
 - `pnpm --filter @codeagora/desktop tauri:check`
+- `pnpm --filter @codeagora/desktop app:e2e`
+- `pnpm --filter @codeagora/desktop macos:webdriver-e2e`
 - `pnpm --filter @codeagora/desktop bundle:smoke`
 - `pnpm --filter @codeagora/desktop evidence`
 

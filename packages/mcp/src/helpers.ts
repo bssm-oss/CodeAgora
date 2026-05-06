@@ -120,12 +120,7 @@ export async function runReviewRaw(
 /**
  * Run review and return compact result (for MCP tool responses).
  */
-export async function runReviewCompact(
-  diff: string,
-  options: ReviewOptions = {},
-): Promise<CompactReviewResult> {
-  const result = await runReviewRaw(diff, options);
-
+export function compactFromPipelineResult(result: PipelineResult): CompactReviewResult {
   if (result.status !== 'success' || !result.summary) {
     return {
       decision: 'ERROR',
@@ -147,3 +142,9 @@ export async function runReviewCompact(
   }));
 }
 
+export async function runReviewCompact(
+  diff: string,
+  options: ReviewOptions = {},
+): Promise<CompactReviewResult> {
+  return compactFromPipelineResult(await runReviewRaw(diff, options));
+}

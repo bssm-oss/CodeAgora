@@ -442,7 +442,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       const appKit = await createAppOctokit(prContext.owner, prContext.repo);
       if (appKit && !options.quiet) console.error(t('cli.info.usingAppAuth'));
       const postResult = await postReview(ghConfig, prContext.prNumber, review, appKit ?? undefined);
-      await setCommitStatus(ghConfig, prContext.headSha, postResult.verdict, postResult.reviewUrl);
+      await setCommitStatus(ghConfig, prContext.headSha, postResult.verdict, postResult.reviewUrl, appKit ?? undefined);
       if (!options.quiet) console.error(t('cli.info.reviewPosted', { url: postResult.reviewUrl }));
     }
 

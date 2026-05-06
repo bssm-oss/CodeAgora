@@ -65,6 +65,13 @@ vi.mock('@codeagora/core/session/queries.js', () => ({
 }));
 
 vi.mock('../helpers.js', () => ({
+  compactFromPipelineResult: vi.fn((result: { status?: string; summary?: { decision?: string } }) => ({
+    decision: result.summary?.decision ?? 'ERROR',
+    reasoning: result.status === 'success' ? 'OK' : 'Pipeline failed',
+    issues: [],
+    summary: result.status === 'success' ? 'ok' : 'error',
+    sessionId: 'raw-compact',
+  })),
   runReviewCompact: vi.fn(),
   runReviewRaw: vi.fn(),
   getStagedDiff: vi.fn(),
@@ -213,6 +220,76 @@ describe('review_pr handler', () => {
     expect(execCalls).toContainEqual(['git', ['remote', 'get-url', 'origin'], { cwd }]);
     expect(execCalls).toContainEqual(['gh', ['pr', 'diff', 'https://github.com/owner/repo/pull/7'], { cwd }]);
     expect(runReviewCompact).toHaveBeenCalledWith(expect.stringContaining('diff --git'), expect.objectContaining({ repoPath: cwd }));
+  });
+
+  it('parses dotted repository names from git remotes', async () => {
+    const cwd = await fs.realpath(process.cwd());
+    const execCalls: Array<[string, string[], unknown]> = [];
+    const execFile = vi.fn();
+    Object.assign(execFile, {
+      [promisify.custom]: async (cmd: string, args: string[], options?: unknown) => {
+        execCalls.push([cmd, args, options]);
+        if (cmd === 'git' && args[0] === 'rev-parse') {
+          return { stdout: `${cwd}\n`, stderr: '' };
+        }
+        if (cmd === 'git') {
+          return { stdout: 'git@github.com:owner/service.api.git\n', stderr: '' };
+        }
+        if (cmd === 'gh') {
+          return { stdout: 'diff --git a/file.ts b/file.ts\n+change\n', stderr: '' };
+        }
+        throw new Error(`unexpected command ${cmd}`);
+      },
+    });
+    vi.doMock('child_process', () => ({ execFile }));
+
+    const { runReviewCompact } = await import('../helpers.js');
+    vi.mocked(runReviewCompact).mockResolvedValue({
+      decision: 'ACCEPT', reasoning: 'OK', issues: [], summary: 'ok', sessionId: '001',
+    });
+
+    const { registerReviewPr } = await import('../tools/review-pr.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewPr(server as never);
+
+    const result = await getHandler('review_pr')({ pr_number: 7, repo_path: process.cwd() });
+
+    if (result.isError) {
+      throw new Error(result.content[0].text);
+    }
+    expect(execCalls).toContainEqual(['gh', ['pr', 'diff', 'https://github.com/owner/service.api/pull/7'], { cwd }]);
+  });
+
+  it('posts review without running the pipeline twice for compact responses', async () => {
+    const execFile = vi.fn();
+    Object.assign(execFile, {
+      [promisify.custom]: async (cmd: string) => {
+        if (cmd === 'gh') {
+          return { stdout: 'diff --git a/file.ts b/file.ts\n+change\n', stderr: '' };
+        }
+        throw new Error(`unexpected command ${cmd}`);
+      },
+    });
+    vi.doMock('child_process', () => ({ execFile }));
+
+    const { compactFromPipelineResult, runReviewCompact, runReviewRaw } = await import('../helpers.js');
+    const { postToGitHub } = await import('../post-actions.js');
+    vi.mocked(runReviewRaw).mockResolvedValue({ status: 'success', summary: { decision: 'ACCEPT' } } as never);
+    vi.mocked(postToGitHub).mockResolvedValue({});
+
+    const { registerReviewPr } = await import('../tools/review-pr.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewPr(server as never);
+
+    const result = await getHandler('review_pr')({ pr_url: 'https://github.com/owner/repo/pull/7', post_review: true });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBeUndefined();
+    expect(parsed.decision).toBe('ACCEPT');
+    expect(runReviewRaw).toHaveBeenCalledTimes(1);
+    expect(postToGitHub).toHaveBeenCalledTimes(1);
+    expect(compactFromPipelineResult).toHaveBeenCalledTimes(1);
+    expect(runReviewCompact).not.toHaveBeenCalled();
   });
 
   it('returns structured error when post_review fails', async () => {

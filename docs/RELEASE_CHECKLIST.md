@@ -64,15 +64,16 @@ Use the following stable filenames for locally captured release-candidate eviden
 
 `cross-surface-parity.log` must show the deterministic CLI/MCP/GitHub Action parity fixture passing. `beta-smoke.log` remains the provider-free packed CLI/MCP/Action runtime smoke.
 
-`desktop-gate.log` must show desktop typecheck, desktop smoke, Tauri check, and
-desktop evidence generation passing. Desktop signing, notarization, updater, and
-public distribution remain deferred private-preview decisions recorded in
+`desktop-gate.log` must show desktop typecheck, desktop smoke, Tauri check,
+backend app E2E, macOS WebDriver E2E on macOS preview hardware, desktop evidence
+generation, and bundle smoke passing. Desktop signing, notarization, updater,
+and public distribution remain deferred private-preview decisions recorded in
 `docs/DESKTOP_PREVIEW.md` and `desktop-evidence-manifest.json`.
 
-Generate the manifest after the logs are captured:
+Generate the RC manifest after the logs are captured:
 
 ```bash
-pnpm evidence:manifest -- --require=beta
+pnpm evidence:manifest -- --require=rc
 ```
 
 See `docs/RELEASE_EVIDENCE.md` for the skipped/live-only register and stricter

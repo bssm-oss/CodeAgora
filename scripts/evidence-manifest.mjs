@@ -24,8 +24,8 @@ const EXPECTED_EVIDENCE = [
   { name: 'desktop-gate', filename: 'desktop-gate.log', command: 'pnpm rc:desktop-gate', tier: 'rc', redactionStatus: 'safe-to-publish' },
   { name: 'desktop-evidence-manifest', filename: 'desktop-evidence-manifest.json', command: 'pnpm desktop:evidence', tier: 'rc', redactionStatus: 'safe-to-publish' },
   { name: 'security-regression', filename: 'security-regression.log', command: 'pnpm test:security', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'live-benchmark-report', filename: 'live-benchmark-report.md', command: 'pnpm bench:fn:run with provider secrets', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
-  { name: 'live-github-action-pr-smoke', filename: 'live-github-action-pr-smoke.md', command: 'manual GitHub Action PR smoke matrix', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
+  { name: 'live-benchmark-report', filename: 'live-benchmark-report.md', sourcePath: path.join('docs', 'live-benchmark-report.md'), command: 'pnpm bench:fn:run with provider secrets', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
+  { name: 'live-github-action-pr-smoke', filename: 'live-github-action-pr-smoke.md', sourcePath: path.join('docs', 'live-github-action-pr-smoke.md'), command: 'manual GitHub Action PR smoke matrix', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
 ];
 
 function parseArgs(argv) {
@@ -87,7 +87,7 @@ function tierIncluded(entryTier, requiredTier) {
 function buildManifest(options) {
   const evidenceDir = path.resolve(options.evidenceDir);
   const entries = EXPECTED_EVIDENCE.map((entry) => {
-    const artifactPath = path.join(evidenceDir, entry.filename);
+    const artifactPath = entry.sourcePath ? path.resolve(entry.sourcePath) : path.join(evidenceDir, entry.filename);
     const exists = fs.existsSync(artifactPath);
     const stat = exists ? fs.statSync(artifactPath) : undefined;
     return {
