@@ -34,7 +34,8 @@ describe('release evidence manifest', () => {
       const liveBenchmark = manifest.entries.find((entry: { name: string }) => entry.name === 'live-benchmark-report');
       expect(liveBenchmark.liveOnly).toBe(true);
       expect(liveBenchmark.tier).toBe('stable');
-      expect(liveBenchmark.exists).toBe(false);
+      expect(liveBenchmark.path).toBe('docs/live-benchmark-report.md');
+      expect(liveBenchmark.exists).toBe(true);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

@@ -96,7 +96,7 @@ Observed results for the 2026-05-04 readiness branch:
 - `pnpm bench:ci`: passed; 20 fixtures validated
 - targeted release/docs readiness tests: passed
 - `pnpm release:beta-smoke`: passed; package dry-run, CLI smoke, MCP smoke all passed
-- `verify-package-contents`: passed; root files 12, MCP files 3
+- `verify-package-contents`: passed; root files 12, MCP files 8, shared runtime data files 103
 - live `bench:fn:run`: passed in GitHub Actions run 25317360402; see `docs/live-benchmark-report.md`
 
 Evidence logs may be stored under `.sisyphus/evidence/` for local audit. Stable-candidate live evidence should be linked to GitHub Actions artifacts or concise docs summaries rather than committed raw provider output.

@@ -131,13 +131,11 @@ describe('github-action production policy', () => {
     });
   });
 
-  it('skips same-repository PRs without provider credentials with a clear reason', () => {
+  it('runs same-repository PRs with only GITHUB_TOKEN for GitHub Models', () => {
     expect(determineActionPolicy(baseInputs, env({ GITHUB_TOKEN: TOKEN }))).toEqual({
-      shouldRunReview: false,
-      shouldPostResults: false,
-      degraded: true,
-      degradedReason: 'missing-provider-secrets',
-      verdictOverride: 'SKIPPED',
+      shouldRunReview: true,
+      shouldPostResults: true,
+      degraded: false,
     });
   });
 
@@ -163,8 +161,9 @@ describe('github-action production policy', () => {
     });
   });
 
-  it('detects provider credentials without treating GITHUB_TOKEN as an LLM secret', () => {
-    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }))).toBe(false);
+  it('detects provider credentials while allowing callers to exclude GITHUB_TOKEN', () => {
+    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }))).toBe(true);
+    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }), { allowGitHubTokenAsProvider: false })).toBe(false);
     expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN, OPENAI_API_KEY: 'sk-test' }))).toBe(true);
   });
 

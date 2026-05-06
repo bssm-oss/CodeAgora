@@ -26,12 +26,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['scripts/**/*.{js,mjs,ts}', '*.config.js', '*.config.ts'],
+    files: ['scripts/**/*.{js,mjs,ts}', 'packages/*/scripts/**/*.{js,mjs,ts}', '*.config.js', '*.config.ts'],
     languageOptions: {
       globals: {
         Buffer: 'readonly',
         clearTimeout: 'readonly',
         console: 'readonly',
+        fetch: 'readonly',
         process: 'readonly',
         setTimeout: 'readonly',
       },

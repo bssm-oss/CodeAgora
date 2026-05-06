@@ -5,7 +5,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { runReviewCompact, runReviewRaw, type ReviewOptions } from '../helpers.js';
+import { compactFromPipelineResult, runReviewCompact, runReviewRaw, type ReviewOptions } from '../helpers.js';
 import { formatReviewResult, postToGitHub, type OutputFormat } from '../post-actions.js';
 import { reviewOptionsSchema, postReviewSchema } from './shared-schema.js';
 import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
@@ -25,12 +25,12 @@ async function resolvePrUrl(prUrl?: string, prNumber?: number, repoPath?: string
   const execFile = promisify(execFileCb);
 
   const { stdout: remoteUrl } = await execFile('git', ['remote', 'get-url', 'origin'], repoPath ? { cwd: repoPath } : undefined);
-  const trimmed = String(remoteUrl).trim();
+  const trimmed = String(remoteUrl).trim().replace(/\/$/, '');
 
   // Parse owner/repo from git remote URL
   // Formats: https://github.com/owner/repo.git, git@github.com:owner/repo.git
-  const httpsMatch = trimmed.match(/github\.com\/([^/]+)\/([^/.]+)/);
-  const sshMatch = trimmed.match(/github\.com:([^/]+)\/([^/.]+)/);
+  const httpsMatch = trimmed.match(/^https?:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/);
+  const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/);
   const match = httpsMatch ?? sshMatch;
 
   if (!match) {
@@ -96,6 +96,9 @@ export function registerReviewPr(server: McpServer): void {
             const formatted = await formatReviewResult(rawResult, params.output_format as OutputFormat);
             return { content: [{ type: 'text' as const, text: formatted }] };
           }
+
+          const result = compactFromPipelineResult(rawResult);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         }
 
         const result = await runReviewCompact(diff, options);

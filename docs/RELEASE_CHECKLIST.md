@@ -13,6 +13,7 @@ Before any future tag is pushed, confirm the intended package versions, dist-tag
 1. Root CLI package: `@codeagora/review`, including the `codeagora` and `agora` binaries.
 2. MCP package: `@codeagora/mcp`, including the `codeagora-mcp` binary and package-local onboarding.
 3. GitHub Action: repo-native composite Action backed by `dist/action.js`.
+4. Desktop private preview: `@codeagora/desktop` Tauri app evidence only. It is not a stable public desktop support claim.
 
 ## Beta Gates
 
@@ -31,6 +32,7 @@ Before any future tag is pushed, confirm the intended package versions, dist-tag
 13. Confirm release workflow publish jobs require the `npm-publish` environment, npm provenance, npm version preflight, and uploaded release evidence artifacts.
 14. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
 15. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
+16. For any RC after `0.1.0-beta.1`, run `pnpm rc:desktop-gate` and attach `.sisyphus/evidence/desktop-evidence-manifest.json` before RC handoff.
 
 For `0.1.0-beta.1`, the tag, prerelease GitHub Release, and npm `beta` dist-tag publication are complete. For the next candidate, rerun this checklist with the target version and keep stable promotion blocked until the `--require=rc` evidence manifest is complete and the live-only register is current.
 
@@ -53,6 +55,8 @@ Use the following stable filenames for locally captured release-candidate eviden
 | MCP package dry-run | `package-mcp-dry-run.log` | `pnpm --filter @codeagora/mcp pack --dry-run` |
 | Action smoke bundle | `action-smoke.log` | `pnpm build:action && pnpm release:beta-smoke` |
 | MCP smoke | `mcp-smoke.log` | covered by `pnpm release:beta-smoke` |
+| Desktop private-preview gate | `desktop-gate.log` | `pnpm rc:desktop-gate` |
+| Desktop evidence manifest | `desktop-evidence-manifest.json` | `pnpm desktop:evidence` |
 | Security regression gate | `security-regression.log` | `pnpm test:security` |
 | Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider credentials or GitHub Models |
 | Live GitHub Action PR smoke | `live-github-action-pr-smoke.md` | same-repository PR smoke plus degraded-path evidence |
@@ -60,10 +64,16 @@ Use the following stable filenames for locally captured release-candidate eviden
 
 `cross-surface-parity.log` must show the deterministic CLI/MCP/GitHub Action parity fixture passing. `beta-smoke.log` remains the provider-free packed CLI/MCP/Action runtime smoke.
 
-Generate the manifest after the logs are captured:
+`desktop-gate.log` must show desktop typecheck, desktop smoke, Tauri check,
+backend app E2E, macOS WebDriver E2E on macOS preview hardware, desktop evidence
+generation, and bundle smoke passing. Desktop signing, notarization, updater,
+and public distribution remain deferred private-preview decisions recorded in
+`docs/DESKTOP_PREVIEW.md` and `desktop-evidence-manifest.json`.
+
+Generate the RC manifest after the logs are captured:
 
 ```bash
-pnpm evidence:manifest -- --require=beta
+pnpm evidence:manifest -- --require=rc
 ```
 
 See `docs/RELEASE_EVIDENCE.md` for the skipped/live-only register and stricter
