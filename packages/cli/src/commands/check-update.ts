@@ -13,12 +13,13 @@ export function registerCheckUpdateCommand(program: Command): void {
       const current = process.env.CODEAGORA_VERSION ?? 'dev';
       console.log(`Current: v${current}`);
       try {
-        const res = await fetch('https://registry.npmjs.org/@codeagora%2Freview/latest');
+        const distTag = current.includes('-') ? 'beta' : 'latest';
+        const res = await fetch(`https://registry.npmjs.org/@codeagora%2Freview/${distTag}`);
         if (res.ok) {
           const data = await res.json() as { version: string };
           if (data.version !== current) {
-            console.log(`Latest:  v${data.version}`);
-            console.log(`\nUpdate:  npm i -g @codeagora/review@latest`);
+            console.log(`${distTag === 'beta' ? 'Beta' : 'Latest'}:  v${data.version}`);
+            console.log(`\nUpdate:  npm i -g @codeagora/review@${distTag}`);
           } else {
             console.log('Already up to date.');
           }
