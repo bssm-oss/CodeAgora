@@ -32,7 +32,7 @@ describe('beta release safety', () => {
     const rootVersion = readPackageVersion('package.json');
     const mcpVersion = readPackageVersion('packages/mcp/package.json');
 
-    expect(rootVersion).toBe('0.1.0-beta.1');
+    expect(rootVersion).toBe('0.1.0-beta.2');
     expect(mcpVersion).toBe(rootVersion);
   });
 
@@ -51,5 +51,21 @@ describe('beta release safety', () => {
       expect(content, `${file} should mention the beta Action ref`).toContain(actionRef);
       expect(content, `${file} should not use the legacy v2 Action ref`).not.toContain('uses: bssm-oss/CodeAgora@v2');
     }
+  });
+
+  it('keeps prerelease install examples on the beta dist-tag', () => {
+    const readme = readText('README.md');
+    const mcpReadme = readText('packages/mcp/README.md');
+    const extensions = readText('docs/EXTENSIONS.md');
+    const checkUpdate = readText('packages/cli/src/commands/check-update.ts');
+
+    expect(readme).toContain('npm i -g @codeagora/review@beta');
+    expect(readme).toContain('npm i -g @codeagora/mcp@beta');
+    expect(readme).toContain('"@codeagora/mcp@beta"');
+    expect(mcpReadme).toContain('npx -y @codeagora/mcp@beta');
+    expect(mcpReadme).toContain('"@codeagora/mcp@beta"');
+    expect(extensions).toContain('npm i -g @codeagora/mcp@beta');
+    expect(checkUpdate).toContain("current.includes('-') ? 'beta' : 'latest'");
+    expect(checkUpdate).toContain('@codeagora/review@${distTag}');
   });
 });
