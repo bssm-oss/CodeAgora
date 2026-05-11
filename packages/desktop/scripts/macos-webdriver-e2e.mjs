@@ -59,7 +59,7 @@ function fixtureWorkspace() {
     'jobs:',
     '  review:',
     '    steps:',
-    '      - uses: bssm-oss/CodeAgora@v0.1.0-beta.1',
+    '      - uses: bssm-oss/CodeAgora@v0.1.0-beta.2',
     '        with:',
     '          config-path: .ca/config.json',
     '',
