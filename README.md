@@ -19,7 +19,7 @@ Multiple LLMs review your code in parallel, debate conflicting opinions, then a 
 ## Quick Start
 
 ```bash
-npm i -g @codeagora/review
+npm i -g @codeagora/review@beta
 agora init
 git diff | agora review
 ```
@@ -91,7 +91,7 @@ An initial private preview scaffold lives in `packages/desktop` while the deskto
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp"]
+      "args": ["-y", "@codeagora/mcp@beta"]
     }
   }
 }
@@ -109,7 +109,7 @@ All extensions are optional — install only what you need.
 
 | Package | Install | What it does |
 |---------|---------|-------------|
-| [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp` | MCP server (9 tools) — integrates with Claude Code, Cursor, and any MCP-compatible IDE |
+| [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp@beta` | MCP server (9 tools) — integrates with Claude Code, Cursor, and any MCP-compatible IDE |
 
 The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions. Human-facing UI work is moving into the desktop app.
 
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: bssm-oss/CodeAgora@v0.1.0-beta.1
+      - uses: bssm-oss/CodeAgora@v0.1.0-beta.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
@@ -163,7 +163,7 @@ jobs:
 
 Every PR gets inline review comments, a summary verdict, and a commit status check. Add `review:skip` label to any PR to bypass.
 
-Note: Use the `v0.1.0-beta.1` Action tag for the scoped beta package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
+Note: Use the `v0.1.0-beta.2` Action tag for the scoped beta package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
 
 ---
 

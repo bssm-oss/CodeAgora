@@ -3,7 +3,7 @@
 Optional packages installed separately from the core `codeagora` CLI.
 
 ```bash
-npm i -g @codeagora/mcp            # MCP server (Claude Code, Cursor, etc.)
+npm i -g @codeagora/mcp@beta       # MCP server (Claude Code, Cursor, etc.)
 ```
 
 ## Desktop App
