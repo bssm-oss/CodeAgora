@@ -28,13 +28,13 @@ Before any future tag is pushed, confirm the intended package versions, dist-tag
 9. Run the GitHub Action smoke path through `pnpm build:action` and the release smoke script.
 10. Confirm `.github/workflows/release.yml` computes a prerelease publish tag and runs npm publish with `--tag beta` for beta versions.
 11. Confirm `.github/workflows/npm-dist-tags.yml` offers `beta` and blocks assigning prerelease versions to `latest`.
-12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-beta.1` for beta Action examples rather than legacy `@v2` or stable-looking refs.
+12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-beta.2` for beta Action examples rather than legacy `@v2` or stable-looking refs.
 13. Confirm release workflow publish jobs require the `npm-publish` environment, npm provenance, npm version preflight, and uploaded release evidence artifacts.
 14. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
 15. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
 16. For any RC after `0.1.0-beta.1`, run `pnpm rc:desktop-gate` and attach `.sisyphus/evidence/desktop-evidence-manifest.json` before RC handoff.
 
-For `0.1.0-beta.1`, the tag, prerelease GitHub Release, and npm `beta` dist-tag publication are complete. For the next candidate, rerun this checklist with the target version and keep stable promotion blocked until the `--require=rc` evidence manifest is complete and the live-only register is current.
+For `0.1.0-beta.1`, the tag, prerelease GitHub Release, and npm `beta` dist-tag publication are complete. For `0.1.0-beta.2`, rerun this checklist with the target version and keep stable promotion blocked until the `--require=rc` evidence manifest is complete and the live-only register is current.
 
 Current RC handoff status: on 2026-05-06, `origin/main` `1075f81` passed
 `pnpm rc:desktop-gate`, `pnpm test:security`, and

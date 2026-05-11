@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-beta.2 (2026-05-11)
+
+### Beta Release Preparation
+- Promoted workspace package metadata and beta Action examples from `0.1.0-beta.1` to `0.1.0-beta.2`.
+- Keep CLI, GitHub Action, and MCP as the supported beta surfaces; desktop remains a private-preview evidence surface outside stable public support.
+
+### Runtime And Release Surface
+- Includes the post-beta.1 runtime option, timeout, reviewer selection, and full-evidence output fixes.
+- Carries forward the refreshed GitHub Action bundle, beta smoke, package smoke, release evidence, and manifest guardrail improvements.
+
+### RC Readiness
+- Documented the beta-to-RC gate sequence while leaving review-quality benchmark execution for separate follow-up.
+- Release remains prerelease-only; npm `latest` promotion and public desktop support stay out of scope.
+
 ## 0.1.0-beta.1 (2026-05-05)
 
 ### Beta Release Readiness

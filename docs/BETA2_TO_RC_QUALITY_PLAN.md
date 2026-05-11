@@ -41,7 +41,7 @@ Goal: publish the accumulated post-beta.1 work as a feedback-ready prerelease.
 
 Required work:
 
-1. Bump package versions from `0.1.0-beta.1` to `0.1.0-beta.2`.
+1. Confirm package versions are bumped from `0.1.0-beta.1` to `0.1.0-beta.2`.
 2. Update release-facing docs and changelog entries for the beta.2 scope.
 3. Keep examples and release notes on prerelease wording; do not imply stable
    support or npm `latest`.
