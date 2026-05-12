@@ -57,6 +57,8 @@ describe('beta release safety', () => {
     const readme = readText('README.md');
     const mcpReadme = readText('packages/mcp/README.md');
     const extensions = readText('docs/EXTENSIONS.md');
+    const troubleshooting = readText('docs/TROUBLESHOOTING.md');
+    const mcpConfig = readText('.mcp.json');
     const checkUpdate = readText('packages/cli/src/commands/check-update.ts');
 
     expect(readme).toContain('npm i -g @codeagora/review@beta');
@@ -65,6 +67,9 @@ describe('beta release safety', () => {
     expect(mcpReadme).toContain('npx -y @codeagora/mcp@beta');
     expect(mcpReadme).toContain('"@codeagora/mcp@beta"');
     expect(extensions).toContain('npm i -g @codeagora/mcp@beta');
+    expect(extensions).toContain('"@codeagora/mcp@beta"');
+    expect(troubleshooting).toContain('"@codeagora/mcp@beta"');
+    expect(mcpConfig).toContain('"@codeagora/mcp@beta"');
     expect(checkUpdate).toContain("current.includes('-') ? 'beta' : 'latest'");
     expect(checkUpdate).toContain('@codeagora/review@${distTag}');
   });
