@@ -4,26 +4,26 @@
 
 ## Purpose
 
-This plan defines the path from `0.1.0-beta.2` to the first release candidate.
-It intentionally treats `0.1.0-beta.2` as the next public prerelease even if the
-current local gates are green. The post-`0.1.0-beta.1` changes are broad enough
-that they need one beta feedback cycle before the project freezes release
-contracts for `0.1.0-rc.0`.
+This plan records the path from `0.1.0-beta.2` to the first release candidate.
+`0.1.0-beta.2` is published and verified; `0.1.0-rc.0` is now the prepared
+release-candidate target. The project still treats RC as prerelease-only until
+tag creation, GitHub Release creation, and npm publication are requested
+separately.
 
 The plan covers:
 
 - publishing `0.1.0-beta.2` under the npm `beta` dist-tag
 - validating install, runtime, and public surface behavior after publish
 - reviewing actual review quality, not only test pass/fail status
-- deciding whether the next version is `0.1.0-rc.0` or another beta
+- preparing `0.1.0-rc.0` only after beta.2 runtime and evidence gates pass
 
 Stable release wording, npm `latest` promotion, and public desktop support remain
 out of scope for this plan.
 
 ## Current Position
 
-`0.1.0-beta.1` is the latest published beta. Since that release, the repository
-has accumulated meaningful runtime and release-surface changes:
+`0.1.0-beta.2` is the latest published beta. Since `0.1.0-beta.1`, the repository
+accumulated meaningful runtime and release-surface changes:
 
 - desktop private-preview RC gates and bundle smoke
 - runtime option, timeout, and reviewer selection fixes
@@ -31,13 +31,13 @@ has accumulated meaningful runtime and release-surface changes:
 - GitHub Action bundle refresh
 - release evidence, package smoke, and manifest tooling updates
 
-Those changes are appropriate for `0.1.0-beta.2`. They are not enough by
-themselves to justify `0.1.0-rc.0`, because RC means the supported contracts are
-ready to freeze.
+Those changes were published in `0.1.0-beta.2`. The follow-up smoke, CI, MCP
+client fix, desktop gate, and RC evidence pass now justify preparing
+`0.1.0-rc.0` while still keeping stable promotion out of scope.
 
 ## Phase 1: Publish Beta.2
 
-Goal: publish the accumulated post-beta.1 work as a feedback-ready prerelease.
+Status: complete. Beta.2 was published as a feedback-ready prerelease.
 
 Required work:
 
@@ -211,7 +211,7 @@ Decision rule:
 
 ## Phase 6: Prepare RC.0
 
-Goal: cut `0.1.0-rc.0` only after beta.2 has cleared runtime and quality review.
+Status: current. Prepare `0.1.0-rc.0` after beta.2 cleared runtime and RC evidence review.
 
 Required work:
 
@@ -232,3 +232,5 @@ Required work:
 `0.1.0-rc.0` should mean the project is ready to freeze public contracts for the
 supported CLI, GitHub Action, and MCP surfaces while desktop remains a
 private-preview surface included in evidence, not in stable public support.
+Performance tuning and app stabilization should proceed after this metadata bump
+as separate workstreams, not as part of the RC version-prep diff.

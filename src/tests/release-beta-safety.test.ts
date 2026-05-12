@@ -28,15 +28,15 @@ describe('beta release safety', () => {
     expect(workflow).toContain('if [ "$TAG" = "latest" ] && [[ "$VERSION" == *-* ]]; then');
   });
 
-  it('keeps public package versions aligned for beta', () => {
+  it('keeps public package versions aligned for prerelease', () => {
     const rootVersion = readPackageVersion('package.json');
     const mcpVersion = readPackageVersion('packages/mcp/package.json');
 
-    expect(rootVersion).toBe('0.1.0-beta.2');
+    expect(rootVersion).toBe('0.1.0-rc.0');
     expect(mcpVersion).toBe(rootVersion);
   });
 
-  it('keeps public and generated Action examples on the beta ref, not legacy v2', () => {
+  it('keeps public and generated Action examples on the prerelease ref, not legacy v2', () => {
     const rootVersion = readPackageVersion('package.json');
     const actionRef = `bssm-oss/CodeAgora@v${rootVersion}`;
     const files = [
@@ -48,7 +48,7 @@ describe('beta release safety', () => {
 
     for (const file of files) {
       const content = readText(file);
-      expect(content, `${file} should mention the beta Action ref`).toContain(actionRef);
+      expect(content, `${file} should mention the prerelease Action ref`).toContain(actionRef);
       expect(content, `${file} should not use the legacy v2 Action ref`).not.toContain('uses: bssm-oss/CodeAgora@v2');
     }
   });

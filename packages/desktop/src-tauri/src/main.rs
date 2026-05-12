@@ -1158,7 +1158,7 @@ fn github_action_status(root: &Path) -> GitHubActionStatus {
             "    runs-on: ubuntu-latest",
             "    steps:",
             "      - uses: actions/checkout@v4",
-            "      - uses: bssm-oss/CodeAgora@v0.1.0-beta.2",
+            "      - uses: bssm-oss/CodeAgora@v0.1.0-rc.0",
         ]
         .join("\n"),
     }
@@ -1844,7 +1844,7 @@ mod tests {
         write_file(
             &root,
             ".github/workflows/codeagora.yml",
-            "name: CodeAgora Review\non:\n  pull_request:\npermissions:\n  contents: read\n  pull-requests: write\njobs:\n  review:\n    steps:\n      - uses: bssm-oss/CodeAgora@v0.1.0-beta.2\n        with:\n          config-path: .ca/config.json\n",
+            "name: CodeAgora Review\non:\n  pull_request:\npermissions:\n  contents: read\n  pull-requests: write\njobs:\n  review:\n    steps:\n      - uses: bssm-oss/CodeAgora@v0.1.0-rc.0\n        with:\n          config-path: .ca/config.json\n",
         );
         write_file(&root, "docs/RELEASE_EVIDENCE.md", "# Release Evidence\n");
         write_file(&root, "docs/live-benchmark-report.md", "# Live Benchmark\n");

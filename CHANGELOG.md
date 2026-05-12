@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-rc.0 (2026-05-12)
+
+### RC Candidate Preparation
+- Promoted workspace package metadata, generated Action examples, and private-preview desktop metadata from `0.1.0-beta.2` to `0.1.0-rc.0`.
+- Keep CLI, GitHub Action, and MCP as the supported release-candidate surfaces; desktop remains a private-preview evidence surface outside stable public support.
+
+### Release Evidence
+- Carries forward the `0.1.0-beta.2` publish verification, MCP client startup fix, and refreshed RC evidence gates on `main`.
+- Release candidate remains prerelease-only; npm `latest` promotion and public desktop support stay out of scope.
+
+### Follow-Up Focus
+- Performance tuning and app stabilization move to the post-RC work queue so this bump stays limited to release metadata, refs, tests, and docs.
+
 ## 0.1.0-beta.2 (2026-05-11)
 
 ### Beta Release Preparation
