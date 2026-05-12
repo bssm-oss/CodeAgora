@@ -122,7 +122,7 @@ Keep MCP as a thin agent/IDE adapter over the same review engine, not a divergen
 
 ### Acceptance Gate
 
-- MCP server starts from the published package command: `npx -y @codeagora/mcp`.
+- MCP server starts from the published beta package command: `npx -y @codeagora/mcp@beta`.
 - Each MCP tool has documented parameters, output shape, and failure behavior.
 - Parity tests prove CLI and MCP reach equivalent decisions/issues for fixture diffs under the same config.
 - Invalid tool input and inaccessible repo paths return structured errors without crashing the server.

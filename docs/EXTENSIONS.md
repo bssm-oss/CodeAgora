@@ -23,11 +23,12 @@ Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["@codeagora/mcp"],
-      "env": { "GROQ_API_KEY": "your_key_here" }
+      "args": ["-y", "@codeagora/mcp@beta"]
     }
   }
 }
 ```
+
+Provider keys are only needed for live review tools. `dry_run`, `tools/list`, and config reads should start without API keys.
 
 `review_quick` runs L1 only for fast feedback. `review_full` runs the complete L1 > L2 > L3 pipeline. `review_pr` reviews a GitHub PR by URL or number. Review tools accept `repo_path` for surrounding code context, but explicit paths must stay inside the MCP server cwd/repository root. Failures return MCP `isError: true` with JSON `{ "status": "error", "code": string, "message": string, "details"?: object }`. `config_get`/`config_set` manage reviewer configuration without leaving the MCP session.
