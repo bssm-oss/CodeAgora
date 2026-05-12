@@ -10,20 +10,21 @@ function readPackageVersion(filePath: string): string {
   return manifest.version;
 }
 
-describe('beta release safety', () => {
-  it('publishes prerelease packages with an explicit beta dist-tag', () => {
+describe('prerelease safety', () => {
+  it('publishes prerelease packages with explicit prerelease dist-tags', () => {
     const workflow = readText('.github/workflows/release.yml');
 
     expect(workflow).toContain('PUBLISH_TAG=$(node -e');
-    expect(workflow).toContain("version.includes('-') ? 'beta' : 'latest'");
+    expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'latest'");
     expect(workflow).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
     expect(workflow).toContain('cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"');
   });
 
-  it('allows manual beta dist-tagging but blocks prereleases from latest', () => {
+  it('allows manual prerelease dist-tagging but blocks prereleases from latest', () => {
     const workflow = readText('.github/workflows/npm-dist-tags.yml');
 
     expect(workflow).toContain('          - beta');
+    expect(workflow).toContain('          - rc');
     expect(workflow).toContain('Prerelease versions must not be assigned the latest dist-tag');
     expect(workflow).toContain('if [ "$TAG" = "latest" ] && [[ "$VERSION" == *-* ]]; then');
   });

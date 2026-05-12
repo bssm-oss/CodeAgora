@@ -21,6 +21,7 @@ on:
         options:
           - alpha
           - beta
+          - rc
           - legacy
           - latest
 

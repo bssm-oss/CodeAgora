@@ -108,14 +108,14 @@ jobs:
 
       - name: Publish @codeagora/review
         run: |
-          PUBLISH_TAG=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-') ? 'beta' : 'latest');")
+          PUBLISH_TAG=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'latest');")
           npm publish --provenance --access public --tag "$PUBLISH_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @codeagora/mcp
         run: |
-          PUBLISH_TAG=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('packages/mcp/package.json', 'utf8')).version; process.stdout.write(version.includes('-') ? 'beta' : 'latest');")
+          PUBLISH_TAG=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('packages/mcp/package.json', 'utf8')).version; process.stdout.write(version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'latest');")
           cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
