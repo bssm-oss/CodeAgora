@@ -47,13 +47,15 @@ Stable production readiness is not complete yet. The main remaining work is no l
 ### rc.3 Goals
 
 1. Finish the app experience enough for serious private-preview use: repository readiness, review launch, progress, sessions, setup panels, evidence, export, and Korean/English copy must feel cohesive.
-2. Prove actual production usage readiness across the supported surfaces: local CLI reviews, GitHub PR automation, MCP agent workflows, package installs, and realistic failure modes.
-3. Tune the review system against evidence: benchmark recall/precision, false-positive suppression, latency, cost, model selection, confidence calibration, and degraded behavior.
-4. Polish UX without changing contracts: clearer triage, better setup guidance, understandable progress, safer error states, and more useful result exploration.
+2. Make the app capable of the full practical local workflow: a user should be able to open a real repository, understand what is ready or blocked, fix setup/config issues, launch or cancel a review, inspect results, export evidence, and know the next action without falling back to raw files or terminal spelunking for normal cases.
+3. Prove actual production usage readiness across the supported surfaces: local CLI reviews, GitHub PR automation, MCP agent workflows, package installs, and realistic failure modes.
+4. Tune the review system against evidence: benchmark recall/precision, false-positive suppression, latency, cost, model selection, confidence calibration, and degraded behavior.
+5. Polish UX without changing contracts: clearer triage, better setup guidance, understandable progress, safer error states, and more useful result exploration.
 
 ### App Completion Workstream
 
 - Keep desktop as a host over existing CLI/core/session/config contracts; do not add desktop-only verdict, finding, session, or config semantics.
+- Treat app-complete as a workflow requirement, not a screen checklist: the cockpit must let a private-preview user complete the normal review loop from repo readiness through setup, launch, monitoring, result triage, evidence export, and follow-up.
 - Close gaps in the Review Cockpit flow: current workspace status, config validity, provider readiness, MCP status, GitHub Action setup, release evidence, recent verdicts, blockers, and launch affordances.
 - Make session exploration production-shaped: search/filter, verdict and severity summaries, finding evidence, model/cost metadata, degraded states, and export paths that match canonical artifacts.
 - Make review execution understandable: progress events, cancellation, partial failure states, cache/degraded metadata, and no raw stack traces in user-facing UI.
@@ -88,7 +90,7 @@ Stable production readiness is not complete yet. The main remaining work is no l
 - CLI, GitHub Action, and MCP pass their production-readiness gates through real entrypoints and packed artifacts.
 - Desktop private-preview passes `pnpm rc:desktop-gate`, manual smoke, and evidence-manifest checks without claiming public support.
 - Live benchmark and live PR smoke evidence are fresh enough for the claims made in README, changelog, release notes, and release evidence docs.
-- App UX blockers are either fixed or explicitly documented as private-preview limitations.
+- App UX blockers that prevent the normal local review workflow are fixed before rc.3 or explicitly marked as release blockers; lesser gaps are documented as private-preview limitations.
 - No new dependency, framework, config format, or desktop-only review behavior is introduced for rc.3.
 - Stable or npm `latest` promotion remains blocked until the release-candidate evidence cycle stays green and the stable approval decision is explicit.
 
