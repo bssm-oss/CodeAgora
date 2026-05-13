@@ -40,6 +40,77 @@ CodeAgora has cleared the cautious beta line for CLI, GitHub Action, and MCP fee
 
 Stable production readiness is not complete yet. The main remaining work is no longer broad CLI/GitHub/MCP feature development or desktop implementation; it is re-running package, release, security, benchmark, and live-evidence checks with the desktop private-preview surface included in the RC story.
 
+## 0.1.0-rc.3 Execution Plan
+
+`0.1.0-rc.3` is the release-candidate cycle for app completion, real production usage validation, review-quality tuning, and UX polish. It should not widen the stable contract by accident: CLI, GitHub Action, and MCP remain the production gates, while desktop remains private-preview until its promotion criteria are explicitly revisited and passed.
+
+### rc.3 Goals
+
+1. Finish the app experience enough for serious private-preview use: repository readiness, review launch, progress, sessions, setup panels, evidence, export, and Korean/English copy must feel cohesive.
+2. Prove actual production usage readiness across the supported surfaces: local CLI reviews, GitHub PR automation, MCP agent workflows, package installs, and realistic failure modes.
+3. Tune the review system against evidence: benchmark recall/precision, false-positive suppression, latency, cost, model selection, confidence calibration, and degraded behavior.
+4. Polish UX without changing contracts: clearer triage, better setup guidance, understandable progress, safer error states, and more useful result exploration.
+
+### App Completion Workstream
+
+- Keep desktop as a host over existing CLI/core/session/config contracts; do not add desktop-only verdict, finding, session, or config semantics.
+- Close gaps in the Review Cockpit flow: current workspace status, config validity, provider readiness, MCP status, GitHub Action setup, release evidence, recent verdicts, blockers, and launch affordances.
+- Make session exploration production-shaped: search/filter, verdict and severity summaries, finding evidence, model/cost metadata, degraded states, and export paths that match canonical artifacts.
+- Make review execution understandable: progress events, cancellation, partial failure states, cache/degraded metadata, and no raw stack traces in user-facing UI.
+- Keep desktop packaging private-preview: signing, notarization, updater, public distribution, and support policy are promotion decisions, not implicit rc.3 promises.
+
+### Production Usage Workstream
+
+- Dogfood the CLI against real repository diffs: clean diff, staged diff, patch file, ignored files, invalid config, missing provider key, timeout, and degraded review.
+- Dogfood the GitHub Action against representative PRs: same-repo PR, fork/missing-secret behavior, stale head, oversized diff, 422 fallback, duplicate prevention, statuses, and SARIF handoff.
+- Dogfood MCP in agent workflows: startup, tools/list, `dry_run`, `review_quick`, `review_full`, `review_pr`, config get/set, structured errors, and inaccessible repo handling.
+- Verify packed artifacts, not just source: root package install smoke, MCP package install smoke, Action bundle smoke, runtime data paths, and generated workflow refs.
+- Record failures as release blockers or known limits before any stable wording is considered.
+
+### Tuning Workstream
+
+- Keep `pnpm bench:ci` as the provider-free deterministic gate and refresh live benchmark evidence when model pools, severity semantics, L2/L3 behavior, or stable wording changes.
+- Track TP, FP, FN, precision, recall, F1, recall@3/@5/@10, FP clean-rate, latency, and cost where available.
+- Tune for production behavior, not benchmark theater: add held-out/multi-file/clean-diff/large-diff cases before trusting improvements.
+- Calibrate confidence and severity so high-confidence false positives, artifact-only findings, and ambiguous risks do not dominate triage.
+- Measure cost and latency before changing reviewer counts, supporter pools, model selection, cache behavior, or discussion thresholds.
+
+### UX Workstream
+
+- CLI UX: preserve scriptable output while improving setup guidance, failure summaries, dry-run clarity, and next-step hints.
+- GitHub Action UX: keep PR comments concise, deduplicated, severity-sorted, head-SHA-safe, and explicit about degraded or skipped paths.
+- MCP UX: keep tool responses compact, schema-aware, and useful to agents without leaking raw internal traces.
+- Desktop UX: make the cockpit/evidence-board workflow explain what is ready, what is blocked, what ran, what it cost, and what to do next.
+- Localization UX: keep Korean desktop copy in the shared i18n catalog and keep canonical docs English unless a separate translation pass is planned.
+
+### rc.3 Exit Criteria
+
+- CLI, GitHub Action, and MCP pass their production-readiness gates through real entrypoints and packed artifacts.
+- Desktop private-preview passes `pnpm rc:desktop-gate`, manual smoke, and evidence-manifest checks without claiming public support.
+- Live benchmark and live PR smoke evidence are fresh enough for the claims made in README, changelog, release notes, and release evidence docs.
+- App UX blockers are either fixed or explicitly documented as private-preview limitations.
+- No new dependency, framework, config format, or desktop-only review behavior is introduced for rc.3.
+- Stable or npm `latest` promotion remains blocked until the release-candidate evidence cycle stays green and the stable approval decision is explicit.
+
+### rc.3 Verification Commands
+
+```bash
+pnpm typecheck
+pnpm build
+pnpm test --no-file-parallelism
+pnpm bench:ci
+pnpm release:beta-smoke
+pnpm rc:desktop-gate
+pnpm evidence:manifest -- --require=rc
+```
+
+Live-only evidence before stable wording or production claims:
+
+```bash
+pnpm bench:fn:run
+pnpm bench:fn
+```
+
 ## Readiness Snapshot
 
 | Area | Current state | Stable gap |
