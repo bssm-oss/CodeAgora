@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-rc.2 (2026-05-14)
+
+### Desktop Private Preview
+- Refreshed the desktop private-preview Review Cockpit around readiness, recent verdicts, blockers, and release evidence access.
+- Added Korean desktop copy through the existing shared i18n catalog while preserving stable desktop bridge contracts and automation selectors.
+
+### Release Candidate Metadata
+- Promoted workspace package metadata, generated Action examples, and private-preview desktop metadata from `0.1.0-rc.1` to `0.1.0-rc.2`.
+- Keep CLI, GitHub Action, and MCP as the supported release-candidate surfaces; desktop remains private preview evidence only.
+
+### Verification
+- `pnpm rc:desktop-gate` passed locally on macOS, including desktop typecheck, smoke, Tauri check, app E2E, macOS WebDriver E2E, evidence generation, and bundle smoke.
+
 ## 0.1.0-rc.1 (2026-05-13)
 
 ### RC Candidate Refresh
