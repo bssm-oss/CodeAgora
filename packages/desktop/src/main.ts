@@ -1,3 +1,4 @@
+import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
 import {
   getRepoInfo,
   getCommandContract,
@@ -28,6 +29,7 @@ import {
 } from './api/desktop-bridge.js';
 
 type View = 'sessions' | 'run' | 'config' | 'setup';
+type DesktopLocale = 'en' | 'ko';
 
 const recentReposKey = 'codeagora.desktop.recentRepos';
 
@@ -74,6 +76,38 @@ if (!app) throw new Error('Missing #app root');
 const appRoot = app;
 let reviewPollHandle: number | undefined;
 
+function normalizeLocale(value?: string): DesktopLocale | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === 'ko' || normalized.startsWith('ko-') || normalized.startsWith('ko_')) return 'ko';
+  if (normalized === 'en' || normalized.startsWith('en-') || normalized.startsWith('en_')) return 'en';
+  return undefined;
+}
+
+function configLocale(raw: string): DesktopLocale | undefined {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
+    const language = (parsed as { language?: unknown }).language;
+    return typeof language === 'string' ? normalizeLocale(language) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function browserLocales(): string[] {
+  return [...(navigator.languages ?? []), navigator.language].filter((language): language is string => Boolean(language));
+}
+
+function resolveDesktopLocale(raw: string, languages = browserLocales()): DesktopLocale {
+  return configLocale(raw) ?? languages.map(normalizeLocale).find((locale): locale is DesktopLocale => Boolean(locale)) ?? 'en';
+}
+
+function applyDesktopLocale(raw = state.configRaw): void {
+  setLocale(resolveDesktopLocale(raw));
+  document.documentElement.lang = getLocale();
+}
+
 function severityTotal(session: SessionSummary): number {
   const counts = session.severityCounts ?? {};
   return Object.values(counts).reduce((sum, value) => sum + (value ?? 0), 0);
@@ -103,6 +137,37 @@ function decisionClass(decision?: string): string {
   return 'decision';
 }
 
+type SeverityKey = 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION';
+
+type SeveritySource = {
+  severityCounts?: Partial<Record<SeverityKey, number>>;
+};
+
+function severityCount(source: SeveritySource, key: SeverityKey): number {
+  return source.severityCounts?.[key] ?? 0;
+}
+
+function blockerCount(source: SeveritySource): number {
+  return severityCount(source, 'HARSHLY_CRITICAL') + severityCount(source, 'CRITICAL');
+}
+
+function latestSession(): SessionSummary | undefined {
+  return [...state.sessions].sort((a, b) => timestampValue(b.updatedAt) - timestampValue(a.updatedAt))[0];
+}
+
+function timestampValue(value?: string): number {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function appendMetric(parent: HTMLElement, label: string, value: string, tone = ''): void {
+  const card = el('div', tone ? `metric-card ${tone}` : 'metric-card');
+  card.append(el('span', '', label));
+  card.append(el('strong', '', value));
+  parent.append(card);
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className?: string,
@@ -114,10 +179,10 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function button(label: string, onClick: () => void, className = 'button'): HTMLButtonElement {
+function button(label: string, onClick: () => void, className = 'button', testId?: string): HTMLButtonElement {
   const node = el('button', className, label);
   node.type = 'button';
-  node.dataset.testid = `button-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+  node.dataset.testid = testId ?? `button-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
   node.disabled = state.busy;
   node.addEventListener('click', onClick);
   return node;
@@ -240,6 +305,7 @@ async function loadConfig(): Promise<void> {
     const config = await readConfig();
     state.configRaw = config.raw;
     state.configPath = config.path;
+    applyDesktopLocale(config.raw);
     state.configValidation = await validateConfig(config.raw);
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
@@ -250,18 +316,20 @@ async function loadConfig(): Promise<void> {
 }
 
 async function saveConfig(raw: string): Promise<void> {
+  state.configRaw = raw;
   state.busy = true;
   render();
   try {
     state.configValidation = await validateConfig(raw);
     if (!state.configValidation.valid) {
-      state.notice = `Invalid config: ${state.configValidation.errors.join('; ')}`;
+      state.notice = t('desktop.notice.invalidConfig', { errors: state.configValidation.errors.join('; ') });
       return;
     }
     const config = await writeConfig(raw);
     state.configRaw = config.raw;
     state.configPath = config.path;
-    state.notice = `Saved ${config.path}`;
+    applyDesktopLocale(config.raw);
+    state.notice = t('desktop.notice.savedConfig', { path: config.path });
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
   } finally {
@@ -271,11 +339,13 @@ async function saveConfig(raw: string): Promise<void> {
 }
 
 async function validateConfigEditor(raw: string): Promise<void> {
+  state.configRaw = raw;
   state.busy = true;
   render();
   try {
+    applyDesktopLocale(raw);
     state.configValidation = await validateConfig(raw);
-    state.notice = state.configValidation.valid ? 'Config validates.' : 'Config has validation errors.';
+    state.notice = state.configValidation.valid ? t('desktop.notice.configValidates') : t('desktop.notice.configErrors');
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
   } finally {
@@ -291,12 +361,12 @@ async function startReview(staged: boolean): Promise<void> {
     return;
   }
   if (state.activeRun && isReviewRunning(state.activeRun)) {
-    state.notice = `Review already running: ${state.activeRun.runId}`;
+    state.notice = t('desktop.notice.reviewAlreadyRunning', { runId: state.activeRun.runId });
     render();
     return;
   }
   state.busy = true;
-  state.notice = staged ? 'Starting staged review...' : 'Starting working tree review...';
+  state.notice = staged ? t('desktop.notice.startingStaged') : t('desktop.notice.startingWorkingTree');
   render();
   try {
     state.activeRun = await startReviewRun(staged);
@@ -363,7 +433,7 @@ async function exportSelected(format: 'markdown' | 'json' | 'sarif'): Promise<vo
   try {
     const output = await exportSession(id, format);
     await window.navigator.clipboard?.writeText(output.content);
-    state.notice = `Copied ${output.fileName} to clipboard.`;
+    state.notice = t('desktop.notice.copiedExport', { fileName: output.fileName });
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
   } finally {
@@ -380,23 +450,24 @@ function renderShell(): HTMLElement {
   brand.append(el('div', 'brand-mark', 'CA'));
   const brandText = el('div');
   brandText.append(el('strong', '', 'CodeAgora'));
-  brandText.append(el('span', '', 'Desktop'));
+  brandText.append(el('span', '', t('desktop.brand.surface')));
   brand.append(brandText);
   sidebar.append(brand);
 
   const nav = el('nav', 'nav');
-  const navItems: Array<[View, string]> = [
-    ['sessions', 'Sessions'],
-    ['run', 'Run Review'],
-    ['config', 'Config'],
-    ['setup', 'Setup'],
+  const navItems: Array<[View, string, string]> = [
+    ['sessions', t('desktop.nav.cockpit'), 'button-sessions'],
+    ['run', t('desktop.nav.runReview'), 'button-run-review'],
+    ['config', t('desktop.nav.config'), 'button-config'],
+    ['setup', t('desktop.nav.setup'), 'button-setup'],
   ];
-  for (const [view, label] of navItems) {
-    nav.append(button(label, () => {
+  for (const [view, label, testId] of navItems) {
+    const navButton = button(label, () => {
       setView(view);
       if (view === 'config' && !state.configRaw) void loadConfig();
       if (view === 'setup' && state.providers.length === 0) void loadSetup();
-    }, state.view === view ? 'nav-button active' : 'nav-button'));
+    }, state.view === view ? 'nav-button active' : 'nav-button', testId);
+    nav.append(navButton);
   }
   sidebar.append(nav);
   shell.append(sidebar);
@@ -416,22 +487,22 @@ function renderToolbar(): HTMLElement {
   toolbar.append(title);
 
   const actions = el('div', 'toolbar-actions');
-  actions.append(button('Refresh', () => void refreshSessions(state.view === 'sessions' && !state.selected)));
-  actions.append(button('Quick Review', () => void startReview(true), 'button primary'));
+  actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected), 'button', 'button-refresh'));
+  actions.append(button(t('desktop.action.quickReview'), () => void startReview(true), 'button primary', 'button-quick-review'));
   toolbar.append(actions);
   return toolbar;
 }
 
 function viewTitle(): string {
-  if (state.view === 'sessions') return 'Review Sessions';
-  if (state.view === 'run') return 'Run Review';
-  if (state.view === 'config') return 'Configuration';
-  return 'Setup';
+  if (state.view === 'sessions') return t('desktop.title.cockpit');
+  if (state.view === 'run') return t('desktop.title.launch');
+  if (state.view === 'config') return t('desktop.title.config');
+  return t('desktop.title.setup');
 }
 
 function repoSubtitle(): string {
   const repo = state.repoInfo;
-  if (!repo) return state.repoPath || 'Loading repository...';
+  if (!repo) return state.repoPath || t('desktop.repo.loading');
   const branch = repo.branch ? ` · ${repo.branch}` : '';
   const head = repo.headSha ? ` @ ${repo.headSha}` : '';
   return `${repo.path}${branch}${head}`;
@@ -442,13 +513,13 @@ function renderContent(): HTMLElement {
   content.dataset.testid = `view-${state.view}`;
   if (state.notice) {
     const notice = el('div', 'notice', state.notice);
-    notice.append(button('Dismiss', () => {
+    notice.append(button(t('desktop.action.dismiss'), () => {
       state.notice = undefined;
       render();
-    }, 'ghost'));
+    }, 'ghost', 'button-dismiss'));
     content.append(notice);
   }
-  if (state.busy) content.append(el('div', 'loading', 'Working...'));
+  if (state.busy) content.append(el('div', 'loading', t('desktop.status.working')));
 
   if (state.view === 'sessions') content.append(renderSessions());
   if (state.view === 'run') content.append(renderRunReview());
@@ -458,14 +529,23 @@ function renderContent(): HTMLElement {
 }
 
 function renderSessions(): HTMLElement {
+  const wrapper = el('div', 'cockpit-page');
+  wrapper.append(renderCockpitOverview());
+
   const layout = el('div', 'sessions-layout');
   layout.dataset.testid = 'sessions-layout';
   const listPanel = el('div', 'session-list');
+  const listHeader = el('div', 'panel-heading');
+  listHeader.append(el('span', 'eyebrow', t('desktop.sessions.historyEyebrow')));
+  listHeader.append(el('h2', '', t('desktop.sessions.recentTitle')));
+  listPanel.append(listHeader);
+
   const controls = el('div', 'session-controls');
   const search = el('input', 'filter-input') as HTMLInputElement;
   search.dataset.testid = 'session-filter-input';
   search.type = 'search';
-  search.placeholder = 'Filter sessions';
+  search.placeholder = t('desktop.sessions.filterPlaceholder');
+  search.setAttribute('aria-label', t('desktop.sessions.filterAria'));
   search.value = state.sessionSearch;
   search.addEventListener('input', () => {
     state.sessionSearch = search.value;
@@ -473,10 +553,11 @@ function renderSessions(): HTMLElement {
   });
   const status = el('select', 'filter-select') as HTMLSelectElement;
   status.dataset.testid = 'session-status-filter';
+  status.setAttribute('aria-label', t('desktop.sessions.statusFilterAria'));
   for (const option of ['all', 'completed', 'failed', 'interrupted', 'in_progress', 'unknown'] as const) {
     const node = el('option') as HTMLOptionElement;
     node.value = option;
-    node.textContent = option === 'all' ? 'All statuses' : option.replace('_', ' ');
+    node.textContent = option === 'all' ? t('desktop.sessions.allStatuses') : option.replace('_', ' ');
     node.selected = state.sessionStatus === option;
     status.append(node);
   }
@@ -488,12 +569,16 @@ function renderSessions(): HTMLElement {
   listPanel.append(controls);
 
   const sessions = filteredSessions();
-  const summary = el('div', 'list-summary', `${sessions.length} of ${state.sessions.length} sessions`);
+  const summary = el('div', 'list-summary', t('desktop.sessions.visibleSummary', { visible: sessions.length, total: state.sessions.length }));
   listPanel.append(summary);
   if (state.sessions.length === 0) {
-    listPanel.append(el('p', 'empty padded', 'No sessions found yet.'));
+    const empty = el('div', 'empty-state padded');
+    empty.append(el('strong', '', t('desktop.sessions.emptyTitle')));
+    empty.append(el('p', '', t('desktop.sessions.emptyBody')));
+    empty.append(button(t('desktop.action.startReview'), () => setView('run'), 'button primary', 'button-start-review'));
+    listPanel.append(empty);
   } else if (sessions.length === 0) {
-    listPanel.append(el('p', 'empty padded', 'No sessions match the current filter.'));
+    listPanel.append(el('p', 'empty padded', t('desktop.sessions.noFilterMatch')));
   }
   for (const session of sessions) {
     const item = button('', () => void selectSession(session.id), state.selected?.id === session.id ? 'session-row selected' : 'session-row');
@@ -502,76 +587,141 @@ function renderSessions(): HTMLElement {
     top.append(el('strong', '', session.id));
     top.append(el('span', decisionClass(session.decision), session.decision ?? session.status));
     item.append(top);
-    item.append(el('span', 'session-meta', `${severityTotal(session)} issues · ${formatTimestamp(session.updatedAt)}`));
+    item.append(el('span', 'session-meta', t('desktop.sessions.rowMeta', { blockers: blockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
     listPanel.append(item);
   }
   layout.append(listPanel);
   layout.append(renderSessionDetail());
-  return layout;
+  wrapper.append(layout);
+  return wrapper;
+}
+
+function renderCockpitOverview(): HTMLElement {
+  const section = el('section', 'cockpit-overview');
+  section.dataset.testid = 'cockpit-overview';
+  const latest = latestSession();
+  const repo = state.repoInfo;
+  const hero = el('div', 'cockpit-hero');
+  hero.append(el('span', 'eyebrow', t('desktop.cockpit.eyebrow')));
+  hero.append(el('h2', '', latest ? t('desktop.cockpit.latestVerdict', { verdict: latest.decision ?? latest.status }) : t('desktop.cockpit.readyTitle')));
+  hero.append(el('p', '', latest?.reasoning ?? t('desktop.cockpit.readyBody')));
+  const actions = el('div', 'cockpit-actions');
+  actions.append(button(t('desktop.action.runStagedReview'), () => setView('run'), 'button primary', 'button-run-staged-review'));
+  actions.append(button(t('desktop.action.openRepository'), () => setView('run'), 'button', 'button-open-repository'));
+  actions.append(button(t('desktop.action.setupGuide'), () => {
+    setView('setup');
+    if (state.providers.length === 0) void loadSetup();
+  }, 'button subtle', 'button-setup-guide'));
+  hero.append(actions);
+  section.append(hero);
+
+  const metrics = el('div', 'cockpit-metrics');
+  appendMetric(metrics, t('desktop.metric.workspace'), repo?.trusted ? t('desktop.value.trusted') : t('desktop.value.needsTrust'), repo?.trusted ? 'good' : 'warn');
+  appendMetric(metrics, t('desktop.metric.branch'), repo?.branch || t('desktop.value.unknown'));
+  appendMetric(metrics, t('desktop.metric.dirtyFiles'), repo ? String(repo.dirtyFileCount) : '...');
+  appendMetric(metrics, t('desktop.metric.sessions'), String(state.sessions.length));
+  appendMetric(metrics, t('desktop.metric.currentBlockers'), latest ? String(blockerCount(latest)) : '0', latest && blockerCount(latest) > 0 ? 'danger' : 'good');
+  appendMetric(metrics, t('desktop.metric.latestUpdated'), latest ? formatTimestamp(latest.updatedAt) : t('desktop.value.noSessions'));
+  section.append(metrics);
+
+  const links = el('div', 'quick-links');
+  links.append(button(t('desktop.action.refreshEvidence'), () => void refreshSessions(true), 'button', 'button-refresh-evidence'));
+  links.append(button(t('desktop.nav.config'), () => {
+    setView('config');
+    if (!state.configRaw) void loadConfig();
+  }, 'button', 'button-cockpit-config'));
+  links.append(button(t('desktop.nav.setup'), () => {
+    setView('setup');
+    if (state.providers.length === 0) void loadSetup();
+  }, 'button', 'button-cockpit-setup'));
+  section.append(links);
+  return section;
 }
 
 function formatTimestamp(value?: string): string {
-  if (!value) return 'no timestamp';
+  if (!value) return t('desktop.value.noTimestamp');
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function renderSessionDetail(): HTMLElement {
-  const detail = el('article', 'detail');
+  const detail = el('article', 'detail insight-panel');
   detail.dataset.testid = 'session-detail';
   const selected = state.selected;
   if (!selected) {
-    detail.append(el('p', 'empty', 'Select a session to inspect its verdict, findings, and report.'));
+    const empty = el('div', 'empty-state');
+    empty.append(el('span', 'eyebrow', t('desktop.detail.eyebrow')));
+    empty.append(el('h2', '', t('desktop.detail.emptyTitle')));
+    empty.append(el('p', '', t('desktop.detail.emptyBody')));
+    detail.append(empty);
     return detail;
   }
 
-  const head = el('div', 'detail-head');
-  head.append(el('div', decisionClass(selected.decision), selected.decision ?? selected.status));
-  head.append(el('h2', '', selected.id));
-  detail.append(head);
+  const banner = el('div', `verdict-banner ${selected.decision === 'REJECT' ? 'danger' : selected.decision === 'ACCEPT' ? 'good' : 'warn'}`);
+  const bannerText = el('div');
+  bannerText.append(el('span', 'eyebrow', t('desktop.detail.finalVerdict')));
+  bannerText.append(el('h2', '', selected.decision ?? selected.status));
+  bannerText.append(el('p', '', selected.reasoning ?? t('desktop.detail.noReasoning')));
+  banner.append(bannerText);
+  banner.append(el('span', decisionClass(selected.decision), selected.id));
+  detail.append(banner);
+
   const meta = el('div', 'detail-meta');
   meta.append(el('span', '', selected.dirPath ?? '.ca/sessions'));
-  meta.append(el('span', '', `Updated ${formatTimestamp(selected.updatedAt)}`));
-  meta.append(el('span', '', `${selected.evidenceCount ?? 0} evidence docs`));
-  meta.append(el('span', '', `${selected.discussionsCount ?? 0} discussion files`));
+  meta.append(el('span', '', t('desktop.detail.updated', { updated: formatTimestamp(selected.updatedAt) })));
+  meta.append(el('span', '', t('desktop.detail.evidenceDocs', { count: selected.evidenceCount ?? 0 })));
+  meta.append(el('span', '', t('desktop.detail.discussionFiles', { count: selected.discussionsCount ?? 0 })));
   detail.append(meta);
-  const exports = el('div', 'export-actions');
-  exports.append(button('Copy Markdown', () => void exportSelected('markdown')));
-  exports.append(button('Copy JSON', () => void exportSelected('json')));
-  exports.append(button('Copy SARIF', () => void exportSelected('sarif')));
-  detail.append(exports);
-  detail.append(el('p', 'reasoning', selected.reasoning ?? 'No reasoning recorded.'));
 
   const counts = selected.severityCounts ?? {};
   const countGrid = el('div', 'count-grid');
   for (const key of ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'] as const) {
-    const cell = el('div', 'count-cell');
+    const cell = el('div', key === 'HARSHLY_CRITICAL' || key === 'CRITICAL' ? 'count-cell danger' : 'count-cell');
     cell.append(el('span', '', key.replace('_', ' ')));
     cell.append(el('strong', '', String(counts[key] ?? 0)));
     countGrid.append(cell);
   }
   detail.append(countGrid);
 
+  const evidence = el('section', 'evidence-board');
+  evidence.append(el('h3', '', t('desktop.detail.consensusEvidence')));
+  const evidenceGrid = el('div', 'evidence-grid');
+  appendMetric(evidenceGrid, t('desktop.detail.evidenceDocsLabel'), String(selected.evidenceCount ?? 0));
+  appendMetric(evidenceGrid, t('desktop.detail.debateFilesLabel'), String(selected.discussionsCount ?? 0));
+  appendMetric(evidenceGrid, t('desktop.detail.exportFormats'), 'Markdown · JSON · SARIF');
+  evidence.append(evidenceGrid);
+  detail.append(evidence);
+
   const issues = el('div', 'issues');
   const findings = selected.findings?.length ? selected.findings : selected.topIssues ?? [];
-  issues.append(el('h3', '', `Findings (${findings.length})`));
+  issues.append(el('h3', '', t('desktop.detail.findingsToTriage', { count: findings.length })));
   if (findings.length === 0) {
-    issues.append(el('p', 'empty', 'No findings recorded.'));
+    issues.append(el('p', 'empty', t('desktop.detail.noFindings')));
   } else {
     for (const issue of findings) {
-      const row = el('div', 'issue-row');
+      const row = el('div', 'issue-row issue-card');
+      const confidence = issue.confidence === undefined ? t('desktop.detail.confidenceUnavailable') : t('desktop.detail.confidencePercent', { confidence: Math.round(issue.confidence) });
+      row.append(el('span', 'issue-severity', issue.severity));
       row.append(el('strong', '', issue.title));
-      const confidence = issue.confidence === undefined ? '' : ` · ${Math.round(issue.confidence)}%`;
-      row.append(el('span', '', `${issue.severity} · ${issue.filePath}:${issue.lineRange[0]}${confidence}`));
+      row.append(el('span', '', `${issue.filePath}:${issue.lineRange[0]} · ${confidence}`));
       issues.append(row);
     }
   }
   detail.append(issues);
 
+  const exports = el('div', 'export-actions');
+  exports.append(button(t('desktop.action.copyMarkdown'), () => void exportSelected('markdown'), 'button', 'button-copy-markdown'));
+  exports.append(button(t('desktop.action.copyJson'), () => void exportSelected('json'), 'button', 'button-copy-json'));
+  exports.append(button(t('desktop.action.copySarif'), () => void exportSelected('sarif'), 'button', 'button-copy-sarif'));
+  detail.append(exports);
+
   if (selected.markdown) {
+    const reportSection = el('details', 'report-shell') as HTMLDetailsElement;
+    const summary = el('summary', '', t('desktop.detail.rawReportPreview'));
     const report = el('pre', 'report');
     report.textContent = selected.markdown;
-    detail.append(report);
+    reportSection.append(summary, report);
+    detail.append(reportSection);
   }
   return detail;
 }
@@ -579,17 +729,20 @@ function renderSessionDetail(): HTMLElement {
 function renderRunReview(): HTMLElement {
   const panel = el('div', 'run-panel');
   panel.dataset.testid = 'run-panel';
-  panel.append(el('h2', '', 'Start a Local Review'));
-  panel.append(el('p', '', state.repoPath || 'Current repository'));
+  const intro = el('div', 'launch-intro');
+  intro.append(el('span', 'eyebrow', t('desktop.run.eyebrow')));
+  intro.append(el('h2', '', t('desktop.run.title')));
+  intro.append(el('p', '', t('desktop.run.body')));
+  panel.append(intro);
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
-  const actions = el('div', 'run-actions');
-  actions.append(button('Review Staged Changes', () => void startReview(true), 'button primary'));
-  actions.append(button('Review Working Tree', () => void startReview(false)));
+
+  const actions = el('div', 'launch-cards');
+  const staged = launchCard(t('desktop.run.stagedTitle'), t('desktop.run.stagedEyebrow'), t('desktop.run.stagedBody'), true, () => void startReview(true), 'button-review-staged-changes');
+  const working = launchCard(t('desktop.run.workingTitle'), t('desktop.run.workingEyebrow'), t('desktop.run.workingBody'), false, () => void startReview(false), 'button-review-working-tree');
+  actions.append(staged, working);
   if (state.activeRun && isReviewRunning(state.activeRun)) {
-    const cancel = el('button', 'button danger', 'Cancel Review');
-    cancel.type = 'button';
-    cancel.addEventListener('click', () => void cancelActiveReview());
+    const cancel = button(t('desktop.action.cancelReview'), () => void cancelActiveReview(), 'button danger', 'button-cancel-review');
     actions.append(cancel);
   }
   panel.append(actions);
@@ -598,27 +751,43 @@ function renderRunReview(): HTMLElement {
   return panel;
 }
 
+function launchCard(label: string, eyebrow: string, description: string, primary: boolean, onClick: () => void, testId: string): HTMLButtonElement {
+  const node = el('button', primary ? 'launch-card primary' : 'launch-card');
+  node.type = 'button';
+  node.dataset.testid = testId;
+  node.disabled = state.busy;
+  node.addEventListener('click', onClick);
+  node.append(el('span', 'eyebrow', eyebrow));
+  node.append(el('strong', '', label));
+  node.append(el('span', '', description));
+  return node;
+}
+
 function renderReviewRun(): HTMLElement {
   const run = state.activeRun;
   const section = el('section', 'review-run');
   section.dataset.testid = 'review-run';
-  section.append(el('h3', '', 'Review Progress'));
+  section.append(el('h3', '', t('desktop.run.timelineTitle')));
   if (!run) {
-    section.append(el('p', 'empty', 'No desktop-started review is active.'));
+    const empty = el('div', 'empty-state compact');
+    empty.append(el('strong', '', t('desktop.run.noActiveTitle')));
+    empty.append(el('p', '', t('desktop.run.noActiveBody')));
+    section.append(empty);
     return section;
   }
 
   const summary = el('div', 'review-run-summary');
   summary.append(el('span', statusClass(run.status), run.status));
   summary.append(el('strong', '', run.runId));
-  summary.append(el('span', '', run.staged ? 'staged diff' : 'working tree diff'));
-  if (run.sessionId) summary.append(el('span', '', `session ${run.sessionId}`));
+  summary.append(el('span', '', run.staged ? t('desktop.run.stagedDiff') : t('desktop.run.workingTreeDiff')));
+  if (run.sessionId) summary.append(el('span', '', t('desktop.run.sessionLabel', { sessionId: run.sessionId })));
   section.append(summary);
   section.append(el('p', 'repo-note', run.message));
 
-  const events = el('div', 'event-list');
+  const events = el('div', 'event-list timeline');
   for (const event of run.events.slice(-12).reverse()) {
     const row = el('div', 'event-row');
+    row.append(el('span', 'event-dot', ''));
     row.append(el('span', 'event-kind', event.kind));
     row.append(el('span', '', event.message));
     row.append(el('time', '', formatTimestamp(event.timestamp)));
@@ -640,17 +809,18 @@ function renderRepositoryPicker(): HTMLElement {
   const input = el('input', 'repo-path-input') as HTMLInputElement;
   input.dataset.testid = 'repo-path-input';
   input.type = 'text';
-  input.placeholder = '/path/to/repository';
+  input.placeholder = t('desktop.repo.pathPlaceholder');
+  input.setAttribute('aria-label', t('desktop.repo.pathAria'));
   input.value = state.repoInput || state.repoPath;
   input.addEventListener('input', () => {
     state.repoInput = input.value;
   });
   section.append(input);
-  section.append(button('Open Repository', () => void openRepo(input.value), 'button primary'));
+  section.append(button(t('desktop.action.openRepository'), () => void openRepo(input.value), 'button primary', 'button-open-repository'));
 
   if (state.recentRepoPaths.length > 0) {
     const recent = el('div', 'recent-repos');
-    recent.append(el('span', '', 'Recent'));
+    recent.append(el('span', '', t('desktop.repo.recent')));
     for (const path of state.recentRepoPaths) {
       recent.append(button(path, () => void openRepo(path), 'ghost repo-chip'));
     }
@@ -663,20 +833,20 @@ function renderRepoFacts(): HTMLElement {
   const repo = state.repoInfo;
   const grid = el('div', 'repo-grid');
   if (!repo) {
-    grid.append(el('div', 'repo-card', 'Loading repository state...'));
+    grid.append(el('div', 'repo-card', t('desktop.repo.loadingState')));
     return grid;
   }
 
   const facts: Array<[string, string, boolean?]> = [
-    ['Trust', repo.trusted ? 'trusted git workspace' : 'not trusted', repo.trusted],
-    ['Git', repo.isGitRepo ? 'detected' : 'missing', repo.isGitRepo],
-    ['Branch', repo.branch || 'detached or unavailable'],
-    ['Head', repo.headSha || 'unknown'],
-    ['Dirty files', String(repo.dirtyFileCount)],
-    ['Sessions', String(repo.sessionCount)],
-    ['Config', repo.configPath || 'not found', repo.hasConfig],
-    ['Review rules', repo.reviewRulesPath || 'not found', Boolean(repo.reviewRulesPath)],
-    ['Review ignore', repo.reviewIgnorePath || 'not found', Boolean(repo.reviewIgnorePath)],
+    [t('desktop.repo.fact.trust'), repo.trusted ? t('desktop.repo.value.trustedWorkspace') : t('desktop.repo.value.notTrusted'), repo.trusted],
+    [t('desktop.repo.fact.git'), repo.isGitRepo ? t('desktop.repo.value.detected') : t('desktop.repo.value.missing'), repo.isGitRepo],
+    [t('desktop.metric.branch'), repo.branch || t('desktop.repo.value.detached')],
+    [t('desktop.repo.fact.head'), repo.headSha || t('desktop.value.unknown')],
+    [t('desktop.metric.dirtyFiles'), String(repo.dirtyFileCount)],
+    [t('desktop.metric.sessions'), String(repo.sessionCount)],
+    [t('desktop.nav.config'), repo.configPath || t('desktop.value.notFound'), repo.hasConfig],
+    [t('desktop.repo.fact.reviewRules'), repo.reviewRulesPath || t('desktop.value.notFound'), Boolean(repo.reviewRulesPath)],
+    [t('desktop.repo.fact.reviewIgnore'), repo.reviewIgnorePath || t('desktop.value.notFound'), Boolean(repo.reviewIgnorePath)],
   ];
 
   for (const [label, value, healthy] of facts) {
@@ -694,9 +864,9 @@ function renderRepoFacts(): HTMLElement {
 
 function renderCommandContract(): HTMLElement {
   const section = el('section', 'command-contract');
-  section.append(el('h3', '', 'Tauri Command Boundary'));
+  section.append(el('h3', '', t('desktop.command.title')));
   if (state.commandContract.length === 0) {
-    section.append(el('p', 'empty', 'Command contract is not loaded yet.'));
+    section.append(el('p', 'empty', t('desktop.command.notLoaded')));
     return section;
   }
 
@@ -708,9 +878,9 @@ function renderCommandContract(): HTMLElement {
     row.append(title);
     const flags = el('div', 'command-flags');
     flags.append(el('span', 'fact', item.classification));
-    if (item.readsProject) flags.append(el('span', 'fact', 'reads project'));
-    if (item.mutatesProject) flags.append(el('span', 'fact warn', 'mutates project'));
-    if (item.spawnsProcess) flags.append(el('span', 'fact warn', 'spawns process'));
+    if (item.readsProject) flags.append(el('span', 'fact', t('desktop.command.readsProject')));
+    if (item.mutatesProject) flags.append(el('span', 'fact warn', t('desktop.command.mutatesProject')));
+    if (item.spawnsProcess) flags.append(el('span', 'fact warn', t('desktop.command.spawnsProcess')));
     row.append(flags);
     section.append(row);
   }
@@ -720,16 +890,30 @@ function renderCommandContract(): HTMLElement {
 function renderConfig(): HTMLElement {
   const panel = el('div', 'config-panel');
   panel.dataset.testid = 'config-panel';
-  panel.append(el('h2', '', state.configPath));
+  const header = el('div', 'config-hero');
+  header.append(el('span', 'eyebrow', t('desktop.config.eyebrow')));
+  header.append(el('h2', '', state.configPath));
+  header.append(el('p', '', t('desktop.config.body')));
+  panel.append(header);
   panel.append(renderConfigFacts());
+  panel.append(renderConfigValidation());
+
+  const advanced = el('details', 'advanced-config') as HTMLDetailsElement;
+  advanced.open = true;
+  advanced.append(el('summary', '', t('desktop.config.advancedEditor')));
   const textarea = el('textarea', 'config-editor') as HTMLTextAreaElement;
   textarea.dataset.testid = 'config-editor';
+  textarea.setAttribute('aria-label', t('desktop.config.editorAria'));
   textarea.value = state.configRaw;
-  panel.append(textarea);
-  panel.append(renderConfigValidation());
+  textarea.addEventListener('input', () => {
+    state.configRaw = textarea.value;
+  });
+  advanced.append(textarea);
+  panel.append(advanced);
+
   const actions = el('div', 'config-actions');
-  actions.append(button('Validate Config', () => void validateConfigEditor(textarea.value)));
-  actions.append(button('Save Config', () => void saveConfig(textarea.value), 'button primary'));
+  actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(textarea.value), 'button', 'button-validate-config'));
+  actions.append(button(t('desktop.action.saveConfig'), () => void saveConfig(textarea.value), 'button primary', 'button-save-config'));
   panel.append(actions);
   return panel;
 }
@@ -738,10 +922,10 @@ function renderConfigValidation(): HTMLElement {
   const validation = state.configValidation;
   const panel = el('div', validation?.valid === false ? 'validation-panel invalid' : 'validation-panel');
   if (!validation) {
-    panel.append(el('p', 'empty', 'Config has not been validated yet.'));
+    panel.append(el('p', 'empty', t('desktop.config.notValidated')));
     return panel;
   }
-  panel.append(el('strong', '', validation.valid ? 'Config valid' : 'Config invalid'));
+  panel.append(el('strong', '', validation.valid ? t('desktop.config.valid') : t('desktop.config.invalid')));
   for (const error of validation.errors) {
     panel.append(el('span', 'validation-error', error));
   }
@@ -749,50 +933,67 @@ function renderConfigValidation(): HTMLElement {
     panel.append(el('span', 'validation-warning', warning));
   }
   if (validation.errors.length === 0 && validation.warnings.length === 0) {
-    panel.append(el('span', 'validation-ok', 'No errors or warnings.'));
+    panel.append(el('span', 'validation-ok', t('desktop.config.noErrorsOrWarnings')));
   }
   return panel;
 }
 
 function renderConfigFacts(): HTMLElement {
-  const facts = el('div', 'config-facts');
+  const facts = el('div', 'config-facts summary-cards');
   let parsed: Record<string, unknown> | undefined;
   try {
     parsed = JSON.parse(state.configRaw) as Record<string, unknown>;
   } catch {
-    facts.append(el('span', 'fact warn', 'Invalid JSON'));
+    appendMetric(facts, 'JSON', t('desktop.value.invalid'), 'warn');
+    appendMetric(facts, t('desktop.config.reviewers'), t('desktop.value.unknown'));
+    appendMetric(facts, t('desktop.config.providers'), t('desktop.value.unknown'));
     return facts;
   }
-  const language = typeof parsed.language === 'string' ? parsed.language : 'unset';
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    appendMetric(facts, 'JSON', t('desktop.value.invalidShape'), 'warn');
+    appendMetric(facts, t('desktop.config.reviewers'), t('desktop.value.unknown'));
+    appendMetric(facts, t('desktop.config.providers'), t('desktop.value.unknown'));
+    return facts;
+  }
+  const language = typeof parsed.language === 'string' ? parsed.language : t('desktop.value.unset');
   const reviewers = Array.isArray(parsed.reviewers) ? parsed.reviewers.length : 0;
   const providers = Array.isArray(parsed.providers) ? parsed.providers.length : 0;
-  facts.append(el('span', 'fact', `Language ${language}`));
-  facts.append(el('span', 'fact', `${reviewers} reviewers`));
-  facts.append(el('span', 'fact', `${providers} providers`));
+  appendMetric(facts, t('desktop.config.language'), language);
+  appendMetric(facts, t('desktop.config.reviewers'), String(reviewers));
+  appendMetric(facts, t('desktop.config.providers'), String(providers));
+  appendMetric(facts, t('desktop.config.validation'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'warn' : 'good');
   return facts;
 }
 
 function renderSetup(): HTMLElement {
   const panel = el('div', 'setup-panel');
   panel.dataset.testid = 'setup-panel';
-  const header = el('div', 'section-head');
-  header.append(el('h2', '', 'Providers and Local Backends'));
-  header.append(button('Refresh Setup', () => void loadSetup()));
+  const header = el('div', 'section-head setup-hero');
+  const copy = el('div');
+  copy.append(el('span', 'eyebrow', t('desktop.setup.eyebrow')));
+  copy.append(el('h2', '', t('desktop.setup.title')));
+  copy.append(el('p', '', t('desktop.setup.body')));
+  header.append(copy);
+  header.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'button', 'button-refresh-setup'));
   panel.append(header);
 
   const grid = el('div', 'provider-grid');
   for (const provider of state.providers) {
-    const card = el('div', provider.configured ? 'provider-card configured' : 'provider-card');
+    const card = el('div', provider.configured ? 'provider-card configured checklist-card' : 'provider-card checklist-card');
+    card.append(el('span', provider.configured ? 'check-dot good' : 'check-dot optional', provider.configured ? t('desktop.value.ready') : t('desktop.value.optional')));
     card.append(el('strong', '', provider.name));
     card.append(el('span', 'provider-kind', provider.kind));
-    const status = provider.configured ? 'configured' : 'missing';
-    card.append(el('span', provider.configured ? 'provider-ok' : 'provider-missing', status));
+    const status = provider.configured ? t('desktop.setup.configured') : t('desktop.setup.notConfigured');
+    card.append(el('span', provider.configured ? 'provider-ok' : 'provider-missing optional', status));
     if (provider.envVar) card.append(el('span', '', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
     if (provider.binary) card.append(el('span', '', provider.binary));
     grid.append(card);
   }
   if (state.providers.length === 0) {
-    grid.append(el('p', 'empty', 'Provider status has not been loaded yet.'));
+    const empty = el('div', 'empty-state compact');
+    empty.append(el('strong', '', t('desktop.setup.providerStatusNotLoaded')));
+    empty.append(el('p', '', t('desktop.setup.providerStatusHint')));
+    grid.append(empty);
   }
   panel.append(grid);
   panel.append(renderMcpSetup());
@@ -803,10 +1004,10 @@ function renderSetup(): HTMLElement {
 
 function renderMcpSetup(): HTMLElement {
   const section = el('section', 'integration-section');
-  section.append(el('h3', '', 'MCP Server'));
+  section.append(el('h3', '', t('desktop.setup.mcpServer')));
   const mcp = state.mcpStatus;
   if (!mcp) {
-    section.append(el('p', 'empty', 'MCP status has not been loaded yet.'));
+    section.append(el('p', 'empty', t('desktop.setup.mcpNotLoaded')));
     return section;
   }
   section.append(el('p', 'repo-note', mcp.command));
@@ -823,20 +1024,20 @@ function renderMcpSetup(): HTMLElement {
 
 function renderGitHubActionSetup(): HTMLElement {
   const section = el('section', 'integration-section');
-  section.append(el('h3', '', 'GitHub Action'));
+  section.append(el('h3', '', t('desktop.setup.githubAction')));
   const status = state.githubActionStatus;
   if (!status) {
-    section.append(el('p', 'empty', 'GitHub Action status has not been loaded yet.'));
+    section.append(el('p', 'empty', t('desktop.setup.githubActionNotLoaded')));
     return section;
   }
-  section.append(el('p', 'repo-note', `${status.codeagoraWorkflowCount} CodeAgora workflow(s) found across ${status.workflowCount} workflow file(s).`));
+  section.append(el('p', 'repo-note', t('desktop.setup.workflowSummary', { codeagora: status.codeagoraWorkflowCount, workflows: status.workflowCount })));
   for (const workflow of status.workflows) {
     const row = el('div', 'workflow-row');
     row.append(el('strong', '', workflow.path));
-    row.append(el('span', workflow.mentionsCodeagora ? 'provider-ok' : 'provider-missing', workflow.mentionsCodeagora ? 'CodeAgora' : 'No CodeAgora'));
-    row.append(el('span', workflow.hasPullRequestTrigger ? 'provider-ok' : 'provider-missing', workflow.hasPullRequestTrigger ? 'PR trigger' : 'No PR trigger'));
-    row.append(el('span', workflow.hasPermissions ? 'provider-ok' : 'provider-missing', workflow.hasPermissions ? 'permissions' : 'permissions missing'));
-    row.append(el('span', workflow.hasConfigPath ? 'provider-ok' : 'provider-kind', workflow.hasConfigPath ? 'config-path' : 'default config'));
+    row.append(el('span', workflow.mentionsCodeagora ? 'provider-ok' : 'provider-missing', workflow.mentionsCodeagora ? 'CodeAgora' : t('desktop.setup.noCodeAgora')));
+    row.append(el('span', workflow.hasPullRequestTrigger ? 'provider-ok' : 'provider-missing', workflow.hasPullRequestTrigger ? t('desktop.setup.prTrigger') : t('desktop.setup.noPrTrigger')));
+    row.append(el('span', workflow.hasPermissions ? 'provider-ok' : 'provider-missing', workflow.hasPermissions ? t('desktop.setup.permissions') : t('desktop.setup.permissionsMissing')));
+    row.append(el('span', workflow.hasConfigPath ? 'provider-ok' : 'provider-kind', workflow.hasConfigPath ? 'config-path' : t('desktop.setup.defaultConfig')));
     section.append(row);
   }
   const snippet = el('pre', 'snippet');
@@ -847,22 +1048,22 @@ function renderGitHubActionSetup(): HTMLElement {
 
 function renderEvidenceSetup(): HTMLElement {
   const section = el('section', 'integration-section');
-  section.append(el('h3', '', 'Release Evidence'));
+  section.append(el('h3', '', t('desktop.setup.releaseEvidence')));
   const evidence = state.evidenceStatus;
   if (!evidence) {
-    section.append(el('p', 'empty', 'Evidence status has not been loaded yet.'));
+    section.append(el('p', 'empty', t('desktop.setup.evidenceNotLoaded')));
     return section;
   }
   const rows: Array<[string, boolean, string | undefined]> = [
-    ['Release evidence', evidence.hasReleaseEvidence, evidence.releaseEvidencePath],
-    ['Live benchmark report', evidence.hasBenchmarkReport, evidence.benchmarkReportPath],
-    ['Evidence manifest', evidence.hasEvidenceManifest, evidence.evidenceManifestPath],
+    [t('desktop.setup.releaseEvidence'), evidence.hasReleaseEvidence, evidence.releaseEvidencePath],
+    [t('desktop.setup.liveBenchmarkReport'), evidence.hasBenchmarkReport, evidence.benchmarkReportPath],
+    [t('desktop.setup.evidenceManifest'), evidence.hasEvidenceManifest, evidence.evidenceManifestPath],
   ];
   for (const [label, present, path] of rows) {
     const row = el('div', 'evidence-row');
     row.append(el('strong', '', label));
-    row.append(el('span', present ? 'provider-ok' : 'provider-missing', present ? 'present' : 'missing'));
-    row.append(el('span', '', path ?? 'not found'));
+    row.append(el('span', present ? 'provider-ok' : 'provider-missing', present ? t('desktop.value.present') : t('desktop.value.missing')));
+    row.append(el('span', '', path ?? t('desktop.value.notFound')));
     section.append(row);
   }
   return section;
@@ -872,6 +1073,21 @@ function render(): void {
   appRoot.replaceChildren(renderShell());
 }
 
-void refreshSessions(true);
-void loadRepoInfo();
-void loadCommandContract();
+async function bootstrap(): Promise<void> {
+  applyDesktopLocale();
+  try {
+    const config = await readConfig();
+    state.configRaw = config.raw;
+    state.configPath = config.path;
+    applyDesktopLocale(config.raw);
+    state.configValidation = await validateConfig(config.raw);
+  } catch (error) {
+    state.notice = error instanceof Error ? error.message : String(error);
+  }
+  render();
+  void refreshSessions(true);
+  void loadRepoInfo();
+  void loadCommandContract();
+}
+
+void bootstrap();

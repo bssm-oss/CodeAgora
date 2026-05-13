@@ -31,7 +31,7 @@ function fixtureWorkspace() {
   assert(git.status === 0, 'Failed to initialize temporary git workspace');
   writeFile(path.join(dir, 'README.md'), '# CodeAgora desktop WebDriver fixture\n');
   writeFile(path.join(dir, '.ca', 'config.json'), `${JSON.stringify({
-    language: 'en',
+    language: 'ko',
     reviewers: [{ id: 'codex', backend: 'opencode', provider: 'openai', model: 'gpt-5' }],
   }, null, 2)}\n`);
   const sessionDir = path.join(dir, '.ca', 'sessions', '2026-05-06', 'webdriver-001');
@@ -177,14 +177,15 @@ try {
   assert(sessionId, `Missing WebDriver session id: ${JSON.stringify(session)}`);
 
   await waitForText(sessionId, '[data-testid="desktop-shell"]', 'CodeAgora');
+  await waitForText(sessionId, '[data-testid="desktop-shell"]', '리뷰 콕핏');
   await waitForText(sessionId, '[data-testid="session-detail"]', 'WebDriver fixture finding');
 
   await click(sessionId, '[data-testid="button-config"]');
-  await waitForText(sessionId, '[data-testid="config-panel"]', 'Config valid');
+  await waitForText(sessionId, '[data-testid="config-panel"]', '설정 유효함');
 
   await click(sessionId, '[data-testid="button-setup"]');
-  await waitForText(sessionId, '[data-testid="setup-panel"]', 'MCP Server');
-  await waitForText(sessionId, '[data-testid="setup-panel"]', 'Release Evidence');
+  await waitForText(sessionId, '[data-testid="setup-panel"]', 'MCP 서버');
+  await waitForText(sessionId, '[data-testid="setup-panel"]', '릴리즈 증거');
 
   console.log('CodeAgora desktop macOS WebDriver E2E passed');
 } catch (error) {
