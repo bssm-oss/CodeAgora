@@ -8,6 +8,10 @@ import koMessages from './locales/ko.json';
 
 type Locale = 'en' | 'ko';
 
+type ProcessLike = {
+  env?: Record<string, string | undefined>;
+};
+
 let currentLocale: Locale = 'en';
 
 const locales: Record<Locale, Record<string, string>> = {
@@ -43,9 +47,10 @@ export function t(key: string, params?: Record<string, string | number>): string
  * Priority: CODEAGORA_LANG env var → system LANG → fallback 'en'.
  */
 export function detectLocale(): Locale {
-  const envLang = process.env['CODEAGORA_LANG'];
+  const env = (globalThis as { process?: ProcessLike }).process?.env ?? {};
+  const envLang = env['CODEAGORA_LANG'];
   if (envLang === 'ko' || envLang === 'en') return envLang;
-  const sysLang = process.env['LANG'] ?? process.env['LANGUAGE'] ?? '';
+  const sysLang = env['LANG'] ?? env['LANGUAGE'] ?? '';
   if (sysLang.startsWith('ko')) return 'ko';
   return 'en';
 }
