@@ -8,5 +8,6 @@ export default defineConfig({
   clean: true,
   outDir: 'dist',
   bundle: true,
+  noExternal: ['@codeagora/shared'],
   splitting: false,
 });

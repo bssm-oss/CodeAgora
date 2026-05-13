@@ -17,6 +17,9 @@
     "tauri:dev": "pnpm build && cd src-tauri && cargo run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@codeagora/shared": "workspace:*"
+  },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.0",
     "tsup": "^8.0.1",

@@ -185,6 +185,10 @@ importers:
         version: 3.25.76
 
   packages/desktop:
+    dependencies:
+      '@codeagora/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@tauri-apps/cli':
         specifier: ^2.11.0
