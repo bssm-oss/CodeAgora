@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-rc.1 (2026-05-13)
+
+### RC Candidate Refresh
+- Promoted workspace package metadata, generated Action examples, and private-preview desktop metadata from `0.1.0-rc.0` to `0.1.0-rc.1`.
+- Added macOS desktop bundle validation for the icon-click private-preview app path while keeping public desktop support out of scope.
+
+### Verification
+- Carries forward the release-candidate evidence gates from `0.1.0-rc.0`; npm `latest` promotion and stable release wording remain out of scope.
+
 ## 0.1.0-rc.0 (2026-05-12)
 
 ### RC Candidate Preparation
