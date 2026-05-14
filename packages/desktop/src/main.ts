@@ -155,6 +155,26 @@ function latestSession(): SessionSummary | undefined {
   return [...state.sessions].sort((a, b) => timestampValue(b.updatedAt) - timestampValue(a.updatedAt))[0];
 }
 
+function runReadiness(): { ready: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  const repo = state.repoInfo;
+  if (!repo) reasons.push(t('desktop.readiness.reason.repoUnknown'));
+  if (repo && !repo.isGitRepo) reasons.push(t('desktop.readiness.reason.notGitRepo'));
+  if (repo && !repo.trusted) reasons.push(repo.trustReason || t('desktop.readiness.reason.notTrusted'));
+  if (repo && !repo.hasConfig) reasons.push(t('desktop.readiness.reason.configMissing'));
+  if (state.configValidation?.valid === false) reasons.push(t('desktop.readiness.reason.configInvalid'));
+  return { ready: reasons.length === 0, reasons };
+}
+
+function sessionHasDegradedSignal(session?: SessionDetail): boolean {
+  return Boolean(session?.degraded || (session?.degradedReasons && session.degradedReasons.length > 0));
+}
+
+function runHasDegradedSignal(run?: ReviewRunSnapshot): boolean {
+  if (!run) return false;
+  return run.events.some((event) => /degraded/i.test(event.kind) || /degraded/i.test(event.message));
+}
+
 function timestampValue(value?: string): number {
   if (!value) return 0;
   const timestamp = new Date(value).getTime();
@@ -355,8 +375,9 @@ async function validateConfigEditor(raw: string): Promise<void> {
 }
 
 async function startReview(staged: boolean): Promise<void> {
-  if (state.repoInfo && !state.repoInfo.trusted) {
-    state.notice = state.repoInfo.trustReason;
+  const readiness = runReadiness();
+  if (!readiness.ready) {
+    state.notice = readiness.reasons[0] ?? t('desktop.readiness.blockedBody');
     render();
     return;
   }
@@ -488,7 +509,9 @@ function renderToolbar(): HTMLElement {
 
   const actions = el('div', 'toolbar-actions');
   actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected), 'button', 'button-refresh'));
-  actions.append(button(t('desktop.action.quickReview'), () => void startReview(true), 'button primary', 'button-quick-review'));
+  const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'button primary', 'button-quick-review');
+  quickReview.disabled = state.busy || !runReadiness().ready;
+  actions.append(quickReview);
   toolbar.append(actions);
   return toolbar;
 }
@@ -603,6 +626,7 @@ function renderCockpitOverview(): HTMLElement {
   const repo = state.repoInfo;
   const hero = el('div', 'cockpit-hero');
   hero.append(el('span', 'eyebrow', t('desktop.cockpit.eyebrow')));
+  hero.append(el('span', 'preview-chip', t('desktop.preview.privatePreview')));
   hero.append(el('h2', '', latest ? t('desktop.cockpit.latestVerdict', { verdict: latest.decision ?? latest.status }) : t('desktop.cockpit.readyTitle')));
   hero.append(el('p', '', latest?.reasoning ?? t('desktop.cockpit.readyBody')));
   const actions = el('div', 'cockpit-actions');
@@ -689,8 +713,26 @@ function renderSessionDetail(): HTMLElement {
   appendMetric(evidenceGrid, t('desktop.detail.evidenceDocsLabel'), String(selected.evidenceCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.debateFilesLabel'), String(selected.discussionsCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.exportFormats'), 'Markdown · JSON · SARIF');
+  appendMetric(evidenceGrid, t('desktop.detail.costLabel'), selected.costSummary?.known ? selected.costSummary.formattedTotalCost : t('desktop.detail.costUnknown'));
+  appendMetric(evidenceGrid, t('desktop.detail.callsLabel'), String(selected.costSummary?.callCount ?? 0));
+  appendMetric(evidenceGrid, t('desktop.detail.tokensLabel'), selected.costSummary?.totalTokens !== undefined ? String(selected.costSummary.totalTokens) : t('desktop.value.unknown'));
   evidence.append(evidenceGrid);
   detail.append(evidence);
+
+  if (sessionHasDegradedSignal(selected)) {
+    const degraded = el('section', 'degraded-signal');
+    degraded.dataset.testid = 'session-degraded-signal';
+    degraded.append(el('h3', '', t('desktop.degraded.title')));
+    degraded.append(el('p', '', t('desktop.degraded.sessionBody')));
+    if (selected.degradedReasons && selected.degradedReasons.length > 0) {
+      const reasons = el('ul', 'degraded-reasons');
+      for (const reason of selected.degradedReasons) {
+        reasons.append(el('li', '', reason));
+      }
+      degraded.append(reasons);
+    }
+    detail.append(degraded);
+  }
 
   const issues = el('div', 'issues');
   const findings = selected.findings?.length ? selected.findings : selected.topIssues ?? [];
@@ -709,11 +751,17 @@ function renderSessionDetail(): HTMLElement {
   }
   detail.append(issues);
 
+  const exportGuide = el('p', 'repo-note', t('desktop.detail.exportGuidance'));
+  detail.append(exportGuide);
+
   const exports = el('div', 'export-actions');
   exports.append(button(t('desktop.action.copyMarkdown'), () => void exportSelected('markdown'), 'button', 'button-copy-markdown'));
   exports.append(button(t('desktop.action.copyJson'), () => void exportSelected('json'), 'button', 'button-copy-json'));
   exports.append(button(t('desktop.action.copySarif'), () => void exportSelected('sarif'), 'button', 'button-copy-sarif'));
   detail.append(exports);
+
+  const nextAction = renderNextActionPanel(selected);
+  detail.append(nextAction);
 
   if (selected.markdown) {
     const reportSection = el('details', 'report-shell') as HTMLDetailsElement;
@@ -729,11 +777,25 @@ function renderSessionDetail(): HTMLElement {
 function renderRunReview(): HTMLElement {
   const panel = el('div', 'run-panel');
   panel.dataset.testid = 'run-panel';
+  const readiness = runReadiness();
   const intro = el('div', 'launch-intro');
   intro.append(el('span', 'eyebrow', t('desktop.run.eyebrow')));
   intro.append(el('h2', '', t('desktop.run.title')));
   intro.append(el('p', '', t('desktop.run.body')));
   panel.append(intro);
+
+  const readinessPanel = el('section', readiness.ready ? 'readiness-panel ready' : 'readiness-panel blocked');
+  readinessPanel.dataset.testid = 'run-readiness';
+  readinessPanel.append(el('h3', '', readiness.ready ? t('desktop.readiness.readyTitle') : t('desktop.readiness.blockedTitle')));
+  readinessPanel.append(el('p', '', readiness.ready ? t('desktop.readiness.readyBody') : t('desktop.readiness.blockedBody')));
+  if (readiness.reasons.length > 0) {
+    const list = el('ul', 'readiness-reasons');
+    for (const reason of readiness.reasons) {
+      list.append(el('li', '', reason));
+    }
+    readinessPanel.append(list);
+  }
+  panel.append(readinessPanel);
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
 
@@ -755,7 +817,7 @@ function launchCard(label: string, eyebrow: string, description: string, primary
   const node = el('button', primary ? 'launch-card primary' : 'launch-card');
   node.type = 'button';
   node.dataset.testid = testId;
-  node.disabled = state.busy;
+  node.disabled = state.busy || !runReadiness().ready;
   node.addEventListener('click', onClick);
   node.append(el('span', 'eyebrow', eyebrow));
   node.append(el('strong', '', label));
@@ -768,6 +830,13 @@ function renderReviewRun(): HTMLElement {
   const section = el('section', 'review-run');
   section.dataset.testid = 'review-run';
   section.append(el('h3', '', t('desktop.run.timelineTitle')));
+  if (runHasDegradedSignal(run)) {
+    const degraded = el('div', 'degraded-signal');
+    degraded.dataset.testid = 'review-degraded-signal';
+    degraded.append(el('strong', '', t('desktop.degraded.title')));
+    degraded.append(el('p', '', t('desktop.degraded.runBody')));
+    section.append(degraded);
+  }
   if (!run) {
     const empty = el('div', 'empty-state compact');
     empty.append(el('strong', '', t('desktop.run.noActiveTitle')));
@@ -935,6 +1004,31 @@ function renderConfigValidation(): HTMLElement {
   if (validation.errors.length === 0 && validation.warnings.length === 0) {
     panel.append(el('span', 'validation-ok', t('desktop.config.noErrorsOrWarnings')));
   }
+  return panel;
+}
+
+function renderNextActionPanel(selected: SessionDetail): HTMLElement {
+  const panel = el('section', 'next-action-panel');
+  panel.dataset.testid = 'next-action-panel';
+  panel.append(el('h3', '', t('desktop.next.title')));
+
+  const list = el('ol', 'next-action-list');
+  const blockers = blockerCount(selected);
+  if (blockers > 0 || selected.decision === 'REJECT') {
+    list.append(el('li', '', t('desktop.next.fixBlockers')));
+    list.append(el('li', '', t('desktop.next.rerunStaged')));
+    list.append(el('li', '', t('desktop.next.exportShare')));
+  } else if (selected.decision === 'NEEDS_HUMAN') {
+    list.append(el('li', '', t('desktop.next.humanReview')));
+    list.append(el('li', '', t('desktop.next.captureDecision')));
+    list.append(el('li', '', t('desktop.next.exportShare')));
+  } else {
+    list.append(el('li', '', t('desktop.next.prepareMerge')));
+    list.append(el('li', '', t('desktop.next.exportRecord')));
+    list.append(el('li', '', t('desktop.next.monitorNextRun')));
+  }
+  panel.append(list);
+  panel.append(el('p', 'repo-note', t('desktop.next.privatePreviewNote')));
   return panel;
 }
 

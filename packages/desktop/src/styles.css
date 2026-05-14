@@ -337,6 +337,20 @@ h3 {
   text-transform: uppercase;
 }
 
+.preview-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in srgb, var(--info) 50%, var(--border));
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .cockpit-metrics,
 .summary-cards,
 .evidence-grid {
@@ -633,7 +647,10 @@ h3 {
 .review-run,
 .command-contract,
 .integration-section,
-.advanced-config {
+.advanced-config,
+.readiness-panel,
+.next-action-panel,
+.degraded-signal {
   display: grid;
   gap: 12px;
 }
@@ -750,6 +767,45 @@ summary {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--surface-soft);
+}
+
+.readiness-panel {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.readiness-panel.ready {
+  border-color: color-mix(in srgb, var(--good) 44%, var(--border));
+  background: var(--good-soft);
+}
+
+.readiness-panel.blocked {
+  border-color: color-mix(in srgb, var(--warn) 44%, var(--border));
+  background: var(--warn-soft);
+}
+
+.readiness-reasons,
+.degraded-reasons,
+.next-action-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.next-action-panel {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.degraded-signal {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 46%, var(--border));
+  border-radius: 14px;
+  background: var(--warn-soft);
 }
 
 .review-run-summary {
