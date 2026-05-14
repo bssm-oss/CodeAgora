@@ -57,4 +57,41 @@ describe('release evidence manifest', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('does not require private-preview desktop evidence for release tiers', () => {
+    const dir = makeTmpDir();
+    try {
+      const rcFiles = [
+        'typecheck.log',
+        'lint.log',
+        'build.log',
+        'test.log',
+        'bench-ci.log',
+        'beta-smoke.log',
+        'cross-surface-parity.log',
+        'package-root-dry-run.log',
+        'package-mcp-dry-run.log',
+        'action-smoke.log',
+        'mcp-smoke.log',
+        'security-regression.log',
+      ];
+      for (const file of rcFiles) {
+        fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+      }
+
+      const result = spawnSync(process.execPath, [scriptPath, '--evidence-dir', dir, '--require=rc'], {
+        encoding: 'utf-8',
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe('');
+
+      const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'evidence-manifest.json'), 'utf-8'));
+      const desktopGate = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-gate');
+      expect(desktopGate.requiredForRelease).toBe(false);
+      expect(desktopGate.exists).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
