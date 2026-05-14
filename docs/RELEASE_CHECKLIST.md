@@ -28,20 +28,21 @@ Before any future tag is pushed, confirm the intended package versions, dist-tag
 9. Run the GitHub Action smoke path through `pnpm build:action` and the release smoke script.
 10. Confirm `.github/workflows/release.yml` computes the expected prerelease publish tag and runs npm publish with `--tag beta` for beta versions and `--tag rc` for release candidates.
 11. Confirm `.github/workflows/npm-dist-tags.yml` offers `beta` and `rc`, and blocks assigning prerelease versions to `latest`.
-12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-rc.2` for RC Action examples rather than legacy `@v2` or stable-looking refs.
+12. Review README, CLI docs, MCP onboarding, `.env.example`, and Action docs for current install and secret requirements, including `bssm-oss/CodeAgora@v0.1.0-rc.3` for RC Action examples rather than legacy `@v2` or stable-looking refs.
 13. Confirm release workflow publish jobs require the `npm-publish` environment, npm provenance, npm version preflight, and uploaded release evidence artifacts.
 14. Open the PR and verify remote checks: CI Node 20/22, CodeAgora review or documented provider-only skip, and PR size label.
 15. Confirm P6 beta readiness only after P4 deterministic benchmark gates and P5 security abuse gates pass.
 16. For any RC after `0.1.0-beta.1`, run `pnpm rc:desktop-gate` and attach `.sisyphus/evidence/desktop-evidence-manifest.json` before RC handoff.
 
-For `0.1.0-beta.1`, `0.1.0-beta.2`, `0.1.0-rc.0`, and `0.1.0-rc.1`, the tags, prerelease GitHub Releases, and npm prerelease dist-tag publications are complete. For `0.1.0-rc.2`, keep stable promotion blocked until the `--require=rc` evidence manifest is complete and the live-only register is current.
+For `0.1.0-beta.1`, `0.1.0-beta.2`, `0.1.0-rc.0`, `0.1.0-rc.1`, and `0.1.0-rc.2`, the tags, prerelease GitHub Releases, and npm prerelease dist-tag publications are complete. For `0.1.0-rc.3`, keep stable promotion blocked until the rc.4 false-positive/noise blockers from the real-repo baseline are resolved.
 
-Current RC handoff status: on 2026-05-12, `main` `d621b62` passed CI plus
-`pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test --no-file-parallelism`,
-`pnpm bench:ci`, `pnpm test:security`, `pnpm release:beta-smoke`,
-`pnpm rc:desktop-gate`, and `pnpm evidence:manifest -- --require=rc`. The RC
-candidate metadata is prepared, but tag creation, GitHub Release creation, and
-npm publication are not complete until requested separately.
+Current RC handoff status: on 2026-05-14, the `0.1.0-rc.3` real-repository
+baseline completed with blockers recorded in `docs/rc-evidence/rc3-real-repo-qa.md`.
+Stable promotion remains blocked; tag creation, GitHub Release creation, and npm
+publication require the release gates below to pass for the rc.3 metadata commit.
+
+The planned `rc.3` through `rc.8` validation sequence is tracked in
+`docs/RC3_TO_RC8_PRERELEASE_ROADMAP.md`.
 
 ## Evidence
 

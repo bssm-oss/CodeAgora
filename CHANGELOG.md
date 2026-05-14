@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-rc.3 (2026-05-14)
+
+### Real Repository Baseline
+- Captured five real CodeAgora PR baseline runs with the OpenRouter low-cost diverse config and recorded the result as `complete with blockers`.
+- Preserved stable/latest promotion as blocked while rc.4 targets false-positive/noise reduction, invalid final locations, and JSON stdout contract cleanup.
+
+### Release Candidate Metadata
+- Promoted workspace package metadata, generated Action examples, and private-preview desktop metadata from `0.1.0-rc.2` to `0.1.0-rc.3`.
+- Updated the tag-triggered release workflow so release-candidate tags require the stricter `--require=rc` evidence manifest tier.
+
+### Verification
+- Deterministic gates and rc.3 real-repo baseline evidence are recorded in `docs/rc-evidence/rc3-real-repo-qa.md`.
+
 ## 0.1.0-rc.2 (2026-05-14)
 
 ### Desktop Private Preview
