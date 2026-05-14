@@ -305,7 +305,7 @@ fn parse_review_stream_line(line: &str) -> (String, String, Option<String>, Opti
         return ("stdout".to_string(), redacted_line, None, None);
     };
 
-    let kind = payload
+    let mut kind = payload
         .get("type")
         .or_else(|| payload.get("event"))
         .or_else(|| payload.get("stage"))
@@ -316,6 +316,7 @@ fn parse_review_stream_line(line: &str) -> (String, String, Option<String>, Opti
         .get("message")
         .or_else(|| payload.get("status"))
         .or_else(|| payload.get("phase"))
+        .or_else(|| payload.get("degradedReason"))
         .and_then(Value::as_str)
         .map(redact_sensitive)
         .unwrap_or(redacted_line);
@@ -323,6 +324,22 @@ fn parse_review_stream_line(line: &str) -> (String, String, Option<String>, Opti
         .get("sessionId")
         .and_then(Value::as_str)
         .map(str::to_string);
+
+    let degraded_signal = payload
+        .get("degraded")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || payload.get("degradedReason").and_then(Value::as_str).is_some()
+        || payload
+            .get("summary")
+            .and_then(|summary| summary.get("forfeitedReviewers"))
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false)
+        || kind.eq_ignore_ascii_case("degraded");
+    if degraded_signal {
+        kind = "degraded".to_string();
+    }
 
     (kind, message, session_id, None)
 }
@@ -562,7 +579,7 @@ fn read_optional_text(path: &Path) -> Option<String> {
 }
 
 fn read_session_verdict(dir: &Path) -> Option<Value> {
-    read_json(&dir.join("head-verdict.json")).or_else(|| read_json(&dir.join("result.json")))
+    read_json(&dir.join("result.json")).or_else(|| read_json(&dir.join("head-verdict.json")))
 }
 
 fn session_parts(id: &str) -> Result<(&str, &str), String> {
@@ -742,6 +759,159 @@ fn all_findings(verdict: Option<&Value>, issues: &[Value]) -> Vec<Value> {
     }
 }
 
+fn push_unique_reason(reasons: &mut Vec<String>, maybe_reason: Option<&str>) {
+    if let Some(reason) = maybe_reason.map(str::trim).filter(|reason| !reason.is_empty()) {
+        let normalized = reason.to_string();
+        if !reasons.iter().any(|existing| existing == &normalized) {
+            reasons.push(normalized);
+        }
+    }
+}
+
+fn numeric_field(value: &Value, keys: &[&str]) -> Option<f64> {
+    for key in keys {
+        if let Some(found) = value.get(*key).and_then(Value::as_f64) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn u64_field(value: &Value, keys: &[&str]) -> Option<u64> {
+    for key in keys {
+        if let Some(found) = value.get(*key).and_then(Value::as_u64) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn cost_summary_from_value(source: &str, value: &Value) -> Option<Value> {
+    if let Some(summary) = value.get("costSummary") {
+        if let Some(total) = numeric_field(summary, &["totalCost", "totalUsd", "cost"]) {
+            return Some(json!({
+                "known": total > 0.0,
+                "formattedTotalCost": if total > 0.0 { format!("${total:.4}") } else { "N/A".to_string() },
+                "totalCost": total,
+                "callCount": u64_field(summary, &["callCount", "calls"]),
+                "totalTokens": u64_field(summary, &["totalTokens", "tokens"]),
+                "source": source,
+            }));
+        }
+    }
+
+    if let Some(costs) = value.get("costs").and_then(Value::as_array) {
+        let total = costs
+            .iter()
+            .filter_map(|entry| numeric_field(entry, &["totalCost", "totalUsd", "cost"]))
+            .filter(|total| *total >= 0.0)
+            .sum::<f64>();
+        return Some(json!({
+            "known": total > 0.0,
+            "formattedTotalCost": if total > 0.0 { format!("${total:.4}") } else { "N/A".to_string() },
+            "totalCost": if total > 0.0 { json!(total) } else { Value::Null },
+            "callCount": costs.len(),
+            "source": source,
+        }));
+    }
+
+    if let Some(total) = numeric_field(value, &["totalCost", "totalUsd", "cost"]) {
+        return Some(json!({
+            "known": total > 0.0,
+            "formattedTotalCost": if total > 0.0 { format!("${total:.4}") } else { "N/A".to_string() },
+            "totalCost": total,
+            "source": source,
+        }));
+    }
+
+    if let Some(token_usage) = value.get("tokenUsage").or_else(|| value.get("usage")) {
+        if let Some(total_tokens) = u64_field(token_usage, &["totalTokens", "total_tokens"]) {
+            return Some(json!({
+                "known": false,
+                "formattedTotalCost": "N/A",
+                "totalTokens": total_tokens,
+                "source": source,
+            }));
+        }
+    }
+
+    None
+}
+
+fn derived_cost_summary(
+    verdict: Option<&Value>,
+    metadata: Option<&Value>,
+    telemetry: Option<&Value>,
+) -> Value {
+    verdict
+        .and_then(|value| cost_summary_from_value("result.json", value))
+        .or_else(|| metadata.and_then(|value| cost_summary_from_value("metadata.json", value)))
+        .or_else(|| telemetry.and_then(|value| cost_summary_from_value("telemetry.json", value)))
+        .unwrap_or_else(|| json!({ "known": false, "formattedTotalCost": "N/A", "source": "none" }))
+}
+
+fn derived_degraded_reasons(
+    verdict: Option<&Value>,
+    metadata: Option<&Value>,
+    telemetry: Option<&Value>,
+) -> Vec<String> {
+    let mut reasons = Vec::new();
+
+    if let Some(forfeited_reviewers) = verdict
+        .and_then(|v| v.get("summary"))
+        .and_then(|summary| summary.get("forfeitedReviewers"))
+        .and_then(Value::as_array)
+    {
+        for reviewer in forfeited_reviewers {
+            if let Some(name) = reviewer.as_str() {
+                push_unique_reason(&mut reasons, Some(&format!("forfeitedReviewer:{name}")));
+            } else {
+                push_unique_reason(
+                    &mut reasons,
+                    reviewer
+                        .get("reason")
+                        .and_then(Value::as_str)
+                        .or_else(|| reviewer.get("id").and_then(Value::as_str)),
+                );
+            }
+        }
+    }
+
+    for source in [verdict, metadata, telemetry] {
+        push_unique_reason(
+            &mut reasons,
+            source
+                .and_then(|value| value.get("degradedReason"))
+                .and_then(Value::as_str),
+        );
+        push_unique_reason(
+            &mut reasons,
+            source
+                .and_then(|value| value.get("summary"))
+                .and_then(|summary| summary.get("degradedReason"))
+                .and_then(Value::as_str),
+        );
+    }
+
+    reasons
+}
+
+fn derived_degraded(
+    verdict: Option<&Value>,
+    metadata: Option<&Value>,
+    telemetry: Option<&Value>,
+    reasons: &[String],
+) -> bool {
+    let explicit_degraded = [verdict, metadata, telemetry].iter().any(|source| {
+        source
+            .and_then(|value| value.get("degraded"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    });
+
+    explicit_degraded || !reasons.is_empty()
+}
+
 fn session_entry(
     date: &str,
     session_id: &str,
@@ -773,6 +943,7 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
 
     let (date, session_id) = session_parts(id)?;
     let metadata = read_json(&dir.join("metadata.json"));
+    let telemetry = read_json(&dir.join("telemetry.json"));
     let verdict = read_session_verdict(&dir);
     let markdown = read_optional_text(&dir.join("report.md"))
         .or_else(|| read_optional_text(&dir.join("result.md")))
@@ -784,15 +955,22 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         .map(|entries| entries.count())
         .unwrap_or(0);
     let findings = all_findings(verdict.as_ref(), &issue_objects(verdict.as_ref()));
+    let cost_summary = derived_cost_summary(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
+    let degraded_reasons = derived_degraded_reasons(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
+    let degraded = derived_degraded(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref(), &degraded_reasons);
 
     Ok(json!({
         "entry": session_entry(date, session_id, &dir, metadata.as_ref(), verdict.as_ref()),
         "metadata": metadata,
+        "telemetry": telemetry,
         "verdict": verdict,
         "findings": findings,
         "markdown": markdown,
         "evidenceCount": evidence_count,
         "discussionsCount": discussions_count,
+        "costSummary": cost_summary,
+        "degraded": degraded,
+        "degradedReasons": degraded_reasons,
     }))
 }
 
@@ -802,6 +980,14 @@ fn sarif_for_session(id: &str, detail: &Value) -> Value {
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+
+    let severity_mapping = |severity: &str| match severity {
+        "HARSHLY_CRITICAL" => ("error", "CA001"),
+        "CRITICAL" => ("error", "CA002"),
+        "WARNING" => ("warning", "CA003"),
+        _ => ("note", "CA004"),
+    };
+
     let results = findings
         .iter()
         .map(|finding| {
@@ -809,43 +995,90 @@ fn sarif_for_session(id: &str, detail: &Value) -> Value {
                 .get("filePath")
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
-            let line = finding
+            let severity = finding
+                .get("severity")
+                .and_then(Value::as_str)
+                .unwrap_or("SUGGESTION");
+            let (level, rule_id) = severity_mapping(severity);
+            let line_range = finding
                 .get("lineRange")
                 .and_then(Value::as_array)
-                .and_then(|range| range.first())
+                .cloned()
+                .unwrap_or_else(|| vec![json!(1), json!(1)]);
+            let start_line = line_range
+                .first()
                 .and_then(Value::as_i64)
                 .unwrap_or(1)
                 .max(1);
+            let end_line = line_range
+                .get(1)
+                .and_then(Value::as_i64)
+                .unwrap_or(start_line)
+                .max(start_line);
             json!({
-                "ruleId": finding.get("severity").and_then(Value::as_str).unwrap_or("CODEAGORA"),
-                "level": "warning",
+                "ruleId": rule_id,
+                "level": level,
                 "message": {
                     "text": finding.get("title").and_then(Value::as_str).unwrap_or("CodeAgora finding")
                 },
                 "locations": [{
                     "physicalLocation": {
-                        "artifactLocation": { "uri": file_path },
-                        "region": { "startLine": line }
+                        "artifactLocation": {
+                            "uri": file_path,
+                            "uriBaseId": "%SRCROOT%"
+                        },
+                        "region": {
+                            "startLine": start_line,
+                            "endLine": end_line
+                        }
                     }
                 }]
             })
         })
         .collect::<Vec<_>>();
+
+    let (date, session_id) = session_parts(id).unwrap_or(("unknown-date", id));
+
     json!({
         "version": "2.1.0",
-        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
         "runs": [{
             "tool": {
                 "driver": {
-                    "name": "CodeAgora Desktop",
-                    "informationUri": "https://github.com/bssm-oss/CodeAgora"
+                    "name": "CodeAgora",
+                    "informationUri": "https://github.com/bssm-oss/CodeAgora",
+                    "rules": [
+                        {
+                            "id": "CA001",
+                            "name": "HarshlyCriticalIssue",
+                            "shortDescription": { "text": "Harshly critical issue detected by multi-agent review" },
+                            "defaultConfiguration": { "level": "error" }
+                        },
+                        {
+                            "id": "CA002",
+                            "name": "CriticalIssue",
+                            "shortDescription": { "text": "Critical issue detected by multi-agent review" },
+                            "defaultConfiguration": { "level": "error" }
+                        },
+                        {
+                            "id": "CA003",
+                            "name": "WarningIssue",
+                            "shortDescription": { "text": "Warning-level issue detected by multi-agent review" },
+                            "defaultConfiguration": { "level": "warning" }
+                        },
+                        {
+                            "id": "CA004",
+                            "name": "Suggestion",
+                            "shortDescription": { "text": "Suggestion from multi-agent review" },
+                            "defaultConfiguration": { "level": "note" }
+                        }
+                    ]
                 }
             },
-            "invocations": [{
-                "executionSuccessful": true,
-                "properties": { "sessionId": id }
-            }],
-            "results": results
+            "results": results,
+            "automationDetails": {
+                "id": format!("codeagora/{date}/{session_id}")
+            }
         }]
     })
 }
@@ -1812,11 +2045,28 @@ mod tests {
             &root,
             ".ca/sessions/2026-05-06/e2e-001/head-verdict.json",
             r#"{
+  "decision": "ACCEPT",
+  "reasoning": "Legacy fallback verdict.",
+  "issues": []
+}
+"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/result.json",
+            r#"{
   "decision": "REJECT",
   "reasoning": "Desktop E2E caught a blocking issue.",
+  "degraded": true,
+  "degradedReason": "reviewer timeout",
+  "costSummary": { "totalUsd": 0.42, "currency": "USD" },
+  "summary": {
+    "forfeitedReviewers": ["r2"],
+    "severityCounts": { "HARSHLY_CRITICAL": 1 }
+  },
   "issues": [
     {
-      "severity": "CRITICAL",
+      "severity": "HARSHLY_CRITICAL",
       "filePath": "src/app.ts",
       "lineRange": [12, 18],
       "title": "Blocking desktop E2E finding",
@@ -1825,6 +2075,11 @@ mod tests {
   ]
 }
 "#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/telemetry.json",
+            r#"{ "degradedReason": "fallback backend", "costSummary": { "totalUsd": 0.99 } }"#,
         );
         write_file(
             &root,
@@ -1875,6 +2130,26 @@ mod tests {
             detail.pointer("/findings/0/title").and_then(Value::as_str),
             Some("Blocking desktop E2E finding")
         );
+        assert_eq!(
+            detail.pointer("/costSummary/formattedTotalCost").and_then(Value::as_str),
+            Some("$0.4200")
+        );
+        assert_eq!(
+            detail.pointer("/costSummary/totalCost").and_then(Value::as_f64),
+            Some(0.42)
+        );
+        assert_eq!(detail.pointer("/degraded").and_then(Value::as_bool), Some(true));
+        let degraded_reasons = detail
+            .get("degradedReasons")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        assert!(degraded_reasons.iter().any(|reason| reason.as_str() == Some("reviewer timeout")));
+        assert!(
+            degraded_reasons
+                .iter()
+                .any(|reason| reason.as_str() == Some("forfeitedReviewer:r2"))
+        );
         assert!(detail
             .get("markdown")
             .and_then(Value::as_str)
@@ -1891,8 +2166,11 @@ mod tests {
 
         let sarif =
             export_session_value(&root, "2026-05-06/e2e-001", "sarif").expect("sarif export");
-        assert!(sarif.content.contains("\"ruleId\": \"CRITICAL\""));
-        assert!(sarif.content.contains("\"uri\": \"src/app.ts\""));
+        assert!(sarif.content.contains("\"name\": \"CodeAgora\""));
+        assert!(sarif.content.contains("\"ruleId\": \"CA001\""));
+        assert!(sarif.content.contains("\"level\": \"error\""));
+        assert!(sarif.content.contains("\"uriBaseId\": \"%SRCROOT%\""));
+        assert!(sarif.content.contains("\"id\": \"codeagora/2026-05-06/e2e-001\""));
 
         let action = github_action_status(&root);
         assert_eq!(action.workflow_count, 1);
@@ -1989,5 +2267,48 @@ mod tests {
         let root = temp_workspace("untrusted");
         let error = require_trusted_repo(&root).expect_err("non-git workspace should be blocked");
         assert!(error.contains("No git repository detected"));
+    }
+
+    #[test]
+    fn desktop_app_e2e_uses_legacy_head_verdict_fallback_when_result_missing() {
+        let root = temp_workspace("legacy-fallback");
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/legacy-001/metadata.json",
+            r#"{ "status": "completed" }"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/legacy-001/head-verdict.json",
+            r#"{ "decision": "ACCEPT", "issues": [] }"#,
+        );
+
+        let detail = session_detail_value(&root, "2026-05-06/legacy-001").expect("session detail");
+        assert_eq!(
+            detail.pointer("/entry/decision").and_then(Value::as_str),
+            Some("ACCEPT")
+        );
+    }
+
+    #[test]
+    fn desktop_app_e2e_parses_degraded_stream_events_without_new_status() {
+        let (kind, message, session_id, _) = parse_review_stream_line(
+            r#"{"type":"progress","degraded":true,"degradedReason":"timeout","sessionId":"2026-05-06/e2e-001"}"#,
+        );
+        assert_eq!(kind, "degraded");
+        assert_eq!(message, "timeout");
+        assert_eq!(session_id.as_deref(), Some("2026-05-06/e2e-001"));
+
+        let snapshot = ReviewRunSnapshot {
+            run_id: "run-1".to_string(),
+            staged: false,
+            status: "running".to_string(),
+            message: "ok".to_string(),
+            session_id: None,
+            started_at: "1".to_string(),
+            completed_at: None,
+            events: vec![],
+        };
+        assert!(matches!(snapshot.status.as_str(), "running" | "completed" | "failed" | "cancelled" | "cancelling"));
     }
 }

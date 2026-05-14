@@ -28,11 +28,23 @@ export interface SessionSummary {
   updatedAt?: string;
 }
 
+export interface SessionCostSummary {
+  known: boolean;
+  formattedTotalCost: string;
+  totalCost?: number;
+  callCount?: number;
+  totalTokens?: number;
+  source?: string;
+}
+
 export interface SessionDetail extends SessionSummary {
   findings?: TopIssue[];
   markdown?: string;
   evidenceCount?: number;
   discussionsCount?: number;
+  degraded?: boolean;
+  degradedReasons?: string[];
+  costSummary?: SessionCostSummary;
 }
 
 export interface SessionExport {
@@ -171,6 +183,9 @@ interface CliSessionDetail {
   markdown?: unknown;
   evidenceCount?: unknown;
   discussionsCount?: unknown;
+  degraded?: unknown;
+  degradedReasons?: unknown;
+  costSummary?: unknown;
 }
 
 declare global {
@@ -333,6 +348,9 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
     updatedAt: entry.updatedAt ?? timestampFromMetadata(metadata),
     evidenceCount: asNumber(detail.evidenceCount) ?? issues.length,
     discussionsCount: asNumber(detail.discussionsCount) ?? (Array.isArray(verdict?.['discussions']) ? verdict['discussions'].length : undefined),
+    degraded: typeof detail.degraded === 'boolean' ? detail.degraded : undefined,
+    degradedReasons: Array.isArray(detail.degradedReasons) ? detail.degradedReasons.filter((item): item is string => typeof item === 'string') : undefined,
+    costSummary: asObject(detail.costSummary) as SessionCostSummary | undefined,
     markdown: asString(detail.markdown) || [
       `# Review ${entry.id}`,
       '',
