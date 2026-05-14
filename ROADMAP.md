@@ -32,6 +32,7 @@ Out of scope before stable:
 - `docs/PRODUCTION_READINESS_ROADMAP.md` remains the detailed production gate definition.
 - `docs/BETA_READINESS_P4_P6.md` remains the current beta-readiness evidence summary.
 - `docs/RELEASE_CHECKLIST.md` remains the release procedure and approval-stop checklist.
+- `docs/RC3_TO_RC8_PRERELEASE_ROADMAP.md` defines the rc.3 through rc.8 prerelease validation sequence.
 - This root roadmap is the short operational queue: what must be fixed, proven, or clarified next.
 
 ## Current Position
