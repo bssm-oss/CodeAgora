@@ -83,7 +83,7 @@ jobs:
 
       - name: Generate evidence manifest
         run: |
-          REQUIRED_TIER=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-') ? 'beta' : 'stable');")
+          REQUIRED_TIER=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'stable');")
           pnpm evidence:manifest -- --require="$REQUIRED_TIER"
 
       - name: Upload release evidence

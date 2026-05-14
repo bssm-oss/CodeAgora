@@ -16,6 +16,7 @@ describe('prerelease safety', () => {
 
     expect(workflow).toContain('PUBLISH_TAG=$(node -e');
     expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'latest'");
+    expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'stable'");
     expect(workflow).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
     expect(workflow).toContain('cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"');
   });
@@ -33,7 +34,7 @@ describe('prerelease safety', () => {
     const rootVersion = readPackageVersion('package.json');
     const mcpVersion = readPackageVersion('packages/mcp/package.json');
 
-    expect(rootVersion).toBe('0.1.0-rc.2');
+    expect(rootVersion).toBe('0.1.0-rc.3');
     expect(mcpVersion).toBe(rootVersion);
   });
 
