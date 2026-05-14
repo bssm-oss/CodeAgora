@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/review",
-  "version": "0.1.0-rc.2",
+  "version": "0.1.0-rc.3",
   "type": "module",
   "description": "Multi-LLM code review pipeline — parallel reviewers, structured debate, consensus verdict",
   "license": "MIT",
