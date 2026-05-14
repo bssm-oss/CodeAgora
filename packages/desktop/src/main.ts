@@ -30,8 +30,12 @@ import {
 
 type View = 'sessions' | 'run' | 'config' | 'setup';
 type DesktopLocale = 'en' | 'ko';
+type DesktopLocalePreference = DesktopLocale | 'auto';
+type DesktopThemePreference = 'system' | 'light' | 'dark';
 
 const recentReposKey = 'codeagora.desktop.recentRepos';
+const localePreferenceKey = 'codeagora.desktop.locale';
+const themePreferenceKey = 'codeagora.desktop.theme';
 
 interface AppState {
   view: View;
@@ -53,6 +57,8 @@ interface AppState {
   githubActionStatus?: GitHubActionStatus;
   evidenceStatus?: EvidenceStatus;
   notice?: string;
+  localePreference: DesktopLocalePreference;
+  themePreference: DesktopThemePreference;
   busy: boolean;
 }
 
@@ -68,6 +74,8 @@ const state: AppState = {
   configRaw: '',
   configPath: '.ca/config.json',
   providers: [],
+  localePreference: loadLocalePreference(),
+  themePreference: loadThemePreference(),
   busy: false,
 };
 
@@ -99,12 +107,29 @@ function browserLocales(): string[] {
   return [...(navigator.languages ?? []), navigator.language].filter((language): language is string => Boolean(language));
 }
 
-function resolveDesktopLocale(raw: string, languages = browserLocales()): DesktopLocale {
+function resolveDesktopLocale(raw: string, preference: DesktopLocalePreference, languages = browserLocales()): DesktopLocale {
+  if (preference === 'en' || preference === 'ko') return preference;
   return configLocale(raw) ?? languages.map(normalizeLocale).find((locale): locale is DesktopLocale => Boolean(locale)) ?? 'en';
 }
 
+function resolveDesktopTheme(preference: DesktopThemePreference): 'light' | 'dark' {
+  if (preference === 'light' || preference === 'dark') return preference;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyDesktopTheme(preference = state.themePreference): void {
+  const root = document.documentElement;
+  if (preference === 'light' || preference === 'dark') {
+    root.dataset.theme = preference;
+    root.style.colorScheme = preference;
+    return;
+  }
+  delete root.dataset.theme;
+  root.style.colorScheme = resolveDesktopTheme(preference);
+}
+
 function applyDesktopLocale(raw = state.configRaw): void {
-  setLocale(resolveDesktopLocale(raw));
+  setLocale(resolveDesktopLocale(raw, state.localePreference));
   document.documentElement.lang = getLocale();
 }
 
@@ -226,6 +251,50 @@ function rememberRepoPath(path: string): void {
   const next = [path, ...state.recentRepoPaths.filter((item) => item !== path)].slice(0, 5);
   state.recentRepoPaths = next;
   window.localStorage.setItem(recentReposKey, JSON.stringify(next));
+}
+
+function loadLocalePreference(): DesktopLocalePreference {
+  try {
+    const value = window.localStorage.getItem(localePreferenceKey);
+    if (value === 'en' || value === 'ko' || value === 'auto') return value;
+  } catch {
+    return 'auto';
+  }
+  return 'auto';
+}
+
+function saveLocalePreference(preference: DesktopLocalePreference): void {
+  try {
+    if (preference === 'auto') {
+      window.localStorage.removeItem(localePreferenceKey);
+      return;
+    }
+    window.localStorage.setItem(localePreferenceKey, preference);
+  } catch {
+    return;
+  }
+}
+
+function loadThemePreference(): DesktopThemePreference {
+  try {
+    const value = window.localStorage.getItem(themePreferenceKey);
+    if (value === 'light' || value === 'dark' || value === 'system') return value;
+  } catch {
+    return 'system';
+  }
+  return 'system';
+}
+
+function saveThemePreference(preference: DesktopThemePreference): void {
+  try {
+    if (preference === 'system') {
+      window.localStorage.removeItem(themePreferenceKey);
+      return;
+    }
+    window.localStorage.setItem(themePreferenceKey, preference);
+  } catch {
+    return;
+  }
 }
 
 async function refreshSessions(selectFirst = false): Promise<void> {
@@ -508,6 +577,63 @@ function renderToolbar(): HTMLElement {
   toolbar.append(title);
 
   const actions = el('div', 'toolbar-actions');
+  const preferences = el('div', 'toolbar-preferences');
+
+  const localeControl = el('label', 'toolbar-select') as HTMLLabelElement;
+  localeControl.append(el('span', 'toolbar-select-label', t('desktop.preferences.language')));
+  const localeSelect = el('select', 'toolbar-select-input') as HTMLSelectElement;
+  localeSelect.dataset.testid = 'locale-select';
+  localeSelect.setAttribute('aria-label', t('desktop.preferences.language'));
+  for (const [value, key] of [
+    ['auto', 'desktop.preferences.locale.auto'],
+    ['en', 'desktop.preferences.locale.en'],
+    ['ko', 'desktop.preferences.locale.ko'],
+  ] as const) {
+    const option = el('option') as HTMLOptionElement;
+    option.value = value;
+    option.textContent = t(key);
+    option.selected = state.localePreference === value;
+    localeSelect.append(option);
+  }
+  localeSelect.disabled = state.busy;
+  localeSelect.addEventListener('change', () => {
+    const next = localeSelect.value;
+    state.localePreference = next === 'en' || next === 'ko' ? next : 'auto';
+    saveLocalePreference(state.localePreference);
+    applyDesktopLocale();
+    render();
+  });
+  localeControl.append(localeSelect);
+
+  const themeControl = el('label', 'toolbar-select') as HTMLLabelElement;
+  themeControl.append(el('span', 'toolbar-select-label', t('desktop.preferences.theme')));
+  const themeSelect = el('select', 'toolbar-select-input') as HTMLSelectElement;
+  themeSelect.dataset.testid = 'theme-select';
+  themeSelect.setAttribute('aria-label', t('desktop.preferences.theme'));
+  for (const [value, key] of [
+    ['system', 'desktop.preferences.theme.system'],
+    ['light', 'desktop.preferences.theme.light'],
+    ['dark', 'desktop.preferences.theme.dark'],
+  ] as const) {
+    const option = el('option') as HTMLOptionElement;
+    option.value = value;
+    option.textContent = t(key);
+    option.selected = state.themePreference === value;
+    themeSelect.append(option);
+  }
+  themeSelect.disabled = state.busy;
+  themeSelect.addEventListener('change', () => {
+    const next = themeSelect.value;
+    state.themePreference = next === 'light' || next === 'dark' ? next : 'system';
+    saveThemePreference(state.themePreference);
+    applyDesktopTheme();
+    render();
+  });
+  themeControl.append(themeSelect);
+
+  preferences.append(localeControl, themeControl);
+  actions.append(preferences);
+
   actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected), 'button', 'button-refresh'));
   const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'button primary', 'button-quick-review');
   quickReview.disabled = state.busy || !runReadiness().ready;
@@ -1074,13 +1200,15 @@ function renderSetup(): HTMLElement {
   const grid = el('div', 'provider-grid');
   for (const provider of state.providers) {
     const card = el('div', provider.configured ? 'provider-card configured checklist-card' : 'provider-card checklist-card');
-    card.append(el('span', provider.configured ? 'check-dot good' : 'check-dot optional', provider.configured ? t('desktop.value.ready') : t('desktop.value.optional')));
+    const top = el('div', 'provider-card-top');
+    top.append(el('span', provider.configured ? 'check-dot good status-pill' : 'check-dot optional status-pill', provider.configured ? t('desktop.value.ready') : t('desktop.value.optional')));
+    top.append(el('span', 'provider-kind status-pill neutral', provider.kind));
+    card.append(top);
     card.append(el('strong', '', provider.name));
-    card.append(el('span', 'provider-kind', provider.kind));
     const status = provider.configured ? t('desktop.setup.configured') : t('desktop.setup.notConfigured');
-    card.append(el('span', provider.configured ? 'provider-ok' : 'provider-missing optional', status));
-    if (provider.envVar) card.append(el('span', '', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
-    if (provider.binary) card.append(el('span', '', provider.binary));
+    card.append(el('span', provider.configured ? 'provider-ok status-pill' : 'provider-missing optional status-pill', status));
+    if (provider.envVar) card.append(el('span', 'provider-meta', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
+    if (provider.binary) card.append(el('span', 'provider-meta', provider.binary));
     grid.append(card);
   }
   if (state.providers.length === 0) {
@@ -1127,11 +1255,13 @@ function renderGitHubActionSetup(): HTMLElement {
   section.append(el('p', 'repo-note', t('desktop.setup.workflowSummary', { codeagora: status.codeagoraWorkflowCount, workflows: status.workflowCount })));
   for (const workflow of status.workflows) {
     const row = el('div', 'workflow-row');
-    row.append(el('strong', '', workflow.path));
-    row.append(el('span', workflow.mentionsCodeagora ? 'provider-ok' : 'provider-missing', workflow.mentionsCodeagora ? 'CodeAgora' : t('desktop.setup.noCodeAgora')));
-    row.append(el('span', workflow.hasPullRequestTrigger ? 'provider-ok' : 'provider-missing', workflow.hasPullRequestTrigger ? t('desktop.setup.prTrigger') : t('desktop.setup.noPrTrigger')));
-    row.append(el('span', workflow.hasPermissions ? 'provider-ok' : 'provider-missing', workflow.hasPermissions ? t('desktop.setup.permissions') : t('desktop.setup.permissionsMissing')));
-    row.append(el('span', workflow.hasConfigPath ? 'provider-ok' : 'provider-kind', workflow.hasConfigPath ? 'config-path' : t('desktop.setup.defaultConfig')));
+    row.append(el('strong', 'workflow-path', workflow.path));
+    const flags = el('div', 'workflow-flags');
+    flags.append(el('span', workflow.mentionsCodeagora ? 'provider-ok status-pill' : 'provider-missing status-pill', workflow.mentionsCodeagora ? 'CodeAgora' : t('desktop.setup.noCodeAgora')));
+    flags.append(el('span', workflow.hasPullRequestTrigger ? 'provider-ok status-pill' : 'provider-missing status-pill', workflow.hasPullRequestTrigger ? t('desktop.setup.prTrigger') : t('desktop.setup.noPrTrigger')));
+    flags.append(el('span', workflow.hasPermissions ? 'provider-ok status-pill' : 'provider-missing status-pill', workflow.hasPermissions ? t('desktop.setup.permissions') : t('desktop.setup.permissionsMissing')));
+    flags.append(el('span', workflow.hasConfigPath ? 'provider-ok status-pill' : 'provider-kind status-pill neutral', workflow.hasConfigPath ? 'config-path' : t('desktop.setup.defaultConfig')));
+    row.append(flags);
     section.append(row);
   }
   const snippet = el('pre', 'snippet');
@@ -1168,6 +1298,10 @@ function render(): void {
 }
 
 async function bootstrap(): Promise<void> {
+  applyDesktopTheme();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (state.themePreference === 'system') applyDesktopTheme();
+  });
   applyDesktopLocale();
   try {
     const config = await readConfig();
