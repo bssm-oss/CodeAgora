@@ -23,6 +23,12 @@ const main = readText('src-tauri/src/main.rs');
 
 assert(fs.existsSync(path.join(root, 'dist/index.html')), 'dist/index.html is missing');
 assert(fs.existsSync(path.join(root, 'dist/main.js')), 'dist/main.js is missing');
+assert(fs.existsSync(path.join(root, 'dist/styles.css')), 'dist/styles.css is missing');
+
+const builtCss = readText('dist/styles.css').toLowerCase();
+assert(builtCss.includes('#191a51'), 'Built CSS is missing logo navy #191A51');
+assert(builtCss.includes('#05a6b9'), 'Built CSS is missing logo cyan #05A6B9');
+
 assert(tauriConfig.version === packageJson.version, 'Tauri config version does not match package version');
 assert(tauriConfig.productName === 'CodeAgora', 'Unexpected Tauri product name');
 assert(typeof tauriConfig.app?.security?.csp === 'string' && tauriConfig.app.security.csp.includes("default-src 'self'"), 'Tauri CSP must be enabled for desktop RC gates');
