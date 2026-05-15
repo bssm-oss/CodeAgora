@@ -73,7 +73,7 @@ export function truncateReviewBody(body: string, maxLen: number): string {
  * Classification:
  * - must-fix: CRITICAL+ with confidence >50%
  * - verify: CRITICAL+ with confidence ≤50%, or WARNING with confidence >50%
- * - ignore: SUGGESTION, or confidence <20%
+ * - ignore: SUGGESTION, non-critical confidence <20%, or class-prior findings below must-fix confidence
  */
 export function buildTriageDigest(docs: EvidenceDocument[]): string | null {
   if (docs.length === 0) return null;
