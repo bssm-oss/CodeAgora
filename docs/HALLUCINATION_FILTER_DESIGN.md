@@ -161,7 +161,7 @@ This gives supporters concrete facts to reason about, reducing reliance on the c
 **Blocks**: Residual hallucinations
 
 - DISMISSED → removed (already implemented)
-- CRITICAL+ with avgConfidence < 15% → NEEDS_HUMAN, not REJECT (already implemented)
+- CRITICAL+ with avgConfidence ≤50% → NEEDS_HUMAN, not REJECT (already implemented)
 - Post-debate single-corroboration findings → downgrade to SUGGESTION
 
 ---

@@ -74,7 +74,7 @@
 3. **Code quote verification**: Backtick-quoted code fabrication check — >50% fabricated → confidence × 0.5
 4. **Self-contradiction**: Claims "added" but only removals exist (or vice versa) → confidence × 0.5
 
-Note: Evidence deduplication is in L2 (`deduplication.ts`). Confidence-based triage (0–15% → NEEDS_HUMAN) is in L3 (`verdict.ts`).
+Note: Evidence deduplication is in L2 (`deduplication.ts`). Confidence-based CRITICAL+ triage (≤50% → NEEDS_HUMAN) is in L3 (`verdict.ts`).
 
 **L2 — Discussion**: A supporter pool and devil's advocate debate contested issues over multiple rounds. Static analysis evidence is included in debate context. The moderator enforces consensus or makes a forced decision.
 

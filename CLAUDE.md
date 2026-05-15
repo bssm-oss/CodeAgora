@@ -38,7 +38,7 @@ Reduces false positives from LLM reviewers (target: <25%):
 
 Low-confidence findings (< 20%) after penalties are routed to `uncertain` for human review.
 Note: Evidence deduplication is handled separately in L2 (`deduplication.ts`, Union-Find).
-Confidence scoring is split across L0 (`specificity-scorer.ts`) and L3 (`verdict.ts`, 0–15% → NEEDS_HUMAN).
+Confidence scoring is split across L0 (`specificity-scorer.ts`) and L3 (`verdict.ts`, CRITICAL+ ≤50% → NEEDS_HUMAN).
 
 ### Specialist Personas
 Built-in persona types: `builtin:security`, `builtin:logic`, `builtin:api-contract`, `builtin:general`
