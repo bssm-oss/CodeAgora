@@ -135,6 +135,21 @@ describe('makeHeadVerdict()', () => {
 
       expect(verdict.questionsForHuman).toBeUndefined();
     });
+
+    it('rejects high-confidence critical issues before strict-mode warning routing', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({ discussionId: 'd-critical', finalSeverity: 'CRITICAL', consensusReached: true, avgConfidence: 51 }),
+          makeVerdict({ discussionId: 'd-warning-1', finalSeverity: 'WARNING', consensusReached: true }),
+          makeVerdict({ discussionId: 'd-warning-2', finalSeverity: 'WARNING', consensusReached: true }),
+          makeVerdict({ discussionId: 'd-warning-3', finalSeverity: 'WARNING', consensusReached: true }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report, undefined, 'strict');
+
+      expect(verdict.decision).toBe('REJECT');
+    });
   });
 
   describe('REJECT with mixed critical + escalated issues', () => {
@@ -332,10 +347,10 @@ describe('applyHeadVerdictSafety()', () => {
     expect(verdict.questionsForHuman?.[0]).toContain('d-escalated');
   });
 
-  it('leaves non-ACCEPT verdicts unchanged', () => {
+  it('leaves REJECT unchanged when actionable critical discussions remain', () => {
     const report = makeReport({
       discussions: [
-        makeVerdict({ discussionId: 'd001', finalSeverity: 'CRITICAL', consensusReached: true }),
+        makeVerdict({ discussionId: 'd001', finalSeverity: 'CRITICAL', consensusReached: true, avgConfidence: 60 }),
       ],
     });
 
@@ -345,6 +360,27 @@ describe('applyHeadVerdictSafety()', () => {
     }, report);
 
     expect(verdict).toEqual({ decision: 'REJECT', reasoning: 'Already blocking.' });
+  });
+
+  it('overrides REJECT to NEEDS_HUMAN when only low-confidence critical discussions remain', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-low-confidence',
+          finalSeverity: 'CRITICAL',
+          consensusReached: true,
+          avgConfidence: 50,
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'REJECT',
+      reasoning: 'LLM rejected unverified critical.',
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
   });
 });
 

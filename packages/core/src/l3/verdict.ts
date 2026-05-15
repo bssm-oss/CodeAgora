@@ -283,10 +283,6 @@ export function applyHeadVerdictSafety(
   verdict: HeadVerdict,
   report: ModeratorReport,
 ): HeadVerdict {
-  if (verdict.decision !== 'ACCEPT') {
-    return verdict;
-  }
-
   const allCritical = report.discussions.filter(
     (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
   );
@@ -294,10 +290,11 @@ export function applyHeadVerdictSafety(
     (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
   if (criticalIssues.length > 0) {
+    if (verdict.decision === 'REJECT') return verdict;
     return {
       decision: 'REJECT',
       reasoning:
-        `Head safety guard: ACCEPT was overridden because ${criticalIssues.length} ` +
+        `Head safety guard: ${verdict.decision} was overridden because ${criticalIssues.length} ` +
         `critical issue(s) remain actionable in the moderator report. Original reasoning: ${verdict.reasoning}`,
       questionsForHuman: verdict.questionsForHuman,
     };
@@ -320,7 +317,7 @@ export function applyHeadVerdictSafety(
     return {
       decision: 'NEEDS_HUMAN',
       reasoning:
-        `Head safety guard: ACCEPT was overridden because ${escalatedIssues.length} unresolved ` +
+        `Head safety guard: ${verdict.decision} was overridden because ${escalatedIssues.length} unresolved ` +
         `discussion(s) and ${unverifiedCritical.length} low-confidence critical finding(s) require human judgment. ` +
         `Original reasoning: ${verdict.reasoning}`,
       questionsForHuman: questions.length > 0 ? questions : undefined,
@@ -354,24 +351,6 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
 
   const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
 
-  // Strict mode: 3+ WARNING issues trigger NEEDS_HUMAN
-  if (mode === 'strict') {
-    const warningIssues = report.discussions.filter((d) => d.finalSeverity === 'WARNING');
-    if (warningIssues.length >= 3) {
-      return {
-        decision: 'NEEDS_HUMAN',
-        reasoning: `Strict mode: ${warningIssues.length} warning-level issue(s) found. Review each to confirm they are acceptable.`,
-        questionsForHuman: [
-          ...warningIssues.slice(0, 3).map(
-            (d) => `Check: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — WARNING`
-          ),
-          ...(warningIssues.length > 3 ? [`...and ${warningIssues.length - 3} more warnings`] : []),
-          ...(escalatedIssues.length > 0 ? [`${escalatedIssues.length} unresolved discussion(s) also need judgment`] : []),
-        ],
-      };
-    }
-  }
-
   if (criticalIssues.length > 0) {
     const unverifiedNote = unverifiedCritical.length > 0
       ? ` Additionally, ${unverifiedCritical.length} low-confidence critical finding(s) need verification.`
@@ -398,6 +377,24 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
         (d) => `Verify: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${d.finalSeverity}, ${d.avgConfidence}% confidence`
       ),
     };
+  }
+
+  // Strict mode: 3+ WARNING issues trigger NEEDS_HUMAN after critical routing.
+  if (mode === 'strict') {
+    const warningIssues = report.discussions.filter((d) => d.finalSeverity === 'WARNING');
+    if (warningIssues.length >= 3) {
+      return {
+        decision: 'NEEDS_HUMAN',
+        reasoning: `Strict mode: ${warningIssues.length} warning-level issue(s) found. Review each to confirm they are acceptable.`,
+        questionsForHuman: [
+          ...warningIssues.slice(0, 3).map(
+            (d) => `Check: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — WARNING`
+          ),
+          ...(warningIssues.length > 3 ? [`...and ${warningIssues.length - 3} more warnings`] : []),
+          ...(escalatedIssues.length > 0 ? [`${escalatedIssues.length} unresolved discussion(s) also need judgment`] : []),
+        ],
+      };
+    }
   }
 
   if (escalatedIssues.length > 0) {
