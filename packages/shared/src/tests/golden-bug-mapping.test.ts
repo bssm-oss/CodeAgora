@@ -76,17 +76,28 @@ describe('evidenceListToActualFindings', () => {
       doc({ issueTitle: 'must fix', confidence: 90 }),
       doc({ issueTitle: 'verify low critical', confidence: 23 }),
       doc({
-        issueTitle: 'ignore class prior critical',
+        issueTitle: 'must fix class prior critical',
+        confidence: 70,
+        confidenceTrace: { raw: 100, filtered: 70, final: 70, classPrior: 'sorting-comparator' },
+      }),
+      doc({
+        issueTitle: 'ignore class prior warning',
+        severity: 'WARNING',
         confidence: 70,
         confidenceTrace: { raw: 100, filtered: 70, final: 70, classPrior: 'sorting-comparator' },
       }),
       doc({ issueTitle: 'ignore warning', severity: 'WARNING', confidence: 42 }),
-      doc({ issueTitle: 'ignore very low critical', confidence: 12 }),
+      doc({ issueTitle: 'verify very low critical', confidence: 12 }),
     ];
 
     const result = evidenceListToActualFindings(input);
 
-    expect(result.map((r) => r.issueTitle)).toEqual(['must fix', 'verify low critical']);
+    expect(result.map((r) => r.issueTitle)).toEqual([
+      'must fix',
+      'verify low critical',
+      'must fix class prior critical',
+      'verify very low critical',
+    ]);
   });
 
   it('returns empty array for empty input', () => {

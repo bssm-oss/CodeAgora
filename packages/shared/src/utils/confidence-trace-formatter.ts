@@ -126,12 +126,13 @@ export function buildTraceRows(doc: TraceableDoc): StageRow[] {
  */
 export function classifyTriageTab(doc: TraceableDoc): 'must-fix' | 'verify' | 'ignore' {
   const conf = doc.confidenceTrace?.final ?? doc.confidence ?? 50;
-  if (conf < 20) return 'ignore';
-  if (doc.confidenceTrace?.classPrior && conf <= 50) return 'ignore';
   const isCritical = doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
   const isWarning = doc.severity === 'WARNING';
   if (isCritical && conf > 50) return 'must-fix';
-  if ((isCritical && conf <= 50) || (isWarning && conf > 50)) return 'verify';
+  if (isCritical) return 'verify';
+  if (conf < 20) return 'ignore';
+  if (doc.confidenceTrace?.classPrior && conf <= 75) return 'ignore';
+  if (isWarning && conf > 50) return 'verify';
   return 'ignore';
 }
 

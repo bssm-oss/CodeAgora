@@ -128,19 +128,19 @@ describe('classifyTriageTab', () => {
     expect(classifyTriageTab(makeDoc({ severity: 'CRITICAL', confidenceTrace: { final: 40 } }))).toBe('verify');
   });
 
-  it('routes class-prior low confidence findings to ignore', () => {
+  it('routes class-prior low confidence critical findings to verify', () => {
     expect(classifyTriageTab(makeDoc({
       severity: 'CRITICAL',
       confidenceTrace: { final: 40, classPrior: 'sorting-comparator' },
-    }))).toBe('ignore');
+    }))).toBe('verify');
   });
 
   it('routes WARNING + high confidence to verify', () => {
     expect(classifyTriageTab(makeDoc({ severity: 'WARNING', confidenceTrace: { final: 75 } }))).toBe('verify');
   });
 
-  it('routes very low confidence to ignore regardless of severity', () => {
-    expect(classifyTriageTab(makeDoc({ severity: 'CRITICAL', confidenceTrace: { final: 15 } }))).toBe('ignore');
+  it('routes very low confidence non-critical findings to ignore', () => {
+    expect(classifyTriageTab(makeDoc({ severity: 'WARNING', confidenceTrace: { final: 15 } }))).toBe('ignore');
   });
 
   it('falls back to legacy confidence when confidenceTrace.final absent', () => {

@@ -33,19 +33,18 @@ export interface TriageSummary {
  *
  * - must-fix: CRITICAL+ with confidence >50%
  * - verify:   CRITICAL+ with confidence ≤50%, or WARNING with confidence >50%
- * - ignore:   SUGGESTION, or confidence <20%
+ * - ignore:   SUGGESTION, non-critical confidence <20, or class-prior findings below must-fix confidence
  */
 export function classifyTriage(doc: EvidenceDocument): TriageCategory {
   const conf = doc.confidenceTrace?.final ?? doc.confidence ?? 50;
-
-  if (conf < 20) return 'ignore';
-  if (doc.confidenceTrace?.classPrior && conf <= 75) return 'ignore';
-
   const isCritical = doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
   const isWarning = doc.severity === 'WARNING';
 
   if (isCritical && conf > 50) return 'must-fix';
-  if ((isCritical && conf <= 50) || (isWarning && conf > 50)) return 'verify';
+  if (isCritical) return 'verify';
+  if (conf < 20) return 'ignore';
+  if (doc.confidenceTrace?.classPrior && conf <= 75) return 'ignore';
+  if (isWarning && conf > 50) return 'verify';
   return 'ignore';
 }
 

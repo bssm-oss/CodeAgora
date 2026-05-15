@@ -174,6 +174,6 @@ describe('traceSession', () => {
     });
     const result = await traceSession(tmpDir, '2026-04-20/005');
     expect(result.output).toContain('→ must-fix tab');
-    expect(result.output).toContain('→ ignore tab');
+    expect(result.output).toContain('→ verify tab');
   });
 });
