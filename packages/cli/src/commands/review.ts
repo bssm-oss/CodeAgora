@@ -52,6 +52,34 @@ interface ReviewOptions {
   scope?: string;
 }
 
+interface ReviewStartupDiagnostics {
+  resolvedPath: string;
+  provider?: string;
+  model?: string;
+  timeout?: number;
+  reviewerTimeout?: number;
+  discussion: boolean;
+  repoPath?: string;
+  contextLines: number;
+}
+
+export function emitReviewStartupDiagnostics(
+  diagnostics: ReviewStartupDiagnostics,
+  machineReadableStdout: boolean,
+): void {
+  const writeLine = machineReadableStdout ? console.error : console.log;
+
+  writeLine(`Starting review: ${diagnostics.resolvedPath}`);
+  if (diagnostics.provider) writeLine(`  Provider override: ${diagnostics.provider}`);
+  if (diagnostics.model) writeLine(`  Model override: ${diagnostics.model}`);
+  if (diagnostics.timeout) writeLine(`  Pipeline timeout: ${diagnostics.timeout}s`);
+  if (diagnostics.reviewerTimeout) writeLine(`  Reviewer timeout: ${diagnostics.reviewerTimeout}s`);
+  if (!diagnostics.discussion) writeLine('  Discussion: skipped');
+  if (diagnostics.repoPath) writeLine(`  Context lines: ${diagnostics.contextLines}`);
+  else if (diagnostics.contextLines > 0) writeLine('  Context: disabled (not a git repo)');
+  writeLine('---');
+}
+
 // ============================================================================
 // Action handler
 // ============================================================================
@@ -330,15 +358,19 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     };
 
     if (options.verbose) {
-      console.log(`Starting review: ${resolvedPath}`);
-      if (options.provider) console.log(`  Provider override: ${options.provider}`);
-      if (options.model) console.log(`  Model override: ${options.model}`);
-      if (options.timeout) console.log(`  Pipeline timeout: ${options.timeout}s`);
-      if (options.reviewerTimeout) console.log(`  Reviewer timeout: ${options.reviewerTimeout}s`);
-      if (!options.discussion) console.log(`  Discussion: skipped`);
-      if (repoPath) console.log(`  Context lines: ${contextLines}`);
-      else if (contextLines > 0) console.log(`  Context: disabled (not a git repo)`);
-      console.log('---');
+      emitReviewStartupDiagnostics(
+        {
+          resolvedPath,
+          provider: options.provider,
+          model: options.model,
+          timeout: options.timeout,
+          reviewerTimeout: options.reviewerTimeout,
+          discussion: options.discussion,
+          repoPath,
+          contextLines,
+        },
+        outputFormat === 'json' || options.jsonStream === true,
+      );
     }
 
     // Setup progress spinner (stderr so stdout remains clean for results)

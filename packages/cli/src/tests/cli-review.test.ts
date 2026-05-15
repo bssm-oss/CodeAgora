@@ -709,10 +709,10 @@ describe('review command — action handler', () => {
   });
 
   // --------------------------------------------------------------------------
-  // --json-stream option
+  // JSON stdout contract
   // --------------------------------------------------------------------------
 
-  describe('--json-stream option', () => {
+  describe('JSON stdout contract', () => {
     it('emits final result as NDJSON when jsonStream is true', () => {
       const result = makeSuccessResult();
       const ndjsonLine = JSON.stringify({
@@ -724,6 +724,47 @@ describe('review command — action handler', () => {
       expect(parsed.type).toBe('result');
       expect(parsed.schemaVersion).toBe('codeagora.review.v1');
       expect(parsed.status).toBe('success');
+    });
+
+    it('routes verbose startup diagnostics to stderr for machine-readable stdout', async () => {
+      const { emitReviewStartupDiagnostics } = await import('../commands/review.js');
+
+      emitReviewStartupDiagnostics(
+        {
+          resolvedPath: '/tmp/change.patch',
+          provider: 'groq',
+          model: 'llama-3.3-70b-versatile',
+          timeout: 120,
+          reviewerTimeout: 30,
+          discussion: false,
+          contextLines: 20,
+        },
+        true,
+      );
+
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Starting review: /tmp/change.patch');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('  Provider override: groq');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('---');
+    });
+
+    it('preserves stdout verbose startup diagnostics for human output', async () => {
+      const { emitReviewStartupDiagnostics } = await import('../commands/review.js');
+
+      emitReviewStartupDiagnostics(
+        {
+          resolvedPath: '/tmp/change.patch',
+          discussion: true,
+          repoPath: '/repo',
+          contextLines: 20,
+        },
+        false,
+      );
+
+      expect(consoleLogSpy).toHaveBeenCalledWith('Starting review: /tmp/change.patch');
+      expect(consoleLogSpy).toHaveBeenCalledWith('  Context lines: 20');
+      expect(consoleLogSpy).toHaveBeenCalledWith('---');
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
   });
 
