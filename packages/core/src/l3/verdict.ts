@@ -159,7 +159,7 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 ## 판단 지침 (신뢰도 기반 분류 필수)
 - CRITICAL+ 이슈를 신뢰도 구간별로 분류할 것
 - 신뢰도 >50% CRITICAL+: 실제 문제 가능성 높음 — REJECT 고려
-- 신뢰도 ≤15% CRITICAL+: 미검증 — NEEDS_HUMAN으로 라우팅, REJECT 금지
+- 신뢰도 ≤50% CRITICAL+: 미검증 — NEEDS_HUMAN으로 라우팅, REJECT 금지
 - 미해결 토론이 남아있으면: NEEDS_HUMAN 고려
 - 0% 신뢰도 이슈를 "차단 이슈"로 표시할 경우 반드시 "미검증" 표기 필요
 - 모든 CRITICAL+ 이슈가 저신뢰도라면: REJECT 대신 NEEDS_HUMAN + 트리아지 가이드 반환`
@@ -173,7 +173,7 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 ## Triage Guidance (#236)
 - Group findings by confidence tier before deciding
 - CRITICAL+ with confidence >50%: likely real — consider REJECT
-- CRITICAL+ with confidence ≤15%: unverified — route to NEEDS_HUMAN, NOT REJECT
+- CRITICAL+ with confidence ≤50%: unverified — route to NEEDS_HUMAN, NOT REJECT
 - Do NOT mark zero-confidence findings as "Blocking Issues" without flagging them as unverified
 - If all critical findings are low-confidence, return NEEDS_HUMAN with triage guidance`;
 
@@ -291,7 +291,7 @@ export function applyHeadVerdictSafety(
     (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
   );
   const criticalIssues = allCritical.filter(
-    (d) => d.avgConfidence == null || d.avgConfidence > ZERO_CONFIDENCE_THRESHOLD
+    (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
   if (criticalIssues.length > 0) {
     return {
@@ -304,7 +304,7 @@ export function applyHeadVerdictSafety(
   }
 
   const unverifiedCritical = allCritical.filter(
-    (d) => d.avgConfidence != null && d.avgConfidence <= ZERO_CONFIDENCE_THRESHOLD
+    (d) => d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
   const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
   if (unverifiedCritical.length > 0 || escalatedIssues.length > 0) {
@@ -335,21 +335,21 @@ export function applyHeadVerdictSafety(
 // ============================================================================
 
 /**
- * Issues at or below this confidence (%) are treated as unverified — routed to
- * NEEDS_HUMAN instead of REJECT. (#229: 0% confidence should not be HARSHLY_CRITICAL)
+ * CRITICAL+ issues at or below this confidence (%) are treated as unverified —
+ * routed to NEEDS_HUMAN instead of REJECT.
  */
-const ZERO_CONFIDENCE_THRESHOLD = 15;
+const CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD = 50;
 
 function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'): HeadVerdict {
-  // Separate high-confidence critical issues from unverified (zero/very-low confidence) ones (#229)
+  // Separate high-confidence critical issues from unverified low-confidence ones.
   const allCritical = report.discussions.filter(
     (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
   );
   const criticalIssues = allCritical.filter(
-    (d) => d.avgConfidence == null || d.avgConfidence > ZERO_CONFIDENCE_THRESHOLD
+    (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
   const unverifiedCritical = allCritical.filter(
-    (d) => d.avgConfidence != null && d.avgConfidence <= ZERO_CONFIDENCE_THRESHOLD
+    (d) => d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
 
   const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
@@ -389,11 +389,11 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
     };
   }
 
-  // Only unverified critical (zero confidence) — escalate to human instead of hard reject
+  // Only unverified critical findings — escalate to human instead of hard reject
   if (unverifiedCritical.length > 0) {
     return {
       decision: 'NEEDS_HUMAN',
-      reasoning: `Found ${unverifiedCritical.length} critical finding(s) with very low confidence (≤${ZERO_CONFIDENCE_THRESHOLD}%). These may be false positives — human verification required before rejecting.`,
+      reasoning: `Found ${unverifiedCritical.length} critical finding(s) with low confidence (≤${CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD}%). These may be false positives — human verification required before rejecting.`,
       questionsForHuman: unverifiedCritical.map(
         (d) => `Verify: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${d.finalSeverity}, ${d.avgConfidence}% confidence`
       ),

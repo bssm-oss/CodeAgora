@@ -216,14 +216,14 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.reasoning.toLowerCase()).toContain('consensus');
     });
 
-    it('routes very low-confidence critical discussions to human review instead of reject', async () => {
+    it('routes low-confidence critical discussions to human review instead of reject', async () => {
       const report = makeReport({
         discussions: [
           makeVerdict({
             discussionId: 'd-low-confidence',
             finalSeverity: 'CRITICAL',
             consensusReached: false,
-            avgConfidence: 10,
+            avgConfidence: 30,
           }),
         ],
       });
@@ -232,6 +232,59 @@ describe('makeHeadVerdict()', () => {
 
       expect(verdict.decision).toBe('NEEDS_HUMAN');
       expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
+    });
+
+    it('routes critical confidence 50 to human review at the blocking boundary', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-boundary-critical',
+            finalSeverity: 'CRITICAL',
+            consensusReached: true,
+            avgConfidence: 50,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.[0]).toContain('d-boundary-critical');
+    });
+
+    it('routes harshly critical confidence 50 to human review at the blocking boundary', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-boundary-harshly-critical',
+            finalSeverity: 'HARSHLY_CRITICAL',
+            consensusReached: true,
+            avgConfidence: 50,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.[0]).toContain('d-boundary-harshly-critical');
+    });
+
+    it('rejects critical confidence 51 as blocking', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-blocking-critical',
+            finalSeverity: 'CRITICAL',
+            consensusReached: true,
+            avgConfidence: 51,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('REJECT');
     });
   });
 });
