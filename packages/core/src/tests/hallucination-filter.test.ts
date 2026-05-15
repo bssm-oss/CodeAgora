@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterHallucinations } from '../pipeline/hallucination-filter.js';
+import { filterHallucinations, hasActionableLocation } from '../pipeline/hallucination-filter.js';
 import type { EvidenceDocument } from '../types/core.js';
 
 // ============================================================================
@@ -110,6 +110,35 @@ function makeDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDocument {
 }
 
 // ============================================================================
+// Actionable Location Gate
+// ============================================================================
+
+describe('Actionable location gate', () => {
+  it('requires a concrete file path and positive line range', () => {
+    expect(hasActionableLocation(makeDoc({ filePath: 'src/utils.ts', lineRange: [10, 12] }))).toBe(true);
+    expect(hasActionableLocation(makeDoc({ filePath: 'unknown', lineRange: [10, 12] }))).toBe(false);
+    expect(hasActionableLocation(makeDoc({ filePath: 'src/utils.ts', lineRange: [0, 12] }))).toBe(false);
+    expect(hasActionableLocation(makeDoc({ filePath: 'src/utils.ts', lineRange: [10, 0] }))).toBe(false);
+  });
+
+  it('hard-removes unknown:0 findings before confidence routing', () => {
+    const docs = [makeDoc({
+      filePath: 'unknown',
+      lineRange: [0, 0],
+      confidence: 95,
+      severity: 'CRITICAL',
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(0);
+    expect(result.uncertain).toHaveLength(0);
+    expect(result.removed).toHaveLength(1);
+    expect(result.removed[0].filePath).toBe('unknown');
+    expect(result.removed[0].lineRange).toEqual([0, 0]);
+  });
+});
+
+// ============================================================================
 // Check 1: File Existence
 // ============================================================================
 
@@ -131,11 +160,13 @@ describe('Check 1: File existence', () => {
     expect(result.removed).toHaveLength(0);
   });
 
-  it('should keep findings with unknown filePath', () => {
+  it('should remove findings with unknown filePath before they become actionable', () => {
     const docs = [makeDoc({ filePath: 'unknown' })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
-    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered).toHaveLength(0);
+    expect(result.removed).toHaveLength(1);
+    expect(result.removed[0].filePath).toBe('unknown');
   });
 
   it('should handle files with similar prefixes correctly', () => {
@@ -177,11 +208,13 @@ describe('Check 2: Line range overlap', () => {
     expect(result.filtered.length + result.uncertain.length).toBe(1);
   });
 
-  it('should handle lineRange [0, 0] gracefully (skip line check)', () => {
+  it('should remove findings with lineRange [0, 0] before they become actionable', () => {
     const docs = [makeDoc({ filePath: 'src/utils.ts', lineRange: [0, 0] })];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
-    expect(result.filtered).toHaveLength(1);
+    expect(result.filtered).toHaveLength(0);
+    expect(result.removed).toHaveLength(1);
+    expect(result.removed[0].lineRange).toEqual([0, 0]);
   });
 
   it('should down-rank findings that only touch unchanged context lines', () => {
@@ -528,7 +561,7 @@ describe('Uncertainty routing', () => {
 // ============================================================================
 
 describe('Rule-source bypass', () => {
-  it('should always keep rule-source findings', () => {
+  it('should keep rule-source findings with actionable locations', () => {
     const docs = [makeDoc({
       source: 'rule',
       filePath: 'src/nonexistent.ts',
@@ -538,6 +571,18 @@ describe('Rule-source bypass', () => {
 
     expect(result.filtered).toHaveLength(1);
     expect(result.removed).toHaveLength(0);
+  });
+
+  it('should remove rule-source findings without actionable locations', () => {
+    const docs = [makeDoc({
+      source: 'rule',
+      filePath: 'unknown',
+      lineRange: [0, 0],
+    })];
+    const result = filterHallucinations(docs, SAMPLE_DIFF);
+
+    expect(result.filtered).toHaveLength(0);
+    expect(result.removed).toHaveLength(1);
   });
 });
 
@@ -568,15 +613,17 @@ describe('Edge cases', () => {
       makeDoc({ filePath: 'src/nonexistent.ts' }),                       // invalid: file not in diff
       makeDoc({ filePath: 'src/index.ts', lineRange: [1, 3] }),         // valid
       makeDoc({ filePath: 'src/utils.ts', lineRange: [500, 510] }),     // invalid: out of range
+      makeDoc({ filePath: 'unknown', lineRange: [0, 0] }),              // invalid: non-actionable location
       makeDoc({ source: 'rule', filePath: 'any-file.ts' }),             // valid: rule source
     ];
     const result = filterHallucinations(docs, SAMPLE_DIFF);
 
     expect(result.filtered).toHaveLength(3);
-    expect(result.removed).toHaveLength(2);
+    expect(result.removed).toHaveLength(3);
     expect(result.removed.map(d => d.filePath)).toEqual([
       'src/nonexistent.ts',
       'src/utils.ts',
+      'unknown',
     ]);
   });
 

@@ -3,8 +3,8 @@
  * Validates evidence documents against the actual diff before L2 debate.
  *
  * 8 checks (zero model cost):
- * 1. File existence — filePath must be in diff file list
- * 2. Line range — lineRange must overlap at least one diff hunk
+ * 1. File existence — filePath must be concrete and in diff file list
+ * 2. Line range — lineRange must be positive and overlap at least one diff hunk
  * 3. Added-line anchor — findings on unchanged context lines are down-ranked
  * 4. Code quote — inline code quotes must exist in diff content
  * 5. Self-contradiction — finding must not contradict observed change direction
@@ -111,6 +111,10 @@ function overlapsAnyRange(
   return ranges.some(([start, end]) => lineRange[0] <= end && lineRange[1] >= start);
 }
 
+export function hasActionableLocation(doc: EvidenceDocument): boolean {
+  return doc.filePath !== 'unknown' && doc.lineRange[0] > 0 && doc.lineRange[1] > 0;
+}
+
 // Contradiction signal keywords
 const ADDED_SIGNALS = ['added', 'introduced', 'new import', 'new variable', 'new function'];
 const REMOVED_SIGNALS = ['removed', 'deleted', 'missing', 'no longer'];
@@ -204,6 +208,11 @@ export function filterHallucinations(
   const uncertain: EvidenceDocument[] = [];
 
   for (const doc of docs) {
+    if (!hasActionableLocation(doc)) {
+      removed.push(doc);
+      continue;
+    }
+
     // Skip rule-based findings (they come from static analysis, not LLM)
     if (doc.source === 'rule') {
       filtered.push(doc);
@@ -211,34 +220,30 @@ export function filterHallucinations(
     }
 
     // Check 1: File exists in diff
-    if (doc.filePath !== 'unknown' && !diffFiles.has(doc.filePath)) {
+    if (!diffFiles.has(doc.filePath)) {
       removed.push(doc);
       continue;
     }
 
     // Check 2: Line range overlaps with diff hunks
-    if (doc.filePath !== 'unknown' && doc.lineRange[0] > 0) {
-      const hunks = hunkMap.get(doc.filePath);
-      if (hunks && hunks.length > 0) {
-        const overlaps = hunks.some(([start, end]) =>
-          doc.lineRange[0] <= end + HUNK_TOLERANCE &&
-          doc.lineRange[1] >= start - HUNK_TOLERANCE
-        );
-        if (!overlaps) {
-          removed.push(doc);
-          continue;
-        }
+    const hunks = hunkMap.get(doc.filePath);
+    if (hunks && hunks.length > 0) {
+      const overlaps = hunks.some(([start, end]) =>
+        doc.lineRange[0] <= end + HUNK_TOLERANCE &&
+        doc.lineRange[1] >= start - HUNK_TOLERANCE
+      );
+      if (!overlaps) {
+        removed.push(doc);
+        continue;
       }
     }
 
     let anchorPrior: string | undefined;
-    if (doc.filePath !== 'unknown' && doc.lineRange[0] > 0) {
-      const addedRanges = addedLineMap.get(doc.filePath);
-      if (addedRanges && addedRanges.length > 0 && !overlapsAnyRange(doc.lineRange, addedRanges)) {
-        const penalized = Math.round((doc.confidence ?? 50) * ADDED_LINE_ANCHOR_PENALTY);
-        doc.confidence = penalized; // BC: legacy single-field confidence
-        anchorPrior = UNCHANGED_CONTEXT_PRIOR;
-      }
+    const addedRanges = addedLineMap.get(doc.filePath);
+    if (addedRanges && addedRanges.length > 0 && !overlapsAnyRange(doc.lineRange, addedRanges)) {
+      const penalized = Math.round((doc.confidence ?? 50) * ADDED_LINE_ANCHOR_PENALTY);
+      doc.confidence = penalized; // BC: legacy single-field confidence
+      anchorPrior = UNCHANGED_CONTEXT_PRIOR;
     }
 
     // Check 4: Code quote verification
