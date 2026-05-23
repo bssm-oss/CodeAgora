@@ -2,12 +2,19 @@
  * L3 Head Verdict Tests
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { applyHeadVerdictSafety, makeHeadVerdict, scanUnconfirmedQueue } from '@codeagora/core/l3/verdict.js';
+import { executeBackend } from '@codeagora/core/l1/backend.js';
 import type { ModeratorReport, DiscussionVerdict, EvidenceDocument } from '@codeagora/core/types/core.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
+vi.mock('@codeagora/core/l1/backend.js', () => ({
+  executeBackend: vi.fn(),
+}));
+
+const mockExecuteBackend = vi.mocked(executeBackend);
+
 // ---------------------------------------------------------------------------
 
 function makeVerdict(overrides: Partial<DiscussionVerdict> = {}): DiscussionVerdict {
@@ -48,6 +55,10 @@ function makeEvidenceDoc(overrides: Partial<EvidenceDocument> = {}): EvidenceDoc
 }
 
 // ---------------------------------------------------------------------------
+
+afterEach(() => {
+  mockExecuteBackend.mockReset();
+});
 
 describe('makeHeadVerdict()', () => {
   describe('ACCEPT decision', () => {
@@ -301,6 +312,111 @@ describe('makeHeadVerdict()', () => {
 
       expect(verdict.decision).toBe('REJECT');
     });
+
+    it('does not block on critical discussions with unknown:0 locations', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-unknown-critical',
+            filePath: 'unknown',
+            lineRange: [0, 0],
+            finalSeverity: 'CRITICAL',
+            consensusReached: true,
+            avgConfidence: 99,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('ACCEPT');
+      expect(verdict.questionsForHuman).toBeUndefined();
+    });
+
+    it('does not escalate unresolved discussions with invalid line ranges', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-invalid-range',
+            lineRange: [12, 3],
+            finalSeverity: 'WARNING',
+            consensusReached: false,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('ACCEPT');
+      expect(verdict.questionsForHuman).toBeUndefined();
+    });
+
+    it('does not count invalid warning locations toward strict-mode escalation', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({ discussionId: 'd-warning-1', finalSeverity: 'WARNING', consensusReached: true }),
+          makeVerdict({ discussionId: 'd-warning-2', finalSeverity: 'WARNING', consensusReached: true }),
+          makeVerdict({
+            discussionId: 'd-invalid-warning',
+            filePath: 'unknown',
+            lineRange: [0, 0],
+            finalSeverity: 'WARNING',
+            consensusReached: true,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report, undefined, 'strict');
+
+      expect(verdict.decision).toBe('ACCEPT');
+      expect(verdict.questionsForHuman).toBeUndefined();
+    });
+
+    it('omits invalid-location discussions from the LLM head prompt', async () => {
+      mockExecuteBackend.mockResolvedValue('DECISION: ACCEPT\nREASONING: Only actionable discussions remain.\nQUESTIONS: none');
+      const report = makeReport({
+        discussions: [
+          makeVerdict({ discussionId: 'd-actionable-warning', finalSeverity: 'WARNING', consensusReached: true }),
+          makeVerdict({
+            discussionId: 'd-invalid-critical',
+            filePath: 'unknown',
+            lineRange: [0, 0],
+            finalSeverity: 'CRITICAL',
+            consensusReached: true,
+            avgConfidence: 99,
+          }),
+        ],
+        roundsPerDiscussion: {
+          'd-invalid-critical': [{
+            round: 1,
+            moderatorPrompt: 'Discuss invalid critical.',
+            supporterResponses: [{
+              supporterId: 's1',
+              stance: 'agree',
+              response: 'This invalid critical should not be shown to the head model.',
+            }],
+          }],
+        },
+        summary: { totalDiscussions: 2, resolved: 2, escalated: 0 },
+      });
+
+      const verdict = await makeHeadVerdict(report, {
+        backend: 'api',
+        model: 'head-model',
+        provider: 'test-provider',
+        enabled: true,
+      });
+
+      expect(verdict.decision).toBe('ACCEPT');
+      expect(mockExecuteBackend).toHaveBeenCalledTimes(1);
+      const backendInput = mockExecuteBackend.mock.calls[0]?.[0];
+      expect(backendInput).toBeDefined();
+      expect(backendInput?.prompt).toContain('d-actionable-warning');
+      expect(backendInput?.prompt).not.toContain('d-invalid-critical');
+      expect(backendInput?.prompt).not.toContain('unknown:0');
+      expect(backendInput?.prompt).toContain('CRITICAL: 0 issues');
+      expect(backendInput?.prompt).toContain('Total discussions: 1');
+    });
   });
 });
 
@@ -382,6 +498,29 @@ describe('applyHeadVerdictSafety()', () => {
     expect(verdict.decision).toBe('NEEDS_HUMAN');
     expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
   });
+
+  it('does not let invalid critical locations override an LLM accept verdict', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-unknown-critical',
+          filePath: 'unknown',
+          lineRange: [0, 0],
+          finalSeverity: 'HARSHLY_CRITICAL',
+          consensusReached: true,
+          avgConfidence: 99,
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'ACCEPT',
+      reasoning: 'LLM says safe.',
+    }, report);
+
+    expect(verdict.decision).toBe('ACCEPT');
+    expect(verdict.reasoning).toBe('LLM says safe.');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -448,6 +587,35 @@ describe('scanUnconfirmedQueue()', () => {
 
       expect(result.promoted).toHaveLength(1);
       expect(result.dismissed).toHaveLength(0);
+    });
+
+    it('dismisses CRITICAL items with unknown:0 locations instead of promoting them', () => {
+      const docs = [makeEvidenceDoc({
+        severity: 'CRITICAL',
+        issueTitle: 'Ungrounded critical',
+        filePath: 'unknown',
+        lineRange: [0, 0],
+      })];
+
+      const result = scanUnconfirmedQueue(docs);
+
+      expect(result.promoted).toHaveLength(0);
+      expect(result.dismissed).toHaveLength(1);
+      expect(result.dismissed[0].issueTitle).toBe('Ungrounded critical');
+    });
+
+    it('dismisses critical items with inverted line ranges instead of promoting them', () => {
+      const docs = [makeEvidenceDoc({
+        severity: 'CRITICAL',
+        issueTitle: 'Invalid range critical',
+        lineRange: [15, 4],
+      })];
+
+      const result = scanUnconfirmedQueue(docs);
+
+      expect(result.promoted).toHaveLength(0);
+      expect(result.dismissed).toHaveLength(1);
+      expect(result.dismissed[0].issueTitle).toBe('Invalid range critical');
     });
   });
 

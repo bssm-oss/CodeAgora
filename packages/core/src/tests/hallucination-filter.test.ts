@@ -119,6 +119,7 @@ describe('Actionable location gate', () => {
     expect(hasActionableLocation(makeDoc({ filePath: 'unknown', lineRange: [10, 12] }))).toBe(false);
     expect(hasActionableLocation(makeDoc({ filePath: 'src/utils.ts', lineRange: [0, 12] }))).toBe(false);
     expect(hasActionableLocation(makeDoc({ filePath: 'src/utils.ts', lineRange: [10, 0] }))).toBe(false);
+    expect(hasActionableLocation(makeDoc({ filePath: 'src/utils.ts', lineRange: [12, 10] }))).toBe(false);
   });
 
   it('hard-removes unknown:0 findings before confidence routing', () => {

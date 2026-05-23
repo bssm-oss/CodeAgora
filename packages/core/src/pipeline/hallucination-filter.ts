@@ -112,7 +112,7 @@ function overlapsAnyRange(
 }
 
 export function hasActionableLocation(doc: EvidenceDocument): boolean {
-  return doc.filePath !== 'unknown' && doc.lineRange[0] > 0 && doc.lineRange[1] > 0;
+  return doc.filePath !== 'unknown' && doc.lineRange[0] > 0 && doc.lineRange[1] > 0 && doc.lineRange[0] <= doc.lineRange[1];
 }
 
 // Contradiction signal keywords

@@ -97,8 +97,9 @@ async function llmVerdict(
 
 function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): string {
   const isKo = language === 'ko';
+  const actionableDiscussions = report.discussions.filter(hasActionableDiscussionLocation);
 
-  const discussionSummary = report.discussions.map((d) => {
+  const discussionSummary = actionableDiscussions.map((d) => {
     const consensus = d.consensusReached
       ? (isKo ? '합의 도달' : 'consensus reached')
       : (isKo ? '합의 미달' : 'no consensus');
@@ -112,7 +113,7 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
   }).join('\n');
 
   // Build condensed evidence for CRITICAL+ findings (#310)
-  const criticalDiscussions = report.discussions.filter(
+  const criticalDiscussions = actionableDiscussions.filter(
     (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
   );
   const evidenceSummary = criticalDiscussions.map((d) => {
@@ -141,12 +142,12 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 
   // Quantitative counts per severity
   const countBySeverity = (sev: string) =>
-    report.discussions.filter((d) => d.finalSeverity === sev).length;
+    actionableDiscussions.filter((d) => d.finalSeverity === sev).length;
   const harshlyCount = countBySeverity('HARSHLY_CRITICAL');
   const criticalCount = countBySeverity('CRITICAL');
   const warningCount = countBySeverity('WARNING');
   const suggestionCount = report.suggestions?.length ?? 0;
-  const unresolvedCount = report.discussions.filter((d) => !d.consensusReached).length;
+  const unresolvedCount = actionableDiscussions.filter((d) => !d.consensusReached).length;
 
   const quantSection = isKo
     ? `## 정량 요약
@@ -183,9 +184,9 @@ ${untrustedContentInstruction('reviewer, supporter, and moderator models')}
 
 ## 토론 결과
 
-전체 토론: ${report.summary.totalDiscussions}
-해결됨 (합의): ${report.summary.resolved}
-에스컬레이션 (미합의): ${report.summary.escalated}
+전체 토론: ${actionableDiscussions.length}
+해결됨 (합의): ${actionableDiscussions.filter((d) => d.consensusReached).length}
+에스컬레이션 (미합의): ${unresolvedCount}
 ${unconfirmedSummary}
 ${suggestionsSummary}
 
@@ -217,9 +218,9 @@ ${untrustedContentInstruction('reviewer, supporter, and moderator models')}
 
 ## Discussion Results
 
-Total discussions: ${report.summary.totalDiscussions}
-Resolved (consensus): ${report.summary.resolved}
-Escalated (no consensus): ${report.summary.escalated}
+Total discussions: ${actionableDiscussions.length}
+Resolved (consensus): ${actionableDiscussions.filter((d) => d.consensusReached).length}
+Escalated (no consensus): ${unresolvedCount}
 ${unconfirmedSummary}
 ${suggestionsSummary}
 
@@ -244,6 +245,18 @@ DECISION: ACCEPT | REJECT | NEEDS_HUMAN
 REASONING: <one paragraph explaining your decision based on the evidence quality>
 QUESTIONS: <comma-separated list of open questions for human reviewers, or "none">
 `;
+}
+
+function hasValidLineRange(lineRange: [number, number]): boolean {
+  return lineRange[0] > 0 && lineRange[1] > 0 && lineRange[0] <= lineRange[1];
+}
+
+function hasActionableDiscussionLocation(discussion: { filePath: string; lineRange: [number, number] }): boolean {
+  return discussion.filePath !== 'unknown' && hasValidLineRange(discussion.lineRange);
+}
+
+function hasActionableEvidenceLocation(doc: EvidenceDocument): boolean {
+  return doc.filePath !== 'unknown' && hasValidLineRange(doc.lineRange);
 }
 
 function parseHeadResponse(response: string, report: ModeratorReport): HeadVerdict {
@@ -284,7 +297,7 @@ export function applyHeadVerdictSafety(
   report: ModeratorReport,
 ): HeadVerdict {
   const allCritical = report.discussions.filter(
-    (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
+    (d) => hasActionableDiscussionLocation(d) && (d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL')
   );
   const criticalIssues = allCritical.filter(
     (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
@@ -303,7 +316,7 @@ export function applyHeadVerdictSafety(
   const unverifiedCritical = allCritical.filter(
     (d) => d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
-  const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
+  const escalatedIssues = report.discussions.filter((d) => hasActionableDiscussionLocation(d) && !d.consensusReached);
   if (unverifiedCritical.length > 0 || escalatedIssues.length > 0) {
     const questions = [
       ...(verdict.questionsForHuman ?? []),
@@ -340,7 +353,7 @@ const CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD = 50;
 function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'): HeadVerdict {
   // Separate high-confidence critical issues from unverified low-confidence ones.
   const allCritical = report.discussions.filter(
-    (d) => d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL'
+    (d) => hasActionableDiscussionLocation(d) && (d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL')
   );
   const criticalIssues = allCritical.filter(
     (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
@@ -349,7 +362,7 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
     (d) => d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
 
-  const escalatedIssues = report.discussions.filter((d) => !d.consensusReached);
+  const escalatedIssues = report.discussions.filter((d) => hasActionableDiscussionLocation(d) && !d.consensusReached);
 
   if (criticalIssues.length > 0) {
     const unverifiedNote = unverifiedCritical.length > 0
@@ -381,7 +394,9 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
 
   // Strict mode: 3+ WARNING issues trigger NEEDS_HUMAN after critical routing.
   if (mode === 'strict') {
-    const warningIssues = report.discussions.filter((d) => d.finalSeverity === 'WARNING');
+    const warningIssues = report.discussions.filter(
+      (d) => hasActionableDiscussionLocation(d) && d.finalSeverity === 'WARNING'
+    );
     if (warningIssues.length >= 3) {
       return {
         decision: 'NEEDS_HUMAN',
@@ -434,10 +449,10 @@ export function scanUnconfirmedQueue(
 } {
   // Promote CRITICAL/HARSHLY_CRITICAL, dismiss others
   const promoted = unconfirmed.filter(
-    (doc) => doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL'
+    (doc) => hasActionableEvidenceLocation(doc) && (doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL')
   );
   const dismissed = unconfirmed.filter(
-    (doc) => doc.severity !== 'CRITICAL' && doc.severity !== 'HARSHLY_CRITICAL'
+    (doc) => !hasActionableEvidenceLocation(doc) || (doc.severity !== 'CRITICAL' && doc.severity !== 'HARSHLY_CRITICAL')
   );
 
   return { promoted, dismissed };
