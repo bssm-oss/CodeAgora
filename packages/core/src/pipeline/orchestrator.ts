@@ -519,7 +519,7 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
     if (compiledRules && compiledRules.length > 0) {
       const ruleEvidence = matchRules(filteredDiffContent, compiledRules);
       if (ruleEvidence.length > 0) {
-        console.log(`[Rules] Matched ${ruleEvidence.length} rule-based issue(s)`);
+        console.error(`[Rules] Matched ${ruleEvidence.length} rule-based issue(s)`);
         allEvidenceDocs.push(...ruleEvidence);
       }
     }
@@ -532,7 +532,7 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
         learnedPatterns.dismissedPatterns,
       );
       if (suppressed.length > 0) {
-        console.log(`[Learning] Suppressed ${suppressed.length} previously dismissed issue(s)`);
+        console.error(`[Learning] Suppressed ${suppressed.length} previously dismissed issue(s)`);
       }
       allEvidenceDocs = filtered;
     }
@@ -541,10 +541,10 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
     const { filterHallucinations } = await import('./hallucination-filter.js');
     const hallucinationResult = filterHallucinations(allEvidenceDocs, filteredDiffContent);
     if (hallucinationResult.removed.length > 0) {
-      console.log(`[Hallucination Filter] Removed ${hallucinationResult.removed.length} finding(s) referencing non-existent code`);
+      console.error(`[Hallucination Filter] Removed ${hallucinationResult.removed.length} finding(s) referencing non-existent code`);
     }
     if (hallucinationResult.uncertain.length > 0) {
-      console.log(`[Hallucination Filter] ${hallucinationResult.uncertain.length} finding(s) flagged as uncertain (low confidence after penalty)`);
+      console.error(`[Hallucination Filter] ${hallucinationResult.uncertain.length} finding(s) flagged as uncertain (low confidence after penalty)`);
     }
     // Keep uncertain findings in the pipeline (confidence already penalized,
     // triage will classify them as "verify" or "ignore" for human review)

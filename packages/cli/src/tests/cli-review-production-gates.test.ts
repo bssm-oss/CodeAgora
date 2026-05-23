@@ -153,6 +153,8 @@ describe('review command production gates', () => {
 
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
+    expect(result.stdout).toBe(result.stdout.trimStart());
+    expect(result.stdout.startsWith('{')).toBe(true);
     const parsed = JSON.parse(result.stdout) as {
       diffMetadata?: {
         includedFiles: string[];

@@ -56,12 +56,12 @@ export class SessionLogger {
 
     this.logs.push(entry);
 
-    // Also log to console in development
+    // Also log to stderr in development so machine-readable stdout stays clean.
     if (process.env.NODE_ENV !== 'production') {
       const timestamp = new Date(entry.timestamp).toISOString();
-      console.log(`[${timestamp}] ${level} [${this.component}] ${message}`);
+      console.error(`[${timestamp}] ${level} [${this.component}] ${message}`);
       if (data) {
-        console.log(data);
+        console.error(data);
       }
     }
   }
