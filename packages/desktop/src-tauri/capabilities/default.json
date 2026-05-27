@@ -6,7 +6,8 @@
     "windows": ["main"],
     "permissions": [
       "core:default",
-      "notification:default"
+      "notification:default",
+      "window-state:default"
     ]
   }
 ]

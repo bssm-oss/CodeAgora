@@ -5,7 +5,7 @@
   "identifier": "dev.codeagora.desktop",
   "build": {
     "beforeBuildCommand": "pnpm --filter @codeagora/desktop build",
-    "beforeDevCommand": "pnpm --filter @codeagora/desktop build",
+    "beforeDevCommand": "pnpm --filter @codeagora/desktop build:watch",
     "frontendDist": "../dist",
     "devUrl": null
   },

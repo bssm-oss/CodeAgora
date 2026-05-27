@@ -5,7 +5,8 @@
   "type": "module",
   "description": "CodeAgora desktop app scaffold — human-facing local UI for sessions, config, and review runs",
   "scripts": {
-    "build": "tsup && node scripts/copy-assets.mjs",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
     "bundle:smoke": "pnpm tauri:build && node scripts/bundle-smoke.mjs",
     "dev": "pnpm build && echo \"Open packages/desktop/dist/index.html for the scaffold preview\"",
     "evidence": "pnpm smoke && node scripts/evidence.mjs",
