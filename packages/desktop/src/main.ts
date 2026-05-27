@@ -1001,6 +1001,7 @@ function renderReviewRun(): HTMLElement {
     const empty = el('div', 'empty-state compact');
     empty.append(el('strong', '', t('desktop.run.noActiveTitle')));
     empty.append(el('p', '', t('desktop.run.noActiveBody')));
+    empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'button subtle'));
     section.append(empty);
     return section;
   }
@@ -1249,6 +1250,7 @@ function renderSetup(): HTMLElement {
     const empty = el('div', 'empty-state compact');
     empty.append(el('strong', '', t('desktop.setup.providerStatusNotLoaded')));
     empty.append(el('p', '', t('desktop.setup.providerStatusHint')));
+    empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'button subtle'));
     grid.append(empty);
   }
   panel.append(grid);
