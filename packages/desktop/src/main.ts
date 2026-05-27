@@ -93,6 +93,7 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 const appRoot = app;
 let reviewPollHandle: number | undefined;
+let lastView: View | undefined;
 
 function normalizeLocale(value?: string): DesktopLocale | undefined {
   const normalized = value?.trim().toLowerCase();
@@ -307,11 +308,17 @@ function saveThemePreference(preference: DesktopThemePreference): void {
   }
 }
 
+function announce(message: string): void {
+  const announcer = document.getElementById('a11y-announcer')
+  if (announcer) announcer.textContent = message
+}
+
 function pushToast(message: string, type: Toast['type'] = 'info'): void {
   const id = `toast-${Date.now()}`
   state.toasts.push({ id, message, type, createdAt: Date.now() })
   if (state.toasts.length > 3) state.toasts.shift()
   window.setTimeout(() => removeToast(id), 4000)
+  announce(message)
   render()
 }
 
@@ -511,6 +518,7 @@ function scheduleReviewPoll(): void {
 async function pollReviewRun(): Promise<void> {
   const runId = state.activeRun?.runId;
   if (!runId) return;
+  const previousStatus = state.activeRun?.status;
   try {
     state.activeRun = await getReviewRun(runId);
     if (isReviewRunning(state.activeRun)) {
@@ -518,6 +526,9 @@ async function pollReviewRun(): Promise<void> {
     } else {
       pushToast(state.activeRun.message, 'success')
       await refreshSessions(false);
+      if ((state.activeRun.status === 'completed' || state.activeRun.status === 'failed') && state.activeRun.status !== previousStatus) {
+        announce(state.activeRun.message)
+      }
     }
   } catch (error) {
     pushToast(error instanceof Error ? error.message : String(error), 'error')
@@ -757,9 +768,13 @@ function renderSessions(): HTMLElement {
   search.placeholder = t('desktop.sessions.filterPlaceholder');
   search.setAttribute('aria-label', t('desktop.sessions.filterAria'));
   search.value = state.sessionSearch;
+  let searchDebounce: number | undefined;
   search.addEventListener('input', () => {
-    state.sessionSearch = search.value;
-    render();
+    window.clearTimeout(searchDebounce);
+    searchDebounce = window.setTimeout(() => {
+      state.sessionSearch = search.value;
+      render();
+    }, 150);
   });
   const status = el('select', 'filter-select') as HTMLSelectElement;
   status.dataset.testid = 'session-status-filter';
@@ -1357,77 +1372,108 @@ function renderEvidenceSetup(): HTMLElement {
 }
 
 function renderToasts(): void {
-  if (state.toasts.length === 0) return
-  const container = el('div', 'toast-container')
+  const existing = document.getElementById('toast-container')
+  if (state.toasts.length === 0) {
+    if (existing) existing.remove()
+    return
+  }
+  const container = existing ?? el('div', 'toast-container')
+  if (!existing) {
+    container.id = 'toast-container'
+    appRoot.append(container)
+  } else {
+    container.replaceChildren()
+  }
   for (const toast of state.toasts) {
     const node = el('div', `toast toast--${toast.type}`)
     node.append(el('span', '', toast.message))
     node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ghost', 'button-dismiss-toast'))
     container.append(node)
   }
-  appRoot.append(container)
 }
 
 function render(): void {
-  appRoot.replaceChildren(renderShell());
+  if (lastView !== state.view) {
+    appRoot.replaceChildren(renderShell());
+    lastView = state.view;
+  } else {
+    const content = appRoot.querySelector('.content')
+    if (content) {
+      const newContent = renderContent()
+      content.replaceChildren(...Array.from(newContent.childNodes))
+    } else {
+      appRoot.replaceChildren(renderShell());
+    }
+  }
   renderToasts()
 }
 
 async function bootstrap(): Promise<void> {
-  applyDesktopTheme();
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (state.themePreference === 'system') applyDesktopTheme();
-  });
-  applyDesktopLocale();
   try {
-    const config = await readConfig();
-    state.configRaw = config.raw;
-    state.configPath = config.path;
-    applyDesktopLocale(config.raw);
-    state.configValidation = await validateConfig(config.raw);
-  } catch (error) {
-    pushToast(error instanceof Error ? error.message : String(error), 'error')
-  }
-  render();
-  void refreshSessions(true);
-  void loadRepoInfo();
-  void loadCommandContract();
-
-  // Keyboard shortcuts (Tauri context only)
-  if (IS_TAURI) {
-    document.addEventListener('keydown', (event) => {
-      // Don't activate shortcuts while typing in input/textarea
-      const target = event.target as HTMLElement;
-      if (
-        target.isContentEditable ||
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      const isMeta = event.metaKey || event.ctrlKey;
-
-      if (isMeta && event.key === 'r') {
-        event.preventDefault();
-        if (!state.busy && runReadiness().ready) {
-          void startReview(true);
-        }
-        return;
-      }
-
-      if (isMeta && event.key === ',') {
-        event.preventDefault();
-        setView('config');
-        if (!state.configRaw) void loadConfig();
-        return;
-      }
-
-      if (isMeta && event.key === '1') {
-        event.preventDefault();
-        setView('sessions');
-      }
+    applyDesktopTheme();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (state.themePreference === 'system') applyDesktopTheme();
     });
+    applyDesktopLocale();
+    try {
+      const config = await readConfig();
+      state.configRaw = config.raw;
+      state.configPath = config.path;
+      applyDesktopLocale(config.raw);
+      state.configValidation = await validateConfig(config.raw);
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : String(error), 'error')
+    }
+    render();
+    void refreshSessions(true);
+    void loadRepoInfo();
+    void loadCommandContract();
+
+    // Keyboard shortcuts (Tauri context only)
+    if (IS_TAURI) {
+      document.addEventListener('keydown', (event) => {
+        // Don't activate shortcuts while typing in input/textarea
+        const target = event.target as HTMLElement;
+        if (
+          target.isContentEditable ||
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement
+        ) {
+          return;
+        }
+
+        const isMeta = event.metaKey || event.ctrlKey;
+
+        if (isMeta && event.key === 'r') {
+          event.preventDefault();
+          if (!state.busy && runReadiness().ready) {
+            void startReview(true);
+          }
+          return;
+        }
+
+        if (isMeta && event.key === ',') {
+          event.preventDefault();
+          setView('config');
+          if (!state.configRaw) void loadConfig();
+          return;
+        }
+
+        if (isMeta && event.key === '1') {
+          event.preventDefault();
+          setView('sessions');
+        }
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    appRoot.innerHTML = `
+      <div style="padding: 40px; text-align: center; font-family: system-ui, sans-serif;">
+        <h1 style="color: var(--danger, #b91c1c);">CodeAgora Desktop failed to start</h1>
+        <p style="color: var(--muted, #5d688d); margin: 16px 0;">${message}</p>
+        <button onclick="location.reload()" style="padding: 10px 20px; border-radius: 8px; border: none; background: var(--brand, #05A6B9); color: white; cursor: pointer;">Reload</button>
+      </div>
+    `;
   }
 }
 
