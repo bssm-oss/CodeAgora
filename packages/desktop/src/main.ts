@@ -659,6 +659,37 @@ function repoSubtitle(): string {
   return `${repo.path}${branch}${head}`;
 }
 
+function renderSkeleton(view: View): HTMLElement {
+  const shell = el('div', 'skeleton-shell');
+  if (view === 'sessions') {
+    const sidebar = el('div', 'skeleton-sidebar');
+    sidebar.append(el('div', 'skeleton skeleton-title'));
+    sidebar.append(el('div', 'skeleton skeleton-text'));
+    sidebar.append(el('div', 'skeleton-sidebar-nav'));
+    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
+    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
+    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
+    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
+    shell.append(sidebar);
+    const main = el('div', 'skeleton-main');
+    main.append(el('div', 'skeleton skeleton-title'));
+    main.append(el('div', 'skeleton skeleton-text'));
+    main.append(el('div', 'skeleton-grid'));
+    main.append(el('div', 'skeleton skeleton-cell'));
+    main.append(el('div', 'skeleton skeleton-cell'));
+    shell.append(main);
+  } else {
+    const main = el('div', 'skeleton-main');
+    main.append(el('div', 'skeleton skeleton-title'));
+    main.append(el('div', 'skeleton skeleton-text'));
+    main.append(el('div', 'skeleton skeleton-card'));
+    main.append(el('div', 'skeleton skeleton-card'));
+    main.append(el('div', 'skeleton skeleton-card'));
+    shell.append(main);
+  }
+  return shell;
+}
+
 function renderContent(): HTMLElement {
   const content = el('section', 'content');
   content.dataset.testid = `view-${state.view}`;
@@ -670,12 +701,13 @@ function renderContent(): HTMLElement {
     }, 'ghost', 'button-dismiss'));
     content.append(notice);
   }
-  if (state.busy) content.append(el('div', 'loading', t('desktop.status.working')));
-
-  if (state.view === 'sessions') content.append(renderSessions());
-  if (state.view === 'run') content.append(renderRunReview());
-  if (state.view === 'config') content.append(renderConfig());
-  if (state.view === 'setup') content.append(renderSetup());
+  if (state.busy) content.append(renderSkeleton(state.view));
+  else {
+    if (state.view === 'sessions') content.append(renderSessions());
+    if (state.view === 'run') content.append(renderRunReview());
+    if (state.view === 'config') content.append(renderConfig());
+    if (state.view === 'setup') content.append(renderSetup());
+  }
   return content;
 }
 
