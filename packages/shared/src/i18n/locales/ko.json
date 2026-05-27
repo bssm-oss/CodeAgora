@@ -282,6 +282,8 @@
   "desktop.action.validateConfig": "설정 검증",
   "desktop.action.saveConfig": "설정 저장",
   "desktop.action.refreshSetup": "셋업 새로고침",
+
+  "desktop.confirm.cancelReview": "실행 중인 리뷰를 취소할까요? 진행 중인 작업이 손실됩니다.",
   "desktop.status.working": "작업 중...",
   "desktop.notice.invalidConfig": "잘못된 설정: {errors}",
   "desktop.notice.savedConfig": "{path} 저장됨",

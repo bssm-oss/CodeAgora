@@ -503,6 +503,7 @@ async function pollReviewRun(): Promise<void> {
 async function cancelActiveReview(): Promise<void> {
   const runId = state.activeRun?.runId;
   if (!runId) return;
+  if (!confirm(t('desktop.confirm.cancelReview'))) return;
   state.busy = true;
   render();
   try {
