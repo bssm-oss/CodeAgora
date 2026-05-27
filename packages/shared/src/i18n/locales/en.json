@@ -283,6 +283,8 @@
   "desktop.action.validateConfig": "Validate Config",
   "desktop.action.saveConfig": "Save Config",
   "desktop.action.refreshSetup": "Refresh Setup",
+
+  "desktop.confirm.cancelReview": "Cancel the running review? Ongoing progress will be lost.",
   "desktop.status.working": "Working...",
   "desktop.notice.invalidConfig": "Invalid config: {errors}",
   "desktop.notice.savedConfig": "Saved {path}",
