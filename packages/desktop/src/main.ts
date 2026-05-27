@@ -16,6 +16,7 @@ import {
   startReviewRun,
   validateConfig,
   writeConfig,
+  IS_TAURI,
   type ConfigValidation,
   type DesktopCommandContract,
   type EvidenceStatus,
@@ -317,6 +318,7 @@ async function loadRepoInfo(): Promise<void> {
   try {
     state.repoInfo = await getRepoInfo();
     state.repoPath = state.repoInfo.path;
+    document.title = repoSubtitle();
   } catch (error) {
     state.repoPath = error instanceof Error ? error.message : String(error);
   }
@@ -1316,6 +1318,33 @@ async function bootstrap(): Promise<void> {
   void refreshSessions(true);
   void loadRepoInfo();
   void loadCommandContract();
+
+  // Keyboard shortcuts (Tauri context only)
+  if (IS_TAURI) {
+    document.addEventListener('keydown', (event) => {
+      const isMeta = event.metaKey || event.ctrlKey;
+
+      if (isMeta && event.key === 'r') {
+        event.preventDefault();
+        if (!state.busy && runReadiness().ready) {
+          void startReview(true);
+        }
+        return;
+      }
+
+      if (isMeta && event.key === ',') {
+        event.preventDefault();
+        setView('config');
+        if (!state.configRaw) void loadConfig();
+        return;
+      }
+
+      if (isMeta && event.key === '1') {
+        event.preventDefault();
+        setView('sessions');
+      }
+    });
+  }
 }
 
 void bootstrap();

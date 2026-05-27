@@ -36,7 +36,7 @@ import {
 // ── tauriCall wrapper ────────────────────────────────────────────
 
 /** Whether the app is running inside a Tauri shell. */
-const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 /**
  * Call a Tauri IPC command, returning `null` if not in a Tauri context.
