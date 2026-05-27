@@ -1322,6 +1322,16 @@ async function bootstrap(): Promise<void> {
   // Keyboard shortcuts (Tauri context only)
   if (IS_TAURI) {
     document.addEventListener('keydown', (event) => {
+      // Don't activate shortcuts while typing in input/textarea
+      const target = event.target as HTMLElement;
+      if (
+        target.isContentEditable ||
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
       const isMeta = event.metaKey || event.ctrlKey;
 
       if (isMeta && event.key === 'r') {
