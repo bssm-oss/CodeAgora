@@ -38,6 +38,13 @@ const recentReposKey = 'codeagora.desktop.recentRepos';
 const localePreferenceKey = 'codeagora.desktop.locale';
 const themePreferenceKey = 'codeagora.desktop.theme';
 
+interface Toast {
+  id: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  createdAt: number;
+}
+
 interface AppState {
   view: View;
   sessions: SessionSummary[];
@@ -58,6 +65,7 @@ interface AppState {
   githubActionStatus?: GitHubActionStatus;
   evidenceStatus?: EvidenceStatus;
   notice?: string;
+  toasts: Toast[];
   localePreference: DesktopLocalePreference;
   themePreference: DesktopThemePreference;
   busy: boolean;
@@ -78,6 +86,7 @@ const state: AppState = {
   localePreference: loadLocalePreference(),
   themePreference: loadThemePreference(),
   busy: false,
+  toasts: [],
 };
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -298,6 +307,19 @@ function saveThemePreference(preference: DesktopThemePreference): void {
   }
 }
 
+function pushToast(message: string, type: Toast['type'] = 'info'): void {
+  const id = `toast-${Date.now()}`
+  state.toasts.push({ id, message, type, createdAt: Date.now() })
+  if (state.toasts.length > 3) state.toasts.shift()
+  window.setTimeout(() => removeToast(id), 4000)
+  render()
+}
+
+function removeToast(id: string): void {
+  state.toasts = state.toasts.filter((toast) => toast.id !== id)
+  render()
+}
+
 async function refreshSessions(selectFirst = false): Promise<void> {
   state.busy = true;
   render();
@@ -307,7 +329,7 @@ async function refreshSessions(selectFirst = false): Promise<void> {
       state.selected = await getSessionDetail(state.sessions[0].id);
     }
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -349,7 +371,7 @@ async function loadCommandContract(): Promise<void> {
   try {
     state.commandContract = await getCommandContract();
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   }
   render();
 }
@@ -369,7 +391,7 @@ async function loadSetup(): Promise<void> {
     state.githubActionStatus = githubAction;
     state.evidenceStatus = evidence;
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -382,7 +404,7 @@ async function selectSession(id: string): Promise<void> {
   try {
     state.selected = await getSessionDetail(id);
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -399,7 +421,7 @@ async function loadConfig(): Promise<void> {
     applyDesktopLocale(config.raw);
     state.configValidation = await validateConfig(config.raw);
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -413,16 +435,16 @@ async function saveConfig(raw: string): Promise<void> {
   try {
     state.configValidation = await validateConfig(raw);
     if (!state.configValidation.valid) {
-      state.notice = t('desktop.notice.invalidConfig', { errors: state.configValidation.errors.join('; ') });
+      pushToast(t('desktop.notice.invalidConfig', { errors: state.configValidation.errors.join('; ') }), 'error')
       return;
     }
     const config = await writeConfig(raw);
     state.configRaw = config.raw;
     state.configPath = config.path;
     applyDesktopLocale(config.raw);
-    state.notice = t('desktop.notice.savedConfig', { path: config.path });
+    pushToast(t('desktop.notice.savedConfig', { path: config.path }), 'success')
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -436,9 +458,13 @@ async function validateConfigEditor(raw: string): Promise<void> {
   try {
     applyDesktopLocale(raw);
     state.configValidation = await validateConfig(raw);
-    state.notice = state.configValidation.valid ? t('desktop.notice.configValidates') : t('desktop.notice.configErrors');
+    if (state.configValidation.valid) {
+      pushToast(t('desktop.notice.configValidates'), 'success')
+    } else {
+      pushToast(t('desktop.notice.configErrors'), 'error')
+    }
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -458,11 +484,11 @@ async function startReview(staged: boolean): Promise<void> {
     return;
   }
   state.busy = true;
-  state.notice = staged ? t('desktop.notice.startingStaged') : t('desktop.notice.startingWorkingTree');
+  pushToast(staged ? t('desktop.notice.startingStaged') : t('desktop.notice.startingWorkingTree'), 'success')
   render();
   try {
     state.activeRun = await startReviewRun(staged);
-    state.notice = state.activeRun.message;
+    pushToast(state.activeRun.message, 'success')
     scheduleReviewPoll();
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
@@ -490,11 +516,11 @@ async function pollReviewRun(): Promise<void> {
     if (isReviewRunning(state.activeRun)) {
       scheduleReviewPoll();
     } else {
-      state.notice = state.activeRun.message;
+      pushToast(state.activeRun.message, 'success')
       await refreshSessions(false);
     }
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     render();
   }
@@ -508,10 +534,10 @@ async function cancelActiveReview(): Promise<void> {
   render();
   try {
     state.activeRun = await cancelReviewRun(runId);
-    state.notice = state.activeRun.message;
+    pushToast(state.activeRun.message, 'success')
     scheduleReviewPoll();
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -526,9 +552,9 @@ async function exportSelected(format: 'markdown' | 'json' | 'sarif'): Promise<vo
   try {
     const output = await exportSession(id, format);
     await window.navigator.clipboard?.writeText(output.content);
-    state.notice = t('desktop.notice.copiedExport', { fileName: output.fileName });
+    pushToast(t('desktop.notice.copiedExport', { fileName: output.fileName }), 'success')
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
     state.busy = false;
     render();
@@ -1330,8 +1356,21 @@ function renderEvidenceSetup(): HTMLElement {
   return section;
 }
 
+function renderToasts(): void {
+  if (state.toasts.length === 0) return
+  const container = el('div', 'toast-container')
+  for (const toast of state.toasts) {
+    const node = el('div', `toast toast--${toast.type}`)
+    node.append(el('span', '', toast.message))
+    node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ghost', 'button-dismiss-toast'))
+    container.append(node)
+  }
+  appRoot.append(container)
+}
+
 function render(): void {
   appRoot.replaceChildren(renderShell());
+  renderToasts()
 }
 
 async function bootstrap(): Promise<void> {
@@ -1347,7 +1386,7 @@ async function bootstrap(): Promise<void> {
     applyDesktopLocale(config.raw);
     state.configValidation = await validateConfig(config.raw);
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : String(error);
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
   }
   render();
   void refreshSessions(true);
