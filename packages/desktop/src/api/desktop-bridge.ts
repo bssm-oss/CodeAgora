@@ -1,244 +1,56 @@
-export type ReviewDecision = 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
+import { invoke } from '@tauri-apps/api/core';
+import type {
+  SessionSummary,
+  SessionDetail,
+  SessionExport,
+  RunReviewResult,
+  ReviewRunSnapshot,
+  DesktopConfig,
+  ConfigValidation,
+  ProviderStatus,
+  McpStatus,
+  GitHubActionStatus,
+  EvidenceStatus,
+  RepoInfo,
+  DesktopCommandContract,
+  SeverityCounts,
+  TopIssue,
+  SessionCostSummary,
+} from './desktop-bridge.types.js';
+export type * from './desktop-bridge.types.js';
+import {
+  fallbackSessions,
+  fallbackSessionDetail,
+  fallbackSessionExport,
+  fallbackReviewRun,
+  fallbackConfig,
+  fallbackConfigValidation,
+  fallbackProviderStatus,
+  fallbackMcpStatus,
+  fallbackGitHubActionStatus,
+  fallbackEvidenceStatus,
+  fallbackRepoInfo,
+  fallbackCommandContract,
+} from './desktop-fallbacks.js';
 
-export interface SeverityCounts {
-  HARSHLY_CRITICAL?: number;
-  CRITICAL?: number;
-  WARNING?: number;
-  SUGGESTION?: number;
+// ── tauriCall wrapper ────────────────────────────────────────────
+
+/** Whether the app is running inside a Tauri shell. */
+const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+/**
+ * Call a Tauri IPC command, returning `null` if not in a Tauri context.
+ * When in Tauri, real errors propagate to the caller so the UI can
+ * surface failures instead of silently falling through to mock data.
+ */
+async function tauriCall<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
+  if (!IS_TAURI) return null;
+  return invoke<T>(cmd, args);
 }
 
-export interface TopIssue {
-  severity: string;
-  filePath: string;
-  lineRange: [number, number];
-  title: string;
-  confidence?: number;
-}
+// ── JSON normalisation helpers ───────────────────────────────────
 
-export interface SessionSummary {
-  id: string;
-  date: string;
-  sessionId: string;
-  status: 'completed' | 'failed' | 'interrupted' | 'in_progress' | 'unknown';
-  dirPath?: string;
-  decision?: ReviewDecision;
-  reasoning?: string;
-  severityCounts?: SeverityCounts;
-  topIssues?: TopIssue[];
-  updatedAt?: string;
-}
-
-export interface SessionCostSummary {
-  known: boolean;
-  formattedTotalCost: string;
-  totalCost?: number;
-  callCount?: number;
-  totalTokens?: number;
-  source?: string;
-}
-
-export interface SessionDetail extends SessionSummary {
-  findings?: TopIssue[];
-  markdown?: string;
-  evidenceCount?: number;
-  discussionsCount?: number;
-  degraded?: boolean;
-  degradedReasons?: string[];
-  costSummary?: SessionCostSummary;
-}
-
-export interface SessionExport {
-  format: 'markdown' | 'json' | 'sarif' | string;
-  fileName: string;
-  content: string;
-}
-
-export interface RunReviewResult {
-  ok: boolean;
-  message: string;
-  sessionId?: string;
-}
-
-export type ReviewRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'cancelling';
-
-export interface ReviewRunEvent {
-  kind: string;
-  message: string;
-  timestamp: string;
-  payload?: unknown;
-}
-
-export interface ReviewRunSnapshot {
-  runId: string;
-  staged: boolean;
-  status: ReviewRunStatus;
-  message: string;
-  sessionId?: string;
-  startedAt: string;
-  completedAt?: string;
-  events: ReviewRunEvent[];
-}
-
-export interface DesktopConfig {
-  raw: string;
-  path: string;
-}
-
-export interface ConfigValidation {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
-}
-
-export interface ProviderStatus {
-  name: string;
-  kind: 'api' | 'cli' | string;
-  envVar?: string;
-  configured: boolean;
-  redactedValue?: string;
-  binary?: string;
-}
-
-export interface McpStatus {
-  command: string;
-  tools: string[];
-  clientSnippet: string;
-}
-
-export interface WorkflowStatus {
-  path: string;
-  mentionsCodeagora: boolean;
-  hasPullRequestTrigger: boolean;
-  hasPermissions: boolean;
-  hasConfigPath: boolean;
-}
-
-export interface GitHubActionStatus {
-  workflowCount: number;
-  codeagoraWorkflowCount: number;
-  workflows: WorkflowStatus[];
-  recommendedSnippet: string;
-}
-
-export interface EvidenceStatus {
-  releaseEvidencePath?: string;
-  benchmarkReportPath?: string;
-  evidenceManifestPath?: string;
-  hasReleaseEvidence: boolean;
-  hasBenchmarkReport: boolean;
-  hasEvidenceManifest: boolean;
-}
-
-export interface RepoInfo {
-  path: string;
-  gitRoot?: string;
-  isGitRepo: boolean;
-  branch?: string;
-  headSha?: string;
-  dirtyFileCount: number;
-  hasConfig: boolean;
-  configPath?: string;
-  reviewIgnorePath?: string;
-  reviewRulesPath?: string;
-  sessionsRoot: string;
-  sessionCount: number;
-  trusted: boolean;
-  trustReason: string;
-}
-
-export interface DesktopCommandContract {
-  name: string;
-  classification: 'read-only' | 'process-execution' | 'project-mutation' | string;
-  readsProject: boolean;
-  mutatesProject: boolean;
-  spawnsProcess: boolean;
-  notes: string;
-}
-
-type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 type JsonObject = Record<string, unknown>;
-
-interface CliSessionList {
-  sessions?: CliSessionEntry[];
-}
-
-interface CliSessionEntry {
-  id?: unknown;
-  date?: unknown;
-  sessionId?: unknown;
-  status?: unknown;
-  dirPath?: unknown;
-  decision?: unknown;
-  reasoning?: unknown;
-  severityCounts?: unknown;
-  topIssues?: unknown;
-  updatedAt?: unknown;
-}
-
-interface CliSessionDetail {
-  entry?: CliSessionEntry;
-  metadata?: JsonObject;
-  verdict?: JsonObject;
-  findings?: unknown;
-  markdown?: unknown;
-  evidenceCount?: unknown;
-  discussionsCount?: unknown;
-  degraded?: unknown;
-  degradedReasons?: unknown;
-  costSummary?: unknown;
-}
-
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: {
-      invoke?: TauriInvoke;
-    };
-    __TAURI__?: {
-      core?: {
-        invoke?: TauriInvoke;
-      };
-    };
-  }
-}
-
-function getInvoke(): TauriInvoke | undefined {
-  return window.__TAURI__?.core?.invoke ?? window.__TAURI_INTERNALS__?.invoke;
-}
-
-function fallbackSessions(): SessionSummary[] {
-  return [
-    {
-      id: '2026-04-27/001',
-      date: '2026-04-27',
-      sessionId: '001',
-      status: 'completed',
-      decision: 'REJECT',
-      reasoning: 'Two high-confidence findings need changes before merge.',
-      severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 1, WARNING: 2, SUGGESTION: 1 },
-      topIssues: [
-        {
-          severity: 'CRITICAL',
-          filePath: 'packages/core/src/pipeline/orchestrator.ts',
-          lineRange: [156, 180],
-          title: 'Pipeline error path skips result persistence',
-          confidence: 91,
-        },
-      ],
-      updatedAt: '2026-04-27T09:30:00.000Z',
-    },
-    {
-      id: '2026-04-26/003',
-      date: '2026-04-26',
-      sessionId: '003',
-      status: 'completed',
-      decision: 'ACCEPT',
-      reasoning: 'No blocking issues found across reviewers.',
-      severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 0, WARNING: 0, SUGGESTION: 2 },
-      topIssues: [],
-      updatedAt: '2026-04-26T18:12:00.000Z',
-    },
-  ];
-}
 
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
@@ -252,14 +64,9 @@ function asObject(value: unknown): JsonObject | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as JsonObject : undefined;
 }
 
-function severityCountsFromVerdict(verdict?: JsonObject): SeverityCounts {
-  const counts: SeverityCounts = {};
-  for (const issue of extractIssues(verdict)) {
-    const severity = asString(issue.severity, 'SUGGESTION') as keyof SeverityCounts;
-    counts[severity] = (counts[severity] ?? 0) + 1;
-  }
-  return counts;
-}
+type CliSessionList = { sessions?: CliSessionEntry[] };
+type CliSessionEntry = Record<string, unknown>;
+type CliSessionDetail = Record<string, unknown>;
 
 function extractIssues(verdict?: JsonObject): JsonObject[] {
   if (!verdict) return [];
@@ -277,6 +84,15 @@ function severityCountsFromValue(value: unknown, verdict?: JsonObject): Severity
   for (const key of ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'] as const) {
     const count = raw[key];
     if (typeof count === 'number') counts[key] = count;
+  }
+  return counts;
+}
+
+function severityCountsFromVerdict(verdict?: JsonObject): SeverityCounts {
+  const counts: SeverityCounts = {};
+  for (const issue of extractIssues(verdict)) {
+    const severity = asString(issue.severity, 'SUGGESTION') as keyof SeverityCounts;
+    counts[severity] = (counts[severity] ?? 0) + 1;
   }
   return counts;
 }
@@ -300,23 +116,12 @@ function normalizeTopIssues(value: unknown, verdict?: JsonObject): TopIssue[] {
   return issues.map(normalizeIssue);
 }
 
-function timestampFromValue(raw: unknown): string | undefined {
-  if (typeof raw === 'number') return new Date(raw).toISOString();
-  if (typeof raw === 'string' && /^\d+$/.test(raw)) return new Date(Number(raw)).toISOString();
-  return typeof raw === 'string' ? raw : undefined;
-}
-
-function timestampFromMetadata(metadata?: JsonObject): string | undefined {
-  const raw = metadata?.['completedAt'] ?? metadata?.['startedAt'] ?? metadata?.['timestamp'];
-  return timestampFromValue(raw);
-}
-
 function normalizeEntry(entry: CliSessionEntry): SessionSummary {
   const date = asString(entry.date);
   const sessionId = asString(entry.sessionId);
   const id = asString(entry.id, date && sessionId ? `${date}/${sessionId}` : 'unknown');
-  const verdict = asObject((entry as JsonObject)['verdict']);
-  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as ReviewDecision | '';
+  const verdict = asObject(entry['verdict']);
+  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as SessionSummary['decision'] | '';
   return {
     id,
     date,
@@ -327,16 +132,23 @@ function normalizeEntry(entry: CliSessionEntry): SessionSummary {
     reasoning: asString(entry.reasoning ?? verdict?.['reasoning'] ?? verdict?.['summary']) || undefined,
     severityCounts: severityCountsFromValue(entry.severityCounts, verdict),
     topIssues: normalizeTopIssues(entry.topIssues, verdict),
-    updatedAt: timestampFromValue(entry.updatedAt),
+    updatedAt: asString(entry.updatedAt) || undefined,
   };
 }
 
+function timestampFromMetadata(metadata?: JsonObject): string | undefined {
+  const raw = metadata?.['completedAt'] ?? metadata?.['startedAt'] ?? metadata?.['timestamp'];
+  if (typeof raw === 'number') return new Date(raw).toISOString();
+  if (typeof raw === 'string' && /^\d+$/.test(raw)) return new Date(Number(raw)).toISOString();
+  return typeof raw === 'string' ? raw : undefined;
+}
+
 function normalizeDetail(detail: CliSessionDetail): SessionDetail {
-  const entry = normalizeEntry(detail.entry ?? {});
-  const verdict = detail.verdict;
-  const metadata = detail.metadata;
+  const entry = normalizeEntry(asObject(detail['entry']) ?? {});
+  const verdict = asObject(detail['verdict']);
+  const metadata = asObject(detail['metadata']);
   const issues = extractIssues(verdict);
-  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as ReviewDecision | '';
+  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as SessionDetail['decision'] | '';
   const reasoning = asString(entry.reasoning ?? verdict?.['reasoning'] ?? verdict?.['summary']);
   return {
     ...entry,
@@ -344,14 +156,14 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
     reasoning,
     severityCounts: entry.severityCounts ?? severityCountsFromVerdict(verdict),
     topIssues: entry.topIssues?.length ? entry.topIssues : normalizeTopIssues(undefined, verdict),
-    findings: normalizeTopIssues(detail.findings, verdict),
+    findings: normalizeTopIssues(detail['findings'], verdict),
     updatedAt: entry.updatedAt ?? timestampFromMetadata(metadata),
-    evidenceCount: asNumber(detail.evidenceCount) ?? issues.length,
-    discussionsCount: asNumber(detail.discussionsCount) ?? (Array.isArray(verdict?.['discussions']) ? verdict['discussions'].length : undefined),
-    degraded: typeof detail.degraded === 'boolean' ? detail.degraded : undefined,
-    degradedReasons: Array.isArray(detail.degradedReasons) ? detail.degradedReasons.filter((item): item is string => typeof item === 'string') : undefined,
-    costSummary: asObject(detail.costSummary) as SessionCostSummary | undefined,
-    markdown: asString(detail.markdown) || [
+    evidenceCount: asNumber(detail['evidenceCount']) ?? issues.length,
+    discussionsCount: asNumber(detail['discussionsCount']) ?? (Array.isArray(verdict?.['discussions']) ? verdict['discussions'].length : undefined),
+    degraded: typeof detail['degraded'] === 'boolean' ? detail['degraded'] : undefined,
+    degradedReasons: Array.isArray(detail['degradedReasons']) ? detail['degradedReasons'].filter((item): item is string => typeof item === 'string') : undefined,
+    costSummary: asObject(detail['costSummary']) as SessionCostSummary | undefined,
+    markdown: asString(detail['markdown']) || [
       `# Review ${entry.id}`,
       '',
       `Decision: ${decision || entry.status}`,
@@ -361,55 +173,33 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
   };
 }
 
+// ── Bridge API ───────────────────────────────────────────────────
+
 export async function listSessions(): Promise<SessionSummary[]> {
-  const invoke = getInvoke();
-  if (invoke) {
-    const response = await invoke<CliSessionList | CliSessionEntry[]>('list_sessions');
-    const sessions = Array.isArray(response) ? response : response.sessions ?? [];
+  const result = await tauriCall<CliSessionList | CliSessionEntry[]>('list_sessions');
+  if (result) {
+    const sessions = Array.isArray(result) ? result : result.sessions ?? [];
     return sessions.map(normalizeEntry);
   }
   return fallbackSessions();
 }
 
 export async function getSessionDetail(id: string): Promise<SessionDetail> {
-  const invoke = getInvoke();
-  if (invoke) {
-    return normalizeDetail(await invoke<CliSessionDetail>('get_session_detail', { id }));
-  }
-  const session = fallbackSessions().find((item) => item.id === id) ?? fallbackSessions()[0]!;
-  return {
-    ...session,
-    evidenceCount: session.topIssues?.length ?? 0,
-    discussionsCount: session.severityCounts?.CRITICAL ? 1 : 0,
-    markdown: [
-      `# Review ${session.id}`,
-      '',
-      `Decision: ${session.decision ?? 'unknown'}`,
-      '',
-      session.reasoning ?? 'No reasoning available.',
-    ].join('\n'),
-  };
+  const result = await tauriCall<CliSessionDetail>('get_session_detail', { id });
+  if (result) return normalizeDetail(result);
+  return fallbackSessionDetail(id, await listSessions());
 }
 
 export async function exportSession(id: string, format: 'markdown' | 'json' | 'sarif'): Promise<SessionExport> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<SessionExport>('export_session', { id, format });
+  const result = await tauriCall<SessionExport>('export_session', { id, format });
+  if (result) return result;
   const detail = await getSessionDetail(id);
-  const content = format === 'json'
-    ? JSON.stringify(detail, null, 2)
-    : format === 'sarif'
-      ? JSON.stringify({ version: '2.1.0', runs: [{ results: detail.findings ?? [] }] }, null, 2)
-      : detail.markdown ?? `# Review ${id}`;
-  return {
-    format,
-    fileName: `codeagora-session-${id.replace('/', '-')}.${format === 'markdown' ? 'md' : format}`,
-    content,
-  };
+  return fallbackSessionExport(id, format, detail);
 }
 
 export async function runReview(staged: boolean): Promise<RunReviewResult> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<RunReviewResult>('run_review', { staged });
+  const result = await tauriCall<RunReviewResult>('run_review', { staged });
+  if (result) return result;
   await new Promise((resolve) => setTimeout(resolve, 500));
   return {
     ok: true,
@@ -419,182 +209,80 @@ export async function runReview(staged: boolean): Promise<RunReviewResult> {
 }
 
 export async function startReviewRun(staged: boolean): Promise<ReviewRunSnapshot> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<ReviewRunSnapshot>('start_review_run', { staged });
-  return {
-    runId: `preview-${Date.now()}`,
-    staged,
-    status: 'completed',
-    message: staged ? 'Preview mode: staged review would start.' : 'Preview mode: working tree review would start.',
-    sessionId: 'preview',
-    startedAt: String(Date.now()),
-    completedAt: String(Date.now()),
-    events: [
-      {
-        kind: 'preview',
-        message: 'Browser preview does not run the CLI.',
-        timestamp: String(Date.now()),
-      },
-    ],
-  };
+  const result = await tauriCall<ReviewRunSnapshot>('start_review_run', { staged });
+  if (result) return result;
+  return fallbackReviewRun(staged);
 }
 
 export async function getReviewRun(runId: string): Promise<ReviewRunSnapshot> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<ReviewRunSnapshot>('get_review_run', { runId });
-  return {
-    runId,
-    staged: true,
-    status: 'completed',
-    message: 'Preview run completed.',
-    sessionId: 'preview',
-    startedAt: String(Date.now()),
-    completedAt: String(Date.now()),
-    events: [],
-  };
+  const result = await tauriCall<ReviewRunSnapshot>('get_review_run', { runId });
+  if (result) return result;
+  return fallbackReviewRun(true);
 }
 
 export async function cancelReviewRun(runId: string): Promise<ReviewRunSnapshot> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<ReviewRunSnapshot>('cancel_review_run', { runId });
-  return {
-    runId,
-    staged: true,
-    status: 'cancelled',
-    message: 'Preview run cancelled.',
-    startedAt: String(Date.now()),
-    completedAt: String(Date.now()),
-    events: [],
-  };
+  const result = await tauriCall<ReviewRunSnapshot>('cancel_review_run', { runId });
+  if (result) return result;
+  return { ...fallbackReviewRun(true), status: 'cancelled' };
 }
 
 export async function readConfig(): Promise<DesktopConfig> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<DesktopConfig>('read_config');
-  return {
-    path: '.ca/config.json',
-    raw: window.localStorage.getItem('codeagora.desktop.config') ?? '{\n  "language": "en",\n  "reviewers": []\n}',
-  };
+  const result = await tauriCall<DesktopConfig>('read_config');
+  if (result) return result;
+  return fallbackConfig();
 }
 
 export async function writeConfig(raw: string): Promise<DesktopConfig> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<DesktopConfig>('write_config', { raw });
+  const result = await tauriCall<DesktopConfig>('write_config', { raw });
+  if (result) return result;
   window.localStorage.setItem('codeagora.desktop.config', raw);
   return { path: '.ca/config.json', raw };
 }
 
 export async function validateConfig(raw: string): Promise<ConfigValidation> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<ConfigValidation>('validate_config', { raw });
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return {
-      valid: typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed),
-      errors: typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? [] : ['Config must be an object.'],
-      warnings: [],
-    };
-  } catch (error) {
-    return {
-      valid: false,
-      errors: [error instanceof Error ? error.message : String(error)],
-      warnings: [],
-    };
-  }
+  const result = await tauriCall<ConfigValidation>('validate_config', { raw });
+  if (result) return result;
+  return fallbackConfigValidation(raw);
 }
 
 export async function getProviderStatus(): Promise<ProviderStatus[]> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<ProviderStatus[]>('get_provider_status');
-  return [
-    { name: 'openai', kind: 'api', envVar: 'OPENAI_API_KEY', configured: false },
-    { name: 'anthropic', kind: 'api', envVar: 'ANTHROPIC_API_KEY', configured: false },
-    { name: 'codex', kind: 'cli', binary: 'codex', configured: false },
-  ];
+  const result = await tauriCall<ProviderStatus[]>('get_provider_status');
+  if (result) return result;
+  return fallbackProviderStatus();
 }
 
 export async function getMcpStatus(): Promise<McpStatus> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<McpStatus>('get_mcp_status');
-  return {
-    command: 'codeagora-mcp',
-    tools: ['review_quick', 'review_full', 'review_pr', 'dry_run', 'explain_session', 'leaderboard', 'stats', 'config_get', 'config_set'],
-    clientSnippet: JSON.stringify({ mcpServers: { codeagora: { command: 'codeagora-mcp', args: [] } } }, null, 2),
-  };
+  const result = await tauriCall<McpStatus>('get_mcp_status');
+  if (result) return result;
+  return fallbackMcpStatus();
 }
 
 export async function getGitHubActionStatus(): Promise<GitHubActionStatus> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<GitHubActionStatus>('get_github_action_status');
-  return {
-    workflowCount: 0,
-    codeagoraWorkflowCount: 0,
-    workflows: [],
-    recommendedSnippet: 'name: CodeAgora Review',
-  };
+  const result = await tauriCall<GitHubActionStatus>('get_github_action_status');
+  if (result) return result;
+  return fallbackGitHubActionStatus();
 }
 
 export async function getEvidenceStatus(): Promise<EvidenceStatus> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<EvidenceStatus>('get_evidence_status');
-  return {
-    hasReleaseEvidence: false,
-    hasBenchmarkReport: false,
-    hasEvidenceManifest: false,
-  };
+  const result = await tauriCall<EvidenceStatus>('get_evidence_status');
+  if (result) return result;
+  return fallbackEvidenceStatus();
 }
 
 export async function getRepoInfo(): Promise<RepoInfo> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<RepoInfo>('get_repo_info');
-  return {
-    path: window.location.pathname.includes('/packages/desktop/') ? 'browser preview' : window.location.pathname,
-    gitRoot: undefined,
-    isGitRepo: false,
-    branch: 'preview',
-    headSha: undefined,
-    dirtyFileCount: 0,
-    hasConfig: true,
-    configPath: '.ca/config.json',
-    reviewIgnorePath: undefined,
-    reviewRulesPath: undefined,
-    sessionsRoot: '.ca/sessions',
-    sessionCount: fallbackSessions().length,
-    trusted: false,
-    trustReason: 'Browser preview uses fallback data and cannot execute local reviews.',
-  };
+  const result = await tauriCall<RepoInfo>('get_repo_info');
+  if (result) return result;
+  return fallbackRepoInfo();
 }
 
 export async function openRepository(path: string): Promise<RepoInfo> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<RepoInfo>('open_repository', { path });
-  return {
-    ...(await getRepoInfo()),
-    path,
-    trusted: false,
-    trustReason: 'Browser preview cannot open local repositories through Tauri.',
-  };
+  const result = await tauriCall<RepoInfo>('open_repository', { path });
+  if (result) return result;
+  return { ...fallbackRepoInfo(), path };
 }
 
 export async function getCommandContract(): Promise<DesktopCommandContract[]> {
-  const invoke = getInvoke();
-  if (invoke) return invoke<DesktopCommandContract[]>('get_command_contract');
-  return [
-    {
-      name: 'get_repo_info',
-      classification: 'read-only',
-      readsProject: true,
-      mutatesProject: false,
-      spawnsProcess: false,
-      notes: 'Browser preview fallback.',
-    },
-    {
-      name: 'run_review',
-      classification: 'process-execution',
-      readsProject: true,
-      mutatesProject: true,
-      spawnsProcess: true,
-      notes: 'Disabled in browser preview.',
-    },
-  ];
+  const result = await tauriCall<DesktopCommandContract[]>('get_command_contract');
+  if (result) return result;
+  return fallbackCommandContract();
 }
