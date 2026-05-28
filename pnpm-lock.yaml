@@ -186,6 +186,9 @@ importers:
 
   packages/desktop:
     dependencies:
+      '@codeagora/core':
+        specifier: workspace:*
+        version: link:../core
       '@codeagora/shared':
         specifier: workspace:*
         version: link:../shared

@@ -5,10 +5,12 @@
     "rootDir": "../..",
     "baseUrl": "../..",
     "paths": {
+      "@codeagora/core": ["packages/core/src/index.ts"],
+      "@codeagora/core/*": ["packages/core/src/*"],
       "@codeagora/shared/*": ["packages/shared/src/*"]
     },
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": []
   },
-  "include": ["./src/**/*.ts", "../shared/src/i18n/**/*.ts", "../shared/src/i18n/**/*.json"]
+  "include": ["./src/**/*.ts", "../core/src/session/contracts.ts", "../shared/src/i18n/**/*.ts", "../shared/src/i18n/**/*.json"]
 }

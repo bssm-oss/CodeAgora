@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@codeagora/core": "workspace:*",
     "@codeagora/shared": "workspace:*",
     "@tauri-apps/api": "^2.11.0"
   },
