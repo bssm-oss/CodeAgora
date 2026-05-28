@@ -132,8 +132,29 @@ function onThemeChange(): void {
   if (state.themePreference === 'system') applyDesktopTheme();
 }
 
+function resetSessionFilters(): boolean {
+  const hadFilters = Boolean(state.sessionSearch) || state.sessionStatus !== 'all' || state.sessionSort !== 'date-desc';
+  if (!hadFilters) return false;
+  state.sessionSearch = '';
+  state.sessionStatus = 'all';
+  state.sessionSort = 'date-desc';
+  render();
+  return true;
+}
+
 function onKeyDown(event: KeyboardEvent): void {
+  const target = event.target as HTMLElement;
   if (event.key === 'Escape') {
+    if (target instanceof HTMLInputElement && target.dataset.testid === 'session-filter-input' && state.sessionSearch) {
+      state.sessionSearch = '';
+      render();
+      event.preventDefault();
+      return;
+    }
+    if (state.view === 'sessions' && resetSessionFilters()) {
+      event.preventDefault();
+      return;
+    }
     if (state.toasts.length > 0) {
       removeToast(state.toasts[state.toasts.length - 1].id)
       event.preventDefault()
@@ -153,7 +174,6 @@ function onKeyDown(event: KeyboardEvent): void {
     }
   }
 
-  const target = event.target as HTMLElement;
   if (
     target.isContentEditable ||
     target instanceof HTMLInputElement ||
@@ -182,6 +202,32 @@ function onKeyDown(event: KeyboardEvent): void {
   if (isMeta && event.key === '1') {
     event.preventDefault();
     setView('sessions');
+    return;
+  }
+
+  if (isMeta && event.key === '2') {
+    event.preventDefault();
+    setView('run');
+    return;
+  }
+
+  if (isMeta && event.key === '3') {
+    event.preventDefault();
+    setView('config');
+    if (!state.configRaw) void loadConfig();
+    return;
+  }
+
+  if (isMeta && event.key === '4') {
+    event.preventDefault();
+    setView('setup');
+    if (state.providers.length === 0) void loadSetup();
+    return;
+  }
+
+  if (event.key === '?' || (event.shiftKey && event.key === '/')) {
+    event.preventDefault();
+    pushToast(t('desktop.shortcuts.global'), 'info');
   }
 }
 
@@ -1368,6 +1414,7 @@ function renderRunReview(): HTMLElement {
   intro.append(el('span', 'ca-eyebrow', t('desktop.run.eyebrow')));
   intro.append(el('h2', '', t('desktop.run.title')));
   intro.append(el('p', '', t('desktop.run.body')));
+  intro.append(el('p', 'ca-shortcut-hint', t('desktop.shortcuts.run')));
   panel.append(intro);
 
   const readinessPanel = el('section', readiness.ready ? 'ca-readiness-panel ca-ready' : 'ca-readiness-panel ca-blocked');
@@ -1427,7 +1474,7 @@ function renderReviewRun(): HTMLElement {
     const empty = el('div', 'ca-empty-state ca-compact');
     empty.append(el('strong', '', t('desktop.run.noActiveTitle')));
     empty.append(el('p', '', t('desktop.run.noActiveBody')));
-    empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'ca-button ca-subtle'));
+    empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'ca-button ca-subtle', 'button-start-staged-review-empty'));
     section.append(empty);
     return section;
   }
@@ -1495,8 +1542,8 @@ function renderRepositoryPicker(): HTMLElement {
   if (state.recentRepoPaths.length > 0) {
     const recent = el('div', 'ca-recent-repos');
     recent.append(el('span', '', t('desktop.repo.recent')));
-    for (const path of state.recentRepoPaths) {
-      recent.append(button(path, () => void openRepo(path), 'ca-ghost ca-repo-chip'));
+    for (const [index, path] of state.recentRepoPaths.entries()) {
+      recent.append(button(path, () => void openRepo(path), 'ca-ghost ca-repo-chip', `button-recent-repo-${index}`));
     }
     section.append(recent);
   }
@@ -1690,6 +1737,7 @@ function renderSetup(): HTMLElement {
   copy.append(el('span', 'ca-eyebrow', t('desktop.setup.eyebrow')));
   copy.append(el('h2', '', t('desktop.setup.title')));
   copy.append(el('p', '', t('desktop.setup.body')));
+  copy.append(el('p', 'ca-shortcut-hint', t('desktop.shortcuts.setup')));
   header.append(copy);
   header.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button', 'button-refresh-setup'));
   panel.append(header);
@@ -1723,7 +1771,7 @@ function renderSetup(): HTMLElement {
     const empty = el('div', 'ca-empty-state ca-compact');
     empty.append(el('strong', '', t('desktop.setup.providerStatusNotLoaded')));
     empty.append(el('p', '', t('desktop.setup.providerStatusHint')));
-    empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button ca-subtle'));
+    empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button ca-subtle', 'button-refresh-setup-empty'));
     grid.append(empty);
   }
   panel.append(grid);

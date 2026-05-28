@@ -295,6 +295,9 @@
   "desktop.toast.dismiss": "닫기",
   "desktop.toast.copied": "클립보드에 복사됨",
   "desktop.toast.copyFailed": "복사 실패",
+  "desktop.shortcuts.global": "단축키: ⌘1 콕핏 · ⌘2 실행 · ⌘3 설정 · ⌘4 셋업 · ⌘R 빠른 리뷰 · Esc 지우기/닫기",
+  "desktop.shortcuts.run": "단축키: ⌘R로 staged 리뷰를 시작합니다. Esc로 알림을 닫습니다.",
+  "desktop.shortcuts.setup": "단축키: ⌘4로 셋업을 엽니다. Esc로 알림을 닫습니다.",
 
   "desktop.confirm.cancelReview": "실행 중인 리뷰를 취소할까요? 진행 중인 작업이 손실됩니다.",
   "desktop.confirm.discardUnsavedConfig": "저장하지 않은 설정 변경이 있습니다. 버리고 레포지토리를 전환할까요?",

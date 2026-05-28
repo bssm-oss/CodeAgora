@@ -296,6 +296,9 @@
   "desktop.toast.dismiss": "Dismiss",
   "desktop.toast.copied": "Copied to clipboard",
   "desktop.toast.copyFailed": "Copy failed",
+  "desktop.shortcuts.global": "Shortcuts: ⌘1 Cockpit · ⌘2 Run · ⌘3 Config · ⌘4 Setup · ⌘R Quick review · Esc clear/dismiss",
+  "desktop.shortcuts.run": "Shortcuts: ⌘R starts a staged review. Esc dismisses active notices.",
+  "desktop.shortcuts.setup": "Shortcuts: ⌘4 opens Setup. Esc dismisses active notices.",
 
   "desktop.confirm.cancelReview": "Cancel the running review? Ongoing progress will be lost.",
   "desktop.confirm.discardUnsavedConfig": "You have unsaved config changes. Discard them and switch repository?",
