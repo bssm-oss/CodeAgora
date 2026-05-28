@@ -13,6 +13,7 @@ import type {
   EvidenceStatus,
   RepoInfo,
   DesktopCommandContract,
+  NotificationPreferences,
   SeverityCounts,
   TopIssue,
   SessionCostSummary,
@@ -285,4 +286,9 @@ export async function getCommandContract(): Promise<DesktopCommandContract[]> {
   const result = await tauriCall<DesktopCommandContract[]>('get_command_contract');
   if (result) return result;
   return fallbackCommandContract();
+}
+
+export async function setNotificationPreferences(preferences: NotificationPreferences): Promise<NotificationPreferences> {
+  const result = await tauriCall<NotificationPreferences>('set_notification_preferences', { preferences });
+  return result ?? preferences;
 }

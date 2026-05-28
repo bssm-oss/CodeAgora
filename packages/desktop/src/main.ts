@@ -13,6 +13,7 @@ import {
   listSessions,
   openRepository,
   readConfig,
+  setNotificationPreferences,
   startReviewRun,
   validateConfig,
   writeConfig,
@@ -22,6 +23,7 @@ import {
   type EvidenceStatus,
   type GitHubActionStatus,
   type McpStatus,
+  type NotificationPreferences,
   type ProviderStatus,
   type RepoInfo,
   type ReviewRunEvent,
@@ -38,6 +40,14 @@ type DesktopThemePreference = 'system' | 'light' | 'dark';
 const recentReposKey = 'codeagora.desktop.recentRepos';
 const localePreferenceKey = 'codeagora.desktop.locale';
 const themePreferenceKey = 'codeagora.desktop.theme';
+const notificationPreferenceKey = 'codeagora.desktop.notifications';
+const defaultNotificationPreferences: NotificationPreferences = {
+  enabled: true,
+  notifySuccess: false,
+  notifyFailure: true,
+  sound: false,
+  badge: true,
+};
 
 interface Toast {
   id: string;
@@ -72,6 +82,8 @@ interface AppState {
   toasts: Toast[];
   localePreference: DesktopLocalePreference;
   themePreference: DesktopThemePreference;
+  notificationPreferences: NotificationPreferences;
+  attentionCount: number;
   busy: boolean;
 }
 
@@ -92,6 +104,8 @@ const state: AppState = {
   providers: [],
   localePreference: loadLocalePreference(),
   themePreference: loadThemePreference(),
+  notificationPreferences: loadNotificationPreferences(),
+  attentionCount: 0,
   busy: false,
   toasts: [],
 };
@@ -337,8 +351,25 @@ function button(label: string, onClick: () => void, className = 'ca-button', tes
   return node;
 }
 
+function checkboxControl(label: string, checked: boolean, onChange: (checked: boolean) => void, testId: string): HTMLLabelElement {
+  const control = el('label', 'ca-toolbar-checkbox') as HTMLLabelElement;
+  const input = el('input', '') as HTMLInputElement;
+  input.type = 'checkbox';
+  input.checked = checked;
+  input.disabled = state.busy;
+  input.dataset.testid = testId;
+  input.setAttribute('aria-label', label);
+  input.addEventListener('change', () => onChange(input.checked));
+  control.append(input, el('span', '', label));
+  return control;
+}
+
 function setView(view: View): void {
   state.view = view;
+  if (view === 'sessions') {
+    state.attentionCount = 0;
+    updateBadgeState();
+  }
   render();
 }
 
@@ -401,6 +432,85 @@ function saveThemePreference(preference: DesktopThemePreference): void {
   }
 }
 
+function loadNotificationPreferences(): NotificationPreferences {
+  try {
+    const raw = window.localStorage.getItem(notificationPreferenceKey);
+    if (!raw) return defaultNotificationPreferences;
+    const parsed = JSON.parse(raw) as Partial<NotificationPreferences>;
+    return {
+      enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : defaultNotificationPreferences.enabled,
+      notifySuccess: typeof parsed.notifySuccess === 'boolean' ? parsed.notifySuccess : defaultNotificationPreferences.notifySuccess,
+      notifyFailure: typeof parsed.notifyFailure === 'boolean' ? parsed.notifyFailure : defaultNotificationPreferences.notifyFailure,
+      sound: typeof parsed.sound === 'boolean' ? parsed.sound : defaultNotificationPreferences.sound,
+      badge: typeof parsed.badge === 'boolean' ? parsed.badge : defaultNotificationPreferences.badge,
+    };
+  } catch {
+    return defaultNotificationPreferences;
+  }
+}
+
+function saveNotificationPreferences(preferences: NotificationPreferences): void {
+  try {
+    window.localStorage.setItem(notificationPreferenceKey, JSON.stringify(preferences));
+  } catch {
+    // Ignore unavailable storage.
+  }
+  void setNotificationPreferences(preferences).catch((error) => {
+    pushToast(error instanceof Error ? error.message : String(error), 'warning');
+  });
+}
+
+function updateNotificationPreferences(next: Partial<NotificationPreferences>): void {
+  state.notificationPreferences = { ...state.notificationPreferences, ...next };
+  if (!state.notificationPreferences.badge) state.attentionCount = 0;
+  updateBadgeState();
+  saveNotificationPreferences(state.notificationPreferences);
+  render();
+}
+
+function shouldNotifyForStatus(status: ReviewRunSnapshot['status']): boolean {
+  const preferences = state.notificationPreferences;
+  if (!preferences.enabled) return false;
+  if (status === 'completed') return preferences.notifySuccess;
+  if (status === 'failed' || status === 'cancelled') return preferences.notifyFailure;
+  return false;
+}
+
+function playCompletionSound(): void {
+  if (!state.notificationPreferences.sound) return;
+  const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) return;
+  const context = new AudioContextCtor();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.value = 660;
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.08, context.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.18);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.2);
+  window.setTimeout(() => void context.close(), 250);
+}
+
+function updateBadgeState(): void {
+  const baseTitle = repoSubtitle();
+  document.title = state.attentionCount > 0 && state.notificationPreferences.badge
+    ? `(${state.attentionCount}) ${baseTitle}`
+    : baseTitle;
+}
+
+function markReviewAttention(status: ReviewRunSnapshot['status']): void {
+  if (!shouldNotifyForStatus(status)) return;
+  if (state.notificationPreferences.badge) {
+    state.attentionCount = Math.max(1, state.attentionCount + 1);
+    updateBadgeState();
+  }
+  playCompletionSound();
+}
+
 function announce(message: string): void {
   const announcer = document.getElementById('a11y-announcer')
   if (announcer) announcer.textContent = message
@@ -449,7 +559,7 @@ async function loadRepoInfo(): Promise<void> {
   try {
     state.repoInfo = await getRepoInfo();
     state.repoPath = state.repoInfo.path;
-    document.title = repoSubtitle();
+    updateBadgeState();
   } catch (error) {
     state.repoPath = error instanceof Error ? error.message : String(error);
   }
@@ -469,6 +579,8 @@ async function openRepo(path: string): Promise<void> {
     state.repoInput = state.repoInfo.path;
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
+    state.attentionCount = 0;
+    updateBadgeState();
     resetConfigState();
     await refreshSessions(true, true);
     await loadConfig();
@@ -682,6 +794,8 @@ async function pollReviewRun(runId: string): Promise<void> {
     const terminal = ['completed', 'failed', 'cancelled'];
     if (!terminal.includes(snapshot.status)) {
       reviewPollHandle = window.setTimeout(() => pollReviewRun(runId), 2000);
+    } else {
+      markReviewAttention(snapshot.status);
     }
   } catch (error) {
     pollRetryCount++;
@@ -832,7 +946,53 @@ function renderToolbar(): HTMLElement {
   });
   themeControl.append(themeSelect);
 
-  preferences.append(localeControl, themeControl);
+  const notificationControl = el('label', 'ca-toolbar-select') as HTMLLabelElement;
+  notificationControl.append(el('span', 'ca-toolbar-select-label', t('desktop.preferences.notifications')));
+  const notificationSelect = el('select', 'ca-toolbar-select-input') as HTMLSelectElement;
+  notificationSelect.dataset.testid = 'notification-select';
+  notificationSelect.setAttribute('aria-label', t('desktop.preferences.notifications'));
+  const notificationValue = !state.notificationPreferences.enabled
+    ? 'off'
+    : state.notificationPreferences.notifySuccess && state.notificationPreferences.notifyFailure
+      ? 'all'
+      : state.notificationPreferences.notifyFailure
+        ? 'failures'
+        : 'off';
+  for (const [value, key] of [
+    ['failures', 'desktop.preferences.notifications.failures'],
+    ['all', 'desktop.preferences.notifications.all'],
+    ['off', 'desktop.preferences.notifications.off'],
+  ] as const) {
+    const option = el('option', '', t(key)) as HTMLOptionElement;
+    option.value = value;
+    option.selected = notificationValue === value;
+    notificationSelect.append(option);
+  }
+  notificationSelect.disabled = state.busy;
+  notificationSelect.addEventListener('change', () => {
+    const next = notificationSelect.value;
+    updateNotificationPreferences({
+      enabled: next !== 'off',
+      notifySuccess: next === 'all',
+      notifyFailure: next === 'all' || next === 'failures',
+    });
+  });
+  notificationControl.append(notificationSelect);
+
+  const soundControl = checkboxControl(
+    t('desktop.preferences.sound'),
+    state.notificationPreferences.sound,
+    (checked) => updateNotificationPreferences({ sound: checked }),
+    'notification-sound-checkbox',
+  );
+  const badgeControl = checkboxControl(
+    t('desktop.preferences.badge'),
+    state.notificationPreferences.badge,
+    (checked) => updateNotificationPreferences({ badge: checked }),
+    'notification-badge-checkbox',
+  );
+
+  preferences.append(localeControl, themeControl, notificationControl, soundControl, badgeControl);
   actions.append(preferences);
 
   actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected, true), 'ca-button', 'button-refresh'));
@@ -1731,6 +1891,10 @@ function render(): void {
 async function bootstrap(): Promise<void> {
   try {
     applyDesktopTheme();
+    updateBadgeState();
+    void setNotificationPreferences(state.notificationPreferences).catch((error) => {
+      pushToast(error instanceof Error ? error.message : String(error), 'warning')
+    });
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.addEventListener('change', onThemeChange);
     applyDesktopLocale();

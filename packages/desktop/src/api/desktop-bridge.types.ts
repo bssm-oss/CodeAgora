@@ -127,3 +127,11 @@ export interface DesktopCommandContract {
   spawnsProcess: boolean;
   notes: string;
 }
+
+export interface NotificationPreferences {
+  enabled: boolean;
+  notifySuccess: boolean;
+  notifyFailure: boolean;
+  sound: boolean;
+  badge: boolean;
+}

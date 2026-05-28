@@ -162,10 +162,33 @@ struct SessionExport {
     content: String,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NotificationPreferences {
+    enabled: bool,
+    notify_success: bool,
+    notify_failure: bool,
+    sound: bool,
+    badge: bool,
+}
+
 struct WorkspaceState {
     repo_root: Mutex<Option<PathBuf>>,
     review_runs: Mutex<HashMap<String, Arc<ReviewRunHandle>>>,
     session_cache: Mutex<SessionCache>,
+    notification_preferences: Mutex<NotificationPreferences>,
+}
+
+impl Default for NotificationPreferences {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            notify_success: false,
+            notify_failure: true,
+            sound: false,
+            badge: true,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -1651,7 +1674,18 @@ fn run_agora(
     }
 }
 
-fn notify_review_finished(app: &tauri::AppHandle, result: &CommandResult) {
+fn notify_review_finished(
+    app: &tauri::AppHandle,
+    preferences: &NotificationPreferences,
+    result: &CommandResult,
+) {
+    if !preferences.enabled
+        || (result.ok && !preferences.notify_success)
+        || (!result.ok && !preferences.notify_failure)
+    {
+        return;
+    }
+
     let title = if result.ok {
         "CodeAgora review completed"
     } else {
@@ -1729,6 +1763,18 @@ fn open_repository(path: String, state: State<'_, WorkspaceState>) -> Result<Rep
 #[tauri::command]
 fn get_command_contract() -> Result<Vec<DesktopCommandContract>, String> {
     Ok(desktop_command_contracts())
+}
+
+#[tauri::command]
+fn set_notification_preferences(
+    preferences: NotificationPreferences,
+    state: State<'_, WorkspaceState>,
+) -> Result<NotificationPreferences, String> {
+    *state
+        .notification_preferences
+        .lock()
+        .map_err(|_| "Notification preferences lock failed".to_string())? = preferences.clone();
+    Ok(preferences)
 }
 
 #[tauri::command]
@@ -1848,7 +1894,12 @@ fn run_review(
         session_id,
     };
 
-    notify_review_finished(&app, &result);
+    let preferences = state
+        .notification_preferences
+        .lock()
+        .map(|preferences| preferences.clone())
+        .unwrap_or_default();
+    notify_review_finished(&app, &preferences, &result);
     invalidate_session_cache(&state)?;
 
     Ok(result)
@@ -1918,6 +1969,11 @@ fn start_review_run(
     }
 
     let monitor_handle = Arc::clone(&handle);
+    let notification_preferences = state
+        .notification_preferences
+        .lock()
+        .map(|preferences| preferences.clone())
+        .unwrap_or_default();
     thread::spawn(move || loop {
         let status = {
             let mut child = match monitor_handle.child.lock() {
@@ -1972,6 +2028,7 @@ fn start_review_run(
                 let snapshot = review_snapshot(&monitor_handle).ok();
                 notify_review_finished(
                     &app,
+                    &notification_preferences,
                     &CommandResult {
                         ok: final_status == "completed",
                         message,
@@ -2200,6 +2257,7 @@ fn main() {
             repo_root: Mutex::new(None),
             review_runs: Mutex::new(HashMap::new()),
             session_cache: Mutex::new(SessionCache::default()),
+            notification_preferences: Mutex::new(NotificationPreferences::default()),
         })
         .invoke_handler(tauri::generate_handler![
             list_sessions,
@@ -2218,6 +2276,7 @@ fn main() {
             write_config,
             get_repo_info,
             open_repository,
+            set_notification_preferences,
             get_command_contract
         ])
         .run(tauri::generate_context!())
