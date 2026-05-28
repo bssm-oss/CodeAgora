@@ -96,6 +96,14 @@ const state: AppState = {
   toasts: [],
 };
 
+function resetConfigState(): void {
+  state.configRaw = '';
+  state.configPath = '.ca/config.json';
+  state.configOriginal = '';
+  state.configDirty = false;
+  state.configValidation = undefined;
+}
+
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 const appRoot = app;
@@ -449,6 +457,9 @@ async function loadRepoInfo(): Promise<void> {
 }
 
 async function openRepo(path: string): Promise<void> {
+  if (state.configDirty) {
+    if (!confirm(t('desktop.confirm.discardUnsavedConfig'))) return;
+  }
   state.busy = true;
   state.notice = undefined;
   render();
@@ -458,8 +469,9 @@ async function openRepo(path: string): Promise<void> {
     state.repoInput = state.repoInfo.path;
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
+    resetConfigState();
     await refreshSessions(true);
-    if (state.view === 'config') await loadConfig();
+    await loadConfig();
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
   } finally {
@@ -523,6 +535,9 @@ async function loadConfig(): Promise<void> {
     state.configDirty = false;
     applyDesktopLocale(config.raw);
     state.configValidation = await validateConfig(config.raw);
+    if (state.configPath.endsWith('.yml') || state.configPath.endsWith('.yaml')) {
+      pushToast(t('desktop.notice.yamlReadOnly'), 'warning');
+    }
   } catch (error) {
     pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
@@ -532,19 +547,23 @@ async function loadConfig(): Promise<void> {
 }
 
 async function saveConfig(raw: string): Promise<void> {
-  state.configRaw = raw;
+  if (state.configPath.endsWith('.yml') || state.configPath.endsWith('.yaml')) {
+    pushToast(t('desktop.notice.yamlSaveBlocked'), 'error');
+    return;
+  }
   state.busy = true;
   render();
   try {
-    state.configValidation = await validateConfig(raw);
-    if (!state.configValidation.valid) {
-      pushToast(t('desktop.notice.invalidConfig', { errors: state.configValidation.errors.join('; ') }), 'error')
+    const validation = await validateConfig(raw);
+    state.configValidation = validation;
+    if (!validation.valid) {
+      pushToast(t('desktop.notice.invalidConfig', { errors: validation.errors.join('; ') }), 'error')
       return;
     }
     const config = await writeConfig(raw);
     state.configRaw = config.raw;
     state.configPath = config.path;
-    state.configOriginal = raw;
+    state.configOriginal = config.raw;
     state.configDirty = false;
     applyDesktopLocale(config.raw);
     pushToast(t('desktop.notice.savedConfig', { path: config.path }), 'success')
@@ -1372,6 +1391,12 @@ function renderConfig(): HTMLElement {
     panel.append(dirtyBanner);
   }
 
+  const isYaml = state.configPath.endsWith('.yml') || state.configPath.endsWith('.yaml');
+  if (isYaml) {
+    const yamlBanner = el('div', 'ca-yaml-banner', t('desktop.config.yamlReadOnlyBanner'));
+    panel.append(yamlBanner);
+  }
+
   const advanced = el('details', 'ca-advanced-config') as HTMLDetailsElement;
   advanced.open = true;
   advanced.append(el('summary', '', t('desktop.config.advancedEditor')));
@@ -1389,7 +1414,12 @@ function renderConfig(): HTMLElement {
 
   const actions = el('div', 'ca-config-actions');
   actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(textarea.value), 'ca-button', 'button-validate-config'));
-  actions.append(button(t('desktop.action.saveConfig'), () => void saveConfig(textarea.value), 'ca-button ca-primary', 'button-save-config'));
+  const saveButton = button(t('desktop.action.saveConfig'), () => void saveConfig(textarea.value), 'ca-button ca-primary', 'button-save-config');
+  if (isYaml) {
+    saveButton.disabled = true;
+    saveButton.title = t('desktop.config.yamlReadOnlyBanner');
+  }
+  actions.append(saveButton);
   panel.append(actions);
   return panel;
 }
@@ -1682,6 +1712,8 @@ async function bootstrap(): Promise<void> {
       const config = await readConfig();
       state.configRaw = config.raw;
       state.configPath = config.path;
+      state.configOriginal = config.raw;
+      state.configDirty = false;
       applyDesktopLocale(config.raw);
       state.configValidation = await validateConfig(config.raw);
     } catch (error) {

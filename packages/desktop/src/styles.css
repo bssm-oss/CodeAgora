@@ -1317,7 +1317,8 @@ summary {
   text-align: center;
 }
 
-.ca-dirty-banner {
+.ca-dirty-banner,
+.ca-yaml-banner {
   display: flex;
   align-items: center;
   gap: 10px;
