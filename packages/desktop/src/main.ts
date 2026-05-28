@@ -1413,6 +1413,7 @@ function renderSessionDetail(): HTMLElement {
     }
   }
   detail.append(issues);
+  detail.append(renderAnnotatedDiff(selected, findings));
 
   const exportGuide = el('p', 'ca-repo-note', t('desktop.detail.exportGuidance'));
   detail.append(exportGuide);
@@ -1437,6 +1438,94 @@ function renderSessionDetail(): HTMLElement {
     detail.append(reportSection);
   }
   return detail;
+}
+
+function renderAnnotatedDiff(selected: SessionDetail, findings: NonNullable<SessionDetail['findings']>): HTMLElement {
+  const section = el('section', 'ca-annotated-diff');
+  section.dataset.testid = 'annotated-diff-viewer';
+  const header = el('div', 'ca-section-head');
+  const title = el('div');
+  title.append(el('h3', '', t('desktop.detail.annotatedDiffTitle')));
+  title.append(el('p', 'ca-repo-note', t('desktop.detail.annotatedDiffBody')));
+  header.append(title);
+  section.append(header);
+
+  const annotated = selected.annotatedDiff;
+  if (!annotated?.available) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.detail.annotatedDiffUnavailableTitle')));
+    empty.append(el('p', '', annotated?.reason ?? t('desktop.detail.annotatedDiffUnavailableBody')));
+    section.append(empty);
+    return section;
+  }
+
+  const facts = el('div', 'ca-detail-meta');
+  facts.append(el('span', '', t('desktop.detail.annotatedDiffFiles', { count: annotated.files.length })));
+  if (annotated.sourcePath) facts.append(el('span', '', annotated.sourcePath));
+  if (annotated.truncated) facts.append(el('span', 'ca-fact ca-warn', t('desktop.detail.annotatedDiffTruncated')));
+  section.append(facts);
+
+  if (annotated.files.length === 0) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.detail.annotatedDiffNoFilesTitle')));
+    empty.append(el('p', '', t('desktop.detail.annotatedDiffNoFilesBody')));
+    section.append(empty);
+    return section;
+  }
+
+  const fileList = el('div', 'ca-annotated-files');
+  for (const file of annotated.files) {
+    const fileShell = el('details', 'ca-annotated-file') as HTMLDetailsElement;
+    fileShell.open = file.findings.length > 0;
+    const summary = el('summary', 'ca-annotated-file-summary');
+    summary.append(el('strong', '', file.path));
+    summary.append(el('span', '', t('desktop.detail.annotatedDiffFileMeta', {
+      changed: file.changedLines,
+      findings: file.findings.length,
+    })));
+    fileShell.append(summary);
+
+    if (file.findings.length > 0) {
+      const chips = el('div', 'ca-inline-findings');
+      for (const finding of file.findings) {
+        chips.append(el('span', 'ca-finding-chip', `${finding.severity}: ${finding.title}`));
+      }
+      fileShell.append(chips);
+    }
+
+    const code = el('div', 'ca-annotated-code');
+    code.tabIndex = 0;
+    code.setAttribute('aria-label', t('desktop.detail.annotatedDiffCodeAria', { file: file.path }));
+    for (const line of file.lines) {
+      const findingIndexes = line.findingIndexes ?? [];
+      const row = el('div', `ca-diff-line ca-diff-line-${line.kind}${findingIndexes.length ? ' ca-has-finding' : ''}`);
+      row.append(el('span', 'ca-line-no', line.oldLine === undefined ? '' : String(line.oldLine)));
+      row.append(el('span', 'ca-line-no', line.newLine === undefined ? '' : String(line.newLine)));
+      row.append(el('code', '', `${diffLinePrefix(line.kind)}${line.content}`));
+      code.append(row);
+
+      if (findingIndexes.length > 0) {
+        const attached = el('div', 'ca-attached-findings');
+        for (const index of findingIndexes) {
+          const finding = file.findings.find((item) => item.index === index) ?? findings[index];
+          if (!finding) continue;
+          attached.append(el('span', 'ca-finding-chip', `${finding.severity}: ${finding.title}`));
+        }
+        code.append(attached);
+      }
+    }
+    fileShell.append(code);
+    fileList.append(fileShell);
+  }
+  section.append(fileList);
+  return section;
+}
+
+function diffLinePrefix(kind: string): string {
+  if (kind === 'add') return '+ ';
+  if (kind === 'remove') return '- ';
+  if (kind === 'hunk') return '';
+  return '  ';
 }
 
 function renderRunReview(): HTMLElement {

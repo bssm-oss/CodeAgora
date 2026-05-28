@@ -55,6 +55,24 @@ export function fallbackSessionDetail(id: string, sessions: SessionSummary[]): S
     ...session,
     evidenceCount: session.topIssues?.length ?? 0,
     discussionsCount: 1,
+    annotatedDiff: {
+      available: true,
+      sourcePath: 'browser-preview.patch',
+      truncated: false,
+      files: [
+        {
+          path: 'packages/core/src/pipeline/orchestrator.ts',
+          changedLines: 2,
+          findings: session.topIssues ?? [],
+          lines: [
+            { kind: 'hunk', content: '@@ -154,3 +154,4 @@', findingIndexes: [] },
+            { kind: 'context', oldLine: 154, newLine: 154, content: '  try {', findingIndexes: [] },
+            { kind: 'add', newLine: 156, content: '    await persistResult(result);', findingIndexes: session.topIssues?.length ? [0] : [] },
+            { kind: 'context', oldLine: 156, newLine: 157, content: '  } finally {', findingIndexes: [] },
+          ],
+        },
+      ],
+    },
     markdown: [
       `# Review ${session.id}`,
       '',

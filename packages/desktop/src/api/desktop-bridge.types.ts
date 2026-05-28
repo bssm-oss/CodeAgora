@@ -12,7 +12,33 @@ export type SeverityCounts = SessionSeverityCounts;
 export type TopIssue = SessionTopIssue;
 export type SessionSummary = CoreSessionSummary;
 export type SessionCostSummary = CoreSessionCostSummary;
-export type SessionDetail = SessionDetailView;
+
+export interface AnnotatedDiffLine {
+  kind: 'hunk' | 'add' | 'remove' | 'context';
+  oldLine?: number;
+  newLine?: number;
+  content: string;
+  findingIndexes: number[];
+}
+
+export interface AnnotatedDiffFile {
+  path: string;
+  changedLines: number;
+  findings: Array<SessionTopIssue & { index?: number }>;
+  lines: AnnotatedDiffLine[];
+}
+
+export interface AnnotatedDiff {
+  available: boolean;
+  reason?: string;
+  sourcePath?: string;
+  files: AnnotatedDiffFile[];
+  truncated: boolean;
+}
+
+export interface SessionDetail extends SessionDetailView {
+  annotatedDiff?: AnnotatedDiff;
+}
 
 export interface SessionExport {
   format: string;

@@ -12,6 +12,9 @@ use tauri::State;
 use tauri_plugin_notification::NotificationExt;
 
 const REVIEW_CONTRACT_VERSION: &str = "codeagora.review.v1";
+const ANNOTATED_DIFF_MAX_CHARS: usize = 120_000;
+const ANNOTATED_DIFF_MAX_FILES: usize = 40;
+const ANNOTATED_DIFF_MAX_LINES: usize = 1_200;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -969,6 +972,286 @@ fn issue_view(issue: &Value) -> Value {
     })
 }
 
+fn strip_diff_prefix(path: &str) -> &str {
+    path.strip_prefix("a/")
+        .or_else(|| path.strip_prefix("b/"))
+        .unwrap_or(path)
+}
+
+fn diff_path_from_marker(line: &str) -> Option<String> {
+    let parts = line.split_whitespace().collect::<Vec<_>>();
+    if parts.len() >= 4 && parts[0] == "diff" && parts[1] == "--git" {
+        return Some(strip_diff_prefix(parts[3]).to_string());
+    }
+    None
+}
+
+fn diff_path_from_header(line: &str) -> Option<String> {
+    let path = line.strip_prefix("+++ ")?.trim();
+    if path == "/dev/null" {
+        return None;
+    }
+    Some(strip_diff_prefix(path).to_string())
+}
+
+fn parse_hunk_start(segment: &str, marker: char) -> Option<i64> {
+    let value = segment.strip_prefix(marker)?;
+    value
+        .split(',')
+        .next()
+        .and_then(|start| start.parse::<i64>().ok())
+}
+
+fn parse_hunk_header(line: &str) -> Option<(i64, i64)> {
+    if !line.starts_with("@@ ") {
+        return None;
+    }
+    let parts = line.split_whitespace().collect::<Vec<_>>();
+    if parts.len() < 3 {
+        return None;
+    }
+    Some((
+        parse_hunk_start(parts[1], '-')?,
+        parse_hunk_start(parts[2], '+')?,
+    ))
+}
+
+fn value_line_range(issue: &Value) -> (i64, i64) {
+    issue
+        .get("lineRange")
+        .and_then(Value::as_array)
+        .and_then(|range| {
+            let start = range.first().and_then(Value::as_i64)?;
+            let end = range.get(1).and_then(Value::as_i64).unwrap_or(start);
+            Some((start, end))
+        })
+        .unwrap_or((0, 0))
+}
+
+fn issue_file_path(issue: &Value) -> &str {
+    issue
+        .get("filePath")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+}
+
+fn diff_path_matches(issue_path: &str, diff_path: &str) -> bool {
+    let issue_path = strip_diff_prefix(issue_path);
+    let diff_path = strip_diff_prefix(diff_path);
+    issue_path == diff_path || issue_path.ends_with(diff_path) || diff_path.ends_with(issue_path)
+}
+
+fn finding_indexes_for_line(findings: &[Value], file_path: &str, line: Option<i64>) -> Vec<usize> {
+    let Some(line) = line else {
+        return Vec::new();
+    };
+    findings
+        .iter()
+        .enumerate()
+        .filter_map(|(index, finding)| {
+            if !diff_path_matches(issue_file_path(finding), file_path) {
+                return None;
+            }
+            let (start, end) = value_line_range(finding);
+            (start > 0 && line >= start && line <= end).then_some(index)
+        })
+        .collect()
+}
+
+fn findings_for_file(findings: &[Value], file_path: &str) -> Vec<Value> {
+    findings
+        .iter()
+        .enumerate()
+        .filter(|(_, finding)| diff_path_matches(issue_file_path(finding), file_path))
+        .map(|(index, finding)| {
+            let mut value = finding.clone();
+            if let Some(object) = value.as_object_mut() {
+                object.insert("index".to_string(), json!(index));
+            }
+            value
+        })
+        .collect()
+}
+
+fn push_annotated_diff_file(
+    files: &mut Vec<Value>,
+    path: &str,
+    lines: &mut Vec<Value>,
+    findings: &[Value],
+) {
+    if path.is_empty() || files.len() >= ANNOTATED_DIFF_MAX_FILES {
+        lines.clear();
+        return;
+    }
+    let changed_lines = lines
+        .iter()
+        .filter(|line| {
+            line.get("kind")
+                .and_then(Value::as_str)
+                .map(|kind| kind == "add" || kind == "remove")
+                .unwrap_or(false)
+        })
+        .count();
+    files.push(json!({
+        "path": path,
+        "changedLines": changed_lines,
+        "findings": findings_for_file(findings, path),
+        "lines": std::mem::take(lines),
+    }));
+}
+
+fn bounded_diff_text(raw: &str) -> (String, bool) {
+    if raw.len() <= ANNOTATED_DIFF_MAX_CHARS {
+        return (raw.to_string(), false);
+    }
+    let mut end = ANNOTATED_DIFF_MAX_CHARS;
+    while end > 0 && !raw.is_char_boundary(end) {
+        end -= 1;
+    }
+    (raw[..end].to_string(), true)
+}
+
+fn safe_metadata_diff_path(root: &Path, metadata: Option<&Value>) -> Option<PathBuf> {
+    let raw = metadata?
+        .get("diffPath")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|path| !path.is_empty())?;
+    let path = PathBuf::from(raw);
+    let resolved = if path.is_absolute() {
+        path
+    } else {
+        root.join(path)
+    };
+    let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let canonical_path = resolved.canonicalize().ok()?;
+    canonical_path
+        .starts_with(canonical_root)
+        .then_some(canonical_path)
+}
+
+fn load_session_diff_text(
+    root: &Path,
+    dir: &Path,
+    metadata: Option<&Value>,
+) -> (Option<String>, Option<String>, bool) {
+    let mut candidates = vec![
+        dir.join("diff.patch"),
+        dir.join("input.diff"),
+        dir.join("input.patch"),
+        dir.join("review.diff"),
+        dir.join("change.patch"),
+    ];
+    if let Some(path) = safe_metadata_diff_path(root, metadata) {
+        candidates.push(path);
+    }
+
+    for path in candidates {
+        if let Some(raw) = read_optional_text(&path) {
+            let (text, truncated) = bounded_diff_text(&raw);
+            return (Some(text), Some(path.display().to_string()), truncated);
+        }
+    }
+
+    (None, None, false)
+}
+
+fn annotated_diff_value(
+    root: &Path,
+    dir: &Path,
+    metadata: Option<&Value>,
+    findings: &[Value],
+) -> Value {
+    let (Some(diff), source_path, source_truncated) = load_session_diff_text(root, dir, metadata)
+    else {
+        return json!({
+            "available": false,
+            "reason": "No session diff artifact was found. Run reviews from a persistent patch file or a session format that records diff artifacts to enable annotated context.",
+            "files": [],
+            "truncated": false,
+        });
+    };
+
+    let mut files: Vec<Value> = Vec::new();
+    let mut current_path = String::new();
+    let mut lines: Vec<Value> = Vec::new();
+    let mut old_line: Option<i64> = None;
+    let mut new_line: Option<i64> = None;
+    let mut line_limit_hit = false;
+
+    for raw_line in diff.lines() {
+        if let Some(path) = diff_path_from_marker(raw_line) {
+            push_annotated_diff_file(&mut files, &current_path, &mut lines, findings);
+            current_path = path;
+            old_line = None;
+            new_line = None;
+            continue;
+        }
+
+        if let Some(path) = diff_path_from_header(raw_line) {
+            current_path = path;
+            continue;
+        }
+
+        if files.len() >= ANNOTATED_DIFF_MAX_FILES || lines.len() >= ANNOTATED_DIFF_MAX_LINES {
+            line_limit_hit = true;
+            continue;
+        }
+
+        if let Some((old_start, new_start)) = parse_hunk_header(raw_line) {
+            old_line = Some(old_start);
+            new_line = Some(new_start);
+            lines.push(json!({
+                "kind": "hunk",
+                "content": raw_line,
+                "findingIndexes": [],
+            }));
+            continue;
+        }
+
+        if current_path.is_empty() || old_line.is_none() || new_line.is_none() {
+            continue;
+        }
+
+        let (kind, old_value, new_value, content) =
+            if let Some(content) = raw_line.strip_prefix('+') {
+                let line = new_line;
+                new_line = new_line.map(|value| value + 1);
+                ("add", None, line, content)
+            } else if let Some(content) = raw_line.strip_prefix('-') {
+                let line = old_line;
+                old_line = old_line.map(|value| value + 1);
+                ("remove", line, None, content)
+            } else if let Some(content) = raw_line.strip_prefix(' ') {
+                let old = old_line;
+                let new = new_line;
+                old_line = old_line.map(|value| value + 1);
+                new_line = new_line.map(|value| value + 1);
+                ("context", old, new, content)
+            } else {
+                continue;
+            };
+
+        let anchor_line = new_value.or(old_value);
+        lines.push(json!({
+            "kind": kind,
+            "oldLine": old_value,
+            "newLine": new_value,
+            "content": content,
+            "findingIndexes": finding_indexes_for_line(findings, &current_path, anchor_line),
+        }));
+    }
+
+    push_annotated_diff_file(&mut files, &current_path, &mut lines, findings);
+
+    json!({
+        "available": true,
+        "sourcePath": source_path,
+        "files": files,
+        "truncated": source_truncated || line_limit_hit,
+    })
+}
+
 fn finding_views(verdict: Option<&Value>, issues: &[Value], limit: Option<usize>) -> Vec<Value> {
     let source = summary_object(verdict)
         .and_then(|summary| summary.get("topIssues"))
@@ -1204,6 +1487,7 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         telemetry.as_ref(),
         &degraded_reasons,
     );
+    let annotated_diff = annotated_diff_value(root, &dir, metadata.as_ref(), &findings);
 
     Ok(json!({
         "entry": session_entry(date, session_id, &dir, metadata.as_ref(), verdict.as_ref()),
@@ -1211,6 +1495,7 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         "telemetry": telemetry,
         "verdict": verdict,
         "findings": findings,
+        "annotatedDiff": annotated_diff,
         "markdown": markdown,
         "evidenceCount": evidence_count,
         "discussionsCount": discussions_count,
@@ -2346,7 +2631,7 @@ mod tests {
         write_file(
             &root,
             ".ca/sessions/2026-05-06/e2e-001/metadata.json",
-            r#"{ "status": "completed", "startedAt": 1778040000000, "completedAt": 1778040060000 }"#,
+            r#"{ "status": "completed", "startedAt": 1778040000000, "completedAt": 1778040060000, "diffPath": "changes.patch" }"#,
         );
         write_file(
             &root,
@@ -2392,6 +2677,11 @@ mod tests {
             &root,
             ".ca/sessions/2026-05-06/e2e-001/report.md",
             "# Desktop E2E report\n\nDecision: REJECT\n",
+        );
+        write_file(
+            &root,
+            "changes.patch",
+            "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -10,3 +10,4 @@ export function app() {\n   const ready = true;\n   return ready;\n+  throw new Error('blocking');\n }\n",
         );
         write_file(
             &root,
@@ -2469,6 +2759,29 @@ mod tests {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .contains("Desktop E2E report"));
+        assert_eq!(
+            detail
+                .pointer("/annotatedDiff/available")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert_eq!(
+            detail
+                .pointer("/annotatedDiff/files/0/path")
+                .and_then(Value::as_str),
+            Some("src/app.ts")
+        );
+        let annotated_lines = detail
+            .pointer("/annotatedDiff/files/0/lines")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        assert!(annotated_lines.iter().any(|line| {
+            line.get("findingIndexes")
+                .and_then(Value::as_array)
+                .map(|indexes| !indexes.is_empty())
+                .unwrap_or(false)
+        }));
 
         let markdown =
             export_session_value(&root, "2026-05-06/e2e-001", "markdown").expect("markdown export");

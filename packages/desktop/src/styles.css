@@ -860,6 +860,7 @@ h3 {
 
 .ca-evidence-board,
 .ca-issues,
+.ca-annotated-diff,
 .ca-repo-section,
 .ca-repo-picker,
 .ca-review-run,
@@ -887,6 +888,113 @@ h3 {
 
 .ca-issue-severity {
   justify-self: start;
+}
+
+.ca-annotated-diff {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.ca-annotated-files {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ca-annotated-file {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ca-annotated-file-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.ca-annotated-file-summary span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.ca-inline-findings,
+.ca-attached-findings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.ca-attached-findings {
+  padding: 6px var(--space-3) 9px 84px;
+  border-left: 4px solid var(--warn);
+  background: var(--warn-soft);
+}
+
+.ca-finding-chip {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.ca-annotated-code {
+  max-height: 360px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  background: var(--report-bg);
+  color: var(--report-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ca-diff-line {
+  display: grid;
+  grid-template-columns: 42px 42px minmax(0, 1fr);
+  min-width: 620px;
+}
+
+.ca-diff-line code,
+.ca-line-no {
+  padding: 2px 8px;
+}
+
+.ca-line-no {
+  border-right: 1px solid color-mix(in srgb, var(--report-text) 16%, transparent);
+  color: color-mix(in srgb, var(--report-text) 62%, transparent);
+  text-align: right;
+  user-select: none;
+}
+
+.ca-diff-line code {
+  white-space: pre;
+}
+
+.ca-diff-line-add {
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.ca-diff-line-remove {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.ca-diff-line-hunk {
+  color: var(--info);
+  background: color-mix(in srgb, var(--info-soft) 42%, transparent);
+}
+
+.ca-diff-line.ca-has-finding {
+  box-shadow: inset 4px 0 0 var(--warn);
 }
 
 .ca-report-shell {
