@@ -95,6 +95,7 @@ const appRoot = app;
 let reviewPollHandle: number | undefined;
 let lastView: View | undefined;
 let pollRetryCount = 0;
+let pollInFlight = false;
 const maxPollRetries = 5;
 let mediaQuery: MediaQueryList | null = null;
 
@@ -548,6 +549,7 @@ async function validateConfigEditor(raw: string): Promise<void> {
 }
 
 async function startReview(staged: boolean): Promise<void> {
+  if (state.busy) return;
   const readiness = runReadiness();
   if (!readiness.ready) {
     state.notice = readiness.reasons[0] ?? t('desktop.readiness.blockedBody');
@@ -563,6 +565,7 @@ async function startReview(staged: boolean): Promise<void> {
   pushToast(staged ? t('desktop.notice.startingStaged') : t('desktop.notice.startingWorkingTree'), 'success')
   render();
   try {
+    pollRetryCount = 0;
     state.activeRun = await startReviewRun(staged);
     pushToast(state.activeRun.message, 'success')
     scheduleReviewPoll();
@@ -580,11 +583,13 @@ function isReviewRunning(run: ReviewRunSnapshot): boolean {
 
 function scheduleReviewPoll(): void {
   if (!state.activeRun || !isReviewRunning(state.activeRun)) return;
-  if (reviewPollHandle !== undefined) window.clearTimeout(reviewPollHandle);
+  window.clearTimeout(reviewPollHandle);
   reviewPollHandle = window.setTimeout(() => void pollReviewRun(state.activeRun!.runId), 700);
 }
 
 async function pollReviewRun(runId: string): Promise<void> {
+  if (pollInFlight) return;
+  pollInFlight = true;
   window.clearTimeout(reviewPollHandle);
   try {
     const snapshot = await getReviewRun(runId);
@@ -603,6 +608,7 @@ async function pollReviewRun(runId: string): Promise<void> {
       pushToast(error instanceof Error ? error.message : String(error), 'error');
     }
   } finally {
+    pollInFlight = false;
     render();
   }
 }
@@ -614,6 +620,7 @@ async function cancelActiveReview(): Promise<void> {
   state.busy = true;
   render();
   try {
+    pollRetryCount = 0;
     state.activeRun = await cancelReviewRun(runId);
     pushToast(state.activeRun.message, 'success')
     scheduleReviewPoll();
@@ -1153,7 +1160,7 @@ function renderReviewRun(): HTMLElement {
 function statusClass(status: string): string {
   if (status === 'completed') return 'ca-run-status ca-complete';
   if (status === 'failed') return 'ca-run-status ca-failed';
-  if (status === 'ca-cancelled' || status === 'cancelling') return 'ca-run-status ca-cancelled';
+  if (status === 'cancelled' || status === 'cancelling') return 'ca-run-status ca-cancelled';
   return 'ca-run-status ca-running';
 }
 
