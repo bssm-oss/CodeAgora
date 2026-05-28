@@ -145,7 +145,7 @@ function buildCommand(input: BackendInput): CliCommand {
     case 'claude':
       return {
         bin: 'claude',
-        args: ['--non-interactive', '--model', validateArg(model, 'model')],
+        args: ['-p', '--model', validateArg(model, 'model')],
         useStdin: true,
       };
     case 'copilot':

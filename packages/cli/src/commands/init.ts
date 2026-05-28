@@ -519,7 +519,7 @@ export function generatePresets(
   const availableCli = cliBackends?.filter((c) => c.available) ?? [];
   if (availableCli.length > 0) {
     const cliProvider = availableCli[0]!;
-    const cliModel = cliProvider.backend === 'claude' ? 'claude'
+    const cliModel = cliProvider.backend === 'claude' ? 'sonnet'
       : cliProvider.backend === 'codex' ? 'codex'
       : cliProvider.backend === 'gemini' ? 'gemini'
       : cliProvider.backend;
