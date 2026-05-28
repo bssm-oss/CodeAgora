@@ -672,11 +672,12 @@ h3 {
 }
 
 .ca-session-row:hover,
-.ca-session-row.ca-selected {
+.ca-session-row.is-selected {
   background: var(--brand-soft);
 }
 
-.ca-session-row.ca-selected {
+.ca-session-row.is-selected {
+  border-color: var(--brand);
   box-shadow: inset 4px 0 0 var(--brand);
 }
 
