@@ -1,11 +1,19 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "../..",
+    "baseUrl": "../..",
+    "paths": {
+      "@codeagora/shared": ["packages/shared/src/index.ts"],
+      "@codeagora/shared/*": ["packages/shared/src/*"],
+      "@codeagora/core": ["packages/core/src/index.ts"],
+      "@codeagora/core/*": ["packages/core/src/*"]
+    }
   },
-  "references": [
-    { "path": "../shared" }
-  ],
-  "include": ["./src/**/*.ts"]
+  "include": ["./src/**/*.ts", "../shared/src/**/*.ts"],
+  "exclude": ["./src/tests/**/*.ts", "../shared/src/tests/**/*.ts"]
 }
