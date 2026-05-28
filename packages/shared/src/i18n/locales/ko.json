@@ -414,6 +414,8 @@
   "desktop.setup.providerStatusHint": "셋업을 새로고침해 설정된 API 키와 로컬 CLI 도구를 감지하세요.",
   "desktop.setup.mcpServer": "MCP 서버",
   "desktop.setup.mcpNotLoaded": "MCP 상태가 아직 로드되지 않았습니다.",
+  "desktop.setup.mcpEmpty": "노출된 MCP 도구 없음",
+  "desktop.setup.workflowsEmpty": "워크플로우 파일 없음",
   "desktop.setup.githubAction": "GitHub Action",
   "desktop.setup.githubActionNotLoaded": "GitHub Action 상태가 아직 로드되지 않았습니다.",
   "desktop.setup.workflowSummary": "CodeAgora 워크플로 {codeagora}개가 전체 워크플로 파일 {workflows}개에서 발견되었습니다.",

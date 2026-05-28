@@ -415,6 +415,8 @@
   "desktop.setup.providerStatusHint": "Refresh setup to detect configured API keys and local CLI tools.",
   "desktop.setup.mcpServer": "MCP Server",
   "desktop.setup.mcpNotLoaded": "MCP status has not been loaded yet.",
+  "desktop.setup.mcpEmpty": "No MCP tools exposed",
+  "desktop.setup.workflowsEmpty": "No workflow files found",
   "desktop.setup.githubAction": "GitHub Action",
   "desktop.setup.githubActionNotLoaded": "GitHub Action status has not been loaded yet.",
   "desktop.setup.workflowSummary": "{codeagora} CodeAgora workflow(s) found across {workflows} workflow file(s).",
