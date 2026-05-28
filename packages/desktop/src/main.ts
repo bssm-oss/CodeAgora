@@ -629,14 +629,40 @@ function isReviewRunning(run: ReviewRunSnapshot): boolean {
 }
 
 function reviewProgress(events: ReviewRunEvent[]): { stage: string; percent: number } {
+  for (const event of [...events].reverse()) {
+    if (event.schemaVersion === 'codeagora.review.v1' && event.type === 'progress' && typeof event.progress === 'number') {
+      const label = event.stage ? reviewStageLabel(event.stage) : 'Review';
+      return { stage: label, percent: Math.max(0, Math.min(100, Math.round(event.progress))) };
+    }
+  }
+
   const kinds = events.map((e) => e.kind);
   if (kinds.includes('completed')) return { stage: 'Verdict', percent: 100 };
+  if (kinds.includes('pipeline-complete')) return { stage: 'Complete', percent: 100 };
+  if (kinds.includes('stage-complete')) return { stage: 'Review', percent: 100 };
   if (kinds.includes('l3')) return { stage: 'L3 Verdict', percent: 90 };
   if (kinds.includes('l2')) return { stage: 'L2 Debate', percent: 70 };
   if (kinds.includes('l1')) return { stage: 'L1 Review', percent: 40 };
   if (kinds.includes('l0')) return { stage: 'L0 Model Selection', percent: 20 };
   if (kinds.includes('started')) return { stage: 'Pre-analysis', percent: 10 };
   return { stage: 'Initializing', percent: 0 };
+}
+
+function reviewStageLabel(stage: string): string {
+  switch (stage) {
+    case 'init':
+      return 'Init';
+    case 'review':
+      return 'L1 Review';
+    case 'discuss':
+      return 'L2 Debate';
+    case 'verdict':
+      return 'L3 Verdict';
+    case 'complete':
+      return 'Complete';
+    default:
+      return stage;
+  }
 }
 
 function scheduleReviewPoll(): void {

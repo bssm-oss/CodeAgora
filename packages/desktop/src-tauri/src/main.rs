@@ -11,6 +11,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::State;
 use tauri_plugin_notification::NotificationExt;
 
+const REVIEW_CONTRACT_VERSION: &str = "codeagora.review.v1";
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CommandResult {
@@ -25,7 +27,24 @@ struct ReviewRunEvent {
     kind: String,
     message: String,
     timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    schema_version: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    event_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    event: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    progress: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_id: Option<String>,
     payload: Option<Value>,
+}
+
+struct ParsedReviewStreamEvent {
+    event: ReviewRunEvent,
+    session_id: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -208,7 +227,36 @@ fn review_event(kind: &str, message: impl Into<String>, payload: Option<Value>) 
         kind: kind.to_string(),
         message: message.into(),
         timestamp: now_millis(),
+        schema_version: None,
+        event_type: None,
+        stage: None,
+        event: None,
+        progress: None,
+        session_id: None,
         payload,
+    }
+}
+
+fn contract_review_event(
+    kind: String,
+    message: String,
+    event_type: String,
+    stage: Option<String>,
+    event_name: Option<String>,
+    progress: Option<u8>,
+    session_id: Option<String>,
+) -> ReviewRunEvent {
+    ReviewRunEvent {
+        kind,
+        message,
+        timestamp: now_millis(),
+        schema_version: Some(REVIEW_CONTRACT_VERSION.to_string()),
+        event_type: Some(event_type),
+        stage,
+        event: event_name,
+        progress,
+        session_id,
+        payload: None,
     }
 }
 
@@ -299,11 +347,22 @@ fn write_child_stdin(child: &mut Child, stdin_input: Option<String>) {
     }
 }
 
-fn parse_review_stream_line(line: &str) -> (String, String, Option<String>, Option<Value>) {
+fn parse_review_stream_event(line: &str) -> ParsedReviewStreamEvent {
     let redacted_line = redact_sensitive(line);
     let Ok(payload) = serde_json::from_str::<Value>(line) else {
-        return ("stdout".to_string(), redacted_line, None, None);
+        return ParsedReviewStreamEvent {
+            event: review_event("stdout", redacted_line, None),
+            session_id: None,
+        };
     };
+
+    if payload
+        .get("schemaVersion")
+        .and_then(Value::as_str)
+        .is_some_and(|schema| schema == REVIEW_CONTRACT_VERSION)
+    {
+        return parse_review_contract_event(payload, redacted_line);
+    }
 
     let mut kind = payload
         .get("type")
@@ -341,7 +400,96 @@ fn parse_review_stream_line(line: &str) -> (String, String, Option<String>, Opti
         kind = "degraded".to_string();
     }
 
-    (kind, message, session_id, None)
+    ParsedReviewStreamEvent {
+        event: review_event(&kind, message, None),
+        session_id,
+    }
+}
+
+fn parse_review_contract_event(payload: Value, redacted_line: String) -> ParsedReviewStreamEvent {
+    let event_type = payload
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("event")
+        .to_string();
+    let stage = payload.get("stage").and_then(Value::as_str).map(str::to_string);
+    let event_name = payload.get("event").and_then(Value::as_str).map(str::to_string);
+    let progress = payload
+        .get("progress")
+        .and_then(Value::as_u64)
+        .map(|value| value.min(100) as u8);
+    let session_id = payload
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let degraded_reason = payload
+        .get("degradedReason")
+        .and_then(Value::as_str)
+        .map(redact_sensitive);
+    let degraded_signal = payload
+        .get("degraded")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || degraded_reason.is_some()
+        || payload
+            .get("summary")
+            .and_then(|summary| summary.get("forfeitedReviewers"))
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false);
+    let kind = if degraded_signal {
+        "degraded".to_string()
+    } else if event_type == "progress" {
+        event_name
+            .clone()
+            .or_else(|| stage.clone())
+            .unwrap_or_else(|| "progress".to_string())
+    } else {
+        event_type.clone()
+    };
+    let message = degraded_reason
+        .unwrap_or_else(|| review_contract_message(&payload, &event_type, &redacted_line));
+
+    ParsedReviewStreamEvent {
+        event: contract_review_event(
+            kind,
+            message,
+            event_type,
+            stage,
+            event_name,
+            progress,
+            session_id.clone(),
+        ),
+        session_id,
+    }
+}
+
+fn review_contract_message(payload: &Value, event_type: &str, redacted_line: &str) -> String {
+    if let Some(message) = payload.get("message").and_then(Value::as_str) {
+        return redact_sensitive(message);
+    }
+
+    if event_type == "result" {
+        let status = payload.get("status").and_then(Value::as_str).unwrap_or("unknown");
+        if let Some(decision) = payload
+            .get("summary")
+            .and_then(|summary| summary.get("decision"))
+            .and_then(Value::as_str)
+        {
+            return format!("Review result: {decision}");
+        }
+        if let Some(error) = payload.get("error").and_then(Value::as_str) {
+            return redact_sensitive(error);
+        }
+        return format!("Review result: {status}");
+    }
+
+    payload
+        .get("event")
+        .or_else(|| payload.get("stage"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| redacted_line.to_string())
 }
 
 fn find_git_root(start: &Path) -> Option<PathBuf> {
@@ -1672,11 +1820,11 @@ fn start_review_run(
         let output_handle = Arc::clone(&handle);
         thread::spawn(move || {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                let (kind, message, session_id, payload) = parse_review_stream_line(&line);
-                if let Some(session_id) = session_id {
+                let parsed = parse_review_stream_event(&line);
+                if let Some(session_id) = parsed.session_id.clone() {
                     update_review_snapshot(&output_handle, None, None, Some(session_id), None);
                 }
-                push_review_event(&output_handle, review_event(&kind, message, payload));
+                push_review_event(&output_handle, parsed.event);
             }
         });
     }
@@ -2305,12 +2453,12 @@ mod tests {
 
     #[test]
     fn desktop_app_e2e_parses_degraded_stream_events_without_new_status() {
-        let (kind, message, session_id, _) = parse_review_stream_line(
+        let parsed = parse_review_stream_event(
             r#"{"type":"progress","degraded":true,"degradedReason":"timeout","sessionId":"2026-05-06/e2e-001"}"#,
         );
-        assert_eq!(kind, "degraded");
-        assert_eq!(message, "timeout");
-        assert_eq!(session_id.as_deref(), Some("2026-05-06/e2e-001"));
+        assert_eq!(parsed.event.kind, "degraded");
+        assert_eq!(parsed.event.message, "timeout");
+        assert_eq!(parsed.session_id.as_deref(), Some("2026-05-06/e2e-001"));
 
         let snapshot = ReviewRunSnapshot {
             run_id: "run-1".to_string(),
@@ -2323,5 +2471,34 @@ mod tests {
             events: vec![],
         };
         assert!(matches!(snapshot.status.as_str(), "running" | "completed" | "failed" | "cancelled" | "cancelling"));
+    }
+
+    #[test]
+    fn desktop_app_e2e_prefers_stable_review_run_contract_events() {
+        let parsed = parse_review_stream_event(
+            r#"{"schemaVersion":"codeagora.review.v1","type":"progress","stage":"review","event":"stage-update","progress":42,"message":"2/5 reviewers complete","timestamp":1777248000000,"sessionId":"2026-05-06/001"}"#,
+        );
+
+        assert_eq!(parsed.event.kind, "stage-update");
+        assert_eq!(parsed.event.message, "2/5 reviewers complete");
+        assert_eq!(parsed.session_id.as_deref(), Some("2026-05-06/001"));
+        assert_eq!(parsed.event.schema_version.as_deref(), Some(REVIEW_CONTRACT_VERSION));
+        assert_eq!(parsed.event.event_type.as_deref(), Some("progress"));
+        assert_eq!(parsed.event.stage.as_deref(), Some("review"));
+        assert_eq!(parsed.event.event.as_deref(), Some("stage-update"));
+        assert_eq!(parsed.event.progress, Some(42));
+        assert_eq!(parsed.event.session_id.as_deref(), Some("2026-05-06/001"));
+    }
+
+    #[test]
+    fn desktop_app_e2e_parses_stable_result_contract_event() {
+        let parsed = parse_review_stream_event(
+            r#"{"schemaVersion":"codeagora.review.v1","type":"result","status":"success","date":"2026-05-06","sessionId":"001","summary":{"decision":"ACCEPT"}}"#,
+        );
+
+        assert_eq!(parsed.event.kind, "result");
+        assert_eq!(parsed.event.message, "Review result: ACCEPT");
+        assert_eq!(parsed.session_id.as_deref(), Some("001"));
+        assert_eq!(parsed.event.event_type.as_deref(), Some("result"));
     }
 }

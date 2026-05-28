@@ -96,6 +96,19 @@ Progress event fields:
 Result event fields are the same as JSON Result plus `type: "result"`.
 The final result event is always the last contract event emitted by the CLI command.
 
+### Desktop review-run event handling
+
+The desktop app consumes `agora review --json-stream` through its Tauri bridge. The bridge must parse this stable contract first:
+
+1. Require `schemaVersion: "codeagora.review.v1"` for contract handling.
+2. Branch on `type`:
+   - `progress`: preserve `stage`, `event`, `progress`, `message`, `timestamp`, and optional `sessionId`.
+   - `result`: preserve `status`, `sessionId`, and `summary.decision` when present.
+3. Treat unknown contract fields as additive and non-breaking.
+4. Fall back to legacy/best-effort parsing only when `schemaVersion` is missing or different.
+
+Desktop-specific fields such as `kind` are presentation adapters and are not part of the CLI NDJSON contract. New integrations should not infer state from ad-hoc aliases such as `phase`, `status`, or `degradedReason` unless they are explicitly in the legacy fallback path.
+
 ## Exit Codes
 
 `agora review` uses deterministic exit codes for CI and agent callers:

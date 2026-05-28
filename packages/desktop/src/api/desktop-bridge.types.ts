@@ -32,6 +32,12 @@ export interface ReviewRunEvent {
   kind: string;
   message: string;
   timestamp: string;
+  schemaVersion?: 'codeagora.review.v1';
+  type?: 'progress' | 'result' | string;
+  stage?: string;
+  event?: string;
+  progress?: number;
+  sessionId?: string;
   payload?: unknown;
 }
 
