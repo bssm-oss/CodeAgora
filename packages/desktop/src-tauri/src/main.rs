@@ -12,6 +12,8 @@ use tauri::State;
 use tauri_plugin_notification::NotificationExt;
 
 const REVIEW_CONTRACT_VERSION: &str = "codeagora.review.v1";
+const DISCUSSION_ARTIFACT_MAX_CHARS: usize = 80_000;
+const DISCUSSION_ARTIFACT_LIMIT: usize = 48;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -814,6 +816,128 @@ fn read_optional_text(path: &Path) -> Option<String> {
         .filter(|raw| !raw.trim().is_empty())
 }
 
+fn bounded_discussion_text(raw: &str) -> (String, bool) {
+    if raw.len() <= DISCUSSION_ARTIFACT_MAX_CHARS {
+        return (raw.to_string(), false);
+    }
+    let suffix = "\n\n[discussion artifact truncated]";
+    let mut end = DISCUSSION_ARTIFACT_MAX_CHARS.saturating_sub(suffix.len());
+    while end > 0 && !raw.is_char_boundary(end) {
+        end -= 1;
+    }
+    (format!("{}{}", &raw[..end], suffix), true)
+}
+
+fn markdown_title(raw: &str, fallback: &str) -> String {
+    raw.lines()
+        .find_map(|line| line.trim().strip_prefix('#').map(str::trim))
+        .filter(|title| !title.is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn discussion_file_value(path: &Path, fallback_title: &str) -> Option<(Value, bool)> {
+    let raw = read_optional_text(path)?;
+    let (content, truncated) = bounded_discussion_text(&raw);
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("discussion.md")
+        .to_string();
+    Some((
+        json!({
+            "name": name,
+            "title": markdown_title(&raw, fallback_title),
+            "path": path.display().to_string(),
+            "content": content,
+            "truncated": truncated,
+        }),
+        truncated,
+    ))
+}
+
+fn discussion_artifacts(dir: &Path) -> Value {
+    let discussions_dir = dir.join("discussions");
+    let Ok(entries) = fs::read_dir(&discussions_dir) else {
+        return json!({
+            "available": false,
+            "reason": "No discussions directory was found for this session.",
+            "artifacts": [],
+            "truncated": false,
+        });
+    };
+
+    let mut entries = entries.filter_map(Result::ok).collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.file_name());
+    let mut artifacts = Vec::new();
+    let mut any_truncated = false;
+
+    for entry in entries.into_iter().take(DISCUSSION_ARTIFACT_LIMIT) {
+        let path = entry.path();
+        let id = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("discussion")
+            .to_string();
+        if path.is_file() {
+            if let Some((file, truncated)) = discussion_file_value(&path, &id) {
+                any_truncated = any_truncated || truncated;
+                artifacts.push(json!({
+                    "id": id,
+                    "kind": "file",
+                    "path": path.display().to_string(),
+                    "files": [file],
+                }));
+            }
+            continue;
+        }
+
+        if !path.is_dir() {
+            continue;
+        }
+
+        let mut children = match fs::read_dir(&path) {
+            Ok(children) => children.filter_map(Result::ok).collect::<Vec<_>>(),
+            Err(_) => Vec::new(),
+        };
+        children.sort_by_key(|child| child.file_name());
+        let mut files = Vec::new();
+        for child in children {
+            let child_path = child.path();
+            if child_path.extension().and_then(|value| value.to_str()) != Some("md") {
+                continue;
+            }
+            if let Some((file, truncated)) = discussion_file_value(&child_path, &id) {
+                any_truncated = any_truncated || truncated;
+                files.push(file);
+            }
+        }
+        if !files.is_empty() {
+            artifacts.push(json!({
+                "id": id,
+                "kind": "thread",
+                "path": path.display().to_string(),
+                "files": files,
+            }));
+        }
+    }
+
+    if artifacts.is_empty() {
+        return json!({
+            "available": false,
+            "reason": "No readable discussion or debate artifacts were found.",
+            "artifacts": [],
+            "truncated": false,
+        });
+    }
+
+    json!({
+        "available": true,
+        "artifacts": artifacts,
+        "truncated": any_truncated,
+    })
+}
+
 fn read_session_verdict(dir: &Path) -> Option<Value> {
     read_json(&dir.join("result.json")).or_else(|| read_json(&dir.join("head-verdict.json")))
 }
@@ -1193,6 +1317,7 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
     let discussions_count = fs::read_dir(dir.join("discussions"))
         .map(|entries| entries.count())
         .unwrap_or(0);
+    let discussion_artifacts = discussion_artifacts(&dir);
     let findings = all_findings(verdict.as_ref(), &issue_objects(verdict.as_ref()));
     let cost_summary =
         derived_cost_summary(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
@@ -1211,6 +1336,7 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         "telemetry": telemetry,
         "verdict": verdict,
         "findings": findings,
+        "discussionArtifacts": discussion_artifacts,
         "markdown": markdown,
         "evidenceCount": evidence_count,
         "discussionsCount": discussions_count,
@@ -2405,6 +2531,16 @@ mod tests {
         );
         write_file(
             &root,
+            ".ca/sessions/2026-05-06/e2e-001/discussions/thread-001/round-1.md",
+            "# Round 1\n\n## Supporter Responses\n\nThe finding is valid.",
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/discussions/thread-001/verdict.md",
+            "# Verdict: thread-001\n\n**Final Severity:** CRITICAL\n\nConsensus reached.",
+        );
+        write_file(
+            &root,
             ".github/workflows/codeagora.yml",
             "name: CodeAgora Review\non:\n  pull_request:\npermissions:\n  contents: read\n  pull-requests: write\njobs:\n  review:\n    steps:\n      - uses: bssm-oss/CodeAgora@v0.1.0-rc.3\n        with:\n          config-path: .ca/config.json\n",
         );
@@ -2469,6 +2605,25 @@ mod tests {
             .and_then(Value::as_str)
             .unwrap_or_default()
             .contains("Desktop E2E report"));
+        assert_eq!(
+            detail
+                .pointer("/discussionArtifacts/available")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        assert!(detail
+            .pointer("/discussionArtifacts/artifacts")
+            .and_then(Value::as_array)
+            .map(|artifacts| artifacts.iter().any(|artifact| artifact
+                .get("files")
+                .and_then(Value::as_array)
+                .map(|files| files.iter().any(|file| file
+                    .get("content")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .contains("Supporter Responses")))
+                .unwrap_or(false)))
+            .unwrap_or(false));
 
         let markdown =
             export_session_value(&root, "2026-05-06/e2e-001", "markdown").expect("markdown export");

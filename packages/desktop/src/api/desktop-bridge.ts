@@ -164,6 +164,7 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
     degraded: typeof detail['degraded'] === 'boolean' ? detail['degraded'] : undefined,
     degradedReasons: Array.isArray(detail['degradedReasons']) ? detail['degradedReasons'].filter((item): item is string => typeof item === 'string') : undefined,
     costSummary: asObject(detail['costSummary']) as SessionCostSummary | undefined,
+    discussionArtifacts: asObject(detail['discussionArtifacts']) as SessionDetail['discussionArtifacts'],
     markdown: asString(detail['markdown']) || [
       `# Review ${entry.id}`,
       '',

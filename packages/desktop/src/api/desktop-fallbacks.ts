@@ -55,6 +55,33 @@ export function fallbackSessionDetail(id: string, sessions: SessionSummary[]): S
     ...session,
     evidenceCount: session.topIssues?.length ?? 0,
     discussionsCount: 1,
+    discussionArtifacts: {
+      available: true,
+      truncated: false,
+      artifacts: [
+        {
+          id: 'preview-discussion',
+          kind: 'thread',
+          path: '.ca/sessions/preview/discussions/preview-discussion',
+          files: [
+            {
+              name: 'round-1.md',
+              title: 'Round 1',
+              path: '.ca/sessions/preview/discussions/preview-discussion/round-1.md',
+              content: '# Round 1\n\n## Supporter Responses\n\nThe critical finding is valid and should block merge until fixed.',
+              truncated: false,
+            },
+            {
+              name: 'verdict.md',
+              title: 'Verdict: preview-discussion',
+              path: '.ca/sessions/preview/discussions/preview-discussion/verdict.md',
+              content: '# Verdict: preview-discussion\n\n**Final Severity:** CRITICAL\n\nConsensus reached after one round.',
+              truncated: false,
+            },
+          ],
+        },
+      ],
+    },
     markdown: [
       `# Review ${session.id}`,
       '',

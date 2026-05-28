@@ -1413,6 +1413,7 @@ function renderSessionDetail(): HTMLElement {
     }
   }
   detail.append(issues);
+  detail.append(renderDiscussionArtifacts(selected));
 
   const exportGuide = el('p', 'ca-repo-note', t('desktop.detail.exportGuidance'));
   detail.append(exportGuide);
@@ -1437,6 +1438,62 @@ function renderSessionDetail(): HTMLElement {
     detail.append(reportSection);
   }
   return detail;
+}
+
+function renderDiscussionArtifacts(selected: SessionDetail): HTMLElement {
+  const section = el('section', 'ca-discussion-viewer');
+  section.dataset.testid = 'discussion-viewer';
+  const header = el('div', 'ca-section-head');
+  const title = el('div');
+  title.append(el('h3', '', t('desktop.detail.discussionViewerTitle')));
+  title.append(el('p', 'ca-repo-note', t('desktop.detail.discussionViewerBody')));
+  header.append(title);
+  section.append(header);
+
+  const discussions = selected.discussionArtifacts;
+  if (!discussions?.available || discussions.artifacts.length === 0) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.detail.noDiscussionsTitle')));
+    empty.append(el('p', '', discussions?.reason ?? t('desktop.detail.noDiscussionsBody')));
+    section.append(empty);
+    return section;
+  }
+
+  const facts = el('div', 'ca-detail-meta');
+  facts.append(el('span', '', t('desktop.detail.discussionArtifacts', { count: discussions.artifacts.length })));
+  if (discussions.truncated) facts.append(el('span', 'ca-fact ca-warn', t('desktop.detail.discussionArtifactsTruncated')));
+  section.append(facts);
+
+  const list = el('div', 'ca-discussion-list');
+  for (const artifact of discussions.artifacts) {
+    const shell = el('details', 'ca-discussion-thread') as HTMLDetailsElement;
+    shell.open = true;
+    const summary = el('summary', 'ca-discussion-summary');
+    summary.append(el('strong', '', artifact.id));
+    summary.append(el('span', '', t('desktop.detail.discussionThreadMeta', {
+      files: artifact.files.length,
+      kind: artifact.kind,
+    })));
+    shell.append(summary);
+
+    for (const file of artifact.files) {
+      const article = el('article', 'ca-discussion-artifact');
+      const fileHead = el('div', 'ca-discussion-artifact-head');
+      fileHead.append(el('strong', '', file.title || file.name));
+      fileHead.append(el('span', '', file.name));
+      article.append(fileHead);
+      if (file.truncated) article.append(el('p', 'ca-repo-note ca-warn', t('desktop.detail.discussionArtifactTruncated')));
+      const content = el('pre', 'ca-discussion-content');
+      content.textContent = file.content;
+      content.tabIndex = 0;
+      content.setAttribute('aria-label', t('desktop.detail.discussionArtifactAria', { title: file.title || file.name }));
+      article.append(content);
+      shell.append(article);
+    }
+    list.append(shell);
+  }
+  section.append(list);
+  return section;
 }
 
 function renderRunReview(): HTMLElement {

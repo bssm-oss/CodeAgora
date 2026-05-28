@@ -12,7 +12,32 @@ export type SeverityCounts = SessionSeverityCounts;
 export type TopIssue = SessionTopIssue;
 export type SessionSummary = CoreSessionSummary;
 export type SessionCostSummary = CoreSessionCostSummary;
-export type SessionDetail = SessionDetailView;
+
+export interface DiscussionArtifactFile {
+  name: string;
+  title: string;
+  path: string;
+  content: string;
+  truncated: boolean;
+}
+
+export interface DiscussionArtifact {
+  id: string;
+  kind: 'file' | 'thread';
+  path: string;
+  files: DiscussionArtifactFile[];
+}
+
+export interface DiscussionArtifacts {
+  available: boolean;
+  reason?: string;
+  artifacts: DiscussionArtifact[];
+  truncated: boolean;
+}
+
+export interface SessionDetail extends SessionDetailView {
+  discussionArtifacts?: DiscussionArtifacts;
+}
 
 export interface SessionExport {
   format: string;

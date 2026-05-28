@@ -860,6 +860,7 @@ h3 {
 
 .ca-evidence-board,
 .ca-issues,
+.ca-discussion-viewer,
 .ca-repo-section,
 .ca-repo-picker,
 .ca-review-run,
@@ -887,6 +888,63 @@ h3 {
 
 .ca-issue-severity {
   justify-self: start;
+}
+
+.ca-discussion-viewer {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.ca-discussion-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ca-discussion-thread {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ca-discussion-summary,
+.ca-discussion-artifact-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ca-discussion-summary {
+  padding: var(--space-3);
+}
+
+.ca-discussion-summary span,
+.ca-discussion-artifact-head span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.ca-discussion-artifact {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.ca-discussion-content {
+  max-height: 340px;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--report-bg);
+  color: var(--report-text);
+  white-space: pre-wrap;
 }
 
 .ca-report-shell {
