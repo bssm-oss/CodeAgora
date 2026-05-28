@@ -175,8 +175,8 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
 
 // ── Bridge API ───────────────────────────────────────────────────
 
-export async function listSessions(): Promise<SessionSummary[]> {
-  const result = await tauriCall<CliSessionList | CliSessionEntry[]>('list_sessions');
+export async function listSessions(forceRefresh = false): Promise<SessionSummary[]> {
+  const result = await tauriCall<CliSessionList | CliSessionEntry[]>('list_sessions', { forceRefresh });
   if (result) {
     const sessions = Array.isArray(result) ? result : result.sessions ?? [];
     return sessions.map(normalizeEntry);
@@ -184,8 +184,8 @@ export async function listSessions(): Promise<SessionSummary[]> {
   return fallbackSessions();
 }
 
-export async function getSessionDetail(id: string): Promise<SessionDetail> {
-  const result = await tauriCall<CliSessionDetail>('get_session_detail', { id });
+export async function getSessionDetail(id: string, forceRefresh = false): Promise<SessionDetail> {
+  const result = await tauriCall<CliSessionDetail>('get_session_detail', { id, forceRefresh });
   if (result) return normalizeDetail(result);
   return fallbackSessionDetail(id, await listSessions());
 }

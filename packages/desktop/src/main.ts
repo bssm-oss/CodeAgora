@@ -429,13 +429,13 @@ function removeToast(id: string): void {
   render()
 }
 
-async function refreshSessions(selectFirst = false): Promise<void> {
+async function refreshSessions(selectFirst = false, forceRefresh = false): Promise<void> {
   state.busy = true;
   render();
   try {
-    state.sessions = await listSessions();
+    state.sessions = await listSessions(forceRefresh);
     if (selectFirst && state.sessions[0]) {
-      state.selected = await getSessionDetail(state.sessions[0].id);
+      state.selected = await getSessionDetail(state.sessions[0].id, forceRefresh);
     }
   } catch (error) {
     pushToast(error instanceof Error ? error.message : String(error), 'error')
@@ -470,7 +470,7 @@ async function openRepo(path: string): Promise<void> {
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
     resetConfigState();
-    await refreshSessions(true);
+    await refreshSessions(true, true);
     await loadConfig();
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
@@ -835,7 +835,7 @@ function renderToolbar(): HTMLElement {
   preferences.append(localeControl, themeControl);
   actions.append(preferences);
 
-  actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected), 'ca-button', 'button-refresh'));
+  actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected, true), 'ca-button', 'button-refresh'));
   const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'ca-button ca-primary', 'button-quick-review');
   quickReview.disabled = state.busy || !runReadiness().ready;
   actions.append(quickReview);
@@ -1047,7 +1047,7 @@ function renderCockpitOverview(): HTMLElement {
   section.append(metrics);
 
   const links = el('div', 'ca-quick-links');
-  links.append(button(t('desktop.action.refreshEvidence'), () => void refreshSessions(true), 'ca-button', 'button-refresh-evidence'));
+  links.append(button(t('desktop.action.refreshEvidence'), () => void refreshSessions(true, true), 'ca-button', 'button-refresh-evidence'));
   links.append(button(t('desktop.nav.config'), () => {
     setView('config');
     if (!state.configRaw) void loadConfig();

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::State;
 use tauri_plugin_notification::NotificationExt;
 
@@ -165,6 +165,59 @@ struct SessionExport {
 struct WorkspaceState {
     repo_root: Mutex<Option<PathBuf>>,
     review_runs: Mutex<HashMap<String, Arc<ReviewRunHandle>>>,
+    session_cache: Mutex<SessionCache>,
+}
+
+#[derive(Clone)]
+struct CachedValue {
+    value: Value,
+    stored_at: Instant,
+}
+
+#[derive(Default)]
+struct SessionCache {
+    repo_root: Option<PathBuf>,
+    list: Option<CachedValue>,
+    details: HashMap<String, CachedValue>,
+}
+
+const SESSION_CACHE_TTL: Duration = Duration::from_secs(2);
+const SESSION_DETAIL_CACHE_LIMIT: usize = 64;
+
+fn fresh_cached_value(value: &CachedValue) -> bool {
+    value.stored_at.elapsed() <= SESSION_CACHE_TTL
+}
+
+fn reset_session_cache_for_repo(cache: &mut SessionCache, repo_root: &Path) {
+    if cache.repo_root.as_deref() != Some(repo_root) {
+        cache.repo_root = Some(repo_root.to_path_buf());
+        cache.list = None;
+        cache.details.clear();
+    }
+}
+
+fn invalidate_session_cache(state: &WorkspaceState) -> Result<(), String> {
+    let mut cache = state
+        .session_cache
+        .lock()
+        .map_err(|_| "Session cache lock failed".to_string())?;
+    cache.list = None;
+    cache.details.clear();
+    Ok(())
+}
+
+fn prune_session_detail_cache(cache: &mut SessionCache) {
+    while cache.details.len() > SESSION_DETAIL_CACHE_LIMIT {
+        let Some(oldest_key) = cache
+            .details
+            .iter()
+            .min_by_key(|(_, value)| value.stored_at)
+            .map(|(key, _)| key.clone())
+        else {
+            break;
+        };
+        cache.details.remove(&oldest_key);
+    }
 }
 
 struct ReviewRunHandle {
@@ -388,7 +441,10 @@ fn parse_review_stream_event(line: &str) -> ParsedReviewStreamEvent {
         .get("degraded")
         .and_then(Value::as_bool)
         .unwrap_or(false)
-        || payload.get("degradedReason").and_then(Value::as_str).is_some()
+        || payload
+            .get("degradedReason")
+            .and_then(Value::as_str)
+            .is_some()
         || payload
             .get("summary")
             .and_then(|summary| summary.get("forfeitedReviewers"))
@@ -412,8 +468,14 @@ fn parse_review_contract_event(payload: Value, redacted_line: String) -> ParsedR
         .and_then(Value::as_str)
         .unwrap_or("event")
         .to_string();
-    let stage = payload.get("stage").and_then(Value::as_str).map(str::to_string);
-    let event_name = payload.get("event").and_then(Value::as_str).map(str::to_string);
+    let stage = payload
+        .get("stage")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let event_name = payload
+        .get("event")
+        .and_then(Value::as_str)
+        .map(str::to_string);
     let progress = payload
         .get("progress")
         .and_then(Value::as_u64)
@@ -470,7 +532,10 @@ fn review_contract_message(payload: &Value, event_type: &str, redacted_line: &st
     }
 
     if event_type == "result" {
-        let status = payload.get("status").and_then(Value::as_str).unwrap_or("unknown");
+        let status = payload
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
         if let Some(decision) = payload
             .get("summary")
             .and_then(|summary| summary.get("decision"))
@@ -908,7 +973,10 @@ fn all_findings(verdict: Option<&Value>, issues: &[Value]) -> Vec<Value> {
 }
 
 fn push_unique_reason(reasons: &mut Vec<String>, maybe_reason: Option<&str>) {
-    if let Some(reason) = maybe_reason.map(str::trim).filter(|reason| !reason.is_empty()) {
+    if let Some(reason) = maybe_reason
+        .map(str::trim)
+        .filter(|reason| !reason.is_empty())
+    {
         let normalized = reason.to_string();
         if !reasons.iter().any(|existing| existing == &normalized) {
             reasons.push(normalized);
@@ -1103,9 +1171,16 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         .map(|entries| entries.count())
         .unwrap_or(0);
     let findings = all_findings(verdict.as_ref(), &issue_objects(verdict.as_ref()));
-    let cost_summary = derived_cost_summary(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
-    let degraded_reasons = derived_degraded_reasons(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
-    let degraded = derived_degraded(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref(), &degraded_reasons);
+    let cost_summary =
+        derived_cost_summary(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
+    let degraded_reasons =
+        derived_degraded_reasons(verdict.as_ref(), metadata.as_ref(), telemetry.as_ref());
+    let degraded = derived_degraded(
+        verdict.as_ref(),
+        metadata.as_ref(),
+        telemetry.as_ref(),
+        &degraded_reasons,
+    );
 
     Ok(json!({
         "entry": session_entry(date, session_id, &dir, metadata.as_ref(), verdict.as_ref()),
@@ -1120,6 +1195,58 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         "degraded": degraded,
         "degradedReasons": degraded_reasons,
     }))
+}
+
+fn session_list_value(workspace_root: &Path) -> Result<Value, String> {
+    let root = sessions_root_for(workspace_root);
+    if !root.exists() {
+        return Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": [] }));
+    }
+
+    let mut sessions = Vec::new();
+    let mut date_dirs = fs::read_dir(&root)
+        .map_err(|error| error.to_string())?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_dir())
+        .collect::<Vec<_>>();
+    date_dirs.sort_by_key(|entry| entry.file_name());
+    date_dirs.reverse();
+
+    for date_entry in date_dirs {
+        let date = date_entry.file_name().to_string_lossy().to_string();
+        if !date
+            .chars()
+            .all(|char| char.is_ascii_digit() || char == '-')
+        {
+            continue;
+        }
+        let mut session_dirs = fs::read_dir(date_entry.path())
+            .map_err(|error| error.to_string())?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .collect::<Vec<_>>();
+        session_dirs.sort_by_key(|entry| entry.file_name());
+        session_dirs.reverse();
+
+        for session_entry_dir in session_dirs {
+            let session_id = session_entry_dir.file_name().to_string_lossy().to_string();
+            let dir = session_entry_dir.path();
+            let metadata = read_json(&dir.join("metadata.json"));
+            let verdict = read_session_verdict(&dir);
+            sessions.push(session_entry(
+                &date,
+                &session_id,
+                &dir,
+                metadata.as_ref(),
+                verdict.as_ref(),
+            ));
+            if sessions.len() >= 25 {
+                return Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": sessions }));
+            }
+        }
+    }
+
+    Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": sessions }))
 }
 
 fn sarif_for_session(id: &str, detail: &Value) -> Value {
@@ -1265,7 +1392,10 @@ fn export_session_value(root: &Path, id: &str, format: &str) -> Result<SessionEx
 }
 
 fn config_format_from_path(path: Option<&Path>) -> &'static str {
-    match path.and_then(|path| path.extension()).and_then(|value| value.to_str()) {
+    match path
+        .and_then(|path| path.extension())
+        .and_then(|value| value.to_str())
+    {
         Some("yaml" | "yml") => "yaml",
         Some("json") => "json",
         _ => "auto",
@@ -1273,29 +1403,36 @@ fn config_format_from_path(path: Option<&Path>) -> &'static str {
 }
 
 fn validate_config_raw(raw: &str, root: &Path, format: &str) -> ConfigValidation {
-    let args = ["config", "validate", "--json", "--stdin", "--format", format];
-    let output = run_agora(
-        root,
-        &args,
-        Some(raw.to_string()),
-    );
+    let args = [
+        "config", "validate", "--json", "--stdin", "--format", format,
+    ];
+    let output = run_agora(root, &args, Some(raw.to_string()));
     match output {
         Ok(output) => {
             let parsed = parse_config_validation_output(&output.stdout, &output.stderr);
-            if parsed.valid || !parsed.errors.iter().any(|error| error.contains("ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE")) {
+            if parsed.valid
+                || !parsed
+                    .errors
+                    .iter()
+                    .any(|error| error.contains("ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE"))
+            {
                 return parsed;
             }
             run_dev_agora(root, &args, Some(raw.to_string()))
                 .map(|output| parse_config_validation_output(&output.stdout, &output.stderr))
                 .unwrap_or_else(|error| ConfigValidation {
                     valid: false,
-                    errors: vec![format!("Failed to run canonical config validation: {error}")],
+                    errors: vec![format!(
+                        "Failed to run canonical config validation: {error}"
+                    )],
                     warnings: Vec::new(),
                 })
         }
         Err(error) => ConfigValidation {
             valid: false,
-            errors: vec![format!("Failed to run canonical config validation: {error}")],
+            errors: vec![format!(
+                "Failed to run canonical config validation: {error}"
+            )],
             warnings: Vec::new(),
         },
     }
@@ -1331,7 +1468,12 @@ fn run_dev_agora(
 
 fn parse_config_validation_output(stdout: &[u8], stderr: &[u8]) -> ConfigValidation {
     let text = String::from_utf8_lossy(stdout);
-    for line in text.lines().rev().map(str::trim).filter(|line| !line.is_empty()) {
+    for line in text
+        .lines()
+        .rev()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+    {
         if line.starts_with('{') {
             if let Ok(validation) = serde_json::from_str::<ConfigValidation>(line) {
                 return validation;
@@ -1664,6 +1806,7 @@ fn open_repository(path: String, state: State<'_, WorkspaceState>) -> Result<Rep
         .repo_root
         .lock()
         .map_err(|_| "Workspace state lock failed".to_string())? = Some(root);
+    invalidate_session_cache(&state)?;
     Ok(info)
 }
 
@@ -1673,63 +1816,78 @@ fn get_command_contract() -> Result<Vec<DesktopCommandContract>, String> {
 }
 
 #[tauri::command]
-fn list_sessions(state: State<'_, WorkspaceState>) -> Result<Value, String> {
+fn list_sessions(
+    force_refresh: Option<bool>,
+    state: State<'_, WorkspaceState>,
+) -> Result<Value, String> {
     let workspace_root = active_repo_root(&state)?;
-    let root = sessions_root_for(&workspace_root);
-    if !root.exists() {
-        return Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": [] }));
-    }
-
-    let mut sessions = Vec::new();
-    let mut date_dirs = fs::read_dir(&root)
-        .map_err(|error| error.to_string())?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .collect::<Vec<_>>();
-    date_dirs.sort_by_key(|entry| entry.file_name());
-    date_dirs.reverse();
-
-    for date_entry in date_dirs {
-        let date = date_entry.file_name().to_string_lossy().to_string();
-        if !date
-            .chars()
-            .all(|char| char.is_ascii_digit() || char == '-')
+    let force_refresh = force_refresh.unwrap_or(false);
+    if !force_refresh {
+        let mut cache = state
+            .session_cache
+            .lock()
+            .map_err(|_| "Session cache lock failed".to_string())?;
+        reset_session_cache_for_repo(&mut cache, &workspace_root);
+        if let Some(cached) = cache
+            .list
+            .as_ref()
+            .filter(|value| fresh_cached_value(value))
         {
-            continue;
-        }
-        let mut session_dirs = fs::read_dir(date_entry.path())
-            .map_err(|error| error.to_string())?
-            .filter_map(Result::ok)
-            .filter(|entry| entry.path().is_dir())
-            .collect::<Vec<_>>();
-        session_dirs.sort_by_key(|entry| entry.file_name());
-        session_dirs.reverse();
-
-        for session_entry_dir in session_dirs {
-            let session_id = session_entry_dir.file_name().to_string_lossy().to_string();
-            let dir = session_entry_dir.path();
-            let metadata = read_json(&dir.join("metadata.json"));
-            let verdict = read_session_verdict(&dir);
-            sessions.push(session_entry(
-                &date,
-                &session_id,
-                &dir,
-                metadata.as_ref(),
-                verdict.as_ref(),
-            ));
-            if sessions.len() >= 25 {
-                return Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": sessions }));
-            }
+            return Ok(cached.value.clone());
         }
     }
 
-    Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": sessions }))
+    let value = session_list_value(&workspace_root)?;
+    let mut cache = state
+        .session_cache
+        .lock()
+        .map_err(|_| "Session cache lock failed".to_string())?;
+    reset_session_cache_for_repo(&mut cache, &workspace_root);
+    cache.list = Some(CachedValue {
+        value: value.clone(),
+        stored_at: Instant::now(),
+    });
+    Ok(value)
 }
 
 #[tauri::command]
-fn get_session_detail(id: String, state: State<'_, WorkspaceState>) -> Result<Value, String> {
+fn get_session_detail(
+    id: String,
+    force_refresh: Option<bool>,
+    state: State<'_, WorkspaceState>,
+) -> Result<Value, String> {
     let root = active_repo_root(&state)?;
-    session_detail_value(&root, &id)
+    let force_refresh = force_refresh.unwrap_or(false);
+    if !force_refresh {
+        let mut cache = state
+            .session_cache
+            .lock()
+            .map_err(|_| "Session cache lock failed".to_string())?;
+        reset_session_cache_for_repo(&mut cache, &root);
+        if let Some(cached) = cache
+            .details
+            .get(&id)
+            .filter(|value| fresh_cached_value(value))
+        {
+            return Ok(cached.value.clone());
+        }
+    }
+
+    let value = session_detail_value(&root, &id)?;
+    let mut cache = state
+        .session_cache
+        .lock()
+        .map_err(|_| "Session cache lock failed".to_string())?;
+    reset_session_cache_for_repo(&mut cache, &root);
+    cache.details.insert(
+        id,
+        CachedValue {
+            value: value.clone(),
+            stored_at: Instant::now(),
+        },
+    );
+    prune_session_detail_cache(&mut cache);
+    Ok(value)
 }
 
 #[tauri::command]
@@ -1750,6 +1908,7 @@ fn run_review(
 ) -> Result<CommandResult, String> {
     let root = active_repo_root(&state)?;
     require_trusted_repo(&root)?;
+    invalidate_session_cache(&state)?;
     let (args, stdin_input) = review_invocation(&root, staged)?;
     let output = run_agora(&root, &args, stdin_input).map_err(|error| error.to_string())?;
 
@@ -1774,6 +1933,7 @@ fn run_review(
     };
 
     notify_review_finished(&app, &result);
+    invalidate_session_cache(&state)?;
 
     Ok(result)
 }
@@ -1786,6 +1946,7 @@ fn start_review_run(
 ) -> Result<ReviewRunSnapshot, String> {
     let root = active_repo_root(&state)?;
     require_trusted_repo(&root)?;
+    invalidate_session_cache(&state)?;
     let (args, stdin_input) = review_invocation(&root, staged)?;
 
     let mut child = spawn_agora(&root, &args, stdin_input).map_err(|error| error.to_string())?;
@@ -2011,24 +2172,35 @@ fn validate_config(
 
 #[tauri::command]
 fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
-    let output = command_stdout("agora", &["doctor", "--json"], &std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")))
-        .ok_or_else(|| "Failed to run agora doctor".to_string())?;
-    let parsed: serde_json::Value = serde_json::from_str(&output)
-        .map_err(|e| format!("Failed to parse doctor output: {e}"))?;
-    
+    let output = command_stdout(
+        "agora",
+        &["doctor", "--json"],
+        &std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")),
+    )
+    .ok_or_else(|| "Failed to run agora doctor".to_string())?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&output).map_err(|e| format!("Failed to parse doctor output: {e}"))?;
+
     let mut statuses = Vec::new();
-    
+
     // Extract provider statuses from doctor checks
     if let Some(checks) = parsed.get("checks").and_then(|v| v.as_array()) {
         for check in checks {
             let name = check.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let status = check.get("status").and_then(|v| v.as_str()).unwrap_or("warn");
+            let status = check
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("warn");
             let message = check.get("message").and_then(|v| v.as_str()).unwrap_or("");
-            
+
             // Only include checks that look like provider checks
             if name.contains("API key") || name.contains("provider") || name.contains("backend") {
                 let configured = status == "pass";
-                let redacted = if configured && message.contains("set") { Some("set".to_string()) } else { None };
+                let redacted = if configured && message.contains("set") {
+                    Some("set".to_string())
+                } else {
+                    None
+                };
                 statuses.push(ProviderStatus {
                     name: name.to_string(),
                     kind: "api".to_string(),
@@ -2040,13 +2212,19 @@ fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
             }
         }
     }
-    
+
     // Also check CLI backends from doctor result
     if let Some(cli_backends) = parsed.get("cliBackends").and_then(|v| v.as_array()) {
         for backend in cli_backends {
             let name = backend.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let configured = backend.get("available").and_then(|v| v.as_bool()).unwrap_or(false);
-            let binary = backend.get("command").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let configured = backend
+                .get("available")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let binary = backend
+                .get("command")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             statuses.push(ProviderStatus {
                 name: name.to_string(),
                 kind: "cli".to_string(),
@@ -2057,7 +2235,7 @@ fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
             });
         }
     }
-    
+
     Ok(statuses)
 }
 
@@ -2105,6 +2283,7 @@ fn main() {
         .manage(WorkspaceState {
             repo_root: Mutex::new(None),
             review_runs: Mutex::new(HashMap::new()),
+            session_cache: Mutex::new(SessionCache::default()),
         })
         .invoke_handler(tauri::generate_handler![
             list_sessions,
@@ -2284,25 +2463,32 @@ mod tests {
             Some("Blocking desktop E2E finding")
         );
         assert_eq!(
-            detail.pointer("/costSummary/formattedTotalCost").and_then(Value::as_str),
+            detail
+                .pointer("/costSummary/formattedTotalCost")
+                .and_then(Value::as_str),
             Some("$0.4200")
         );
         assert_eq!(
-            detail.pointer("/costSummary/totalCost").and_then(Value::as_f64),
+            detail
+                .pointer("/costSummary/totalCost")
+                .and_then(Value::as_f64),
             Some(0.42)
         );
-        assert_eq!(detail.pointer("/degraded").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            detail.pointer("/degraded").and_then(Value::as_bool),
+            Some(true)
+        );
         let degraded_reasons = detail
             .get("degradedReasons")
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        assert!(degraded_reasons.iter().any(|reason| reason.as_str() == Some("reviewer timeout")));
-        assert!(
-            degraded_reasons
-                .iter()
-                .any(|reason| reason.as_str() == Some("forfeitedReviewer:r2"))
-        );
+        assert!(degraded_reasons
+            .iter()
+            .any(|reason| reason.as_str() == Some("reviewer timeout")));
+        assert!(degraded_reasons
+            .iter()
+            .any(|reason| reason.as_str() == Some("forfeitedReviewer:r2")));
         assert!(detail
             .get("markdown")
             .and_then(Value::as_str)
@@ -2323,7 +2509,9 @@ mod tests {
         assert!(sarif.content.contains("\"ruleId\": \"CA001\""));
         assert!(sarif.content.contains("\"level\": \"error\""));
         assert!(sarif.content.contains("\"uriBaseId\": \"%SRCROOT%\""));
-        assert!(sarif.content.contains("\"id\": \"codeagora/2026-05-06/e2e-001\""));
+        assert!(sarif
+            .content
+            .contains("\"id\": \"codeagora/2026-05-06/e2e-001\""));
 
         let action = github_action_status(&root);
         assert_eq!(action.workflow_count, 1);
@@ -2424,6 +2612,41 @@ mod tests {
     }
 
     #[test]
+    fn desktop_app_e2e_bounds_and_invalidates_session_cache() {
+        let root = temp_workspace("session-cache-a");
+        let other_root = temp_workspace("session-cache-b");
+        let now = Instant::now();
+        let mut cache = SessionCache {
+            repo_root: Some(root.clone()),
+            list: Some(CachedValue {
+                value: json!({ "sessions": [] }),
+                stored_at: now,
+            }),
+            details: HashMap::new(),
+        };
+
+        for index in 0..=SESSION_DETAIL_CACHE_LIMIT {
+            cache.details.insert(
+                format!("2026-05-06/{index:03}"),
+                CachedValue {
+                    value: json!({ "entry": { "id": index } }),
+                    stored_at: now + Duration::from_millis(index as u64),
+                },
+            );
+        }
+        prune_session_detail_cache(&mut cache);
+        assert_eq!(cache.details.len(), SESSION_DETAIL_CACHE_LIMIT);
+
+        reset_session_cache_for_repo(&mut cache, &root);
+        assert!(cache.list.is_some());
+        assert_eq!(cache.details.len(), SESSION_DETAIL_CACHE_LIMIT);
+
+        reset_session_cache_for_repo(&mut cache, &other_root);
+        assert!(cache.list.is_none());
+        assert!(cache.details.is_empty());
+    }
+
+    #[test]
     fn desktop_app_e2e_blocks_mutating_commands_for_untrusted_workspace() {
         let root = temp_workspace("untrusted");
         let error = require_trusted_repo(&root).expect_err("non-git workspace should be blocked");
@@ -2470,7 +2693,10 @@ mod tests {
             completed_at: None,
             events: vec![],
         };
-        assert!(matches!(snapshot.status.as_str(), "running" | "completed" | "failed" | "cancelled" | "cancelling"));
+        assert!(matches!(
+            snapshot.status.as_str(),
+            "running" | "completed" | "failed" | "cancelled" | "cancelling"
+        ));
     }
 
     #[test]
@@ -2482,7 +2708,10 @@ mod tests {
         assert_eq!(parsed.event.kind, "stage-update");
         assert_eq!(parsed.event.message, "2/5 reviewers complete");
         assert_eq!(parsed.session_id.as_deref(), Some("2026-05-06/001"));
-        assert_eq!(parsed.event.schema_version.as_deref(), Some(REVIEW_CONTRACT_VERSION));
+        assert_eq!(
+            parsed.event.schema_version.as_deref(),
+            Some(REVIEW_CONTRACT_VERSION)
+        );
         assert_eq!(parsed.event.event_type.as_deref(), Some("progress"));
         assert_eq!(parsed.event.stage.as_deref(), Some("review"));
         assert_eq!(parsed.event.event.as_deref(), Some("stage-update"));
