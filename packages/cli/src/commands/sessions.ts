@@ -28,10 +28,14 @@ import type {
   SessionDiff,
   SessionStats,
 } from '@codeagora/core/session/queries.js';
+import { showSession } from '@codeagora/core/session/queries.js';
 import { AGENT_CONTRACT_VERSION } from '../utils/agent-contract.js';
 
 import fs from 'fs/promises';
 import path from 'path';
+import type { EvidenceDocument, Severity } from '@codeagora/core/types/core.js';
+import { REVIEW_SEVERITIES } from '@codeagora/shared/contracts/stable.js';
+import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
 
 // ============================================================================
 // CLI-only types
@@ -40,6 +44,12 @@ import path from 'path';
 export interface PruneResult {
   deleted: number;
   errors: number;
+}
+
+export interface SessionExportResult {
+  format: 'markdown' | 'json' | 'sarif';
+  fileName: string;
+  content: string;
 }
 
 // ============================================================================
@@ -68,6 +78,77 @@ function extractIssueObjects(verdict: Record<string, unknown>): Array<{ title: s
         return { title: String(item) };
       });
     }
+  }
+  return [];
+}
+
+function sessionDirFor(baseDir: string, sessionPath: string): { date: string; sessionId: string; dirPath: string } {
+  const parts = sessionPath.split('/');
+  if (parts.length !== 2) {
+    throw new Error(`Invalid session path format: "${sessionPath}". Expected "YYYY-MM-DD/NNN".`);
+  }
+  const [date, sessionId] = parts;
+  return {
+    date,
+    sessionId,
+    dirPath: path.join(baseDir, '.ca', 'sessions', date, sessionId),
+  };
+}
+
+async function readOptionalText(filePath: string): Promise<string | undefined> {
+  try {
+    return await fs.readFile(filePath, 'utf-8');
+  } catch {
+    return undefined;
+  }
+}
+
+async function readOptionalJson(filePath: string): Promise<Record<string, unknown> | undefined> {
+  try {
+    return JSON.parse(await fs.readFile(filePath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizedSeverity(value: unknown): Severity {
+  return typeof value === 'string' && (REVIEW_SEVERITIES as readonly string[]).includes(value)
+    ? value as Severity
+    : 'SUGGESTION';
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function lineRangeFrom(value: Record<string, unknown>): [number, number] {
+  if (Array.isArray(value['lineRange'])) {
+    const start = Number(value['lineRange'][0] ?? 1);
+    const end = Number(value['lineRange'][1] ?? value['lineRange'][0] ?? 1);
+    return [Math.max(1, start || 1), Math.max(1, end || start || 1)];
+  }
+  const line = Number(value['line'] ?? value['lineNumber'] ?? 1);
+  return [Math.max(1, line || 1), Math.max(1, line || 1)];
+}
+
+function evidenceDocumentsFromVerdict(verdict: Record<string, unknown> | undefined): EvidenceDocument[] {
+  if (!verdict) return [];
+  for (const key of ['issues', 'findings', 'items']) {
+    const value = verdict[key];
+    if (!Array.isArray(value)) continue;
+    return value.map((item): EvidenceDocument => {
+      const record = typeof item === 'object' && item !== null ? item as Record<string, unknown> : { title: String(item) };
+      const title = String(record['title'] ?? record['issueTitle'] ?? record['description'] ?? record['message'] ?? 'CodeAgora finding');
+      return {
+        issueTitle: title,
+        problem: String(record['problem'] ?? record['description'] ?? record['message'] ?? title),
+        evidence: stringArray(record['evidence']),
+        severity: normalizedSeverity(record['severity']),
+        suggestion: String(record['suggestion'] ?? record['fix'] ?? record['recommendation'] ?? ''),
+        filePath: String(record['filePath'] ?? record['file'] ?? record['path'] ?? 'unknown'),
+        lineRange: lineRangeFrom(record),
+      };
+    });
   }
   return [];
 }
@@ -247,6 +328,38 @@ export function formatSessionDetail(detail: SessionDetail): string {
 
 export function formatSessionDetailJson(detail: SessionDetail): string {
   return JSON.stringify({ schemaVersion: AGENT_CONTRACT_VERSION, ...detail }, null, 2);
+}
+
+export async function exportSession(
+  baseDir: string,
+  sessionPath: string,
+  format: string,
+): Promise<SessionExportResult> {
+  const normalized = format.trim().toLowerCase();
+  const detail = await showSession(baseDir, sessionPath);
+  const { date, sessionId, dirPath } = sessionDirFor(baseDir, sessionPath);
+  const fileBase = `codeagora-session-${sessionPath.replace('/', '-')}`;
+
+  if (normalized === 'markdown' || normalized === 'md') {
+    const content = await readOptionalText(path.join(dirPath, 'report.md'))
+      ?? await readOptionalText(path.join(dirPath, 'result.md'))
+      ?? await readOptionalText(path.join(dirPath, 'suggestions.md'))
+      ?? formatSessionDetail(detail);
+    return { format: 'markdown', fileName: `${fileBase}.md`, content };
+  }
+
+  if (normalized === 'json') {
+    return { format: 'json', fileName: `${fileBase}.json`, content: formatSessionDetailJson(detail) };
+  }
+
+  if (normalized === 'sarif') {
+    const verdict = await readOptionalJson(path.join(dirPath, 'result.json'))
+      ?? detail.verdict;
+    const report = buildSarifReport(evidenceDocumentsFromVerdict(verdict), sessionId, date);
+    return { format: 'sarif', fileName: `${fileBase}.sarif`, content: serializeSarif(report) };
+  }
+
+  throw new Error(`Unsupported export format: ${format}`);
 }
 
 export function formatSessionDiff(diff: SessionDiff): string {

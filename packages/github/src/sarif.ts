@@ -4,6 +4,7 @@
  */
 
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import { SARIF_SEVERITY_RULES } from '@codeagora/shared/contracts/stable.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 // ============================================================================
@@ -54,39 +55,23 @@ interface SarifResult {
 // Severity Mapping
 // ============================================================================
 
-const SEVERITY_TO_SARIF: Record<string, { level: SarifResult['level']; ruleId: string }> = {
-  HARSHLY_CRITICAL: { level: 'error', ruleId: 'CA001' },
-  CRITICAL: { level: 'error', ruleId: 'CA002' },
-  WARNING: { level: 'warning', ruleId: 'CA003' },
-  SUGGESTION: { level: 'note', ruleId: 'CA004' },
+const SARIF_RULE_DESCRIPTIONS: Record<string, string> = {
+  CA001: 'Harshly critical issue detected by multi-agent review',
+  CA002: 'Critical issue detected by multi-agent review',
+  CA003: 'Warning-level issue detected by multi-agent review',
+  CA004: 'Suggestion from multi-agent review',
 };
 
-const SARIF_RULES: SarifRule[] = [
-  {
-    id: 'CA001',
-    name: 'HarshlyCriticalIssue',
-    shortDescription: { text: 'Harshly critical issue detected by multi-agent review' },
-    defaultConfiguration: { level: 'error' },
-  },
-  {
-    id: 'CA002',
-    name: 'CriticalIssue',
-    shortDescription: { text: 'Critical issue detected by multi-agent review' },
-    defaultConfiguration: { level: 'error' },
-  },
-  {
-    id: 'CA003',
-    name: 'WarningIssue',
-    shortDescription: { text: 'Warning-level issue detected by multi-agent review' },
-    defaultConfiguration: { level: 'warning' },
-  },
-  {
-    id: 'CA004',
-    name: 'Suggestion',
-    shortDescription: { text: 'Suggestion from multi-agent review' },
-    defaultConfiguration: { level: 'note' },
-  },
-];
+const SARIF_RULES: SarifRule[] = Object.values(SARIF_SEVERITY_RULES).map((rule) => ({
+  id: rule.ruleId,
+  name: rule.ruleName,
+  shortDescription: { text: SARIF_RULE_DESCRIPTIONS[rule.ruleId] ?? 'CodeAgora review finding' },
+  defaultConfiguration: { level: rule.level },
+}));
+
+function sarifRuleForSeverity(severity: string): { level: SarifResult['level']; ruleId: string } {
+  return SARIF_SEVERITY_RULES[severity as keyof typeof SARIF_SEVERITY_RULES] ?? SARIF_SEVERITY_RULES.SUGGESTION;
+}
 
 // ============================================================================
 // Builder
@@ -111,7 +96,7 @@ export function buildSarifReport(
 ): SarifReport {
   const safeDocs = redactDeep(evidenceDocs);
   const results: SarifResult[] = safeDocs.map((doc) => {
-    const mapping = SEVERITY_TO_SARIF[doc.severity] ?? { level: 'note' as const, ruleId: 'CA004' };
+    const mapping = sarifRuleForSeverity(doc.severity);
 
     const markdown = [
       `**Problem:** ${doc.problem}`,

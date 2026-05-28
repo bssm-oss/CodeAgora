@@ -7,7 +7,7 @@ import type { Command } from 'commander';
 import {
   listSessions, showSession, diffSessions, getSessionStats, pruneSessions,
   formatSessionList, formatSessionListJson, formatSessionDetail, formatSessionDetailJson,
-  formatSessionDiff, formatSessionStats,
+  formatSessionDiff, formatSessionStats, exportSession,
 } from './sessions.js';
 
 export function registerSessionsCommand(program: Command): void {
@@ -60,6 +60,21 @@ export function registerSessionsCommand(program: Command): void {
         } else {
           console.log(formatSessionDetail(detail));
         }
+      } catch (error) {
+        console.error('Error:', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    });
+
+  sessionsCmd.command('export <session>')
+    .description('Export a session as markdown, JSON, or SARIF')
+    .option('--format <format>', 'Export format: markdown, json, sarif', 'markdown')
+    .option('--base-dir <path>', 'Repository root for session lookup')
+    .action(async (session: string, opts: { format?: string; baseDir?: string }) => {
+      try {
+        const result = await exportSession(opts.baseDir ?? process.cwd(), session, opts.format ?? 'markdown');
+        process.stdout.write(result.content);
+        if (!result.content.endsWith('\n')) process.stdout.write('\n');
       } catch (error) {
         console.error('Error:', error instanceof Error ? error.message : error);
         process.exit(1);

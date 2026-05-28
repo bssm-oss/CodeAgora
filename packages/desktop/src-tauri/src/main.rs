@@ -1249,113 +1249,30 @@ fn session_list_value(workspace_root: &Path) -> Result<Value, String> {
     Ok(json!({ "schemaVersion": "codeagora.review.v1", "sessions": sessions }))
 }
 
-fn sarif_for_session(id: &str, detail: &Value) -> Value {
-    let findings = detail
-        .get("findings")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-
-    let severity_mapping = |severity: &str| match severity {
-        "HARSHLY_CRITICAL" => ("error", "CA001"),
-        "CRITICAL" => ("error", "CA002"),
-        "WARNING" => ("warning", "CA003"),
-        _ => ("note", "CA004"),
-    };
-
-    let results = findings
-        .iter()
-        .map(|finding| {
-            let file_path = finding
-                .get("filePath")
-                .and_then(Value::as_str)
-                .unwrap_or("unknown");
-            let severity = finding
-                .get("severity")
-                .and_then(Value::as_str)
-                .unwrap_or("SUGGESTION");
-            let (level, rule_id) = severity_mapping(severity);
-            let line_range = finding
-                .get("lineRange")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_else(|| vec![json!(1), json!(1)]);
-            let start_line = line_range
-                .first()
-                .and_then(Value::as_i64)
-                .unwrap_or(1)
-                .max(1);
-            let end_line = line_range
-                .get(1)
-                .and_then(Value::as_i64)
-                .unwrap_or(start_line)
-                .max(start_line);
-            json!({
-                "ruleId": rule_id,
-                "level": level,
-                "message": {
-                    "text": finding.get("title").and_then(Value::as_str).unwrap_or("CodeAgora finding")
-                },
-                "locations": [{
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": file_path,
-                            "uriBaseId": "%SRCROOT%"
-                        },
-                        "region": {
-                            "startLine": start_line,
-                            "endLine": end_line
-                        }
-                    }
-                }]
-            })
-        })
-        .collect::<Vec<_>>();
-
-    let (date, session_id) = session_parts(id).unwrap_or(("unknown-date", id));
-
-    json!({
-        "version": "2.1.0",
-        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-        "runs": [{
-            "tool": {
-                "driver": {
-                    "name": "CodeAgora",
-                    "informationUri": "https://github.com/bssm-oss/CodeAgora",
-                    "rules": [
-                        {
-                            "id": "CA001",
-                            "name": "HarshlyCriticalIssue",
-                            "shortDescription": { "text": "Harshly critical issue detected by multi-agent review" },
-                            "defaultConfiguration": { "level": "error" }
-                        },
-                        {
-                            "id": "CA002",
-                            "name": "CriticalIssue",
-                            "shortDescription": { "text": "Critical issue detected by multi-agent review" },
-                            "defaultConfiguration": { "level": "error" }
-                        },
-                        {
-                            "id": "CA003",
-                            "name": "WarningIssue",
-                            "shortDescription": { "text": "Warning-level issue detected by multi-agent review" },
-                            "defaultConfiguration": { "level": "warning" }
-                        },
-                        {
-                            "id": "CA004",
-                            "name": "Suggestion",
-                            "shortDescription": { "text": "Suggestion from multi-agent review" },
-                            "defaultConfiguration": { "level": "note" }
-                        }
-                    ]
-                }
-            },
-            "results": results,
-            "automationDetails": {
-                "id": format!("codeagora/{date}/{session_id}")
+fn cli_session_export(root: &Path, id: &str, format: &str) -> Result<String, String> {
+    let root_arg = root.to_string_lossy().to_string();
+    let args = vec![
+        "sessions",
+        "export",
+        id,
+        "--format",
+        format,
+        "--base-dir",
+        root_arg.as_str(),
+    ];
+    let output = run_agora(root, &args, None)
+        .and_then(|output| {
+            if output.status.success() {
+                Ok(output)
+            } else {
+                run_dev_agora(root, &args, None)
             }
-        }]
-    })
+        })
+        .map_err(|error| error.to_string())?;
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+    }
+    Err(redact_sensitive(&String::from_utf8_lossy(&output.stderr)))
 }
 
 fn export_session_value(root: &Path, id: &str, format: &str) -> Result<SessionExport, String> {
@@ -1384,8 +1301,7 @@ fn export_session_value(root: &Path, id: &str, format: &str) -> Result<SessionEx
         "sarif" => Ok(SessionExport {
             format: "sarif".to_string(),
             file_name: format!("codeagora-session-{}.sarif", id.replace('/', "-")),
-            content: serde_json::to_string_pretty(&sarif_for_session(id, &detail))
-                .map_err(|error| error.to_string())?,
+            content: cli_session_export(root, id, "sarif")?,
         }),
         _ => Err(format!("Unsupported export format: {format}")),
     }
