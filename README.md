@@ -40,7 +40,7 @@ git diff | agora review
 | Gemini CLI | CLI | Free |
 | Codex CLI | CLI | Subscription |
 
-[Full provider list (24+ API, 12 CLI) ->](docs/PROVIDERS.md)
+[Full provider list (24+ API, 12 CLI) ->](docs/for-users/PROVIDERS.md)
 
 ---
 
@@ -113,7 +113,7 @@ All extensions are optional — install only what you need.
 
 The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions. Human-facing UI work is moving into the desktop app.
 
-[Extension guide ->](docs/EXTENSIONS.md)
+[Extension guide ->](docs/for-users/EXTENSIONS.md)
 
 ---
 
@@ -171,18 +171,17 @@ Note: Use the `v0.1.0-rc.3` Action tag for the scoped prerelease package line; `
 
 | Doc | Content |
 |-----|---------|
-| [CLI Reference](docs/CLI_REFERENCE.md) | All commands and options |
-| [Configuration](docs/CONFIGURATION.md) | Config file guide |
-| [Providers](docs/PROVIDERS.md) | Full provider list with tiers |
-| [Architecture](docs/ARCHITECTURE.md) | Pipeline design and project structure |
-| [Extensions](docs/EXTENSIONS.md) | MCP and desktop direction |
-| [Product Surface Plan](docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md) | Current surfaces and lightweight roadmap |
-| [Production Readiness Roadmap](docs/PRODUCTION_READINESS_ROADMAP.md) | Gates for production-ready CLI, GitHub Action, and MCP releases |
-| [Beta Readiness](docs/BETA_READINESS_P4_P6.md) | P4-P6 beta gates, smoke checks, and release guardrails |
-| [Agent Contract](docs/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
-| [FAQ](docs/FAQ.md) | Frequently asked questions |
-| [Archived Korean Docs](docs/archive/ko/README.md) | Historical Korean translations; English root docs are canonical |
+| [Docs index](docs/README.md) | Audience-based documentation map |
+| [CLI Reference](docs/for-users/CLI_REFERENCE.md) | All commands and options |
+| [Configuration](docs/for-users/CONFIGURATION.md) | Config file guide |
+| [Providers](docs/for-users/PROVIDERS.md) | Full provider list with tiers |
+| [Architecture](docs/for-agents/ARCHITECTURE.md) | Pipeline design and project structure |
+| [Extensions](docs/for-users/EXTENSIONS.md) | MCP and desktop direction |
+| [Production Readiness Roadmap](docs/for-agents/PRODUCTION_READINESS_ROADMAP.md) | Gates for production-ready CLI, GitHub Action, and MCP releases |
+| [Agent Contract](docs/for-agents/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
+| [Troubleshooting](docs/for-users/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
+| [FAQ](docs/for-users/FAQ.md) | Frequently asked questions |
+| [Archived Korean Docs](docs/archived/archive/ko/README.md) | Historical Korean translations; English root docs are canonical |
 
 ---
 
@@ -210,7 +209,7 @@ pnpm bench:fn -- --validate-only                   # schema-check fixtures
 pnpm bench:reference -- --validate-only            # validate the 20-fixture reference gate
 ```
 
-The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead. The latest stable-candidate live benchmark capture is [docs/live-benchmark-report.md](docs/live-benchmark-report.md).
+The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead. The latest stable-candidate live benchmark capture is [docs/archived/live-benchmark-report.md](docs/archived/live-benchmark-report.md).
 
 **Score pre-computed results** (fast, no API calls):
 
@@ -239,7 +238,7 @@ Current reference fixtures: 14 recall cases + 6 FP regression cases. See `benchm
 
 ### Latest low-cost diverse aggregate (2026-04-28 KST)
 
-Full report: [`docs/golden-bug-benchmark-report-2026-04-27.md`](docs/golden-bug-benchmark-report-2026-04-27.md).
+Full report: [`docs/archived/golden-bug-benchmark-report-2026-04-27.md`](docs/archived/golden-bug-benchmark-report-2026-04-27.md).
 
 Smoke gate:
 

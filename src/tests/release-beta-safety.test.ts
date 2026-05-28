@@ -45,7 +45,7 @@ describe('prerelease safety', () => {
       'README.md',
       'packages/cli/src/commands/init.ts',
       'packages/shared/src/data/github-actions-template.yml',
-      'docs/RELEASE_CHECKLIST.md',
+      'docs/archived/RELEASE_CHECKLIST.md',
     ];
 
     for (const file of files) {
@@ -58,8 +58,8 @@ describe('prerelease safety', () => {
   it('keeps prerelease install examples on the beta dist-tag', () => {
     const readme = readText('README.md');
     const mcpReadme = readText('packages/mcp/README.md');
-    const extensions = readText('docs/EXTENSIONS.md');
-    const troubleshooting = readText('docs/TROUBLESHOOTING.md');
+    const extensions = readText('docs/for-users/EXTENSIONS.md');
+    const troubleshooting = readText('docs/for-users/TROUBLESHOOTING.md');
     const mcpConfig = readText('.mcp.json');
     const checkUpdate = readText('packages/cli/src/commands/check-update.ts');
 

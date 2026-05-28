@@ -29,10 +29,10 @@ Out of scope before stable:
 
 ## Relationship To Existing Docs
 
-- `docs/PRODUCTION_READINESS_ROADMAP.md` remains the detailed production gate definition.
-- `docs/BETA_READINESS_P4_P6.md` remains the current beta-readiness evidence summary.
-- `docs/RELEASE_CHECKLIST.md` remains the release procedure and approval-stop checklist.
-- `docs/RC3_TO_RC8_PRERELEASE_ROADMAP.md` defines the rc.3 through rc.8 prerelease validation sequence.
+- `docs/for-agents/PRODUCTION_READINESS_ROADMAP.md` remains the detailed production gate definition.
+- `docs/archived/BETA_READINESS_P4_P6.md` remains the current beta-readiness evidence summary.
+- `docs/archived/RELEASE_CHECKLIST.md` remains the release procedure and approval-stop checklist.
+- `docs/archived/RC3_TO_RC8_PRERELEASE_ROADMAP.md` defines the rc.3 through rc.8 prerelease validation sequence.
 - This root roadmap is the short operational queue: what must be fixed, proven, or clarified next.
 
 ## Current Position
@@ -186,7 +186,7 @@ closed.
 - 2026-05-04: P0/P1 local correctness and public-surface gates were closed with regression coverage and docs updates. The final P2 live evidence gates were later closed with GitHub Action PR smoke and a stable-candidate live benchmark artifact.
 - 2026-05-04: Live GitHub Action evidence was captured in PR #532 (`review` run 25317789874, review 4219826536, verdict `ACCEPT`) and oversized-diff behavior was captured in PR #531 (`review` run 25317537322).
 - 2026-05-04: Stable-candidate live benchmark evidence was captured in run 25317360402 with 20/20 successful fixtures, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
-- 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/RELEASE_CHECKLIST.md`, `docs/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
+- 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/archived/RELEASE_CHECKLIST.md`, `docs/archived/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
 - 2026-05-04: Desktop scope hygiene was re-checked across README, changelog, release docs, architecture docs, extension docs, and postinstall messaging. Desktop remains a private preview outside stable CLI/GitHub/MCP release gates.
 - 2026-05-06: `v0.1.0-beta.1` is published as a GitHub prerelease and npm `beta` dist-tag release. Stable promotion remains blocked until the RC evidence manifest, live-only register, package smokes, and release wording are current.
 - 2026-05-06: PRs #534-#536 merged the desktop release surface, core correctness fixes, and full evidence output fixes onto `origin/main` at `1075f81`. Post-merge `pnpm rc:desktop-gate`, `pnpm test:security`, and `pnpm evidence:manifest -- --require=rc` passed; the next RC gate is full release evidence regeneration and live-only freshness, not desktop implementation.
@@ -239,8 +239,8 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/desktop/src-tauri/src/main.rs`
 - `packages/desktop/src-tauri/tauri.conf.json`
 - `packages/desktop/src/`
-- `docs/DESKTOP_PREVIEW.md`
-- `docs/AGENT_CONTRACT.md`
+- `docs/for-users/DESKTOP_PREVIEW.md`
+- `docs/for-agents/AGENT_CONTRACT.md`
 
 **Evidence:**
 
@@ -341,7 +341,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/desktop/src/`
 - `packages/core/src/session/queries.ts`
 - `packages/cli/src/commands/sessions.ts`
-- `docs/AGENT_CONTRACT.md`
+- `docs/for-agents/AGENT_CONTRACT.md`
 
 **Evidence:**
 
@@ -417,7 +417,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/core/src/l0/model-registry.ts`
 - `packages/core/src/pipeline/cost-estimator.ts`
 - `packages/core/src/types/config.ts`
-- `docs/PROVIDERS.md`
+- `docs/for-users/PROVIDERS.md`
 
 **Evidence:**
 
@@ -468,8 +468,8 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/desktop/src/`
 - `packages/cli/src/commands/init.ts`
 - `action.yml`
-- `docs/5_GITHUB_INTEGRATION.md`
-- `docs/RELEASE_EVIDENCE.md`
+- `docs/for-users/5_GITHUB_INTEGRATION.md`
+- `docs/archived/RELEASE_EVIDENCE.md`
 
 **Evidence:**
 
@@ -493,8 +493,8 @@ Desktop must stay a host for the existing CodeAgora system:
 
 - `packages/desktop/src/`
 - `scripts/benchmark-ci.mjs`
-- `docs/RELEASE_EVIDENCE.md`
-- `docs/live-benchmark-report.md`
+- `docs/archived/RELEASE_EVIDENCE.md`
+- `docs/archived/live-benchmark-report.md`
 - `.sisyphus/evidence/`
 
 **Evidence:**
@@ -519,7 +519,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/desktop/src-tauri/src/main.rs`
 - `packages/desktop/src-tauri/tauri.conf.json`
 - `packages/desktop/src/`
-- `docs/DESKTOP_PREVIEW.md`
+- `docs/for-users/DESKTOP_PREVIEW.md`
 - `docs/SECURITY.md`
 
 **Evidence:**
@@ -571,7 +571,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/desktop/package.json`
 - `packages/desktop/src/`
 - `.github/workflows/`
-- `docs/RELEASE_CHECKLIST.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
 
 **Evidence:**
 
@@ -580,7 +580,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `pnpm --filter @codeagora/desktop evidence` writes `.sisyphus/evidence/desktop-evidence-manifest.json`.
 - `pnpm --filter @codeagora/desktop macos:webdriver-e2e` passes on macOS preview hardware.
 - `pnpm --filter @codeagora/desktop bundle:smoke` validates the generated private-preview bundle shape.
-- `docs/DESKTOP_PREVIEW.md` and the desktop evidence manifest record signing/notarization/updater decisions as deferred until public desktop launch.
+- `docs/for-users/DESKTOP_PREVIEW.md` and the desktop evidence manifest record signing/notarization/updater decisions as deferred until public desktop launch.
 
 ### D14: Desktop release gates
 
@@ -591,15 +591,15 @@ Desktop must stay a host for the existing CodeAgora system:
 - Add a desktop evidence manifest with command outputs, screenshots where useful, app version, OS, architecture, and package source.
 - Add automated smoke commands for read-only open, config load/edit validation, session browse, review dry-run, MCP tools/list, export, and cancellation.
 - Add manual smoke checklist for first-run UX, provider setup, large diff handling, degraded state display, and app restart persistence.
-- Sync desktop claims across README, changelog, release notes, `docs/DESKTOP_PREVIEW.md`, and release checklist.
+- Sync desktop claims across README, changelog, release notes, `docs/for-users/DESKTOP_PREVIEW.md`, and release checklist.
 - Document known limitations as private-preview limitations, not stable guarantees.
 
 **Likely files:**
 
 - `scripts/desktop-smoke.mjs`
-- `docs/DESKTOP_PREVIEW.md`
-- `docs/RELEASE_CHECKLIST.md`
-- `docs/RELEASE_EVIDENCE.md`
+- `docs/for-users/DESKTOP_PREVIEW.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
+- `docs/archived/RELEASE_EVIDENCE.md`
 - `README.md`
 - `CHANGELOG.md`
 
@@ -608,7 +608,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - Desktop evidence manifest exists for the RC candidate.
 - Automated desktop smoke passes from a packaged or package-equivalent app.
 - `pnpm rc:desktop-gate` passes and captures `desktop-gate.log` plus `.sisyphus/evidence/desktop-evidence-manifest.json`.
-- Manual smoke checklist is documented in `docs/DESKTOP_PREVIEW.md` and must be signed off before an RC branch/tag.
+- Manual smoke checklist is documented in `docs/for-users/DESKTOP_PREVIEW.md` and must be signed off before an RC branch/tag.
 
 ### D15: RC handoff after desktop
 
@@ -749,7 +749,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/cli/src/commands/sessions.ts`
 - `packages/cli/src/commands/replay.ts`
 - `packages/desktop/src-tauri/src/main.rs`
-- `docs/AGENT_CONTRACT.md`
+- `docs/for-agents/AGENT_CONTRACT.md`
 
 **Evidence:**
 
@@ -776,7 +776,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/core/src/types/config.ts`
 - `packages/core/src/config/validator.ts`
 - `packages/core/src/l1/backend.ts`
-- `docs/PROVIDERS.md`
+- `docs/for-users/PROVIDERS.md`
 - `src/tests/config-strict.test.ts`
 - `packages/cli/src/tests/cli-config-set.test.ts`
 
@@ -862,7 +862,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/cli/src/options/review-options.ts`
 - `src/tests/cli-review-options.test.ts`
 - `packages/cli/src/tests/cli-review.test.ts`
-- `docs/CLI_REFERENCE.md`
+- `docs/for-users/CLI_REFERENCE.md`
 
 **Evidence:**
 
@@ -873,11 +873,11 @@ Desktop must stay a host for the existing CodeAgora system:
 
 **Finding:** The CLI reference can drift from implemented command options and generated help text. Stable CLI support requires users, agents, and CI systems to see the same options in code, help, and docs.
 
-**Surface:** CLI help, `docs/CLI_REFERENCE.md`, agent contract, command tests.
+**Surface:** CLI help, `docs/for-users/CLI_REFERENCE.md`, agent contract, command tests.
 
 **Required work:**
 
-- Add a parity test or docs check for `agora review --help` versus `docs/CLI_REFERENCE.md` for stable options.
+- Add a parity test or docs check for `agora review --help` versus `docs/for-users/CLI_REFERENCE.md` for stable options.
 - Ensure options such as failure gates, scope selection, output modes, timeout controls, quick/no-discussion modes, and PR review options are documented consistently.
 - Mark beta-changing presentation formats separately from stable JSON/NDJSON contracts.
 
@@ -885,8 +885,8 @@ Desktop must stay a host for the existing CodeAgora system:
 
 - `packages/cli/src/commands/review.ts`
 - `packages/cli/src/commands/help-text.ts`
-- `docs/CLI_REFERENCE.md`
-- `docs/AGENT_CONTRACT.md`
+- `docs/for-users/CLI_REFERENCE.md`
+- `docs/for-agents/AGENT_CONTRACT.md`
 - `src/tests/cli-review-options.test.ts`
 
 **Evidence:**
@@ -910,15 +910,15 @@ Desktop must stay a host for the existing CodeAgora system:
 **Likely files:**
 
 - `README.md`
-- `docs/CLI_REFERENCE.md`
-- `docs/EXTENSIONS.md`
-- `docs/RELEASE_CHECKLIST.md`
+- `docs/for-users/CLI_REFERENCE.md`
+- `docs/for-users/EXTENSIONS.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
 - `action.yml`
 - `.github/workflows/release.yml`
 
 **Evidence:**
 
-- README, `docs/CLI_REFERENCE.md`, `docs/EXTENSIONS.md`, `docs/RELEASE_CHECKLIST.md`, and `action.yml` agree on install/version language.
+- README, `docs/for-users/CLI_REFERENCE.md`, `docs/for-users/EXTENSIONS.md`, `docs/archived/RELEASE_CHECKLIST.md`, and `action.yml` agree on install/version language.
 
 ### Align Action skip, output, and blocking contracts
 
@@ -941,7 +941,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/github/src/action.ts`
 - `packages/github/src/poster.ts`
 - `packages/cli/src/commands/init.ts`
-- `docs/5_GITHUB_INTEGRATION.md`
+- `docs/for-users/5_GITHUB_INTEGRATION.md`
 - `src/tests/github-action-parse-args.test.ts`
 - `src/tests/github-actions-runtime.test.ts`
 - `packages/github/src/tests/github-poster.test.ts`
@@ -970,7 +970,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/github/src/sarif.ts`
 - `packages/github/src/action.ts`
 - `action.yml`
-- `docs/5_GITHUB_INTEGRATION.md`
+- `docs/for-users/5_GITHUB_INTEGRATION.md`
 - `src/tests/github-sarif.test.ts`
 - `src/tests/github-action-sarif-path.test.ts`
 
@@ -997,8 +997,8 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/cli/src/formatters/review-output.ts`
 - `packages/github/src/sarif.ts`
 - `packages/github/src/action.ts`
-- `docs/CLI_REFERENCE.md`
-- `docs/AGENT_CONTRACT.md`
+- `docs/for-users/CLI_REFERENCE.md`
+- `docs/for-agents/AGENT_CONTRACT.md`
 - `src/tests/github-sarif.test.ts`
 - `src/tests/cli-output-formats.test.ts`
 
@@ -1083,7 +1083,7 @@ posting_degraded
 - Define shared MCP error helpers for all tools.
 - Give every tool stable error codes and tests for invalid input, missing session/config, inaccessible repo path, and write failures.
 - Keep compact success output separate from structured error output.
-- Update `docs/AGENT_CONTRACT.md` and `packages/mcp/README.md` with all stable tool error codes.
+- Update `docs/for-agents/AGENT_CONTRACT.md` and `packages/mcp/README.md` with all stable tool error codes.
 
 **Likely files:**
 
@@ -1091,7 +1091,7 @@ posting_degraded
 - `packages/mcp/src/tools/shared-response.ts`
 - `packages/mcp/src/tests/tool-handlers.test.ts`
 - `packages/mcp/src/tests/critical-errors.test.ts`
-- `docs/AGENT_CONTRACT.md`
+- `docs/for-agents/AGENT_CONTRACT.md`
 - `packages/mcp/README.md`
 
 **Evidence:**
@@ -1186,8 +1186,8 @@ artifact_path
 - `vitest.config.ts`
 - `.github/workflows/ci.yml`
 - `.github/workflows/bench-fn.yml`
-- `docs/BETA_READINESS_P4_P6.md`
-- `docs/RELEASE_CHECKLIST.md`
+- `docs/archived/BETA_READINESS_P4_P6.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
 
 **Evidence:**
 
@@ -1248,7 +1248,7 @@ evidence-manifest.json
 - `eslint.config.js`
 - `.github/workflows/ci.yml`
 - `.github/workflows/release.yml`
-- `docs/RELEASE_CHECKLIST.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
 
 **Evidence:**
 
@@ -1273,8 +1273,8 @@ evidence-manifest.json
 
 - `.github/workflows/release.yml`
 - `.github/workflows/npm-dist-tags.yml`
-- `docs/RELEASE_CHECKLIST.md`
-- `docs/BETA_READINESS_P4_P6.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
+- `docs/archived/BETA_READINESS_P4_P6.md`
 
 **Evidence:**
 
@@ -1300,7 +1300,7 @@ evidence-manifest.json
 - `.github/workflows/release.yml`
 - `.github/workflows/bench-fn.yml`
 - `scripts/beta-smoke.mjs`
-- `docs/RELEASE_CHECKLIST.md`
+- `docs/archived/RELEASE_CHECKLIST.md`
 
 **Evidence:**
 
