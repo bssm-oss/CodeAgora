@@ -442,5 +442,7 @@
   "desktop.next.prepareMerge": "일반적인 머지 체크리스트를 진행하세요.",
   "desktop.next.exportRecord": "리뷰 증거 기록을 위해 세션 결과를 내보내세요.",
   "desktop.next.monitorNextRun": "새 변경 후 다음 실행을 확인해 증거를 최신으로 유지하세요.",
+  "desktop.a11y.reportScrollable": "보고서 미리보기, 스크롤 가능",
+  "desktop.a11y.eventsScrollable": "리뷰 이벤트 목록, 스크롤 가능",
   "desktop.next.privatePreviewNote": "데스크톱 가이드는 프라이빗 프리뷰 전용이며 기존 CodeAgora CLI/세션 의미를 따릅니다."
 }

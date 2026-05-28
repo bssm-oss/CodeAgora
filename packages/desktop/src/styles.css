@@ -129,7 +129,6 @@
 
 body {
   margin: 0;
-  min-width: 720px;
   min-height: 100vh;
   background: transparent;
 }
@@ -1301,6 +1300,10 @@ summary {
 @keyframes toast-out {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to   { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+
+.ca-toast.is-exiting {
+  animation: toast-out 0.22s ease-in forwards;
 }
 
 .ca-visually-hidden {

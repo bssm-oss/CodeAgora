@@ -443,5 +443,7 @@
   "desktop.next.prepareMerge": "Proceed with your normal merge checklist.",
   "desktop.next.exportRecord": "Export the session result to keep a review evidence record.",
   "desktop.next.monitorNextRun": "Monitor the next run after new changes to keep evidence fresh.",
+  "desktop.a11y.reportScrollable": "Report preview, scrollable",
+  "desktop.a11y.eventsScrollable": "Review events, scrollable",
   "desktop.next.privatePreviewNote": "Desktop guidance is private-preview only and follows existing CodeAgora CLI/session semantics."
 }
