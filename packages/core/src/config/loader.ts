@@ -10,6 +10,8 @@ import { Config, validateConfig, type AgentConfig, type ReviewerEntry, type Decl
 import { readJson, CA_ROOT } from '@codeagora/shared/utils/fs.js';
 import { validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
 
+export type ConfigTextFormat = 'json' | 'yaml' | 'auto';
+
 // ============================================================================
 // Config Loader
 // ============================================================================
@@ -156,6 +158,29 @@ async function loadYamlConfig(filePath: string): Promise<Config> {
  */
 export function validateConfigData(data: unknown): Config {
   return validateConfig(data);
+}
+
+/**
+ * Validate raw config text using the canonical core parser and Zod schema.
+ * Used by external surfaces (CLI/Desktop) that need to validate editor content
+ * before it has been written to disk.
+ */
+export function validateConfigText(raw: string, format: ConfigTextFormat = 'auto'): Config {
+  const parseJson = () => JSON.parse(raw) as unknown;
+  const parseYamlText = () => parseYaml(raw) as unknown;
+
+  if (format === 'json') return validateConfig(parseJson());
+  if (format === 'yaml') return validateConfig(parseYamlText());
+
+  try {
+    return validateConfig(parseJson());
+  } catch (jsonError) {
+    try {
+      return validateConfig(parseYamlText());
+    } catch {
+      throw jsonError;
+    }
+  }
 }
 
 /**

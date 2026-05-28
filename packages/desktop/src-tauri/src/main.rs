@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -48,7 +48,7 @@ struct DesktopConfig {
     path: String,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ConfigValidation {
     valid: bool,
@@ -512,16 +512,16 @@ fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
             classification: "project-mutation",
             reads_project: true,
             mutates_project: true,
-            spawns_process: false,
-            notes: "Validates JSON and writes atomically to the current CodeAgora config path.",
+            spawns_process: true,
+            notes: "Validates through the canonical CLI/core schema and writes atomically to the current CodeAgora config path.",
         },
         DesktopCommandContract {
             name: "validate_config",
             classification: "read-only",
-            reads_project: false,
+            reads_project: true,
             mutates_project: false,
-            spawns_process: false,
-            notes: "Validates desktop config edits before atomic writes.",
+            spawns_process: true,
+            notes: "Validates desktop config edits through the canonical CLI/core schema before atomic writes.",
         },
         DesktopCommandContract {
             name: "get_provider_status",
@@ -1116,127 +1116,88 @@ fn export_session_value(root: &Path, id: &str, format: &str) -> Result<SessionEx
     }
 }
 
-fn validate_config_value(value: &Value) -> ConfigValidation {
-    let mut errors = Vec::new();
-    let mut warnings = Vec::new();
-    let Some(object) = value.as_object() else {
-        return ConfigValidation {
-            valid: false,
-            errors: vec!["Config must be a JSON object.".to_string()],
-            warnings,
-        };
-    };
-
-    match object.get("language") {
-        Some(language) if !language.is_string() => {
-            errors.push("language must be a string when present.".to_string());
-        }
-        None => warnings.push("language is not set; CLI defaults may apply.".to_string()),
-        _ => {}
-    }
-
-    if let Some(reviewers_value) = object.get("reviewers") {
-        let Some(reviewers) = reviewers_value.as_array() else {
-            if let Some(reviewers_object) = reviewers_value.as_object() {
-                match reviewers_object.get("count").and_then(Value::as_u64) {
-                    Some(count @ 1..=10) => {
-                        if count > 5 {
-                            warnings.push(format!(
-                                "reviewers.count={count}; high counts increase latency and cost."
-                            ));
-                        }
-                    }
-                    Some(count) => errors.push(format!(
-                        "reviewers.count must be between 1 and 10, got {count}."
-                    )),
-                    None => errors
-                        .push("reviewers.count is required for declarative reviewers.".to_string()),
-                }
-                if let Some(static_reviewers) = reviewers_object.get("static") {
-                    if !static_reviewers.is_array() {
-                        errors.push("reviewers.static must be an array when present.".to_string());
-                    }
-                }
-                return ConfigValidation {
-                    valid: errors.is_empty(),
-                    errors,
-                    warnings,
-                };
-            }
-            errors
-                .push("reviewers must be an array or declarative object when present.".to_string());
-            return ConfigValidation {
-                valid: false,
-                errors,
-                warnings,
-            };
-        };
-        let enabled_count = reviewers
-            .iter()
-            .filter(|reviewer| {
-                reviewer
-                    .get("enabled")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(true)
-            })
-            .count();
-        if enabled_count > 10 {
-            warnings.push(format!(
-                "{enabled_count} reviewers enabled; high counts increase latency and cost."
-            ));
-        }
-        for (index, reviewer) in reviewers.iter().enumerate() {
-            let label = reviewer
-                .get("id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("reviewers[{index}]"));
-            let backend = reviewer.get("backend").and_then(Value::as_str);
-            let model = reviewer.get("model").and_then(Value::as_str);
-            if backend.is_none() {
-                errors.push(format!("{label}: backend is required."));
-            }
-            if matches!(model, Some("")) {
-                errors.push(format!("{label}: model must not be empty."));
-            }
-            if matches!(backend, Some("api" | "opencode"))
-                && reviewer.get("provider").and_then(Value::as_str).is_none()
-            {
-                errors.push(format!(
-                    "{label}: provider is required when backend is {}.",
-                    backend.unwrap_or_default()
-                ));
-            }
-        }
-    } else {
-        warnings.push("reviewers is not set; generated defaults may be needed.".to_string());
-    }
-
-    if let Some(discussion) = object.get("discussion").and_then(Value::as_object) {
-        if let Some(max_rounds) = discussion.get("maxRounds").and_then(Value::as_u64) {
-            if max_rounds > 5 {
-                warnings.push(format!(
-                    "discussion.maxRounds={max_rounds}; high round counts increase latency."
-                ));
-            }
-        }
-    }
-
-    ConfigValidation {
-        valid: errors.is_empty(),
-        errors,
-        warnings,
+fn config_format_from_path(path: Option<&Path>) -> &'static str {
+    match path.and_then(|path| path.extension()).and_then(|value| value.to_str()) {
+        Some("yaml" | "yml") => "yaml",
+        Some("json") => "json",
+        _ => "auto",
     }
 }
 
-fn validate_config_raw(raw: &str) -> ConfigValidation {
-    match serde_json::from_str::<Value>(raw) {
-        Ok(value) => validate_config_value(&value),
+fn validate_config_raw(raw: &str, root: &Path, format: &str) -> ConfigValidation {
+    let args = ["config", "validate", "--json", "--stdin", "--format", format];
+    let output = run_agora(
+        root,
+        &args,
+        Some(raw.to_string()),
+    );
+    match output {
+        Ok(output) => {
+            let parsed = parse_config_validation_output(&output.stdout, &output.stderr);
+            if parsed.valid || !parsed.errors.iter().any(|error| error.contains("ERR_PNPM_RECURSIVE_EXEC_NO_PACKAGE")) {
+                return parsed;
+            }
+            run_dev_agora(root, &args, Some(raw.to_string()))
+                .map(|output| parse_config_validation_output(&output.stdout, &output.stderr))
+                .unwrap_or_else(|error| ConfigValidation {
+                    valid: false,
+                    errors: vec![format!("Failed to run canonical config validation: {error}")],
+                    warnings: Vec::new(),
+                })
+        }
         Err(error) => ConfigValidation {
             valid: false,
-            errors: vec![error.to_string()],
+            errors: vec![format!("Failed to run canonical config validation: {error}")],
             warnings: Vec::new(),
         },
+    }
+}
+
+fn run_dev_agora(
+    root: &Path,
+    args: &[&str],
+    stdin_input: Option<String>,
+) -> io::Result<std::process::Output> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_dir = manifest_dir
+        .ancestors()
+        .nth(3)
+        .map(Path::to_path_buf)
+        .unwrap_or(manifest_dir);
+    let workspace = workspace_dir.to_string_lossy().to_string();
+    let mut child = Command::new("pnpm")
+        .args(["--dir", &workspace, "--filter", "@codeagora/cli", "dev"])
+        .args(args)
+        .current_dir(root)
+        .stdin(if stdin_input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    write_child_stdin(&mut child, stdin_input);
+    child.wait_with_output()
+}
+
+fn parse_config_validation_output(stdout: &[u8], stderr: &[u8]) -> ConfigValidation {
+    let text = String::from_utf8_lossy(stdout);
+    for line in text.lines().rev().map(str::trim).filter(|line| !line.is_empty()) {
+        if line.starts_with('{') {
+            if let Ok(validation) = serde_json::from_str::<ConfigValidation>(line) {
+                return validation;
+            }
+        }
+    }
+    ConfigValidation {
+        valid: false,
+        errors: vec![format!(
+            "Failed to parse canonical config validation output. stdout={} stderr={}",
+            text.trim(),
+            String::from_utf8_lossy(stderr).trim()
+        )],
+        warnings: Vec::new(),
     }
 }
 
@@ -1371,10 +1332,6 @@ fn evidence_status(root: &Path) -> EvidenceStatus {
 }
 
 fn write_config_for_root(raw: &str, root: &Path) -> Result<DesktopConfig, String> {
-    let validation = validate_config_raw(raw);
-    if !validation.valid {
-        return Err(format!("Invalid config: {}", validation.errors.join("; ")));
-    }
     let path = match config_path(root) {
         Some(path) if path.extension().and_then(|value| value.to_str()) == Some("json") => path,
         Some(path) => {
@@ -1385,6 +1342,10 @@ fn write_config_for_root(raw: &str, root: &Path) -> Result<DesktopConfig, String
         }
         None => root.join(".ca").join("config.json"),
     };
+    let validation = validate_config_raw(raw, root, config_format_from_path(Some(&path)));
+    if !validation.valid {
+        return Err(format!("Invalid config: {}", validation.errors.join("; ")));
+    }
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
@@ -1453,9 +1414,33 @@ fn run_agora(
         child.wait_with_output()
     };
 
+    let run_dev_cli = || -> io::Result<std::process::Output> {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let workspace_dir = manifest_dir
+            .ancestors()
+            .nth(3)
+            .map(Path::to_path_buf)
+            .unwrap_or(manifest_dir);
+        let workspace = workspace_dir.to_string_lossy().to_string();
+        run(
+            "pnpm",
+            &["--dir", &workspace, "--filter", "@codeagora/cli", "dev"],
+        )
+    };
+
+    let run_pnpm_exec = || -> io::Result<std::process::Output> {
+        match run("pnpm", &["exec", "agora"]) {
+            Ok(output) if !output.stdout.is_empty() => Ok(output),
+            Ok(_) => run_dev_cli(),
+            Err(pnpm_error) if pnpm_error.kind() == io::ErrorKind::NotFound => run_dev_cli(),
+            Err(pnpm_error) => Err(pnpm_error),
+        }
+    };
+
     match run("agora", &[]) {
-        Ok(output) => Ok(output),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => run("pnpm", &["exec", "agora"]),
+        Ok(output) if !output.stdout.is_empty() => Ok(output),
+        Ok(_) => run_pnpm_exec(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => run_pnpm_exec(),
         Err(error) => Err(error),
     }
 }
@@ -1862,8 +1847,18 @@ fn read_config(state: State<'_, WorkspaceState>) -> Result<DesktopConfig, String
 }
 
 #[tauri::command]
-fn validate_config(raw: String) -> Result<ConfigValidation, String> {
-    Ok(validate_config_raw(&raw))
+fn validate_config(
+    raw: String,
+    config_path: Option<String>,
+    state: State<'_, WorkspaceState>,
+) -> Result<ConfigValidation, String> {
+    let root = active_repo_root(&state)?;
+    let format = config_path
+        .as_deref()
+        .map(Path::new)
+        .map(|path| config_format_from_path(Some(path)))
+        .unwrap_or("auto");
+    Ok(validate_config_raw(&raw, &root, format))
 }
 
 #[tauri::command]
@@ -2030,9 +2025,19 @@ mod tests {
             r#"{
   "language": "en",
   "reviewers": [
-    { "id": "codex", "backend": "opencode", "provider": "openai", "model": "gpt-5" }
+    { "id": "codex", "backend": "codex", "model": "gpt-5" }
   ],
-  "discussion": { "maxRounds": 2 }
+  "supporters": {
+    "pool": [{ "id": "support", "backend": "codex", "model": "gpt-5" }],
+    "pickCount": 1,
+    "pickStrategy": "random",
+    "devilsAdvocate": { "id": "devil", "backend": "codex", "model": "gpt-5" },
+    "personaPool": ["builtin:general"],
+    "personaAssignment": "random"
+  },
+  "moderator": { "backend": "codex", "model": "gpt-5" },
+  "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null } },
+  "head": { "backend": "codex", "model": "gpt-5", "enabled": true }
 }
 "#,
         );
@@ -2188,26 +2193,34 @@ mod tests {
     #[test]
     fn desktop_app_e2e_validates_and_writes_json_config_atomically() {
         let root = fixture_workspace();
-        let invalid = validate_config_raw(r#"{ "reviewers": "codex" }"#);
+        let invalid = validate_config_raw(r#"{ "reviewers": "codex" }"#, &root, "json");
         assert!(!invalid.valid);
-        assert!(invalid
-            .errors
-            .iter()
-            .any(|error| error.contains("reviewers must be an array or declarative object")));
+        assert!(!invalid.errors.is_empty());
 
-        let declarative = validate_config_raw(
-            r#"{ "language": "en", "reviewers": { "count": 3, "constraints": { "minFamilies": 1 } } }"#,
-        );
+        let existing_raw = fs::read_to_string(root.join(".ca/config.json")).unwrap();
+        let declarative = validate_config_raw(&existing_raw, &root, "json");
         assert!(
             declarative.valid,
-            "declarative reviewers should match core config schema"
+            "fixture config should match core config schema: {:?}",
+            declarative.errors
         );
 
         let updated = r#"{
   "language": "ko",
   "reviewers": [
-    { "id": "codex", "backend": "opencode", "provider": "openai", "model": "gpt-5" }
-  ]
+    { "id": "codex", "backend": "codex", "model": "gpt-5" }
+  ],
+  "supporters": {
+    "pool": [{ "id": "support", "backend": "codex", "model": "gpt-5" }],
+    "pickCount": 1,
+    "pickStrategy": "random",
+    "devilsAdvocate": { "id": "devil", "backend": "codex", "model": "gpt-5" },
+    "personaPool": ["builtin:general"],
+    "personaAssignment": "random"
+  },
+  "moderator": { "backend": "codex", "model": "gpt-5" },
+  "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null } },
+  "head": { "backend": "codex", "model": "gpt-5", "enabled": true }
 }
 "#;
         let written = write_config_for_root(updated, &root).expect("write config");
