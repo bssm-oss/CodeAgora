@@ -363,6 +363,15 @@ function pushToast(message: string, type: Toast['type'] = 'info'): void {
 }
 
 function removeToast(id: string): void {
+  const toastEl = document.getElementById(id)
+  if (toastEl) {
+    toastEl.classList.add('is-exiting')
+    window.setTimeout(() => {
+      state.toasts = state.toasts.filter((toast) => toast.id !== id)
+      render()
+    }, 250)
+    return
+  }
   state.toasts = state.toasts.filter((toast) => toast.id !== id)
   render()
 }
@@ -1011,6 +1020,8 @@ function renderSessionDetail(): HTMLElement {
     const summary = el('summary', '', t('desktop.detail.rawReportPreview'));
     const report = el('pre', 'ca-report');
     report.textContent = selected.markdown;
+    report.tabIndex = 0;
+    report.setAttribute('aria-label', t('desktop.a11y.reportScrollable'));
     reportSection.append(summary, report);
     detail.append(reportSection);
   }
@@ -1098,6 +1109,8 @@ function renderReviewRun(): HTMLElement {
   section.append(el('p', 'ca-repo-note', run.message));
 
   const events = el('div', 'ca-event-list timeline');
+  events.tabIndex = 0;
+    events.setAttribute('aria-label', t('desktop.a11y.eventsScrollable'));
   for (const event of run.events.slice(-12).reverse()) {
     const row = el('div', 'ca-event-row');
     row.append(el('span', 'ca-event-dot', ''));
@@ -1427,6 +1440,7 @@ function renderToasts(): void {
   }
   for (const toast of state.toasts) {
     const node = el('div', `ca-toast ca-toast--${toast.type}`)
+    node.id = toast.id
     node.append(el('span', '', toast.message))
     node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ca-ghost', 'button-dismiss-toast'))
     container.append(node)
