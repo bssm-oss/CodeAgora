@@ -24,6 +24,7 @@ import {
   type McpStatus,
   type ProviderStatus,
   type RepoInfo,
+  type ReviewRunEvent,
   type ReviewRunSnapshot,
   type SessionDetail,
   type SessionSummary,
@@ -61,6 +62,8 @@ interface AppState {
   configRaw: string;
   configPath: string;
   configValidation?: ConfigValidation;
+  configDirty: boolean;
+  configOriginal: string;
   providers: ProviderStatus[];
   mcpStatus?: McpStatus;
   githubActionStatus?: GitHubActionStatus;
@@ -84,6 +87,8 @@ const state: AppState = {
   sessionSort: 'date-desc',
   configRaw: '',
   configPath: '.ca/config.json',
+  configDirty: false,
+  configOriginal: '',
   providers: [],
   localePreference: loadLocalePreference(),
   themePreference: loadThemePreference(),
@@ -514,6 +519,8 @@ async function loadConfig(): Promise<void> {
     const config = await readConfig();
     state.configRaw = config.raw;
     state.configPath = config.path;
+    state.configOriginal = config.raw;
+    state.configDirty = false;
     applyDesktopLocale(config.raw);
     state.configValidation = await validateConfig(config.raw);
   } catch (error) {
@@ -537,6 +544,8 @@ async function saveConfig(raw: string): Promise<void> {
     const config = await writeConfig(raw);
     state.configRaw = config.raw;
     state.configPath = config.path;
+    state.configOriginal = raw;
+    state.configDirty = false;
     applyDesktopLocale(config.raw);
     pushToast(t('desktop.notice.savedConfig', { path: config.path }), 'success')
   } catch (error) {
@@ -598,6 +607,17 @@ async function startReview(staged: boolean): Promise<void> {
 
 function isReviewRunning(run: ReviewRunSnapshot): boolean {
   return run.status === 'running' || run.status === 'cancelling';
+}
+
+function reviewProgress(events: ReviewRunEvent[]): { stage: string; percent: number } {
+  const kinds = events.map((e) => e.kind);
+  if (kinds.includes('completed')) return { stage: 'Verdict', percent: 100 };
+  if (kinds.includes('l3')) return { stage: 'L3 Verdict', percent: 90 };
+  if (kinds.includes('l2')) return { stage: 'L2 Debate', percent: 70 };
+  if (kinds.includes('l1')) return { stage: 'L1 Review', percent: 40 };
+  if (kinds.includes('l0')) return { stage: 'L0 Model Selection', percent: 20 };
+  if (kinds.includes('started')) return { stage: 'Pre-analysis', percent: 10 };
+  return { stage: 'Initializing', percent: 0 };
 }
 
 function scheduleReviewPoll(): void {
@@ -1215,6 +1235,16 @@ function renderReviewRun(): HTMLElement {
   section.append(summary);
   section.append(el('p', 'ca-repo-note', run.message));
 
+  if (state.activeRun && isReviewRunning(state.activeRun)) {
+    const progress = reviewProgress(state.activeRun.events);
+    const progressBar = el('div', 'ca-progress-bar');
+    const progressFill = el('div', 'ca-progress-fill');
+    progressFill.style.width = `${progress.percent}%`;
+    progressBar.append(progressFill);
+    const progressLabel = el('div', 'ca-progress-label', `${progress.stage} (${progress.percent}%)`);
+    section.append(progressBar, progressLabel);
+  }
+
   const events = el('div', 'ca-event-list timeline');
   events.tabIndex = 0;
     events.setAttribute('aria-label', t('desktop.a11y.eventsScrollable'));
@@ -1337,6 +1367,11 @@ function renderConfig(): HTMLElement {
   panel.append(renderConfigFacts());
   panel.append(renderConfigValidation());
 
+  if (state.configDirty) {
+    const dirtyBanner = el('div', 'ca-dirty-banner', t('desktop.config.unsavedChanges'));
+    panel.append(dirtyBanner);
+  }
+
   const advanced = el('details', 'ca-advanced-config') as HTMLDetailsElement;
   advanced.open = true;
   advanced.append(el('summary', '', t('desktop.config.advancedEditor')));
@@ -1346,6 +1381,8 @@ function renderConfig(): HTMLElement {
   textarea.value = state.configRaw;
   textarea.addEventListener('input', () => {
     state.configRaw = textarea.value;
+    state.configDirty = state.configRaw !== state.configOriginal;
+    render();
   });
   advanced.append(textarea);
   panel.append(advanced);
@@ -1453,6 +1490,17 @@ function renderSetup(): HTMLElement {
     card.append(el('span', provider.configured ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-optional ca-status-pill', status));
     if (provider.envVar) card.append(el('span', 'ca-provider-meta', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
     if (provider.binary) card.append(el('span', 'ca-provider-meta', provider.binary));
+    if (provider.envVar) {
+      const copyEnvBtn = button(t('desktop.action.copyEnvVar'), async () => {
+        try {
+          await navigator.clipboard.writeText(provider.envVar!);
+          pushToast(t('desktop.toast.copied'), 'success');
+        } catch {
+          pushToast(t('desktop.toast.copyFailed'), 'error');
+        }
+      }, 'ca-button ca-button-ghost', 'button-copy-env');
+      card.append(copyEnvBtn);
+    }
     grid.append(card);
   }
   if (state.providers.length === 0) {
@@ -1463,6 +1511,10 @@ function renderSetup(): HTMLElement {
     grid.append(empty);
   }
   panel.append(grid);
+
+  const providerHint = el('p', 'ca-setup-hint', t('desktop.setup.providerHint'));
+  panel.append(providerHint);
+
   panel.append(renderMcpSetup());
   panel.append(renderGitHubActionSetup());
   panel.append(renderEvidenceSetup());

@@ -1267,6 +1267,42 @@ summary {
   }
 }
 
+.ca-progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+.ca-progress-fill {
+  height: 100%;
+  background: var(--brand);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.ca-progress-label {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: center;
+}
+
+.ca-dirty-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 12px;
+  background: var(--warn-soft);
+  color: var(--text);
+  font-size: var(--text-sm);
+  margin-bottom: 12px;
+}
+.ca-setup-hint {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin-top: 12px;
+}
+
 /* ── Toast notifications ───────────────────────────────────────── */
 
 .ca-toast-container {
