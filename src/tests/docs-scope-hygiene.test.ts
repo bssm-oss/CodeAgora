@@ -10,11 +10,11 @@ describe('public documentation scope hygiene', () => {
     const docs = [
       'README.md',
       'CHANGELOG.md',
-      'docs/ARCHITECTURE.md',
-      'docs/BETA_READINESS_P4_P6.md',
-      'docs/EXTENSIONS.md',
-      'docs/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md',
-      'docs/PRODUCTION_READINESS_ROADMAP.md',
+      'docs/for-agents/ARCHITECTURE.md',
+      'docs/archived/BETA_READINESS_P4_P6.md',
+      'docs/for-users/EXTENSIONS.md',
+      'docs/archived/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md',
+      'docs/for-agents/PRODUCTION_READINESS_ROADMAP.md',
       'scripts/postinstall.cjs',
     ];
 
@@ -24,18 +24,18 @@ describe('public documentation scope hygiene', () => {
     }
 
     expect(read('CHANGELOG.md')).not.toContain('supported surfaces focused on CLI, MCP, GitHub Actions, and Desktop App');
-    expect(read('docs/RELEASE_CHECKLIST.md')).not.toContain('desktop metadata, and');
+    expect(read('docs/archived/RELEASE_CHECKLIST.md')).not.toContain('desktop metadata, and');
   });
 
   it('does not leave TODO/FIXME placeholders in release-facing docs', () => {
     const releaseDocs = [
       'README.md',
       'CHANGELOG.md',
-      'docs/RELEASE_CHECKLIST.md',
-      'docs/BETA_READINESS_P4_P6.md',
-      'docs/PRODUCTION_READINESS_ROADMAP.md',
-      'docs/ARCHITECTURE.md',
-      'docs/EXTENSIONS.md',
+      'docs/archived/RELEASE_CHECKLIST.md',
+      'docs/archived/BETA_READINESS_P4_P6.md',
+      'docs/for-agents/PRODUCTION_READINESS_ROADMAP.md',
+      'docs/for-agents/ARCHITECTURE.md',
+      'docs/for-users/EXTENSIONS.md',
     ];
 
     for (const file of releaseDocs) {

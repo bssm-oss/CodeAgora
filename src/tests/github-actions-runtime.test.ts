@@ -38,7 +38,7 @@ describe('GitHub Actions runtime readiness', () => {
   });
 
   it('documents SARIF as generated output with caller-owned upload', () => {
-    const docs = readText('docs/5_GITHUB_INTEGRATION.md');
+    const docs = readText('docs/for-users/5_GITHUB_INTEGRATION.md');
 
     expect(docs).toContain('it does not upload that file to');
     expect(docs).toContain('github/codeql-action/upload-sarif@v4');

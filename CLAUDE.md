@@ -131,7 +131,7 @@ packages/
 - Permissions: fail-closed on permission check errors
 
 ## Reference Docs
-1. [PRD](docs/1_PRD.md)
-2. [ARCHITECTURE](docs/ARCHITECTURE.md)
-3. [GITHUB_INTEGRATION](docs/5_GITHUB_INTEGRATION.md)
-4. [MAD_RESEARCH](docs/MAD_RESEARCH_AND_IMPROVEMENTS.md)
+1. [PRD](docs/for-agents/1_PRD.md)
+2. [ARCHITECTURE](docs/for-agents/ARCHITECTURE.md)
+3. [GITHUB_INTEGRATION](docs/for-users/5_GITHUB_INTEGRATION.md)
+4. [MAD_RESEARCH](docs/for-agents/MAD_RESEARCH_AND_IMPROVEMENTS.md)
