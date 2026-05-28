@@ -69,6 +69,10 @@ benchmarks/.ca/model-quality.json
 
 # Agent-local planning/evidence
 .sisyphus/
+.cmux/
+.opencode/
+.research/
+.slim/
 
 # Archives
 .archive/
