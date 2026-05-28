@@ -1535,6 +1535,10 @@ function renderMcpSetup(): HTMLElement {
     tools.append(el('span', 'ca-fact', tool));
   }
   section.append(tools);
+  if (!mcp.tools.length) {
+    const empty = el('div', 'ca-empty-state', t('desktop.setup.mcpEmpty'));
+    section.append(empty);
+  }
   const snippet = el('pre', 'ca-snippet');
   snippet.textContent = mcp.clientSnippet;
   section.append(snippet);
@@ -1560,6 +1564,10 @@ function renderGitHubActionSetup(): HTMLElement {
     flags.append(el('span', workflow.hasConfigPath ? 'ca-provider-ok ca-status-pill' : 'ca-provider-kind ca-status-pill ca-neutral', workflow.hasConfigPath ? 'config-path' : t('desktop.setup.defaultConfig')));
     row.append(flags);
     section.append(row);
+  }
+  if (!status.workflows.length) {
+    const empty = el('div', 'ca-empty-state', t('desktop.setup.workflowsEmpty'));
+    section.append(empty);
   }
   const snippet = el('pre', 'ca-snippet');
   snippet.textContent = status.recommendedSnippet;
