@@ -103,6 +103,26 @@ function onThemeChange(): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    if (state.toasts.length > 0) {
+      removeToast(state.toasts[state.toasts.length - 1].id)
+      event.preventDefault()
+      return
+    }
+    if (state.notice) {
+      state.notice = undefined
+      render()
+      event.preventDefault()
+      return
+    }
+    if (state.selected) {
+      state.selected = undefined
+      render()
+      event.preventDefault()
+      return
+    }
+  }
+
   const target = event.target as HTMLElement;
   if (
     target.isContentEditable ||
@@ -856,7 +876,14 @@ function renderSessions(): HTMLElement {
     listPanel.append(el('p', 'ca-empty ca-padded', t('desktop.sessions.noFilterMatch')));
   }
   for (const session of sessions) {
-    const item = button('', () => void selectSession(session.id), state.selected?.id === session.id ? 'ca-session-row ca-selected' : 'ca-session-row');
+    const item = button('', () => {
+      if (state.selected?.id === session.id) {
+        state.selected = undefined
+        render()
+      } else {
+        void selectSession(session.id)
+      }
+    }, state.selected?.id === session.id ? 'ca-session-row is-selected' : 'ca-session-row');
     item.dataset.testid = `session-row-${session.id.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
     const top = el('div', 'ca-session-row-top');
     top.append(el('strong', '', session.id));
@@ -1141,6 +1168,12 @@ function renderRepositoryPicker(): HTMLElement {
   input.addEventListener('input', () => {
     state.repoInput = input.value;
   });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      void openRepo(input.value)
+    }
+  })
   section.append(input);
   section.append(button(t('desktop.action.openRepository'), () => void openRepo(input.value), 'ca-button ca-primary', 'button-open-repository'));
 
@@ -1447,7 +1480,32 @@ function renderToasts(): void {
   }
 }
 
+function getUniqueSelector(el: HTMLElement): string {
+  if (el.id) return `#${el.id}`
+  const testId = el.dataset.testid
+  if (testId) return `[data-testid="${testId}"]`
+  const path: string[] = []
+  let current: HTMLElement | null = el
+  while (current && current !== document.body) {
+    let selector = current.tagName.toLowerCase()
+    if (current.className) {
+      const classes = current.className.split(' ').filter(Boolean)
+      if (classes.length > 0) {
+        selector = `.${classes.join('.')}`
+      }
+    }
+    path.unshift(selector)
+    current = current.parentElement
+  }
+  return path.join(' ')
+}
+
 function render(): void {
+  const active = document.activeElement as HTMLElement | null
+  const activeSelector = active ? getUniqueSelector(active) : null
+  const selectionStart = (active as HTMLInputElement | HTMLTextAreaElement | null)?.selectionStart ?? null
+  const selectionEnd = (active as HTMLInputElement | HTMLTextAreaElement | null)?.selectionEnd ?? null
+
   if (lastView !== state.view) {
     appRoot.replaceChildren(renderShell());
     lastView = state.view;
@@ -1461,6 +1519,17 @@ function render(): void {
     }
   }
   renderToasts()
+
+  if (activeSelector) {
+    const restored = document.querySelector<HTMLElement>(activeSelector)
+    if (restored) {
+      restored.focus()
+      if (selectionStart !== null && selectionEnd !== null &&
+          (restored instanceof HTMLInputElement || restored instanceof HTMLTextAreaElement)) {
+        restored.setSelectionRange(selectionStart, selectionEnd)
+      }
+    }
+  }
 }
 
 async function bootstrap(): Promise<void> {
