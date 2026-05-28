@@ -1266,56 +1266,7 @@ fn redact_sensitive(raw: &str) -> String {
     redacted
 }
 
-fn provider_statuses() -> Vec<ProviderStatus> {
-    let api_providers = [
-        ("openai", "OPENAI_API_KEY"),
-        ("anthropic", "ANTHROPIC_API_KEY"),
-        ("google", "GOOGLE_GENERATIVE_AI_API_KEY"),
-        ("groq", "GROQ_API_KEY"),
-        ("openrouter", "OPENROUTER_API_KEY"),
-        ("cohere", "COHERE_API_KEY"),
-        ("deepinfra", "DEEPINFRA_API_KEY"),
-        ("fireworks", "FIREWORKS_API_KEY"),
-        ("perplexity", "PERPLEXITY_API_KEY"),
-        ("huggingface", "HUGGINGFACE_API_KEY"),
-    ];
-    let mut statuses = api_providers
-        .iter()
-        .map(|(name, env_var)| {
-            let value = std::env::var(env_var)
-                .ok()
-                .filter(|value| !value.is_empty());
-            ProviderStatus {
-                name: (*name).to_string(),
-                kind: "api".to_string(),
-                env_var: Some((*env_var).to_string()),
-                configured: value.is_some(),
-                redacted_value: value.as_deref().map(redact_secret),
-                binary: None,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    for (name, binary) in [
-        ("opencode", "opencode"),
-        ("codex", "codex"),
-        ("gemini", "gemini"),
-        ("claude", "claude"),
-        ("copilot", "gh"),
-    ] {
-        let configured = command_stdout("which", &[binary], Path::new("/")).is_some();
-        statuses.push(ProviderStatus {
-            name: name.to_string(),
-            kind: "cli".to_string(),
-            env_var: None,
-            configured,
-            redacted_value: None,
-            binary: Some(binary.to_string()),
-        });
-    }
-
-    statuses
-}
+// provider_statuses() removed — status now fetched from CLI doctor command
 
 fn mcp_status() -> McpStatus {
     let tools = [
@@ -1917,7 +1868,54 @@ fn validate_config(raw: String) -> Result<ConfigValidation, String> {
 
 #[tauri::command]
 fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
-    Ok(provider_statuses())
+    let output = command_stdout("agora", &["doctor", "--json"], &std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")))
+        .ok_or_else(|| "Failed to run agora doctor".to_string())?;
+    let parsed: serde_json::Value = serde_json::from_str(&output)
+        .map_err(|e| format!("Failed to parse doctor output: {e}"))?;
+    
+    let mut statuses = Vec::new();
+    
+    // Extract provider statuses from doctor checks
+    if let Some(checks) = parsed.get("checks").and_then(|v| v.as_array()) {
+        for check in checks {
+            let name = check.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let status = check.get("status").and_then(|v| v.as_str()).unwrap_or("warn");
+            let message = check.get("message").and_then(|v| v.as_str()).unwrap_or("");
+            
+            // Only include checks that look like provider checks
+            if name.contains("API key") || name.contains("provider") || name.contains("backend") {
+                let configured = status == "pass";
+                let redacted = if configured && message.contains("set") { Some("set".to_string()) } else { None };
+                statuses.push(ProviderStatus {
+                    name: name.to_string(),
+                    kind: "api".to_string(),
+                    env_var: None,
+                    configured,
+                    redacted_value: redacted,
+                    binary: None,
+                });
+            }
+        }
+    }
+    
+    // Also check CLI backends from doctor result
+    if let Some(cli_backends) = parsed.get("cliBackends").and_then(|v| v.as_array()) {
+        for backend in cli_backends {
+            let name = backend.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let configured = backend.get("available").and_then(|v| v.as_bool()).unwrap_or(false);
+            let binary = backend.get("command").and_then(|v| v.as_str()).map(|s| s.to_string());
+            statuses.push(ProviderStatus {
+                name: name.to_string(),
+                kind: "cli".to_string(),
+                env_var: None,
+                configured,
+                redacted_value: None,
+                binary,
+            });
+        }
+    }
+    
+    Ok(statuses)
 }
 
 #[tauri::command]
