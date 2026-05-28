@@ -94,7 +94,8 @@ program.command('config').description('Validate and display current config').act
 
 program.command('doctor').description('Check environment and configuration')
   .option('--live', 'test actual API connections', false)
-  .action(async (options: { live: boolean }) => {
+  .option('--json', 'output JSON', false)
+  .action(async (options: { live: boolean; json: boolean }) => {
     try {
       const result = await runDoctor(process.cwd());
       if (options.live) {
@@ -105,7 +106,11 @@ program.command('doctor').description('Check environment and configuration')
           console.error('Live check failed:', liveErr instanceof Error ? liveErr.message : liveErr);
         }
       }
-      console.log(formatDoctorReport(result));
+      if (options.json) {
+        console.log(JSON.stringify(result));
+      } else {
+        console.log(formatDoctorReport(result));
+      }
       if (result.summary.fail > 0) process.exit(1);
     } catch (error) {
       console.error('Doctor failed:', error instanceof Error ? error.message : error);
