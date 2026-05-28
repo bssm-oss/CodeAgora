@@ -1390,6 +1390,23 @@ summary {
   animation: toast-out 0.22s ease-in forwards;
 }
 
+.ca-render-fallback {
+  display: grid;
+  gap: var(--space-4);
+  align-content: center;
+  min-height: 60vh;
+}
+
+.ca-error-detail {
+  max-width: min(760px, 100%);
+  overflow: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
 .ca-visually-hidden {
   position: absolute;
   width: 1px;

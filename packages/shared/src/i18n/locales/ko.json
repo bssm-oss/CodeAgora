@@ -312,6 +312,8 @@
   "desktop.notice.startingStaged": "스테이지된 리뷰를 시작합니다...",
   "desktop.notice.startingWorkingTree": "작업 트리 리뷰를 시작합니다...",
   "desktop.notice.copiedExport": "{fileName}을 클립보드에 복사했습니다.",
+  "desktop.error.renderTitle": "렌더 오류에서 데스크톱 화면을 복구했습니다",
+  "desktop.error.renderBody": "화면을 새로고침하거나 다른 섹션으로 이동하세요. 앱이 오류를 로컬로 처리했으며 레포지토리 파일은 변경하지 않았습니다.",
   "desktop.repo.loading": "레포지토리 불러오는 중...",
   "desktop.repo.pathPlaceholder": "/path/to/repository",
   "desktop.repo.pathAria": "레포지토리 경로",

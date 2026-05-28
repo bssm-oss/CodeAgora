@@ -313,6 +313,8 @@
   "desktop.notice.startingStaged": "Starting staged review...",
   "desktop.notice.startingWorkingTree": "Starting working tree review...",
   "desktop.notice.copiedExport": "Copied {fileName} to clipboard.",
+  "desktop.error.renderTitle": "Desktop view recovered from a render error",
+  "desktop.error.renderBody": "Refresh the view or switch sections. The app kept the error local so your repository files were not changed.",
   "desktop.repo.loading": "Loading repository...",
   "desktop.repo.pathPlaceholder": "/path/to/repository",
   "desktop.repo.pathAria": "Repository path",

@@ -558,8 +558,18 @@ function markReviewAttention(status: ReviewRunSnapshot['status']): void {
 }
 
 function announce(message: string): void {
-  const announcer = document.getElementById('a11y-announcer')
-  if (announcer) announcer.textContent = message
+  ensureAnnouncer().textContent = message
+}
+
+function ensureAnnouncer(): HTMLElement {
+  const existing = document.getElementById('a11y-announcer');
+  if (existing) return existing;
+  const announcer = el('div', 'ca-visually-hidden') as HTMLDivElement;
+  announcer.id = 'a11y-announcer';
+  announcer.setAttribute('aria-live', 'polite');
+  announcer.setAttribute('aria-atomic', 'true');
+  appRoot.append(announcer);
+  return announcer;
 }
 
 function pushToast(message: string, type: Toast['type'] = 'info'): void {
@@ -576,6 +586,7 @@ function removeToast(id: string): void {
   if (toastEl) {
     toastEl.classList.add('is-exiting')
     window.setTimeout(() => {
+      toastEl.remove()
       state.toasts = state.toasts.filter((toast) => toast.id !== id)
       render()
     }, 250)
@@ -607,7 +618,9 @@ async function loadRepoInfo(): Promise<void> {
     state.repoPath = state.repoInfo.path;
     updateBadgeState();
   } catch (error) {
-    state.repoPath = error instanceof Error ? error.message : String(error);
+    state.repoPath = '';
+    state.repoInfo = undefined;
+    pushToast(error instanceof Error ? error.message : String(error), 'error');
   }
   render();
 }
@@ -1865,23 +1878,47 @@ function renderEvidenceSetup(): HTMLElement {
 function renderToasts(): void {
   const existing = document.getElementById('ca-toast-container')
   if (state.toasts.length === 0) {
-    if (existing) existing.remove()
+    if (existing && !existing.querySelector('.is-exiting')) existing.remove()
     return
   }
   const container = existing ?? el('div', 'ca-toast-container')
   if (!existing) {
     container.id = 'ca-toast-container'
     appRoot.append(container)
-  } else {
-    container.replaceChildren()
+  }
+  const activeIds = new Set(state.toasts.map((toast) => toast.id));
+  for (const child of Array.from(container.children)) {
+    const node = child as HTMLElement;
+    if (!activeIds.has(node.id) && !node.classList.contains('is-exiting')) node.remove();
   }
   for (const toast of state.toasts) {
+    const existingToast = document.getElementById(toast.id);
+    if (existingToast) {
+      if (existingToast.classList.contains('is-exiting')) continue;
+      existingToast.className = `ca-toast ca-toast--${toast.type}`;
+      const message = existingToast.querySelector<HTMLElement>('[data-toast-message]');
+      if (message) message.textContent = toast.message;
+      continue;
+    }
     const node = el('div', `ca-toast ca-toast--${toast.type}`)
     node.id = toast.id
-    node.append(el('span', '', toast.message))
-    node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ca-ghost', 'button-dismiss-toast'))
+    node.setAttribute('role', toast.type === 'error' ? 'alert' : 'status')
+    const message = el('span', '', toast.message)
+    message.dataset.toastMessage = 'true'
+    node.append(message)
+    node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ca-ghost', `button-dismiss-toast-${toast.id}`))
     container.append(node)
   }
+}
+
+function renderFallback(error: unknown): HTMLElement {
+  const fallback = el('main', 'ca-content ca-render-fallback');
+  fallback.dataset.testid = 'render-fallback';
+  fallback.append(el('h2', '', t('desktop.error.renderTitle')));
+  fallback.append(el('p', '', t('desktop.error.renderBody')));
+  fallback.append(el('pre', 'ca-error-detail', error instanceof Error ? error.message : String(error)));
+  fallback.append(button(t('desktop.action.refresh'), () => window.location.reload(), 'ca-button ca-primary', 'button-reload-app'));
+  return fallback;
 }
 
 function getUniqueSelector(el: HTMLElement): string {
@@ -1910,17 +1947,26 @@ function render(): void {
   const selectionStart = (active as HTMLInputElement | HTMLTextAreaElement | null)?.selectionStart ?? null
   const selectionEnd = (active as HTMLInputElement | HTMLTextAreaElement | null)?.selectionEnd ?? null
 
-  if (lastView !== state.view) {
-    appRoot.replaceChildren(renderShell());
-    lastView = state.view;
-  } else {
-    const content = appRoot.querySelector('.ca-content')
-    if (content) {
-      const newContent = renderContent()
-      content.replaceChildren(...Array.from(newContent.childNodes))
-    } else {
+  try {
+    ensureAnnouncer();
+    if (lastView !== state.view) {
       appRoot.replaceChildren(renderShell());
+      ensureAnnouncer();
+      lastView = state.view;
+    } else {
+      const content = appRoot.querySelector('.ca-content')
+      if (content) {
+        const newContent = renderContent()
+        content.replaceChildren(...Array.from(newContent.childNodes))
+      } else {
+        appRoot.replaceChildren(renderShell());
+        ensureAnnouncer();
+      }
     }
+  } catch (error) {
+    appRoot.replaceChildren(renderFallback(error));
+    ensureAnnouncer();
+    announce(t('desktop.error.renderTitle'));
   }
   renderToasts()
 
