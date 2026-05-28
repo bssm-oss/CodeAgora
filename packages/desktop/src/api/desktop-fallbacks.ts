@@ -3,6 +3,7 @@ import type {
   SessionDetail,
   SeverityCounts,
   RepoInfo,
+  DiffPreview,
   ProviderStatus,
   McpStatus,
   GitHubActionStatus,
@@ -169,10 +170,54 @@ export function fallbackRepoInfo(): RepoInfo {
   };
 }
 
+export function fallbackDiffPreview(): DiffPreview {
+  return {
+    staged: {
+      text: [
+        'diff --git a/src/example.ts b/src/example.ts',
+        'index 1111111..2222222 100644',
+        '--- a/src/example.ts',
+        '+++ b/src/example.ts',
+        '@@ -1,2 +1,3 @@',
+        ' export function review() {',
+        '+  return "staged preview";',
+        ' }',
+      ].join('\n'),
+      fileCount: 1,
+      addedLines: 1,
+      removedLines: 0,
+      truncated: false,
+    },
+    workingTree: {
+      text: [
+        'diff --git a/src/local.ts b/src/local.ts',
+        'index 3333333..4444444 100644',
+        '--- a/src/local.ts',
+        '+++ b/src/local.ts',
+        '@@ -1,2 +1,3 @@',
+        ' export const draft = true;',
+        '+export const unstaged = true;',
+      ].join('\n'),
+      fileCount: 1,
+      addedLines: 1,
+      removedLines: 0,
+      truncated: false,
+    },
+  };
+}
+
 export function fallbackCommandContract(): DesktopCommandContract[] {
   return [
     {
       name: 'get_repo_info',
+      classification: 'read-only',
+      readsProject: true,
+      mutatesProject: false,
+      spawnsProcess: false,
+      notes: 'Browser preview fallback.',
+    },
+    {
+      name: 'get_diff_preview',
       classification: 'read-only',
       readsProject: true,
       mutatesProject: false,

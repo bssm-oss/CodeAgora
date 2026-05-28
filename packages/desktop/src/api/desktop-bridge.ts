@@ -12,6 +12,7 @@ import type {
   GitHubActionStatus,
   EvidenceStatus,
   RepoInfo,
+  DiffPreview,
   DesktopCommandContract,
   NotificationPreferences,
   SeverityCounts,
@@ -31,6 +32,7 @@ import {
   fallbackGitHubActionStatus,
   fallbackEvidenceStatus,
   fallbackRepoInfo,
+  fallbackDiffPreview,
   fallbackCommandContract,
 } from './desktop-fallbacks.js';
 
@@ -274,6 +276,12 @@ export async function getRepoInfo(): Promise<RepoInfo> {
   const result = await tauriCall<RepoInfo>('get_repo_info');
   if (result) return result;
   return fallbackRepoInfo();
+}
+
+export async function getDiffPreview(): Promise<DiffPreview> {
+  const result = await tauriCall<DiffPreview>('get_diff_preview');
+  if (result) return result;
+  return fallbackDiffPreview();
 }
 
 export async function openRepository(path: string): Promise<RepoInfo> {

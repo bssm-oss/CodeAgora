@@ -119,6 +119,19 @@ export interface RepoInfo {
   trustReason: string;
 }
 
+export interface DiffPreviewSection {
+  text: string;
+  fileCount: number;
+  addedLines: number;
+  removedLines: number;
+  truncated: boolean;
+}
+
+export interface DiffPreview {
+  staged: DiffPreviewSection;
+  workingTree: DiffPreviewSection;
+}
+
 export interface DesktopCommandContract {
   name: string;
   classification: string;

@@ -685,6 +685,11 @@ h3 {
   background: var(--surface-soft);
 }
 
+.ca-empty-state.ca-warn {
+  border-color: color-mix(in srgb, var(--warn) 46%, var(--border));
+  background: var(--warn-soft);
+}
+
 .ca-session-row {
   display: grid;
   gap: 5px;
@@ -860,6 +865,7 @@ h3 {
 
 .ca-evidence-board,
 .ca-issues,
+.ca-diff-preview,
 .ca-repo-section,
 .ca-repo-picker,
 .ca-review-run,
@@ -901,7 +907,8 @@ summary {
 }
 
 .ca-report,
-.ca-snippet {
+.ca-snippet,
+.ca-diff-output {
   max-height: 260px;
   overflow: auto;
   padding: var(--space-3);
@@ -910,6 +917,14 @@ summary {
   background: var(--report-bg);
   color: var(--report-text);
   white-space: pre-wrap;
+}
+
+.ca-diff-output {
+  max-height: 360px;
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .ca-launch-intro,
@@ -964,6 +979,65 @@ summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+.ca-diff-preview {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+
+.ca-diff-preview-title {
+  display: grid;
+  gap: 3px;
+}
+
+.ca-diff-preview-title p {
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.ca-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.ca-diff-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.ca-diff-card.ca-empty-diff {
+  background: color-mix(in srgb, var(--surface-soft) 86%, var(--surface));
+}
+
+.ca-diff-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ca-diff-stats {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 800;
 }
 
 .ca-card,
@@ -1269,6 +1343,7 @@ summary {
 
   .ca-cockpit-overview,
   .ca-sessions-layout,
+  .ca-diff-grid,
   .ca-repo-grid,
   .ca-provider-grid {
     grid-template-columns: 1fr;

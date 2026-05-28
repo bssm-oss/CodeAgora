@@ -36,6 +36,7 @@ assert(typeof tauriConfig.app?.security?.csp === 'string' && tauriConfig.app.sec
 const requiredCommands = [
   'open_repository',
   'get_repo_info',
+  'get_diff_preview',
   'list_sessions',
   'get_session_detail',
   'export_session',

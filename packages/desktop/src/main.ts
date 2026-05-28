@@ -1,5 +1,6 @@
 import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
 import {
+  getDiffPreview,
   getRepoInfo,
   getCommandContract,
   cancelReviewRun,
@@ -20,6 +21,8 @@ import {
   IS_TAURI,
   type ConfigValidation,
   type DesktopCommandContract,
+  type DiffPreview,
+  type DiffPreviewSection,
   type EvidenceStatus,
   type GitHubActionStatus,
   type McpStatus,
@@ -67,6 +70,9 @@ interface AppState {
   recentRepoPaths: string[];
   commandContract: DesktopCommandContract[];
   activeRun?: ReviewRunSnapshot;
+  diffPreview?: DiffPreview;
+  diffPreviewLoading: boolean;
+  diffPreviewError?: string;
   sessionSearch: string;
   sessionStatus: 'all' | SessionSummary['status'];
   sessionSort: 'date-desc' | 'date-asc' | 'decision' | 'severity';
@@ -96,6 +102,7 @@ const state: AppState = {
   repoInput: '',
   recentRepoPaths: loadRecentRepoPaths(),
   commandContract: [],
+  diffPreviewLoading: false,
   sessionSearch: '',
   sessionStatus: 'all',
   sessionSort: 'date-desc',
@@ -422,6 +429,7 @@ function setView(view: View): void {
     updateBadgeState();
   }
   render();
+  if (view === 'run') void loadDiffPreview();
 }
 
 function loadRecentRepoPaths(): string[] {
@@ -629,6 +637,25 @@ async function loadRepoInfo(): Promise<void> {
     pushToast(error instanceof Error ? error.message : String(error), 'error');
   }
   render();
+  if (state.view === 'run') void loadDiffPreview();
+}
+
+async function loadDiffPreview(showToast = false): Promise<void> {
+  if (state.diffPreviewLoading) return;
+  state.diffPreviewLoading = true;
+  state.diffPreviewError = undefined;
+  render();
+  try {
+    state.diffPreview = await getDiffPreview();
+    if (showToast) pushToast(t('desktop.notice.diffPreviewRefreshed'), 'success');
+  } catch (error) {
+    state.diffPreview = undefined;
+    state.diffPreviewError = error instanceof Error ? error.message : String(error);
+    if (showToast) pushToast(state.diffPreviewError, 'error');
+  } finally {
+    state.diffPreviewLoading = false;
+    render();
+  }
 }
 
 async function openRepo(path: string): Promise<void> {
@@ -642,6 +669,8 @@ async function openRepo(path: string): Promise<void> {
     state.repoInfo = await openRepository(path);
     state.repoPath = state.repoInfo.path;
     state.repoInput = state.repoInfo.path;
+    state.diffPreview = undefined;
+    state.diffPreviewError = undefined;
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
     state.attentionCount = 0;
@@ -649,6 +678,7 @@ async function openRepo(path: string): Promise<void> {
     resetConfigState();
     await refreshSessions(true, true);
     await loadConfig();
+    if (state.view === 'run') await loadDiffPreview();
   } catch (error) {
     state.notice = error instanceof Error ? error.message : String(error);
   } finally {
@@ -1464,6 +1494,7 @@ function renderRunReview(): HTMLElement {
   panel.append(readinessPanel);
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
+  panel.append(renderDiffPreview());
 
   const actions = el('div', 'ca-launch-cards');
   const staged = launchCard(t('desktop.run.stagedTitle'), t('desktop.run.stagedEyebrow'), t('desktop.run.stagedBody'), true, () => void startReview(true), 'button-review-staged-changes');
@@ -1477,6 +1508,87 @@ function renderRunReview(): HTMLElement {
   panel.append(renderReviewRun());
   panel.append(renderCommandContract());
   return panel;
+}
+
+function renderDiffPreview(): HTMLElement {
+  const section = el('section', 'ca-diff-preview');
+  section.dataset.testid = 'diff-preview';
+  section.setAttribute('aria-busy', String(state.diffPreviewLoading));
+
+  const header = el('div', 'ca-section-head');
+  const title = el('div', 'ca-diff-preview-title');
+  title.append(el('h3', '', t('desktop.run.previewTitle')));
+  title.append(el('p', '', t('desktop.run.previewBody')));
+  const refresh = button(t('desktop.action.refreshPreview'), () => void loadDiffPreview(true), 'ca-button', 'button-refresh-diff-preview');
+  refresh.disabled = state.busy || state.diffPreviewLoading;
+  header.append(title, refresh);
+  section.append(header);
+
+  if (state.diffPreviewLoading && !state.diffPreview) {
+    const loading = el('div', 'ca-empty-state ca-compact');
+    loading.append(el('strong', '', t('desktop.run.previewLoadingTitle')));
+    loading.append(el('p', '', t('desktop.run.previewLoadingBody')));
+    section.append(loading);
+    return section;
+  }
+
+  if (state.diffPreviewError) {
+    const error = el('div', 'ca-empty-state ca-compact ca-warn');
+    error.append(el('strong', '', t('desktop.run.previewErrorTitle')));
+    error.append(el('p', '', state.diffPreviewError));
+    section.append(error);
+    return section;
+  }
+
+  if (!state.diffPreview) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.run.previewEmptyTitle')));
+    empty.append(el('p', '', t('desktop.run.previewEmptyBody')));
+    section.append(empty);
+    return section;
+  }
+
+  const grid = el('div', 'ca-diff-grid');
+  grid.append(
+    renderDiffPreviewSection(t('desktop.run.stagedPreviewTitle'), state.diffPreview.staged, true),
+    renderDiffPreviewSection(t('desktop.run.workingPreviewTitle'), state.diffPreview.workingTree, false),
+  );
+  section.append(grid);
+  return section;
+}
+
+function renderDiffPreviewSection(title: string, diff: DiffPreviewSection, staged: boolean): HTMLElement {
+  const hasDiff = diff.text.trim().length > 0;
+  const card = el('article', hasDiff ? 'ca-diff-card' : 'ca-diff-card ca-empty-diff');
+  card.dataset.testid = staged ? 'diff-preview-staged' : 'diff-preview-working-tree';
+
+  const head = el('div', 'ca-diff-card-head');
+  head.append(el('strong', '', title));
+  head.append(el('span', 'ca-diff-stats', t('desktop.run.diffStats', {
+    files: diff.fileCount,
+    added: diff.addedLines,
+    removed: diff.removedLines,
+  })));
+  card.append(head);
+
+  if (diff.truncated) {
+    card.append(el('p', 'ca-repo-note ca-warn', t('desktop.run.previewTruncated')));
+  }
+
+  if (!hasDiff) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', staged ? t('desktop.run.noStagedDiffTitle') : t('desktop.run.noWorkingDiffTitle')));
+    empty.append(el('p', '', staged ? t('desktop.run.noStagedDiffBody') : t('desktop.run.noWorkingDiffBody')));
+    card.append(empty);
+    return card;
+  }
+
+  const pre = el('pre', 'ca-diff-output');
+  pre.textContent = diff.text;
+  pre.tabIndex = 0;
+  pre.setAttribute('aria-label', title);
+  card.append(pre);
+  return card;
 }
 
 function launchCard(label: string, eyebrow: string, description: string, primary: boolean, onClick: () => void, testId: string): HTMLButtonElement {

@@ -12,6 +12,7 @@ use tauri::State;
 use tauri_plugin_notification::NotificationExt;
 
 const REVIEW_CONTRACT_VERSION: &str = "codeagora.review.v1";
+const DIFF_PREVIEW_MAX_CHARS: usize = 80_000;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -141,6 +142,23 @@ struct RepoInfo {
     session_count: usize,
     trusted: bool,
     trust_reason: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiffPreviewSection {
+    text: String,
+    file_count: usize,
+    added_lines: usize,
+    removed_lines: usize,
+    truncated: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiffPreview {
+    staged: DiffPreviewSection,
+    working_tree: DiffPreviewSection,
 }
 
 #[derive(Serialize)]
@@ -677,6 +695,14 @@ fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
             mutates_project: false,
             spawns_process: true,
             notes: "Reads git metadata, config/session presence, and review helper file presence.",
+        },
+        DesktopCommandContract {
+            name: "get_diff_preview",
+            classification: "read-only",
+            reads_project: true,
+            mutates_project: false,
+            spawns_process: true,
+            notes: "Reads bounded staged and working-tree git diff previews for launch review.",
         },
         DesktopCommandContract {
             name: "list_sessions",
@@ -1608,6 +1634,65 @@ fn working_tree_diff(root: &Path) -> Result<String, String> {
     Ok(diff)
 }
 
+fn truncate_diff_preview(raw: &str) -> (String, bool) {
+    if raw.len() <= DIFF_PREVIEW_MAX_CHARS {
+        return (raw.to_string(), false);
+    }
+
+    let suffix = "\n\n[diff preview truncated]";
+    let mut end = DIFF_PREVIEW_MAX_CHARS.saturating_sub(suffix.len());
+    while end > 0 && !raw.is_char_boundary(end) {
+        end -= 1;
+    }
+    (format!("{}{}", &raw[..end], suffix), true)
+}
+
+fn diff_preview_section(raw: &str) -> DiffPreviewSection {
+    let mut file_count = 0;
+    let mut added_lines = 0;
+    let mut removed_lines = 0;
+
+    for line in raw.lines() {
+        if line.starts_with("diff --git ") {
+            file_count += 1;
+        } else if line.starts_with('+') && !line.starts_with("+++") {
+            added_lines += 1;
+        } else if line.starts_with('-') && !line.starts_with("---") {
+            removed_lines += 1;
+        }
+    }
+
+    let (text, truncated) = truncate_diff_preview(raw);
+    DiffPreviewSection {
+        text,
+        file_count,
+        added_lines,
+        removed_lines,
+        truncated,
+    }
+}
+
+fn git_diff_preview(root: &Path, args: &[&str]) -> Result<DiffPreviewSection, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(redact_sensitive(&String::from_utf8_lossy(&output.stderr)));
+    }
+    Ok(diff_preview_section(&String::from_utf8_lossy(
+        &output.stdout,
+    )))
+}
+
+fn diff_preview_for_root(root: &Path) -> Result<DiffPreview, String> {
+    Ok(DiffPreview {
+        staged: git_diff_preview(root, &["diff", "--staged"])?,
+        working_tree: git_diff_preview(root, &["diff"])?,
+    })
+}
+
 fn review_invocation(
     root: &Path,
     staged: bool,
@@ -1705,6 +1790,13 @@ fn notify_review_finished(
 fn get_repo_info(state: State<'_, WorkspaceState>) -> Result<RepoInfo, String> {
     let root = active_repo_root(&state)?;
     repo_info_for_root(&root)
+}
+
+#[tauri::command]
+fn get_diff_preview(state: State<'_, WorkspaceState>) -> Result<DiffPreview, String> {
+    let root = active_repo_root(&state)?;
+    require_trusted_repo(&root)?;
+    diff_preview_for_root(&root)
 }
 
 fn repo_info_for_root(root: &Path) -> Result<RepoInfo, String> {
@@ -2275,6 +2367,7 @@ fn main() {
             get_evidence_status,
             write_config,
             get_repo_info,
+            get_diff_preview,
             open_repository,
             set_notification_preferences,
             get_command_contract
@@ -2577,6 +2670,58 @@ mod tests {
             review_invocation(&root, true).expect("staged invocation");
         assert_eq!(staged_args, vec!["review", "--json-stream", "--staged"]);
         assert!(staged_stdin.is_none());
+    }
+
+    #[test]
+    fn desktop_app_e2e_previews_staged_and_working_tree_diffs() {
+        let root = fixture_workspace();
+        let status = Command::new("git")
+            .args(["add", "README.md", ".ca/config.json"])
+            .current_dir(&root)
+            .status()
+            .expect("git add fixture files");
+        assert!(status.success(), "git add should succeed");
+        let status = Command::new("git")
+            .args([
+                "-c",
+                "user.name=CodeAgora Test",
+                "-c",
+                "user.email=codeagora@example.invalid",
+                "commit",
+                "-m",
+                "fixture",
+            ])
+            .current_dir(&root)
+            .status()
+            .expect("git commit fixture files");
+        assert!(status.success(), "git commit should succeed");
+
+        let clean_preview = diff_preview_for_root(&root).expect("clean diff preview");
+        assert!(clean_preview.staged.text.is_empty());
+        assert_eq!(clean_preview.staged.file_count, 0);
+        assert!(clean_preview.working_tree.text.is_empty());
+        assert_eq!(clean_preview.working_tree.file_count, 0);
+
+        write_file(&root, "README.md", "# Desktop E2E\n\nchanged\n");
+        write_file(&root, "src/staged.ts", "export const staged = true;\n");
+        let status = Command::new("git")
+            .args(["add", "src/staged.ts"])
+            .current_dir(&root)
+            .status()
+            .expect("git add staged file");
+        assert!(status.success(), "git add staged file should succeed");
+
+        let preview = diff_preview_for_root(&root).expect("diff preview");
+        assert!(preview.staged.text.contains("src/staged.ts"));
+        assert_eq!(preview.staged.file_count, 1);
+        assert!(preview.staged.added_lines >= 1);
+        assert_eq!(preview.staged.removed_lines, 0);
+        assert!(!preview.staged.truncated);
+
+        assert!(preview.working_tree.text.contains("+changed"));
+        assert_eq!(preview.working_tree.file_count, 1);
+        assert!(preview.working_tree.added_lines >= 1);
+        assert!(!preview.working_tree.truncated);
     }
 
     #[test]
