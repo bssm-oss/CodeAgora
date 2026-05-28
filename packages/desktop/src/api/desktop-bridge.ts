@@ -239,8 +239,8 @@ export async function writeConfig(raw: string): Promise<DesktopConfig> {
   return { path: '.ca/config.json', raw };
 }
 
-export async function validateConfig(raw: string): Promise<ConfigValidation> {
-  const result = await tauriCall<ConfigValidation>('validate_config', { raw });
+export async function validateConfig(raw: string, configPath?: string): Promise<ConfigValidation> {
+  const result = await tauriCall<ConfigValidation>('validate_config', { raw, configPath });
   if (result) return result;
   return fallbackConfigValidation(raw);
 }

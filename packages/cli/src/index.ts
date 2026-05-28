@@ -7,7 +7,7 @@
  */
 
 import { Command } from 'commander';
-import { loadConfig } from '@codeagora/core/config/loader.js';
+import { loadConfig, validateConfigText, type ConfigTextFormat } from '@codeagora/core/config/loader.js';
 import path from 'path';
 import fs from 'fs/promises';
 import { formatOutput } from './formatters/review-output.js';
@@ -81,7 +81,48 @@ registerCheckUpdateCommand(program);
 
 // === Simple inline commands ===
 
-program.command('config').description('Validate and display current config').action(async () => {
+interface ConfigValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+function normalizeConfigTextFormat(format: string): ConfigTextFormat {
+  if (format === 'json' || format === 'yaml' || format === 'auto') return format;
+  throw new Error(`Invalid config format: ${format}. Expected json, yaml, or auto.`);
+}
+
+async function readStdinText(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf-8');
+}
+
+function validationErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'issues' in error && Array.isArray((error as { issues: unknown }).issues)) {
+    return (error as { issues: Array<{ path?: unknown[]; message?: string }> }).issues
+      .map((issue) => {
+        const pathLabel = Array.isArray(issue.path) && issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+        return `${pathLabel}${issue.message ?? 'Invalid value'}`;
+      })
+      .join('; ');
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function validateConfigInput(options: { file?: string; stdin: boolean; format: ConfigTextFormat }): Promise<ConfigValidationResult> {
+  try {
+    const raw = options.stdin ? await readStdinText() : await fs.readFile(options.file ?? path.join(process.cwd(), '.ca', 'config.json'), 'utf-8');
+    validateConfigText(raw, options.format);
+    return { valid: true, errors: [], warnings: [] };
+  } catch (error) {
+    return { valid: false, errors: [validationErrorMessage(error)], warnings: [] };
+  }
+}
+
+const configCommand = program.command('config').description('Validate and display current config').action(async () => {
   try {
     const config = await loadConfig();
     console.log('Config: .ca/config.json');
@@ -91,6 +132,29 @@ program.command('config').description('Validate and display current config').act
     process.exit(1);
   }
 });
+
+configCommand
+  .command('validate')
+  .description('Validate config content with the canonical core schema')
+  .option('--json', 'output JSON result', false)
+  .option('--stdin', 'read config content from stdin', false)
+  .option('--format <format>', 'config text format: json, yaml, or auto', 'auto')
+  .argument('[file]', 'config file to validate')
+  .action(async (file: string | undefined, options: { json: boolean; stdin: boolean; format: string }) => {
+    const format = normalizeConfigTextFormat(options.format);
+    const result = await validateConfigInput({ file, stdin: options.stdin, format });
+    if (options.json) {
+      console.log(JSON.stringify(result));
+      return;
+    }
+    if (result.valid) {
+      console.log('Config validates.');
+      for (const warning of result.warnings) console.warn(`Warning: ${warning}`);
+      return;
+    }
+    console.error(`Invalid config: ${result.errors.join('; ')}`);
+    process.exit(1);
+  });
 
 program.command('doctor').description('Check environment and configuration')
   .option('--live', 'test actual API connections', false)

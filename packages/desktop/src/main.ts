@@ -534,7 +534,7 @@ async function loadConfig(): Promise<void> {
     state.configOriginal = config.raw;
     state.configDirty = false;
     applyDesktopLocale(config.raw);
-    state.configValidation = await validateConfig(config.raw);
+    state.configValidation = await validateConfig(config.raw, config.path);
     if (state.configPath.endsWith('.yml') || state.configPath.endsWith('.yaml')) {
       pushToast(t('desktop.notice.yamlReadOnly'), 'warning');
     }
@@ -554,7 +554,7 @@ async function saveConfig(raw: string): Promise<void> {
   state.busy = true;
   render();
   try {
-    const validation = await validateConfig(raw);
+    const validation = await validateConfig(raw, state.configPath);
     state.configValidation = validation;
     if (!validation.valid) {
       pushToast(t('desktop.notice.invalidConfig', { errors: validation.errors.join('; ') }), 'error')
@@ -581,7 +581,7 @@ async function validateConfigEditor(raw: string): Promise<void> {
   render();
   try {
     applyDesktopLocale(raw);
-    state.configValidation = await validateConfig(raw);
+    state.configValidation = await validateConfig(raw, state.configPath);
     if (state.configValidation.valid) {
       pushToast(t('desktop.notice.configValidates'), 'success')
     } else {
@@ -1715,7 +1715,7 @@ async function bootstrap(): Promise<void> {
       state.configOriginal = config.raw;
       state.configDirty = false;
       applyDesktopLocale(config.raw);
-      state.configValidation = await validateConfig(config.raw);
+      state.configValidation = await validateConfig(config.raw, config.path);
     } catch (error) {
       pushToast(error instanceof Error ? error.message : String(error), 'error')
     }
