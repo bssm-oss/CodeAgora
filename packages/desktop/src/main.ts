@@ -94,6 +94,46 @@ if (!app) throw new Error('Missing #app root');
 const appRoot = app;
 let reviewPollHandle: number | undefined;
 let lastView: View | undefined;
+let pollRetryCount = 0;
+const maxPollRetries = 5;
+let mediaQuery: MediaQueryList | null = null;
+
+function onThemeChange(): void {
+  if (state.themePreference === 'system') applyDesktopTheme();
+}
+
+function onKeyDown(event: KeyboardEvent): void {
+  const target = event.target as HTMLElement;
+  if (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement
+  ) {
+    return;
+  }
+
+  const isMeta = event.metaKey || event.ctrlKey;
+
+  if (isMeta && event.key === 'r') {
+    event.preventDefault();
+    if (!state.busy && runReadiness().ready) {
+      void startReview(true);
+    }
+    return;
+  }
+
+  if (isMeta && event.key === ',') {
+    event.preventDefault();
+    setView('config');
+    if (!state.configRaw) void loadConfig();
+    return;
+  }
+
+  if (isMeta && event.key === '1') {
+    event.preventDefault();
+    setView('sessions');
+  }
+}
 
 function normalizeLocale(value?: string): DesktopLocale | undefined {
   const normalized = value?.trim().toLowerCase();
@@ -167,10 +207,10 @@ function filteredSessions(): SessionSummary[] {
 }
 
 function decisionClass(decision?: string): string {
-  if (decision === 'ACCEPT') return 'decision accept';
-  if (decision === 'REJECT') return 'decision reject';
-  if (decision === 'NEEDS_HUMAN') return 'decision human';
-  return 'decision';
+  if (decision === 'ACCEPT') return 'ca-decision ca-accept';
+  if (decision === 'REJECT') return 'ca-decision ca-reject';
+  if (decision === 'NEEDS_HUMAN') return 'ca-decision ca-human';
+  return 'ca-decision';
 }
 
 type SeverityKey = 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION';
@@ -218,7 +258,7 @@ function timestampValue(value?: string): number {
 }
 
 function appendMetric(parent: HTMLElement, label: string, value: string, tone = ''): void {
-  const card = el('div', tone ? `metric-card ${tone}` : 'metric-card');
+  const card = el('div', tone ? `ca-metric-card ${tone}` : 'ca-metric-card');
   card.append(el('span', '', label));
   card.append(el('strong', '', value));
   parent.append(card);
@@ -235,7 +275,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function button(label: string, onClick: () => void, className = 'button', testId?: string): HTMLButtonElement {
+function button(label: string, onClick: () => void, className = 'ca-button', testId?: string): HTMLButtonElement {
   const node = el('button', className, label);
   node.type = 'button';
   node.dataset.testid = testId ?? `button-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
@@ -512,26 +552,27 @@ function isReviewRunning(run: ReviewRunSnapshot): boolean {
 function scheduleReviewPoll(): void {
   if (!state.activeRun || !isReviewRunning(state.activeRun)) return;
   if (reviewPollHandle !== undefined) window.clearTimeout(reviewPollHandle);
-  reviewPollHandle = window.setTimeout(() => void pollReviewRun(), 700);
+  reviewPollHandle = window.setTimeout(() => void pollReviewRun(state.activeRun!.runId), 700);
 }
 
-async function pollReviewRun(): Promise<void> {
-  const runId = state.activeRun?.runId;
-  if (!runId) return;
-  const previousStatus = state.activeRun?.status;
+async function pollReviewRun(runId: string): Promise<void> {
+  window.clearTimeout(reviewPollHandle);
   try {
-    state.activeRun = await getReviewRun(runId);
-    if (isReviewRunning(state.activeRun)) {
-      scheduleReviewPoll();
-    } else {
-      pushToast(state.activeRun.message, 'success')
-      await refreshSessions(false);
-      if ((state.activeRun.status === 'completed' || state.activeRun.status === 'failed') && state.activeRun.status !== previousStatus) {
-        announce(state.activeRun.message)
-      }
+    const snapshot = await getReviewRun(runId);
+    pollRetryCount = 0;
+    state.activeRun = snapshot;
+    const terminal = ['completed', 'failed', 'cancelled'];
+    if (!terminal.includes(snapshot.status)) {
+      reviewPollHandle = window.setTimeout(() => pollReviewRun(runId), 2000);
     }
   } catch (error) {
-    pushToast(error instanceof Error ? error.message : String(error), 'error')
+    pollRetryCount++;
+    if (pollRetryCount <= maxPollRetries) {
+      const backoff = Math.min(1000 * Math.pow(2, pollRetryCount - 1), 8000);
+      reviewPollHandle = window.setTimeout(() => pollReviewRun(runId), backoff);
+    } else {
+      pushToast(error instanceof Error ? error.message : String(error), 'error');
+    }
   } finally {
     render();
   }
@@ -573,18 +614,18 @@ async function exportSelected(format: 'markdown' | 'json' | 'sarif'): Promise<vo
 }
 
 function renderShell(): HTMLElement {
-  const shell = el('div', 'shell');
+  const shell = el('div', 'ca-shell');
   shell.dataset.testid = 'desktop-shell';
-  const sidebar = el('aside', 'sidebar');
-  const brand = el('div', 'brand');
-  brand.append(el('div', 'brand-mark', 'CA'));
+  const sidebar = el('aside', 'ca-sidebar');
+  const brand = el('div', 'ca-brand');
+  brand.append(el('div', 'ca-brand-mark', 'CA'));
   const brandText = el('div');
   brandText.append(el('strong', '', 'CodeAgora'));
   brandText.append(el('span', '', t('desktop.brand.surface')));
   brand.append(brandText);
   sidebar.append(brand);
 
-  const nav = el('nav', 'nav');
+  const nav = el('nav', 'ca-nav');
   const navItems: Array<[View, string, string]> = [
     ['sessions', t('desktop.nav.cockpit'), 'button-sessions'],
     ['run', t('desktop.nav.runReview'), 'button-run-review'],
@@ -596,13 +637,13 @@ function renderShell(): HTMLElement {
       setView(view);
       if (view === 'config' && !state.configRaw) void loadConfig();
       if (view === 'setup' && state.providers.length === 0) void loadSetup();
-    }, state.view === view ? 'nav-button active' : 'nav-button', testId);
+    }, state.view === view ? 'ca-nav-button ca-active' : 'ca-nav-button', testId);
     nav.append(navButton);
   }
   sidebar.append(nav);
   shell.append(sidebar);
 
-  const main = el('main', 'main');
+  const main = el('main', 'ca-main');
   main.append(renderToolbar());
   main.append(renderContent());
   shell.append(main);
@@ -610,18 +651,18 @@ function renderShell(): HTMLElement {
 }
 
 function renderToolbar(): HTMLElement {
-  const toolbar = el('header', 'toolbar');
+  const toolbar = el('header', 'ca-toolbar');
   const title = el('div');
   title.append(el('h1', '', viewTitle()));
   title.append(el('p', '', repoSubtitle()));
   toolbar.append(title);
 
-  const actions = el('div', 'toolbar-actions');
-  const preferences = el('div', 'toolbar-preferences');
+  const actions = el('div', 'ca-toolbar-actions');
+  const preferences = el('div', 'ca-toolbar-preferences');
 
-  const localeControl = el('label', 'toolbar-select') as HTMLLabelElement;
-  localeControl.append(el('span', 'toolbar-select-label', t('desktop.preferences.language')));
-  const localeSelect = el('select', 'toolbar-select-input') as HTMLSelectElement;
+  const localeControl = el('label', 'ca-toolbar-select') as HTMLLabelElement;
+  localeControl.append(el('span', 'ca-toolbar-select-label', t('desktop.preferences.language')));
+  const localeSelect = el('select', 'ca-toolbar-select-input') as HTMLSelectElement;
   localeSelect.dataset.testid = 'locale-select';
   localeSelect.setAttribute('aria-label', t('desktop.preferences.language'));
   for (const [value, key] of [
@@ -645,9 +686,9 @@ function renderToolbar(): HTMLElement {
   });
   localeControl.append(localeSelect);
 
-  const themeControl = el('label', 'toolbar-select') as HTMLLabelElement;
-  themeControl.append(el('span', 'toolbar-select-label', t('desktop.preferences.theme')));
-  const themeSelect = el('select', 'toolbar-select-input') as HTMLSelectElement;
+  const themeControl = el('label', 'ca-toolbar-select') as HTMLLabelElement;
+  themeControl.append(el('span', 'ca-toolbar-select-label', t('desktop.preferences.theme')));
+  const themeSelect = el('select', 'ca-toolbar-select-input') as HTMLSelectElement;
   themeSelect.dataset.testid = 'theme-select';
   themeSelect.setAttribute('aria-label', t('desktop.preferences.theme'));
   for (const [value, key] of [
@@ -674,8 +715,8 @@ function renderToolbar(): HTMLElement {
   preferences.append(localeControl, themeControl);
   actions.append(preferences);
 
-  actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected), 'button', 'button-refresh'));
-  const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'button primary', 'button-quick-review');
+  actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected), 'ca-button', 'button-refresh'));
+  const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'ca-button ca-primary', 'button-quick-review');
   quickReview.disabled = state.busy || !runReadiness().ready;
   actions.append(quickReview);
   toolbar.append(actions);
@@ -698,45 +739,45 @@ function repoSubtitle(): string {
 }
 
 function renderSkeleton(view: View): HTMLElement {
-  const shell = el('div', 'skeleton-shell');
+  const shell = el('div', 'ca-skeleton-shell');
   if (view === 'sessions') {
-    const sidebar = el('div', 'skeleton-sidebar');
-    sidebar.append(el('div', 'skeleton skeleton-title'));
-    sidebar.append(el('div', 'skeleton skeleton-text'));
-    sidebar.append(el('div', 'skeleton-sidebar-nav'));
-    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
-    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
-    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
-    sidebar.append(el('div', 'skeleton skeleton-nav-item'));
+    const sidebar = el('div', 'ca-skeleton-sidebar');
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-title'));
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-text'));
+    sidebar.append(el('div', 'ca-skeleton-sidebar-nav'));
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
     shell.append(sidebar);
-    const main = el('div', 'skeleton-main');
-    main.append(el('div', 'skeleton skeleton-title'));
-    main.append(el('div', 'skeleton skeleton-text'));
-    main.append(el('div', 'skeleton-grid'));
-    main.append(el('div', 'skeleton skeleton-cell'));
-    main.append(el('div', 'skeleton skeleton-cell'));
+    const main = el('div', 'ca-skeleton-main');
+    main.append(el('div', 'ca-skeleton ca-skeleton-title'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-text'));
+    main.append(el('div', 'ca-skeleton-grid'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-cell'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-cell'));
     shell.append(main);
   } else {
-    const main = el('div', 'skeleton-main');
-    main.append(el('div', 'skeleton skeleton-title'));
-    main.append(el('div', 'skeleton skeleton-text'));
-    main.append(el('div', 'skeleton skeleton-card'));
-    main.append(el('div', 'skeleton skeleton-card'));
-    main.append(el('div', 'skeleton skeleton-card'));
+    const main = el('div', 'ca-skeleton-main');
+    main.append(el('div', 'ca-skeleton ca-skeleton-title'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-text'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-card'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-card'));
+    main.append(el('div', 'ca-skeleton ca-skeleton-card'));
     shell.append(main);
   }
   return shell;
 }
 
 function renderContent(): HTMLElement {
-  const content = el('section', 'content');
+  const content = el('section', 'ca-content');
   content.dataset.testid = `view-${state.view}`;
   if (state.notice) {
-    const notice = el('div', 'notice', state.notice);
+    const notice = el('div', 'ca-notice', state.notice);
     notice.append(button(t('desktop.action.dismiss'), () => {
       state.notice = undefined;
       render();
-    }, 'ghost', 'button-dismiss'));
+    }, 'ca-ghost', 'button-dismiss'));
     content.append(notice);
   }
   if (state.busy) content.append(renderSkeleton(state.view));
@@ -750,19 +791,19 @@ function renderContent(): HTMLElement {
 }
 
 function renderSessions(): HTMLElement {
-  const wrapper = el('div', 'cockpit-page');
+  const wrapper = el('div', 'ca-cockpit-page');
   wrapper.append(renderCockpitOverview());
 
-  const layout = el('div', 'sessions-layout');
+  const layout = el('div', 'ca-sessions-layout');
   layout.dataset.testid = 'sessions-layout';
-  const listPanel = el('div', 'session-list');
-  const listHeader = el('div', 'panel-heading');
-  listHeader.append(el('span', 'eyebrow', t('desktop.sessions.historyEyebrow')));
+  const listPanel = el('div', 'ca-session-list');
+  const listHeader = el('div', 'ca-panel-heading');
+  listHeader.append(el('span', 'ca-eyebrow', t('desktop.sessions.historyEyebrow')));
   listHeader.append(el('h2', '', t('desktop.sessions.recentTitle')));
   listPanel.append(listHeader);
 
-  const controls = el('div', 'session-controls');
-  const search = el('input', 'filter-input') as HTMLInputElement;
+  const controls = el('div', 'ca-session-controls');
+  const search = el('input', 'ca-filter-input') as HTMLInputElement;
   search.dataset.testid = 'session-filter-input';
   search.type = 'search';
   search.placeholder = t('desktop.sessions.filterPlaceholder');
@@ -776,7 +817,7 @@ function renderSessions(): HTMLElement {
       render();
     }, 150);
   });
-  const status = el('select', 'filter-select') as HTMLSelectElement;
+  const status = el('select', 'ca-filter-select') as HTMLSelectElement;
   status.dataset.testid = 'session-status-filter';
   status.setAttribute('aria-label', t('desktop.sessions.statusFilterAria'));
   for (const option of ['all', 'completed', 'failed', 'interrupted', 'in_progress', 'unknown'] as const) {
@@ -794,25 +835,25 @@ function renderSessions(): HTMLElement {
   listPanel.append(controls);
 
   const sessions = filteredSessions();
-  const summary = el('div', 'list-summary', t('desktop.sessions.visibleSummary', { visible: sessions.length, total: state.sessions.length }));
+  const summary = el('div', 'ca-list-summary', t('desktop.sessions.visibleSummary', { visible: sessions.length, total: state.sessions.length }));
   listPanel.append(summary);
   if (state.sessions.length === 0) {
-    const empty = el('div', 'empty-state padded');
+    const empty = el('div', 'ca-empty-state ca-padded');
     empty.append(el('strong', '', t('desktop.sessions.emptyTitle')));
     empty.append(el('p', '', t('desktop.sessions.emptyBody')));
-    empty.append(button(t('desktop.action.startReview'), () => setView('run'), 'button primary', 'button-start-review'));
+    empty.append(button(t('desktop.action.startReview'), () => setView('run'), 'ca-button ca-primary', 'button-start-review'));
     listPanel.append(empty);
   } else if (sessions.length === 0) {
-    listPanel.append(el('p', 'empty padded', t('desktop.sessions.noFilterMatch')));
+    listPanel.append(el('p', 'ca-empty ca-padded', t('desktop.sessions.noFilterMatch')));
   }
   for (const session of sessions) {
-    const item = button('', () => void selectSession(session.id), state.selected?.id === session.id ? 'session-row selected' : 'session-row');
+    const item = button('', () => void selectSession(session.id), state.selected?.id === session.id ? 'ca-session-row ca-selected' : 'ca-session-row');
     item.dataset.testid = `session-row-${session.id.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
-    const top = el('div', 'session-row-top');
+    const top = el('div', 'ca-session-row-top');
     top.append(el('strong', '', session.id));
     top.append(el('span', decisionClass(session.decision), session.decision ?? session.status));
     item.append(top);
-    item.append(el('span', 'session-meta', t('desktop.sessions.rowMeta', { blockers: blockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
+    item.append(el('span', 'ca-session-meta', t('desktop.sessions.rowMeta', { blockers: blockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
     listPanel.append(item);
   }
   layout.append(listPanel);
@@ -822,44 +863,44 @@ function renderSessions(): HTMLElement {
 }
 
 function renderCockpitOverview(): HTMLElement {
-  const section = el('section', 'cockpit-overview');
+  const section = el('section', 'ca-cockpit-overview');
   section.dataset.testid = 'cockpit-overview';
   const latest = latestSession();
   const repo = state.repoInfo;
-  const hero = el('div', 'cockpit-hero');
-  hero.append(el('span', 'eyebrow', t('desktop.cockpit.eyebrow')));
-  hero.append(el('span', 'preview-chip', t('desktop.preview.privatePreview')));
+  const hero = el('div', 'ca-cockpit-hero');
+  hero.append(el('span', 'ca-eyebrow', t('desktop.cockpit.eyebrow')));
+  hero.append(el('span', 'ca-preview-chip', t('desktop.preview.privatePreview')));
   hero.append(el('h2', '', latest ? t('desktop.cockpit.latestVerdict', { verdict: latest.decision ?? latest.status }) : t('desktop.cockpit.readyTitle')));
   hero.append(el('p', '', latest?.reasoning ?? t('desktop.cockpit.readyBody')));
-  const actions = el('div', 'cockpit-actions');
-  actions.append(button(t('desktop.action.runStagedReview'), () => setView('run'), 'button primary', 'button-run-staged-review'));
-  actions.append(button(t('desktop.action.openRepository'), () => setView('run'), 'button', 'button-open-repository'));
+  const actions = el('div', 'ca-cockpit-actions');
+  actions.append(button(t('desktop.action.runStagedReview'), () => setView('run'), 'ca-button ca-primary', 'button-run-staged-review'));
+  actions.append(button(t('desktop.action.openRepository'), () => setView('run'), 'ca-button', 'button-open-repository'));
   actions.append(button(t('desktop.action.setupGuide'), () => {
     setView('setup');
     if (state.providers.length === 0) void loadSetup();
-  }, 'button subtle', 'button-setup-guide'));
+  }, 'ca-button ca-subtle', 'button-setup-guide'));
   hero.append(actions);
   section.append(hero);
 
-  const metrics = el('div', 'cockpit-metrics');
-  appendMetric(metrics, t('desktop.metric.workspace'), repo?.trusted ? t('desktop.value.trusted') : t('desktop.value.needsTrust'), repo?.trusted ? 'good' : 'warn');
+  const metrics = el('div', 'ca-cockpit-metrics');
+  appendMetric(metrics, t('desktop.metric.workspace'), repo?.trusted ? t('desktop.value.trusted') : t('desktop.value.needsTrust'), repo?.trusted ? 'ca-good' : 'ca-warn');
   appendMetric(metrics, t('desktop.metric.branch'), repo?.branch || t('desktop.value.unknown'));
   appendMetric(metrics, t('desktop.metric.dirtyFiles'), repo ? String(repo.dirtyFileCount) : '...');
   appendMetric(metrics, t('desktop.metric.sessions'), String(state.sessions.length));
-  appendMetric(metrics, t('desktop.metric.currentBlockers'), latest ? String(blockerCount(latest)) : '0', latest && blockerCount(latest) > 0 ? 'danger' : 'good');
+  appendMetric(metrics, t('desktop.metric.currentBlockers'), latest ? String(blockerCount(latest)) : '0', latest && blockerCount(latest) > 0 ? 'ca-danger' : 'ca-good');
   appendMetric(metrics, t('desktop.metric.latestUpdated'), latest ? formatTimestamp(latest.updatedAt) : t('desktop.value.noSessions'));
   section.append(metrics);
 
-  const links = el('div', 'quick-links');
-  links.append(button(t('desktop.action.refreshEvidence'), () => void refreshSessions(true), 'button', 'button-refresh-evidence'));
+  const links = el('div', 'ca-quick-links');
+  links.append(button(t('desktop.action.refreshEvidence'), () => void refreshSessions(true), 'ca-button', 'button-refresh-evidence'));
   links.append(button(t('desktop.nav.config'), () => {
     setView('config');
     if (!state.configRaw) void loadConfig();
-  }, 'button', 'button-cockpit-config'));
+  }, 'ca-button', 'button-cockpit-config'));
   links.append(button(t('desktop.nav.setup'), () => {
     setView('setup');
     if (state.providers.length === 0) void loadSetup();
-  }, 'button', 'button-cockpit-setup'));
+  }, 'ca-button', 'button-cockpit-setup'));
   section.append(links);
   return section;
 }
@@ -871,28 +912,28 @@ function formatTimestamp(value?: string): string {
 }
 
 function renderSessionDetail(): HTMLElement {
-  const detail = el('article', 'detail insight-panel');
+  const detail = el('article', 'ca-detail ca-insight-panel');
   detail.dataset.testid = 'session-detail';
   const selected = state.selected;
   if (!selected) {
-    const empty = el('div', 'empty-state');
-    empty.append(el('span', 'eyebrow', t('desktop.detail.eyebrow')));
+    const empty = el('div', 'ca-empty-state');
+    empty.append(el('span', 'ca-eyebrow', t('desktop.detail.eyebrow')));
     empty.append(el('h2', '', t('desktop.detail.emptyTitle')));
     empty.append(el('p', '', t('desktop.detail.emptyBody')));
     detail.append(empty);
     return detail;
   }
 
-  const banner = el('div', `verdict-banner ${selected.decision === 'REJECT' ? 'danger' : selected.decision === 'ACCEPT' ? 'good' : 'warn'}`);
+  const banner = el('div', `ca-verdict-banner ${selected.decision === 'REJECT' ? 'ca-danger' : selected.decision === 'ACCEPT' ? 'ca-good' : 'ca-warn'}`);
   const bannerText = el('div');
-  bannerText.append(el('span', 'eyebrow', t('desktop.detail.finalVerdict')));
+  bannerText.append(el('span', 'ca-eyebrow', t('desktop.detail.finalVerdict')));
   bannerText.append(el('h2', '', selected.decision ?? selected.status));
   bannerText.append(el('p', '', selected.reasoning ?? t('desktop.detail.noReasoning')));
   banner.append(bannerText);
   banner.append(el('span', decisionClass(selected.decision), selected.id));
   detail.append(banner);
 
-  const meta = el('div', 'detail-meta');
+  const meta = el('div', 'ca-detail-meta');
   meta.append(el('span', '', selected.dirPath ?? '.ca/sessions'));
   meta.append(el('span', '', t('desktop.detail.updated', { updated: formatTimestamp(selected.updatedAt) })));
   meta.append(el('span', '', t('desktop.detail.evidenceDocs', { count: selected.evidenceCount ?? 0 })));
@@ -900,18 +941,18 @@ function renderSessionDetail(): HTMLElement {
   detail.append(meta);
 
   const counts = selected.severityCounts ?? {};
-  const countGrid = el('div', 'count-grid');
+  const countGrid = el('div', 'ca-count-grid');
   for (const key of ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'] as const) {
-    const cell = el('div', key === 'HARSHLY_CRITICAL' || key === 'CRITICAL' ? 'count-cell danger' : 'count-cell');
+    const cell = el('div', key === 'HARSHLY_CRITICAL' || key === 'CRITICAL' ? 'ca-count-cell ca-danger' : 'ca-count-cell');
     cell.append(el('span', '', key.replace('_', ' ')));
     cell.append(el('strong', '', String(counts[key] ?? 0)));
     countGrid.append(cell);
   }
   detail.append(countGrid);
 
-  const evidence = el('section', 'evidence-board');
+  const evidence = el('section', 'ca-evidence-board');
   evidence.append(el('h3', '', t('desktop.detail.consensusEvidence')));
-  const evidenceGrid = el('div', 'evidence-grid');
+  const evidenceGrid = el('div', 'ca-evidence-grid');
   appendMetric(evidenceGrid, t('desktop.detail.evidenceDocsLabel'), String(selected.evidenceCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.debateFilesLabel'), String(selected.discussionsCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.exportFormats'), 'Markdown · JSON · SARIF');
@@ -922,12 +963,12 @@ function renderSessionDetail(): HTMLElement {
   detail.append(evidence);
 
   if (sessionHasDegradedSignal(selected)) {
-    const degraded = el('section', 'degraded-signal');
+    const degraded = el('section', 'ca-degraded-signal');
     degraded.dataset.testid = 'session-degraded-signal';
     degraded.append(el('h3', '', t('desktop.degraded.title')));
     degraded.append(el('p', '', t('desktop.degraded.sessionBody')));
     if (selected.degradedReasons && selected.degradedReasons.length > 0) {
-      const reasons = el('ul', 'degraded-reasons');
+      const reasons = el('ul', 'ca-degraded-reasons');
       for (const reason of selected.degradedReasons) {
         reasons.append(el('li', '', reason));
       }
@@ -936,16 +977,16 @@ function renderSessionDetail(): HTMLElement {
     detail.append(degraded);
   }
 
-  const issues = el('div', 'issues');
+  const issues = el('div', 'ca-issues');
   const findings = selected.findings?.length ? selected.findings : selected.topIssues ?? [];
   issues.append(el('h3', '', t('desktop.detail.findingsToTriage', { count: findings.length })));
   if (findings.length === 0) {
-    issues.append(el('p', 'empty', t('desktop.detail.noFindings')));
+    issues.append(el('p', 'ca-empty', t('desktop.detail.noFindings')));
   } else {
     for (const issue of findings) {
-      const row = el('div', 'issue-row issue-card');
+      const row = el('div', 'ca-issue-row ca-issue-card');
       const confidence = issue.confidence === undefined ? t('desktop.detail.confidenceUnavailable') : t('desktop.detail.confidencePercent', { confidence: Math.round(issue.confidence) });
-      row.append(el('span', 'issue-severity', issue.severity));
+      row.append(el('span', 'ca-issue-severity', issue.severity));
       row.append(el('strong', '', issue.title));
       row.append(el('span', '', `${issue.filePath}:${issue.lineRange[0]} · ${confidence}`));
       issues.append(row);
@@ -953,22 +994,22 @@ function renderSessionDetail(): HTMLElement {
   }
   detail.append(issues);
 
-  const exportGuide = el('p', 'repo-note', t('desktop.detail.exportGuidance'));
+  const exportGuide = el('p', 'ca-repo-note', t('desktop.detail.exportGuidance'));
   detail.append(exportGuide);
 
-  const exports = el('div', 'export-actions');
-  exports.append(button(t('desktop.action.copyMarkdown'), () => void exportSelected('markdown'), 'button', 'button-copy-markdown'));
-  exports.append(button(t('desktop.action.copyJson'), () => void exportSelected('json'), 'button', 'button-copy-json'));
-  exports.append(button(t('desktop.action.copySarif'), () => void exportSelected('sarif'), 'button', 'button-copy-sarif'));
+  const exports = el('div', 'ca-export-actions');
+  exports.append(button(t('desktop.action.copyMarkdown'), () => void exportSelected('markdown'), 'ca-button', 'button-copy-markdown'));
+  exports.append(button(t('desktop.action.copyJson'), () => void exportSelected('json'), 'ca-button', 'button-copy-json'));
+  exports.append(button(t('desktop.action.copySarif'), () => void exportSelected('sarif'), 'ca-button', 'button-copy-sarif'));
   detail.append(exports);
 
   const nextAction = renderNextActionPanel(selected);
   detail.append(nextAction);
 
   if (selected.markdown) {
-    const reportSection = el('details', 'report-shell') as HTMLDetailsElement;
+    const reportSection = el('details', 'ca-report-shell') as HTMLDetailsElement;
     const summary = el('summary', '', t('desktop.detail.rawReportPreview'));
-    const report = el('pre', 'report');
+    const report = el('pre', 'ca-report');
     report.textContent = selected.markdown;
     reportSection.append(summary, report);
     detail.append(reportSection);
@@ -977,21 +1018,21 @@ function renderSessionDetail(): HTMLElement {
 }
 
 function renderRunReview(): HTMLElement {
-  const panel = el('div', 'run-panel');
+  const panel = el('div', 'ca-run-panel');
   panel.dataset.testid = 'run-panel';
   const readiness = runReadiness();
-  const intro = el('div', 'launch-intro');
-  intro.append(el('span', 'eyebrow', t('desktop.run.eyebrow')));
+  const intro = el('div', 'ca-launch-intro');
+  intro.append(el('span', 'ca-eyebrow', t('desktop.run.eyebrow')));
   intro.append(el('h2', '', t('desktop.run.title')));
   intro.append(el('p', '', t('desktop.run.body')));
   panel.append(intro);
 
-  const readinessPanel = el('section', readiness.ready ? 'readiness-panel ready' : 'readiness-panel blocked');
+  const readinessPanel = el('section', readiness.ready ? 'ca-readiness-panel ca-ready' : 'ca-readiness-panel ca-blocked');
   readinessPanel.dataset.testid = 'run-readiness';
   readinessPanel.append(el('h3', '', readiness.ready ? t('desktop.readiness.readyTitle') : t('desktop.readiness.blockedTitle')));
   readinessPanel.append(el('p', '', readiness.ready ? t('desktop.readiness.readyBody') : t('desktop.readiness.blockedBody')));
   if (readiness.reasons.length > 0) {
-    const list = el('ul', 'readiness-reasons');
+    const list = el('ul', 'ca-readiness-reasons');
     for (const reason of readiness.reasons) {
       list.append(el('li', '', reason));
     }
@@ -1001,12 +1042,12 @@ function renderRunReview(): HTMLElement {
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
 
-  const actions = el('div', 'launch-cards');
+  const actions = el('div', 'ca-launch-cards');
   const staged = launchCard(t('desktop.run.stagedTitle'), t('desktop.run.stagedEyebrow'), t('desktop.run.stagedBody'), true, () => void startReview(true), 'button-review-staged-changes');
   const working = launchCard(t('desktop.run.workingTitle'), t('desktop.run.workingEyebrow'), t('desktop.run.workingBody'), false, () => void startReview(false), 'button-review-working-tree');
   actions.append(staged, working);
   if (state.activeRun && isReviewRunning(state.activeRun)) {
-    const cancel = button(t('desktop.action.cancelReview'), () => void cancelActiveReview(), 'button danger', 'button-cancel-review');
+    const cancel = button(t('desktop.action.cancelReview'), () => void cancelActiveReview(), 'ca-button ca-danger', 'button-cancel-review');
     actions.append(cancel);
   }
   panel.append(actions);
@@ -1016,12 +1057,12 @@ function renderRunReview(): HTMLElement {
 }
 
 function launchCard(label: string, eyebrow: string, description: string, primary: boolean, onClick: () => void, testId: string): HTMLButtonElement {
-  const node = el('button', primary ? 'launch-card primary' : 'launch-card');
+  const node = el('button', primary ? 'ca-launch-card ca-primary' : 'ca-launch-card');
   node.type = 'button';
   node.dataset.testid = testId;
   node.disabled = state.busy || !runReadiness().ready;
   node.addEventListener('click', onClick);
-  node.append(el('span', 'eyebrow', eyebrow));
+  node.append(el('span', 'ca-eyebrow', eyebrow));
   node.append(el('strong', '', label));
   node.append(el('span', '', description));
   return node;
@@ -1029,38 +1070,38 @@ function launchCard(label: string, eyebrow: string, description: string, primary
 
 function renderReviewRun(): HTMLElement {
   const run = state.activeRun;
-  const section = el('section', 'review-run');
+  const section = el('section', 'ca-review-run');
   section.dataset.testid = 'review-run';
   section.append(el('h3', '', t('desktop.run.timelineTitle')));
   if (runHasDegradedSignal(run)) {
-    const degraded = el('div', 'degraded-signal');
+    const degraded = el('div', 'ca-degraded-signal');
     degraded.dataset.testid = 'review-degraded-signal';
     degraded.append(el('strong', '', t('desktop.degraded.title')));
     degraded.append(el('p', '', t('desktop.degraded.runBody')));
     section.append(degraded);
   }
   if (!run) {
-    const empty = el('div', 'empty-state compact');
+    const empty = el('div', 'ca-empty-state ca-compact');
     empty.append(el('strong', '', t('desktop.run.noActiveTitle')));
     empty.append(el('p', '', t('desktop.run.noActiveBody')));
-    empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'button subtle'));
+    empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'ca-button ca-subtle'));
     section.append(empty);
     return section;
   }
 
-  const summary = el('div', 'review-run-summary');
+  const summary = el('div', 'ca-review-run-summary');
   summary.append(el('span', statusClass(run.status), run.status));
   summary.append(el('strong', '', run.runId));
   summary.append(el('span', '', run.staged ? t('desktop.run.stagedDiff') : t('desktop.run.workingTreeDiff')));
   if (run.sessionId) summary.append(el('span', '', t('desktop.run.sessionLabel', { sessionId: run.sessionId })));
   section.append(summary);
-  section.append(el('p', 'repo-note', run.message));
+  section.append(el('p', 'ca-repo-note', run.message));
 
-  const events = el('div', 'event-list timeline');
+  const events = el('div', 'ca-event-list timeline');
   for (const event of run.events.slice(-12).reverse()) {
-    const row = el('div', 'event-row');
-    row.append(el('span', 'event-dot', ''));
-    row.append(el('span', 'event-kind', event.kind));
+    const row = el('div', 'ca-event-row');
+    row.append(el('span', 'ca-event-dot', ''));
+    row.append(el('span', 'ca-event-kind', event.kind));
     row.append(el('span', '', event.message));
     row.append(el('time', '', formatTimestamp(event.timestamp)));
     events.append(row);
@@ -1070,15 +1111,15 @@ function renderReviewRun(): HTMLElement {
 }
 
 function statusClass(status: string): string {
-  if (status === 'completed') return 'run-status complete';
-  if (status === 'failed') return 'run-status failed';
-  if (status === 'cancelled' || status === 'cancelling') return 'run-status cancelled';
-  return 'run-status running';
+  if (status === 'completed') return 'ca-run-status ca-complete';
+  if (status === 'failed') return 'ca-run-status ca-failed';
+  if (status === 'ca-cancelled' || status === 'cancelling') return 'ca-run-status ca-cancelled';
+  return 'ca-run-status ca-running';
 }
 
 function renderRepositoryPicker(): HTMLElement {
-  const section = el('section', 'repo-picker');
-  const input = el('input', 'repo-path-input') as HTMLInputElement;
+  const section = el('section', 'ca-repo-picker');
+  const input = el('input', 'ca-repo-path-input') as HTMLInputElement;
   input.dataset.testid = 'repo-path-input';
   input.type = 'text';
   input.placeholder = t('desktop.repo.pathPlaceholder');
@@ -1088,13 +1129,13 @@ function renderRepositoryPicker(): HTMLElement {
     state.repoInput = input.value;
   });
   section.append(input);
-  section.append(button(t('desktop.action.openRepository'), () => void openRepo(input.value), 'button primary', 'button-open-repository'));
+  section.append(button(t('desktop.action.openRepository'), () => void openRepo(input.value), 'ca-button ca-primary', 'button-open-repository'));
 
   if (state.recentRepoPaths.length > 0) {
-    const recent = el('div', 'recent-repos');
+    const recent = el('div', 'ca-recent-repos');
     recent.append(el('span', '', t('desktop.repo.recent')));
     for (const path of state.recentRepoPaths) {
-      recent.append(button(path, () => void openRepo(path), 'ghost repo-chip'));
+      recent.append(button(path, () => void openRepo(path), 'ca-ghost ca-repo-chip'));
     }
     section.append(recent);
   }
@@ -1103,9 +1144,9 @@ function renderRepositoryPicker(): HTMLElement {
 
 function renderRepoFacts(): HTMLElement {
   const repo = state.repoInfo;
-  const grid = el('div', 'repo-grid');
+  const grid = el('div', 'ca-repo-grid');
   if (!repo) {
-    grid.append(el('div', 'repo-card', t('desktop.repo.loadingState')));
+    grid.append(el('div', 'ca-repo-card', t('desktop.repo.loadingState')));
     return grid;
   }
 
@@ -1122,37 +1163,37 @@ function renderRepoFacts(): HTMLElement {
   ];
 
   for (const [label, value, healthy] of facts) {
-    const card = el('div', healthy === false ? 'repo-card warn' : 'repo-card');
+    const card = el('div', healthy === false ? 'ca-repo-card ca-warn' : 'ca-repo-card');
     card.append(el('span', '', label));
     card.append(el('strong', '', value));
     grid.append(card);
   }
 
-  const trust = el('p', repo.trusted ? 'repo-note' : 'repo-note warn', repo.trustReason);
-  const wrapper = el('div', 'repo-section');
+  const trust = el('p', repo.trusted ? 'ca-repo-note' : 'ca-repo-note ca-warn', repo.trustReason);
+  const wrapper = el('div', 'ca-repo-section');
   wrapper.append(grid, trust);
   return wrapper;
 }
 
 function renderCommandContract(): HTMLElement {
-  const section = el('section', 'command-contract');
+  const section = el('section', 'ca-command-contract');
   section.append(el('h3', '', t('desktop.command.title')));
   if (state.commandContract.length === 0) {
-    section.append(el('p', 'empty', t('desktop.command.notLoaded')));
+    section.append(el('p', 'ca-empty', t('desktop.command.notLoaded')));
     return section;
   }
 
   for (const item of state.commandContract) {
-    const row = el('div', 'command-row');
+    const row = el('div', 'ca-command-row');
     const title = el('div');
     title.append(el('strong', '', item.name));
     title.append(el('span', '', item.notes));
     row.append(title);
-    const flags = el('div', 'command-flags');
-    flags.append(el('span', 'fact', item.classification));
-    if (item.readsProject) flags.append(el('span', 'fact', t('desktop.command.readsProject')));
-    if (item.mutatesProject) flags.append(el('span', 'fact warn', t('desktop.command.mutatesProject')));
-    if (item.spawnsProcess) flags.append(el('span', 'fact warn', t('desktop.command.spawnsProcess')));
+    const flags = el('div', 'ca-command-flags');
+    flags.append(el('span', 'ca-fact', item.classification));
+    if (item.readsProject) flags.append(el('span', 'ca-fact', t('desktop.command.readsProject')));
+    if (item.mutatesProject) flags.append(el('span', 'ca-fact ca-warn', t('desktop.command.mutatesProject')));
+    if (item.spawnsProcess) flags.append(el('span', 'ca-fact ca-warn', t('desktop.command.spawnsProcess')));
     row.append(flags);
     section.append(row);
   }
@@ -1160,20 +1201,20 @@ function renderCommandContract(): HTMLElement {
 }
 
 function renderConfig(): HTMLElement {
-  const panel = el('div', 'config-panel');
+  const panel = el('div', 'ca-config-panel');
   panel.dataset.testid = 'config-panel';
-  const header = el('div', 'config-hero');
-  header.append(el('span', 'eyebrow', t('desktop.config.eyebrow')));
+  const header = el('div', 'ca-config-hero');
+  header.append(el('span', 'ca-eyebrow', t('desktop.config.eyebrow')));
   header.append(el('h2', '', state.configPath));
   header.append(el('p', '', t('desktop.config.body')));
   panel.append(header);
   panel.append(renderConfigFacts());
   panel.append(renderConfigValidation());
 
-  const advanced = el('details', 'advanced-config') as HTMLDetailsElement;
+  const advanced = el('details', 'ca-advanced-config') as HTMLDetailsElement;
   advanced.open = true;
   advanced.append(el('summary', '', t('desktop.config.advancedEditor')));
-  const textarea = el('textarea', 'config-editor') as HTMLTextAreaElement;
+  const textarea = el('textarea', 'ca-config-editor') as HTMLTextAreaElement;
   textarea.dataset.testid = 'config-editor';
   textarea.setAttribute('aria-label', t('desktop.config.editorAria'));
   textarea.value = state.configRaw;
@@ -1183,39 +1224,39 @@ function renderConfig(): HTMLElement {
   advanced.append(textarea);
   panel.append(advanced);
 
-  const actions = el('div', 'config-actions');
-  actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(textarea.value), 'button', 'button-validate-config'));
-  actions.append(button(t('desktop.action.saveConfig'), () => void saveConfig(textarea.value), 'button primary', 'button-save-config'));
+  const actions = el('div', 'ca-config-actions');
+  actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(textarea.value), 'ca-button', 'button-validate-config'));
+  actions.append(button(t('desktop.action.saveConfig'), () => void saveConfig(textarea.value), 'ca-button ca-primary', 'button-save-config'));
   panel.append(actions);
   return panel;
 }
 
 function renderConfigValidation(): HTMLElement {
   const validation = state.configValidation;
-  const panel = el('div', validation?.valid === false ? 'validation-panel invalid' : 'validation-panel');
+  const panel = el('div', validation?.valid === false ? 'ca-validation-panel ca-invalid' : 'ca-validation-panel');
   if (!validation) {
-    panel.append(el('p', 'empty', t('desktop.config.notValidated')));
+    panel.append(el('p', 'ca-empty', t('desktop.config.notValidated')));
     return panel;
   }
   panel.append(el('strong', '', validation.valid ? t('desktop.config.valid') : t('desktop.config.invalid')));
   for (const error of validation.errors) {
-    panel.append(el('span', 'validation-error', error));
+    panel.append(el('span', 'ca-validation-error', error));
   }
   for (const warning of validation.warnings) {
-    panel.append(el('span', 'validation-warning', warning));
+    panel.append(el('span', 'ca-validation-warning', warning));
   }
   if (validation.errors.length === 0 && validation.warnings.length === 0) {
-    panel.append(el('span', 'validation-ok', t('desktop.config.noErrorsOrWarnings')));
+    panel.append(el('span', 'ca-validation-ok', t('desktop.config.noErrorsOrWarnings')));
   }
   return panel;
 }
 
 function renderNextActionPanel(selected: SessionDetail): HTMLElement {
-  const panel = el('section', 'next-action-panel');
+  const panel = el('section', 'ca-next-action-panel');
   panel.dataset.testid = 'next-action-panel';
   panel.append(el('h3', '', t('desktop.next.title')));
 
-  const list = el('ol', 'next-action-list');
+  const list = el('ol', 'ca-next-action-list');
   const blockers = blockerCount(selected);
   if (blockers > 0 || selected.decision === 'REJECT') {
     list.append(el('li', '', t('desktop.next.fixBlockers')));
@@ -1231,23 +1272,23 @@ function renderNextActionPanel(selected: SessionDetail): HTMLElement {
     list.append(el('li', '', t('desktop.next.monitorNextRun')));
   }
   panel.append(list);
-  panel.append(el('p', 'repo-note', t('desktop.next.privatePreviewNote')));
+  panel.append(el('p', 'ca-repo-note', t('desktop.next.privatePreviewNote')));
   return panel;
 }
 
 function renderConfigFacts(): HTMLElement {
-  const facts = el('div', 'config-facts summary-cards');
+  const facts = el('div', 'ca-config-facts ca-summary-cards');
   let parsed: Record<string, unknown> | undefined;
   try {
     parsed = JSON.parse(state.configRaw) as Record<string, unknown>;
   } catch {
-    appendMetric(facts, 'JSON', t('desktop.value.invalid'), 'warn');
+    appendMetric(facts, 'JSON', t('desktop.value.invalid'), 'ca-warn');
     appendMetric(facts, t('desktop.config.reviewers'), t('desktop.value.unknown'));
     appendMetric(facts, t('desktop.config.providers'), t('desktop.value.unknown'));
     return facts;
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    appendMetric(facts, 'JSON', t('desktop.value.invalidShape'), 'warn');
+    appendMetric(facts, 'JSON', t('desktop.value.invalidShape'), 'ca-warn');
     appendMetric(facts, t('desktop.config.reviewers'), t('desktop.value.unknown'));
     appendMetric(facts, t('desktop.config.providers'), t('desktop.value.unknown'));
     return facts;
@@ -1258,41 +1299,41 @@ function renderConfigFacts(): HTMLElement {
   appendMetric(facts, t('desktop.config.language'), language);
   appendMetric(facts, t('desktop.config.reviewers'), String(reviewers));
   appendMetric(facts, t('desktop.config.providers'), String(providers));
-  appendMetric(facts, t('desktop.config.validation'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'warn' : 'good');
+  appendMetric(facts, t('desktop.config.validation'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'ca-warn' : 'ca-good');
   return facts;
 }
 
 function renderSetup(): HTMLElement {
-  const panel = el('div', 'setup-panel');
+  const panel = el('div', 'ca-setup-panel');
   panel.dataset.testid = 'setup-panel';
-  const header = el('div', 'section-head setup-hero');
+  const header = el('div', 'ca-section-head ca-setup-hero');
   const copy = el('div');
-  copy.append(el('span', 'eyebrow', t('desktop.setup.eyebrow')));
+  copy.append(el('span', 'ca-eyebrow', t('desktop.setup.eyebrow')));
   copy.append(el('h2', '', t('desktop.setup.title')));
   copy.append(el('p', '', t('desktop.setup.body')));
   header.append(copy);
-  header.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'button', 'button-refresh-setup'));
+  header.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button', 'button-refresh-setup'));
   panel.append(header);
 
-  const grid = el('div', 'provider-grid');
+  const grid = el('div', 'ca-provider-grid');
   for (const provider of state.providers) {
-    const card = el('div', provider.configured ? 'provider-card configured checklist-card' : 'provider-card checklist-card');
-    const top = el('div', 'provider-card-top');
-    top.append(el('span', provider.configured ? 'check-dot good status-pill' : 'check-dot optional status-pill', provider.configured ? t('desktop.value.ready') : t('desktop.value.optional')));
-    top.append(el('span', 'provider-kind status-pill neutral', provider.kind));
+    const card = el('div', provider.configured ? 'ca-provider-card ca-configured ca-checklist-card' : 'ca-provider-card ca-checklist-card');
+    const top = el('div', 'ca-provider-card-top');
+    top.append(el('span', provider.configured ? 'ca-check-dot ca-good ca-status-pill' : 'ca-check-dot ca-optional ca-status-pill', provider.configured ? t('desktop.value.ready') : t('desktop.value.optional')));
+    top.append(el('span', 'ca-provider-kind ca-status-pill ca-neutral', provider.kind));
     card.append(top);
     card.append(el('strong', '', provider.name));
     const status = provider.configured ? t('desktop.setup.configured') : t('desktop.setup.notConfigured');
-    card.append(el('span', provider.configured ? 'provider-ok status-pill' : 'provider-missing optional status-pill', status));
-    if (provider.envVar) card.append(el('span', 'provider-meta', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
-    if (provider.binary) card.append(el('span', 'provider-meta', provider.binary));
+    card.append(el('span', provider.configured ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-optional ca-status-pill', status));
+    if (provider.envVar) card.append(el('span', 'ca-provider-meta', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
+    if (provider.binary) card.append(el('span', 'ca-provider-meta', provider.binary));
     grid.append(card);
   }
   if (state.providers.length === 0) {
-    const empty = el('div', 'empty-state compact');
+    const empty = el('div', 'ca-empty-state ca-compact');
     empty.append(el('strong', '', t('desktop.setup.providerStatusNotLoaded')));
     empty.append(el('p', '', t('desktop.setup.providerStatusHint')));
-    empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'button subtle'));
+    empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button ca-subtle'));
     grid.append(empty);
   }
   panel.append(grid);
@@ -1303,57 +1344,57 @@ function renderSetup(): HTMLElement {
 }
 
 function renderMcpSetup(): HTMLElement {
-  const section = el('section', 'integration-section');
+  const section = el('section', 'ca-integration-section');
   section.append(el('h3', '', t('desktop.setup.mcpServer')));
   const mcp = state.mcpStatus;
   if (!mcp) {
-    section.append(el('p', 'empty', t('desktop.setup.mcpNotLoaded')));
+    section.append(el('p', 'ca-empty', t('desktop.setup.mcpNotLoaded')));
     return section;
   }
-  section.append(el('p', 'repo-note', mcp.command));
-  const tools = el('div', 'tool-list');
+  section.append(el('p', 'ca-repo-note', mcp.command));
+  const tools = el('div', 'ca-tool-list');
   for (const tool of mcp.tools) {
-    tools.append(el('span', 'fact', tool));
+    tools.append(el('span', 'ca-fact', tool));
   }
   section.append(tools);
-  const snippet = el('pre', 'snippet');
+  const snippet = el('pre', 'ca-snippet');
   snippet.textContent = mcp.clientSnippet;
   section.append(snippet);
   return section;
 }
 
 function renderGitHubActionSetup(): HTMLElement {
-  const section = el('section', 'integration-section');
+  const section = el('section', 'ca-integration-section');
   section.append(el('h3', '', t('desktop.setup.githubAction')));
   const status = state.githubActionStatus;
   if (!status) {
-    section.append(el('p', 'empty', t('desktop.setup.githubActionNotLoaded')));
+    section.append(el('p', 'ca-empty', t('desktop.setup.githubActionNotLoaded')));
     return section;
   }
-  section.append(el('p', 'repo-note', t('desktop.setup.workflowSummary', { codeagora: status.codeagoraWorkflowCount, workflows: status.workflowCount })));
+  section.append(el('p', 'ca-repo-note', t('desktop.setup.workflowSummary', { codeagora: status.codeagoraWorkflowCount, workflows: status.workflowCount })));
   for (const workflow of status.workflows) {
-    const row = el('div', 'workflow-row');
-    row.append(el('strong', 'workflow-path', workflow.path));
-    const flags = el('div', 'workflow-flags');
-    flags.append(el('span', workflow.mentionsCodeagora ? 'provider-ok status-pill' : 'provider-missing status-pill', workflow.mentionsCodeagora ? 'CodeAgora' : t('desktop.setup.noCodeAgora')));
-    flags.append(el('span', workflow.hasPullRequestTrigger ? 'provider-ok status-pill' : 'provider-missing status-pill', workflow.hasPullRequestTrigger ? t('desktop.setup.prTrigger') : t('desktop.setup.noPrTrigger')));
-    flags.append(el('span', workflow.hasPermissions ? 'provider-ok status-pill' : 'provider-missing status-pill', workflow.hasPermissions ? t('desktop.setup.permissions') : t('desktop.setup.permissionsMissing')));
-    flags.append(el('span', workflow.hasConfigPath ? 'provider-ok status-pill' : 'provider-kind status-pill neutral', workflow.hasConfigPath ? 'config-path' : t('desktop.setup.defaultConfig')));
+    const row = el('div', 'ca-workflow-row');
+    row.append(el('strong', 'ca-workflow-path', workflow.path));
+    const flags = el('div', 'ca-workflow-flags');
+    flags.append(el('span', workflow.mentionsCodeagora ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-status-pill', workflow.mentionsCodeagora ? 'CodeAgora' : t('desktop.setup.noCodeAgora')));
+    flags.append(el('span', workflow.hasPullRequestTrigger ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-status-pill', workflow.hasPullRequestTrigger ? t('desktop.setup.prTrigger') : t('desktop.setup.noPrTrigger')));
+    flags.append(el('span', workflow.hasPermissions ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-status-pill', workflow.hasPermissions ? t('desktop.setup.permissions') : t('desktop.setup.permissionsMissing')));
+    flags.append(el('span', workflow.hasConfigPath ? 'ca-provider-ok ca-status-pill' : 'ca-provider-kind ca-status-pill ca-neutral', workflow.hasConfigPath ? 'config-path' : t('desktop.setup.defaultConfig')));
     row.append(flags);
     section.append(row);
   }
-  const snippet = el('pre', 'snippet');
+  const snippet = el('pre', 'ca-snippet');
   snippet.textContent = status.recommendedSnippet;
   section.append(snippet);
   return section;
 }
 
 function renderEvidenceSetup(): HTMLElement {
-  const section = el('section', 'integration-section');
+  const section = el('section', 'ca-integration-section');
   section.append(el('h3', '', t('desktop.setup.releaseEvidence')));
   const evidence = state.evidenceStatus;
   if (!evidence) {
-    section.append(el('p', 'empty', t('desktop.setup.evidenceNotLoaded')));
+    section.append(el('p', 'ca-empty', t('desktop.setup.evidenceNotLoaded')));
     return section;
   }
   const rows: Array<[string, boolean, string | undefined]> = [
@@ -1362,9 +1403,9 @@ function renderEvidenceSetup(): HTMLElement {
     [t('desktop.setup.evidenceManifest'), evidence.hasEvidenceManifest, evidence.evidenceManifestPath],
   ];
   for (const [label, present, path] of rows) {
-    const row = el('div', 'evidence-row');
+    const row = el('div', 'ca-evidence-row');
     row.append(el('strong', '', label));
-    row.append(el('span', present ? 'provider-ok' : 'provider-missing', present ? t('desktop.value.present') : t('desktop.value.missing')));
+    row.append(el('span', present ? 'ca-provider-ok' : 'ca-provider-missing', present ? t('desktop.value.present') : t('desktop.value.missing')));
     row.append(el('span', '', path ?? t('desktop.value.notFound')));
     section.append(row);
   }
@@ -1372,22 +1413,22 @@ function renderEvidenceSetup(): HTMLElement {
 }
 
 function renderToasts(): void {
-  const existing = document.getElementById('toast-container')
+  const existing = document.getElementById('ca-toast-container')
   if (state.toasts.length === 0) {
     if (existing) existing.remove()
     return
   }
-  const container = existing ?? el('div', 'toast-container')
+  const container = existing ?? el('div', 'ca-toast-container')
   if (!existing) {
-    container.id = 'toast-container'
+    container.id = 'ca-toast-container'
     appRoot.append(container)
   } else {
     container.replaceChildren()
   }
   for (const toast of state.toasts) {
-    const node = el('div', `toast toast--${toast.type}`)
+    const node = el('div', `ca-toast ca-toast--${toast.type}`)
     node.append(el('span', '', toast.message))
-    node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ghost', 'button-dismiss-toast'))
+    node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ca-ghost', 'button-dismiss-toast'))
     container.append(node)
   }
 }
@@ -1397,7 +1438,7 @@ function render(): void {
     appRoot.replaceChildren(renderShell());
     lastView = state.view;
   } else {
-    const content = appRoot.querySelector('.content')
+    const content = appRoot.querySelector('.ca-content')
     if (content) {
       const newContent = renderContent()
       content.replaceChildren(...Array.from(newContent.childNodes))
@@ -1411,9 +1452,8 @@ function render(): void {
 async function bootstrap(): Promise<void> {
   try {
     applyDesktopTheme();
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (state.themePreference === 'system') applyDesktopTheme();
-    });
+    mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', onThemeChange);
     applyDesktopLocale();
     try {
       const config = await readConfig();
@@ -1431,40 +1471,14 @@ async function bootstrap(): Promise<void> {
 
     // Keyboard shortcuts (Tauri context only)
     if (IS_TAURI) {
-      document.addEventListener('keydown', (event) => {
-        // Don't activate shortcuts while typing in input/textarea
-        const target = event.target as HTMLElement;
-        if (
-          target.isContentEditable ||
-          target instanceof HTMLInputElement ||
-          target instanceof HTMLTextAreaElement
-        ) {
-          return;
-        }
-
-        const isMeta = event.metaKey || event.ctrlKey;
-
-        if (isMeta && event.key === 'r') {
-          event.preventDefault();
-          if (!state.busy && runReadiness().ready) {
-            void startReview(true);
-          }
-          return;
-        }
-
-        if (isMeta && event.key === ',') {
-          event.preventDefault();
-          setView('config');
-          if (!state.configRaw) void loadConfig();
-          return;
-        }
-
-        if (isMeta && event.key === '1') {
-          event.preventDefault();
-          setView('sessions');
-        }
-      });
+      window.addEventListener('keydown', onKeyDown);
     }
+
+    function cleanupListeners(): void {
+      if (mediaQuery) mediaQuery.removeEventListener('change', onThemeChange);
+      window.removeEventListener('keydown', onKeyDown);
+    }
+    window.addEventListener('beforeunload', cleanupListeners);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     appRoot.innerHTML = `
