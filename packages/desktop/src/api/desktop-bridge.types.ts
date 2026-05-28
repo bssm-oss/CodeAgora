@@ -1,51 +1,18 @@
-export type ReviewDecision = 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
+import type {
+  SessionCostSummary as CoreSessionCostSummary,
+  SessionDetailView,
+  SessionReviewDecision,
+  SessionSeverityCounts,
+  SessionSummary as CoreSessionSummary,
+  SessionTopIssue,
+} from '@codeagora/core/session/contracts.js';
 
-export interface SeverityCounts {
-  HARSHLY_CRITICAL?: number;
-  CRITICAL?: number;
-  WARNING?: number;
-  SUGGESTION?: number;
-}
-
-export interface TopIssue {
-  severity: string;
-  filePath: string;
-  lineRange: [number, number];
-  title: string;
-  confidence?: number;
-}
-
-export interface SessionSummary {
-  id: string;
-  date: string;
-  sessionId: string;
-  status: 'completed' | 'failed' | 'interrupted' | 'in_progress' | 'unknown';
-  dirPath?: string;
-  decision?: ReviewDecision;
-  reasoning?: string;
-  severityCounts?: SeverityCounts;
-  topIssues?: TopIssue[];
-  updatedAt?: string;
-}
-
-export interface SessionCostSummary {
-  known: boolean;
-  formattedTotalCost: string;
-  totalCost?: number;
-  callCount?: number;
-  totalTokens?: number;
-  source?: string;
-}
-
-export interface SessionDetail extends SessionSummary {
-  findings?: TopIssue[];
-  markdown?: string;
-  evidenceCount?: number;
-  discussionsCount?: number;
-  degraded?: boolean;
-  degradedReasons?: string[];
-  costSummary?: SessionCostSummary;
-}
+export type ReviewDecision = SessionReviewDecision;
+export type SeverityCounts = SessionSeverityCounts;
+export type TopIssue = SessionTopIssue;
+export type SessionSummary = CoreSessionSummary;
+export type SessionCostSummary = CoreSessionCostSummary;
+export type SessionDetail = SessionDetailView;
 
 export interface SessionExport {
   format: string;
