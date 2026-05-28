@@ -783,6 +783,19 @@ h3 {
   background: var(--danger-soft);
 }
 
+.ca-session-id-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ca-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
 .ca-detail-meta,
 .ca-config-facts,
 .ca-tool-list,
