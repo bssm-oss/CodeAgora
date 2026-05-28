@@ -36,6 +36,7 @@ type View = 'sessions' | 'run' | 'config' | 'setup';
 type DesktopLocale = 'en' | 'ko';
 type DesktopLocalePreference = DesktopLocale | 'auto';
 type DesktopThemePreference = 'system' | 'light' | 'dark';
+const sessionPageSize = 50;
 
 const recentReposKey = 'codeagora.desktop.recentRepos';
 const localePreferenceKey = 'codeagora.desktop.locale';
@@ -69,6 +70,7 @@ interface AppState {
   sessionSearch: string;
   sessionStatus: 'all' | SessionSummary['status'];
   sessionSort: 'date-desc' | 'date-asc' | 'decision' | 'severity';
+  sessionVisibleCount: number;
   configRaw: string;
   configPath: string;
   configValidation?: ConfigValidation;
@@ -97,6 +99,7 @@ const state: AppState = {
   sessionSearch: '',
   sessionStatus: 'all',
   sessionSort: 'date-desc',
+  sessionVisibleCount: sessionPageSize,
   configRaw: '',
   configPath: '.ca/config.json',
   configDirty: false,
@@ -138,6 +141,7 @@ function resetSessionFilters(): boolean {
   state.sessionSearch = '';
   state.sessionStatus = 'all';
   state.sessionSort = 'date-desc';
+  state.sessionVisibleCount = sessionPageSize;
   render();
   return true;
 }
@@ -147,6 +151,7 @@ function onKeyDown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     if (target instanceof HTMLInputElement && target.dataset.testid === 'session-filter-input' && state.sessionSearch) {
       state.sessionSearch = '';
+      state.sessionVisibleCount = sessionPageSize;
       render();
       event.preventDefault();
       return;
@@ -601,6 +606,7 @@ async function refreshSessions(selectFirst = false, forceRefresh = false): Promi
   render();
   try {
     state.sessions = await listSessions(forceRefresh);
+    state.sessionVisibleCount = sessionPageSize;
     if (selectFirst && state.sessions[0]) {
       state.selected = await getSessionDetail(state.sessions[0].id, forceRefresh);
     }
@@ -1153,12 +1159,14 @@ function renderSessions(): HTMLElement {
     window.clearTimeout(searchDebounce);
     searchDebounce = window.setTimeout(() => {
       state.sessionSearch = search.value;
+      state.sessionVisibleCount = sessionPageSize;
       render();
     }, 150);
   });
   if (state.sessionSearch) {
     const clearBtn = button('×', () => {
       state.sessionSearch = '';
+      state.sessionVisibleCount = sessionPageSize;
       render();
     }, 'ca-button ca-button-ghost', 'button-clear-search');
     clearBtn.style.fontSize = '18px';
@@ -1177,6 +1185,7 @@ function renderSessions(): HTMLElement {
   }
   status.addEventListener('change', () => {
     state.sessionStatus = status.value as AppState['sessionStatus'];
+    state.sessionVisibleCount = sessionPageSize;
     render();
   });
   const sortSelect = el('select', 'ca-filter-select') as HTMLSelectElement;
@@ -1196,13 +1205,15 @@ function renderSessions(): HTMLElement {
   }
   sortSelect.addEventListener('change', () => {
     state.sessionSort = sortSelect.value as AppState['sessionSort'];
+    state.sessionVisibleCount = sessionPageSize;
     render();
   });
   controls.append(search, status, sortSelect);
   listPanel.append(controls);
 
   const sessions = filteredSessions();
-  const summary = el('div', 'ca-list-summary', t('desktop.sessions.visibleSummary', { visible: sessions.length, total: state.sessions.length }));
+  const visibleSessions = sessions.slice(0, state.sessionVisibleCount);
+  const summary = el('div', 'ca-list-summary', t('desktop.sessions.visibleSummary', { visible: visibleSessions.length, total: sessions.length }));
   listPanel.append(summary);
   if (state.sessions.length === 0) {
     const empty = el('div', 'ca-empty-state ca-padded');
@@ -1213,7 +1224,7 @@ function renderSessions(): HTMLElement {
   } else if (sessions.length === 0) {
     listPanel.append(el('p', 'ca-empty ca-padded', t('desktop.sessions.noFilterMatch')));
   }
-  for (const session of sessions) {
+  for (const session of visibleSessions) {
     const item = button('', () => {
       if (state.selected?.id === session.id) {
         state.selected = undefined
@@ -1229,6 +1240,15 @@ function renderSessions(): HTMLElement {
     item.append(top);
     item.append(el('span', 'ca-session-meta', t('desktop.sessions.rowMeta', { blockers: blockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
     listPanel.append(item);
+  }
+  if (visibleSessions.length < sessions.length) {
+    const pagination = el('div', 'ca-session-pagination');
+    pagination.append(el('span', '', t('desktop.sessions.paginationSummary', { visible: visibleSessions.length, total: sessions.length })));
+    pagination.append(button(t('desktop.action.showMore'), () => {
+      state.sessionVisibleCount += sessionPageSize;
+      render();
+    }, 'ca-button ca-button-ghost', 'button-show-more-sessions'));
+    listPanel.append(pagination);
   }
   layout.append(listPanel);
   layout.append(renderSessionDetail());
