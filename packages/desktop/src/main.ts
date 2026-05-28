@@ -57,6 +57,7 @@ interface AppState {
   activeRun?: ReviewRunSnapshot;
   sessionSearch: string;
   sessionStatus: 'all' | SessionSummary['status'];
+  sessionSort: 'date-desc' | 'date-asc' | 'decision' | 'severity';
   configRaw: string;
   configPath: string;
   configValidation?: ConfigValidation;
@@ -80,6 +81,7 @@ const state: AppState = {
   commandContract: [],
   sessionSearch: '',
   sessionStatus: 'all',
+  sessionSort: 'date-desc',
   configRaw: '',
   configPath: '.ca/config.json',
   providers: [],
@@ -210,21 +212,38 @@ function severityTotal(session: SessionSummary): number {
   return Object.values(counts).reduce((sum, value) => sum + (value ?? 0), 0);
 }
 
+function sortSessions(sessions: SessionSummary[]): SessionSummary[] {
+  const sorted = [...sessions];
+  switch (state.sessionSort) {
+    case 'date-desc':
+      return sorted.sort((a, b) => timestampValue(b.updatedAt) - timestampValue(a.updatedAt));
+    case 'date-asc':
+      return sorted.sort((a, b) => timestampValue(a.updatedAt) - timestampValue(b.updatedAt));
+    case 'decision': {
+      const order = { ACCEPT: 0, REJECT: 1, NEEDS_HUMAN: 2 };
+      return sorted.sort((a, b) => (order[a.decision as keyof typeof order] ?? 3) - (order[b.decision as keyof typeof order] ?? 3));
+    }
+    case 'severity': {
+      const sev = (s: SessionSummary) =>
+        (s.severityCounts?.CRITICAL ?? 0) * 100 +
+        (s.severityCounts?.WARNING ?? 0) * 10 +
+        (s.severityCounts?.SUGGESTION ?? 0);
+      return sorted.sort((a, b) => sev(b) - sev(a));
+    }
+  }
+  return sorted;
+}
+
 function filteredSessions(): SessionSummary[] {
-  const query = state.sessionSearch.trim().toLowerCase();
-  return state.sessions.filter((session) => {
-    if (state.sessionStatus !== 'all' && session.status !== state.sessionStatus) return false;
-    if (!query) return true;
-    const haystack = [
-      session.id,
-      session.status,
-      session.decision,
-      session.reasoning,
-      session.dirPath,
-      ...(session.topIssues ?? []).flatMap((issue) => [issue.title, issue.filePath, issue.severity]),
-    ].filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(query);
-  });
+  let result = state.sessions;
+  if (state.sessionSearch.trim()) {
+    const q = state.sessionSearch.toLowerCase();
+    result = result.filter((s) => s.id.toLowerCase().includes(q) || (s.decision ?? '').toLowerCase().includes(q));
+  }
+  if (state.sessionStatus !== 'all') {
+    result = result.filter((s) => s.status === state.sessionStatus);
+  }
+  return sortSessions(result);
 }
 
 function decisionClass(decision?: string): string {
@@ -853,6 +872,15 @@ function renderSessions(): HTMLElement {
       render();
     }, 150);
   });
+  if (state.sessionSearch) {
+    const clearBtn = button('×', () => {
+      state.sessionSearch = '';
+      render();
+    }, 'ca-button ca-button-ghost', 'button-clear-search');
+    clearBtn.style.fontSize = '18px';
+    clearBtn.style.lineHeight = '1';
+    controls.append(clearBtn);
+  }
   const status = el('select', 'ca-filter-select') as HTMLSelectElement;
   status.dataset.testid = 'session-status-filter';
   status.setAttribute('aria-label', t('desktop.sessions.statusFilterAria'));
@@ -867,7 +895,26 @@ function renderSessions(): HTMLElement {
     state.sessionStatus = status.value as AppState['sessionStatus'];
     render();
   });
-  controls.append(search, status);
+  const sortSelect = el('select', 'ca-filter-select') as HTMLSelectElement;
+  sortSelect.dataset.testid = 'session-sort-select';
+  const sortOptions = [
+    { value: 'date-desc', label: t('desktop.sessions.sortDateDesc') },
+    { value: 'date-asc', label: t('desktop.sessions.sortDateAsc') },
+    { value: 'decision', label: t('desktop.sessions.sortDecision') },
+    { value: 'severity', label: t('desktop.sessions.sortSeverity') },
+  ];
+  for (const option of sortOptions) {
+    const opt = document.createElement('option');
+    opt.value = option.value;
+    opt.textContent = option.label;
+    if (state.sessionSort === option.value) opt.selected = true;
+    sortSelect.append(opt);
+  }
+  sortSelect.addEventListener('change', () => {
+    state.sessionSort = sortSelect.value as AppState['sessionSort'];
+    render();
+  });
+  controls.append(search, status, sortSelect);
   listPanel.append(controls);
 
   const sessions = filteredSessions();
@@ -975,6 +1022,32 @@ function renderSessionDetail(): HTMLElement {
   banner.append(bannerText);
   banner.append(el('span', decisionClass(selected.decision), selected.id));
   detail.append(banner);
+
+  const detailHeader = el('div', 'ca-detail-header');
+  const idRow = el('div', 'ca-session-id-row');
+  idRow.append(el('span', 'ca-session-id', selected.id));
+  const copyBtn = button(t('desktop.action.copy'), async () => {
+    try {
+      await navigator.clipboard.writeText(selected.id);
+      pushToast(t('desktop.toast.copied'), 'success');
+    } catch {
+      pushToast(t('desktop.toast.copyFailed'), 'error');
+    }
+  }, 'ca-button ca-button-ghost', 'button-copy-session-id');
+  idRow.append(copyBtn);
+  detailHeader.append(idRow);
+
+  const filtered = filteredSessions();
+  const currentIndex = filtered.findIndex((s) => s.id === selected.id);
+  if (currentIndex > 0) {
+    const prevBtn = button(t('desktop.action.previous'), () => void selectSession(filtered[currentIndex - 1].id), 'ca-button ca-button-ghost', 'button-prev-session');
+    detailHeader.append(prevBtn);
+  }
+  if (currentIndex >= 0 && currentIndex < filtered.length - 1) {
+    const nextBtn = button(t('desktop.action.next'), () => void selectSession(filtered[currentIndex + 1].id), 'ca-button ca-button-ghost', 'button-next-session');
+    detailHeader.append(nextBtn);
+  }
+  detail.append(detailHeader);
 
   const meta = el('div', 'ca-detail-meta');
   meta.append(el('span', '', selected.dirPath ?? '.ca/sessions'));
