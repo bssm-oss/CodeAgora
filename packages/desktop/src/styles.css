@@ -490,6 +490,7 @@ h3 {
 }
 
 .ca-cockpit-overview,
+.ca-compare-panel,
 .ca-session-list,
 .ca-detail,
 .ca-run-panel,
@@ -547,6 +548,7 @@ h3 {
 
 .ca-metric-card,
 .ca-repo-card,
+.ca-compare-card,
 .ca-count-cell,
 .ca-provider-card {
   display: grid;
@@ -560,6 +562,7 @@ h3 {
 
 .ca-metric-card span,
 .ca-repo-card span,
+.ca-compare-card span,
 .ca-count-cell span,
 .ca-provider-card span,
 .ca-session-meta,
@@ -572,6 +575,7 @@ h3 {
 
 .ca-metric-card strong,
 .ca-repo-card strong,
+.ca-compare-card strong,
 .ca-provider-card strong {
   min-width: 0;
   overflow: hidden;
@@ -608,6 +612,35 @@ h3 {
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+}
+
+.ca-compare-panel {
+  display: grid;
+  gap: var(--space-4);
+  padding: clamp(18px, 2.4vw, 24px);
+}
+
+.ca-compare-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.ca-compare-select {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.ca-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.ca-compare-card {
+  align-content: start;
+  gap: var(--space-3);
 }
 
 .ca-session-list {
@@ -1268,6 +1301,7 @@ summary {
   }
 
   .ca-cockpit-overview,
+  .ca-compare-grid,
   .ca-sessions-layout,
   .ca-repo-grid,
   .ca-provider-grid {
@@ -1287,6 +1321,7 @@ summary {
   }
 
   .ca-session-controls,
+  .ca-compare-controls,
   .ca-repo-picker,
   .ca-launch-cards,
   .ca-count-grid,

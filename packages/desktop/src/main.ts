@@ -61,6 +61,10 @@ interface AppState {
   view: View;
   sessions: SessionSummary[];
   selected?: SessionDetail;
+  compareLeftId?: string;
+  compareRightId?: string;
+  compareLeft?: SessionDetail;
+  compareRight?: SessionDetail;
   repoPath: string;
   repoInfo?: RepoInfo;
   repoInput: string;
@@ -364,6 +368,10 @@ function sessionHasDegradedSignal(session?: SessionDetail): boolean {
   return Boolean(session?.degraded || (session?.degradedReasons && session.degradedReasons.length > 0));
 }
 
+function sessionCostLabel(session?: SessionDetail): string {
+  return session?.costSummary?.known ? session.costSummary.formattedTotalCost : t('desktop.detail.costUnknown');
+}
+
 function runHasDegradedSignal(run?: ReviewRunSnapshot): boolean {
   if (!run) return false;
   return run.events.some((event) => /degraded/i.test(event.kind) || /degraded/i.test(event.message));
@@ -607,6 +615,11 @@ async function refreshSessions(selectFirst = false, forceRefresh = false): Promi
   try {
     state.sessions = await listSessions(forceRefresh);
     state.sessionVisibleCount = sessionPageSize;
+    const knownIds = new Set(state.sessions.map((session) => session.id));
+    if (state.compareLeftId && !knownIds.has(state.compareLeftId)) state.compareLeftId = undefined;
+    if (state.compareRightId && !knownIds.has(state.compareRightId)) state.compareRightId = undefined;
+    if (state.compareLeft && !knownIds.has(state.compareLeft.id)) state.compareLeft = undefined;
+    if (state.compareRight && !knownIds.has(state.compareRight.id)) state.compareRight = undefined;
     if (selectFirst && state.sessions[0]) {
       state.selected = await getSessionDetail(state.sessions[0].id, forceRefresh);
     }
@@ -644,6 +657,10 @@ async function openRepo(path: string): Promise<void> {
     state.repoInput = state.repoInfo.path;
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
+    state.compareLeftId = undefined;
+    state.compareRightId = undefined;
+    state.compareLeft = undefined;
+    state.compareRight = undefined;
     state.attentionCount = 0;
     updateBadgeState();
     resetConfigState();
@@ -693,6 +710,29 @@ async function selectSession(id: string): Promise<void> {
   render();
   try {
     state.selected = await getSessionDetail(id);
+  } catch (error) {
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
+  } finally {
+    state.busy = false;
+    render();
+  }
+}
+
+async function loadComparison(leftId: string, rightId: string): Promise<void> {
+  state.compareLeftId = leftId;
+  state.compareRightId = rightId;
+  state.compareLeft = undefined;
+  state.compareRight = undefined;
+  if (!leftId || !rightId || leftId === rightId) {
+    render();
+    return;
+  }
+  state.busy = true;
+  render();
+  try {
+    const [left, right] = await Promise.all([getSessionDetail(leftId), getSessionDetail(rightId)]);
+    state.compareLeft = left;
+    state.compareRight = right;
   } catch (error) {
     pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
@@ -1138,6 +1178,7 @@ function renderContent(): HTMLElement {
 function renderSessions(): HTMLElement {
   const wrapper = el('div', 'ca-cockpit-page');
   wrapper.append(renderCockpitOverview());
+  wrapper.append(renderSessionComparison());
 
   const layout = el('div', 'ca-sessions-layout');
   layout.dataset.testid = 'sessions-layout';
@@ -1254,6 +1295,133 @@ function renderSessions(): HTMLElement {
   layout.append(renderSessionDetail());
   wrapper.append(layout);
   return wrapper;
+}
+
+function renderComparisonSelect(label: string, sessions: SessionSummary[], selectedId: string | undefined, onChange: (id: string) => void, testId: string): HTMLLabelElement {
+  const control = el('label', 'ca-compare-select') as HTMLLabelElement;
+  control.append(el('span', 'ca-toolbar-select-label', label));
+  const select = el('select', 'ca-toolbar-select-input') as HTMLSelectElement;
+  select.dataset.testid = testId;
+  select.setAttribute('aria-label', label);
+  for (const session of sessions) {
+    const option = el('option') as HTMLOptionElement;
+    option.value = session.id;
+    option.textContent = `${session.id} · ${session.decision ?? session.status}`;
+    option.selected = session.id === selectedId;
+    select.append(option);
+  }
+  select.disabled = state.busy || sessions.length < 2;
+  select.addEventListener('change', () => onChange(select.value));
+  control.append(select);
+  return control;
+}
+
+function defaultComparisonIds(sessions: SessionSummary[]): [string | undefined, string | undefined] {
+  const sessionIds = sessions.map((session) => session.id);
+  const left = state.compareLeftId && sessionIds.includes(state.compareLeftId) ? state.compareLeftId : sessionIds[0];
+  const right = state.compareRightId && sessionIds.includes(state.compareRightId) && state.compareRightId !== left
+    ? state.compareRightId
+    : sessionIds.find((id) => id !== left);
+  return [left, right];
+}
+
+function renderSessionComparison(): HTMLElement {
+  const panel = el('section', 'ca-compare-panel');
+  panel.dataset.testid = 'session-compare-panel';
+  const header = el('div', 'ca-section-head');
+  const copy = el('div');
+  copy.append(el('span', 'ca-eyebrow', t('desktop.compare.eyebrow')));
+  copy.append(el('h2', '', t('desktop.compare.title')));
+  copy.append(el('p', '', t('desktop.compare.body')));
+  header.append(copy);
+  panel.append(header);
+
+  const sessions = filteredSessions();
+  if (sessions.length < 2) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.compare.emptyTitle')));
+    empty.append(el('p', '', t('desktop.compare.emptyBody')));
+    panel.append(empty);
+    return panel;
+  }
+
+  const [leftId, rightId] = defaultComparisonIds(sessions);
+  const controls = el('div', 'ca-compare-controls');
+  controls.append(renderComparisonSelect(t('desktop.compare.leftLabel'), sessions, leftId, (next) => {
+    state.compareLeftId = next;
+    state.compareLeft = undefined;
+    state.compareRight = undefined;
+    render();
+  }, 'compare-left-select'));
+  controls.append(renderComparisonSelect(t('desktop.compare.rightLabel'), sessions, rightId, (next) => {
+    state.compareRightId = next;
+    state.compareLeft = undefined;
+    state.compareRight = undefined;
+    render();
+  }, 'compare-right-select'));
+  const compareButton = button(t('desktop.action.compareSessions'), () => {
+    if (leftId && rightId) void loadComparison(leftId, rightId);
+  }, 'ca-button ca-subtle', 'button-compare-sessions');
+  compareButton.disabled = state.busy || !leftId || !rightId || leftId === rightId;
+  controls.append(compareButton);
+  panel.append(controls);
+
+  if (leftId === rightId) {
+    panel.append(el('p', 'ca-empty', t('desktop.compare.sameSession')));
+    return panel;
+  }
+
+  const compareLeft = state.compareLeft;
+  const compareRight = state.compareRight;
+  if (compareLeft && compareRight && compareLeft.id === leftId && compareRight.id === rightId) {
+    const grid = el('div', 'ca-compare-grid');
+    grid.append(renderComparisonCard(compareLeft, t('desktop.compare.leftLabel')));
+    grid.append(renderComparisonCard(compareRight, t('desktop.compare.rightLabel')));
+    panel.append(grid);
+  } else {
+    panel.append(el('p', 'ca-empty', t('desktop.compare.prompt')));
+  }
+  return panel;
+}
+
+function renderComparisonCard(session: SessionDetail, label: string): HTMLElement {
+  const card = el('article', 'ca-compare-card');
+  card.append(el('span', 'ca-eyebrow', label));
+  card.append(el('h3', '', session.id));
+  card.append(el('span', decisionClass(session.decision), session.decision ?? session.status));
+
+  const metrics = el('div', 'ca-summary-cards');
+  appendMetric(metrics, t('desktop.compare.verdict'), session.decision ?? session.status);
+  appendMetric(metrics, t('desktop.detail.costLabel'), sessionCostLabel(session), session.costSummary?.known ? 'ca-good' : 'ca-warn');
+  appendMetric(metrics, t('desktop.compare.degraded'), sessionHasDegradedSignal(session) ? t('desktop.value.present') : t('desktop.value.missing'), sessionHasDegradedSignal(session) ? 'ca-warn' : 'ca-good');
+  appendMetric(metrics, t('desktop.compare.findings'), String((session.findings ?? session.topIssues ?? []).length));
+  card.append(metrics);
+
+  const counts = el('div', 'ca-count-grid');
+  for (const key of ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'] as const) {
+    const cell = el('div', key === 'HARSHLY_CRITICAL' || key === 'CRITICAL' ? 'ca-count-cell ca-danger' : 'ca-count-cell');
+    cell.append(el('span', '', key.replace('_', ' ')));
+    cell.append(el('strong', '', String(session.severityCounts?.[key] ?? 0)));
+    counts.append(cell);
+  }
+  card.append(counts);
+
+  const findings = (session.findings?.length ? session.findings : session.topIssues ?? []).slice(0, 5);
+  const findingList = el('div', 'ca-issues');
+  findingList.append(el('h3', '', t('desktop.compare.findingsPreview')));
+  if (findings.length === 0) {
+    findingList.append(el('p', 'ca-empty', t('desktop.detail.noFindings')));
+  } else {
+    for (const issue of findings) {
+      const row = el('div', 'ca-issue-row ca-issue-card');
+      row.append(el('span', 'ca-issue-severity', issue.severity));
+      row.append(el('strong', '', issue.title));
+      row.append(el('span', '', `${issue.filePath}:${issue.lineRange[0]}`));
+      findingList.append(row);
+    }
+  }
+  card.append(findingList);
+  return card;
 }
 
 function renderCockpitOverview(): HTMLElement {
@@ -1376,7 +1544,7 @@ function renderSessionDetail(): HTMLElement {
   appendMetric(evidenceGrid, t('desktop.detail.evidenceDocsLabel'), String(selected.evidenceCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.debateFilesLabel'), String(selected.discussionsCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.exportFormats'), 'Markdown · JSON · SARIF');
-  appendMetric(evidenceGrid, t('desktop.detail.costLabel'), selected.costSummary?.known ? selected.costSummary.formattedTotalCost : t('desktop.detail.costUnknown'));
+  appendMetric(evidenceGrid, t('desktop.detail.costLabel'), sessionCostLabel(selected));
   appendMetric(evidenceGrid, t('desktop.detail.callsLabel'), String(selected.costSummary?.callCount ?? 0));
   appendMetric(evidenceGrid, t('desktop.detail.tokensLabel'), selected.costSummary?.totalTokens !== undefined ? String(selected.costSummary.totalTokens) : t('desktop.value.unknown'));
   evidence.append(evidenceGrid);
