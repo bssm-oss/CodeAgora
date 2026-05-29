@@ -494,6 +494,7 @@ h3 {
 .ca-detail,
 .ca-run-panel,
 .ca-config-panel,
+.ca-analytics-panel,
 .ca-setup-panel {
   border: 1px solid var(--border);
   border-radius: 24px;
@@ -776,6 +777,7 @@ h3 {
 .ca-detail,
 .ca-run-panel,
 .ca-config-panel,
+.ca-analytics-panel,
 .ca-setup-panel {
   display: grid;
   gap: 18px;
@@ -914,6 +916,7 @@ summary {
 
 .ca-launch-intro,
 .ca-config-hero,
+.ca-analytics-hero > div,
 .ca-setup-hero > div {
   display: grid;
   gap: 7px;
@@ -949,6 +952,7 @@ summary {
 }
 
 .ca-repo-grid,
+.ca-analytics-metrics,
 .ca-provider-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -958,6 +962,68 @@ summary {
 .ca-provider-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-3);
+}
+
+.ca-analytics-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.8fr);
+  gap: var(--space-3);
+}
+
+.ca-analytics-list,
+.ca-analytics-trends {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ca-analytics-row,
+.ca-analytics-trend-row {
+  display: grid;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--bg));
+}
+
+.ca-analytics-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ca-analytics-trend-row {
+  grid-template-columns: minmax(120px, 1fr) minmax(110px, auto) auto;
+}
+
+.ca-analytics-row > div:first-child,
+.ca-analytics-row-metrics {
+  min-width: 0;
+}
+
+.ca-analytics-row > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.ca-analytics-row strong,
+.ca-analytics-trend-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ca-analytics-row span,
+.ca-analytics-trend-row span {
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.ca-analytics-row-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .ca-launch-cards {
@@ -1264,12 +1330,13 @@ summary {
   }
 
   .ca-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .ca-cockpit-overview,
   .ca-sessions-layout,
   .ca-repo-grid,
+  .ca-analytics-columns,
   .ca-provider-grid {
     grid-template-columns: 1fr;
   }
@@ -1292,6 +1359,9 @@ summary {
   .ca-count-grid,
   .ca-cockpit-metrics,
   .ca-summary-cards,
+  .ca-analytics-metrics,
+  .ca-analytics-row,
+  .ca-analytics-trend-row,
   .ca-evidence-grid,
   .ca-command-row,
   .ca-event-row,

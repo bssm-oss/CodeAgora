@@ -792,6 +792,14 @@ fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
             notes: "Detects local release evidence, benchmark report, and evidence manifest files.",
         },
         DesktopCommandContract {
+            name: "get_analytics_status",
+            classification: "read-only",
+            reads_project: true,
+            mutates_project: false,
+            spawns_process: false,
+            notes: "Aggregates model usage, leaderboard, and cost telemetry from local session artifacts.",
+        },
+        DesktopCommandContract {
             name: "get_command_contract",
             classification: "read-only",
             reads_project: false,
@@ -1560,6 +1568,246 @@ fn evidence_status(root: &Path) -> EvidenceStatus {
     }
 }
 
+#[derive(Default)]
+struct AnalyticsGroup {
+    provider: String,
+    model: String,
+    calls: u64,
+    sessions: u64,
+    tokens: u64,
+    failures: u64,
+    cost: f64,
+    known_cost_entries: u64,
+}
+
+fn string_value(value: &Value, keys: &[&str], fallback: &str) -> String {
+    for key in keys {
+        if let Some(found) = value.get(*key).and_then(Value::as_str) {
+            if !found.trim().is_empty() {
+                return found.to_string();
+            }
+        }
+    }
+    fallback.to_string()
+}
+
+fn total_tokens_from_value(value: &Value) -> u64 {
+    value
+        .get("usage")
+        .or_else(|| value.get("tokenUsage"))
+        .and_then(|usage| u64_field(usage, &["totalTokens", "total_tokens", "tokens"]))
+        .or_else(|| u64_field(value, &["totalTokens", "tokens"]))
+        .unwrap_or(0)
+}
+
+fn add_analytics_record(
+    groups: &mut HashMap<String, AnalyticsGroup>,
+    sessions_seen: &mut HashMap<String, std::collections::HashSet<String>>,
+    session_id: &str,
+    value: &Value,
+) {
+    let provider = string_value(value, &["provider", "backend"], "unknown");
+    let model = string_value(value, &["model", "modelId", "reviewer", "reviewerId"], "unknown");
+    let key = format!("{provider}/{model}");
+    let group = groups.entry(key.clone()).or_insert_with(|| AnalyticsGroup {
+        provider,
+        model,
+        ..AnalyticsGroup::default()
+    });
+    group.calls += 1;
+    group.tokens += total_tokens_from_value(value);
+    if value
+        .get("success")
+        .and_then(Value::as_bool)
+        .map(|success| !success)
+        .unwrap_or(false)
+    {
+        group.failures += 1;
+    }
+    if let Some(cost) = numeric_field(value, &["totalCost", "totalUsd", "cost"]) {
+        if cost > 0.0 {
+            group.cost += cost;
+            group.known_cost_entries += 1;
+        }
+    }
+    let seen = sessions_seen.entry(key).or_default();
+    if seen.insert(session_id.to_string()) {
+        group.sessions += 1;
+    }
+}
+
+fn collect_analytics_records(
+    groups: &mut HashMap<String, AnalyticsGroup>,
+    sessions_seen: &mut HashMap<String, std::collections::HashSet<String>>,
+    session_id: &str,
+    source: Option<&Value>,
+) {
+    let Some(source) = source else {
+        return;
+    };
+    if let Some(records) = source.get("records").and_then(Value::as_array) {
+        for record in records {
+            add_analytics_record(groups, sessions_seen, session_id, record);
+        }
+    }
+    if let Some(costs) = source.get("costs").and_then(Value::as_array) {
+        for cost in costs {
+            add_analytics_record(groups, sessions_seen, session_id, cost);
+        }
+    }
+}
+
+fn session_known_cost(values: &[Option<&Value>]) -> Option<f64> {
+    for value in values.iter().flatten() {
+        if let Some(summary) = cost_summary_from_value("analytics", value) {
+            if let Some(cost) = summary.get("totalCost").and_then(Value::as_f64) {
+                if cost > 0.0 {
+                    return Some(cost);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn model_leaderboard(root: &Path) -> Vec<Value> {
+    let Some(model_quality) = read_json(&root.join(".ca").join("model-quality.json")) else {
+        return Vec::new();
+    };
+    let Some(arms) = model_quality.get("arms").and_then(Value::as_object) else {
+        return Vec::new();
+    };
+    let mut entries = arms
+        .iter()
+        .filter_map(|(model, arm)| {
+            let alpha = arm.get("alpha").and_then(Value::as_f64)?;
+            let beta = arm.get("beta").and_then(Value::as_f64)?;
+            let denominator = alpha + beta;
+            if denominator <= 0.0 {
+                return None;
+            }
+            Some(json!({
+                "model": model,
+                "winRate": alpha / denominator,
+                "reviews": arm.get("reviewCount").and_then(Value::as_u64).unwrap_or(0),
+                "alpha": alpha,
+                "beta": beta,
+            }))
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|a, b| {
+        b.get("winRate")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            .partial_cmp(&a.get("winRate").and_then(Value::as_f64).unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    entries.truncate(8);
+    entries
+}
+
+fn analytics_status(root: &Path) -> Value {
+    let mut session_count = 0_u64;
+    let mut sessions_with_known_cost = 0_u64;
+    let mut unknown_cost_sessions = 0_u64;
+    let mut total_cost = 0.0_f64;
+    let mut trends: HashMap<String, (u64, f64)> = HashMap::new();
+    let mut groups: HashMap<String, AnalyticsGroup> = HashMap::new();
+    let mut sessions_seen: HashMap<String, std::collections::HashSet<String>> = HashMap::new();
+
+    if let Ok(date_dirs) = fs::read_dir(sessions_root_for(root)) {
+        for date_entry in date_dirs
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+        {
+            let date = date_entry.file_name().to_string_lossy().to_string();
+            if !date.chars().all(|char| char.is_ascii_digit() || char == '-') {
+                continue;
+            }
+            let Ok(session_dirs) = fs::read_dir(date_entry.path()) else {
+                continue;
+            };
+            for session_entry in session_dirs
+                .filter_map(Result::ok)
+                .filter(|entry| entry.path().is_dir())
+            {
+                let session_id = format!("{date}/{}", session_entry.file_name().to_string_lossy());
+                let dir = session_entry.path();
+                let metadata = read_json(&dir.join("metadata.json"));
+                let telemetry = read_json(&dir.join("telemetry.json"));
+                let result = read_json(&dir.join("result.json"));
+                session_count += 1;
+                collect_analytics_records(&mut groups, &mut sessions_seen, &session_id, telemetry.as_ref());
+                collect_analytics_records(&mut groups, &mut sessions_seen, &session_id, result.as_ref());
+                collect_analytics_records(&mut groups, &mut sessions_seen, &session_id, metadata.as_ref());
+                let trend = trends.entry(date.clone()).or_insert((0, 0.0));
+                trend.0 += 1;
+                if let Some(cost) = session_known_cost(&[result.as_ref(), metadata.as_ref(), telemetry.as_ref()]) {
+                    total_cost += cost;
+                    sessions_with_known_cost += 1;
+                    trend.1 += cost;
+                } else {
+                    unknown_cost_sessions += 1;
+                }
+            }
+        }
+    }
+
+    let mut breakdown = groups
+        .values()
+        .map(|group| json!({
+            "provider": group.provider,
+            "model": group.model,
+            "calls": group.calls,
+            "sessions": group.sessions,
+            "tokens": group.tokens,
+            "failures": group.failures,
+            "cost": group.cost,
+            "formattedCost": if group.known_cost_entries > 0 { format!("${:.4}", group.cost) } else { "unknown".to_string() },
+            "knownCostEntries": group.known_cost_entries,
+        }))
+        .collect::<Vec<_>>();
+    breakdown.sort_by(|a, b| {
+        b.get("cost")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            .partial_cmp(&a.get("cost").and_then(Value::as_f64).unwrap_or(0.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                b.get("calls")
+                    .and_then(Value::as_u64)
+                    .cmp(&a.get("calls").and_then(Value::as_u64))
+            })
+    });
+    breakdown.truncate(12);
+
+    let mut trend_rows = trends
+        .into_iter()
+        .map(|(date, (sessions, cost))| json!({
+            "date": date,
+            "sessions": sessions,
+            "cost": cost,
+            "formattedCost": if cost > 0.0 { format!("${cost:.4}") } else { "unknown".to_string() },
+        }))
+        .collect::<Vec<_>>();
+    trend_rows.sort_by_key(|row| row.get("date").and_then(Value::as_str).unwrap_or_default().to_string());
+    trend_rows.reverse();
+    trend_rows.truncate(14);
+
+    json!({
+        "sessionCount": session_count,
+        "sessionsWithKnownCost": sessions_with_known_cost,
+        "unknownCostSessions": unknown_cost_sessions,
+        "totalCost": total_cost,
+        "formattedTotalCost": if sessions_with_known_cost > 0 { format!("${total_cost:.4}") } else { "unknown".to_string() },
+        "averageCost": if sessions_with_known_cost > 0 { total_cost / sessions_with_known_cost as f64 } else { 0.0 },
+        "formattedAverageCost": if sessions_with_known_cost > 0 { format!("${:.4}", total_cost / sessions_with_known_cost as f64) } else { "unknown".to_string() },
+        "breakdown": breakdown,
+        "trends": trend_rows,
+        "leaderboard": model_leaderboard(root),
+    })
+}
+
 fn write_config_for_root(raw: &str, root: &Path) -> Result<DesktopConfig, String> {
     let path = match config_path(root) {
         Some(path) if path.extension().and_then(|value| value.to_str()) == Some("json") => path,
@@ -2232,6 +2480,12 @@ fn get_evidence_status(state: State<'_, WorkspaceState>) -> Result<EvidenceStatu
 }
 
 #[tauri::command]
+fn get_analytics_status(state: State<'_, WorkspaceState>) -> Result<Value, String> {
+    let root = active_repo_root(&state)?;
+    Ok(analytics_status(&root))
+}
+
+#[tauri::command]
 fn write_config(raw: String, state: State<'_, WorkspaceState>) -> Result<DesktopConfig, String> {
     let root = active_repo_root(&state)?;
     require_trusted_repo(&root)?;
@@ -2273,6 +2527,7 @@ fn main() {
             get_mcp_status,
             get_github_action_status,
             get_evidence_status,
+            get_analytics_status,
             write_config,
             get_repo_info,
             open_repository,
@@ -2386,7 +2641,29 @@ mod tests {
         write_file(
             &root,
             ".ca/sessions/2026-05-06/e2e-001/telemetry.json",
-            r#"{ "degradedReason": "fallback backend", "costSummary": { "totalUsd": 0.99 } }"#,
+            r#"{
+  "degradedReason": "fallback backend",
+  "costSummary": { "totalUsd": 0.99 },
+  "records": [
+    { "reviewerId": "r1", "provider": "openai", "model": "gpt-5", "latencyMs": 1200, "success": true, "usage": { "totalTokens": 1200 } }
+  ],
+  "costs": [
+    { "reviewerId": "r1", "provider": "openai", "model": "gpt-5", "totalCost": 0.42, "totalTokens": 1200 }
+  ]
+}"#,
+        );
+        write_file(
+            &root,
+            ".ca/model-quality.json",
+            r#"{
+  "version": 1,
+  "lastUpdated": "2026-05-06T00:00:00.000Z",
+  "arms": {
+    "openai/gpt-5": { "alpha": 9, "beta": 3, "reviewCount": 10, "lastUsed": 1778040000000 },
+    "anthropic/claude": { "alpha": 4, "beta": 4, "reviewCount": 6, "lastUsed": 1778040000000 }
+  },
+  "history": []
+}"#,
         );
         write_file(
             &root,
@@ -2499,6 +2776,30 @@ mod tests {
         assert!(evidence.has_release_evidence);
         assert!(evidence.has_benchmark_report);
         assert!(evidence.has_evidence_manifest);
+
+        let analytics = analytics_status(&root);
+        assert_eq!(
+            analytics.get("sessionCount").and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            analytics.get("sessionsWithKnownCost").and_then(Value::as_u64),
+            Some(1)
+        );
+        assert!(analytics
+            .get("breakdown")
+            .and_then(Value::as_array)
+            .map(|entries| entries
+                .iter()
+                .any(|entry| entry.get("provider").and_then(Value::as_str) == Some("openai")))
+            .unwrap_or(false));
+        assert!(analytics
+            .get("leaderboard")
+            .and_then(Value::as_array)
+            .map(|entries| entries
+                .iter()
+                .any(|entry| entry.get("model").and_then(Value::as_str) == Some("openai/gpt-5")))
+            .unwrap_or(false));
     }
 
     #[test]

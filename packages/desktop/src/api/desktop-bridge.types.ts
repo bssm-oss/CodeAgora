@@ -102,6 +102,46 @@ export interface EvidenceStatus {
   hasEvidenceManifest: boolean;
 }
 
+export interface AnalyticsBreakdownEntry {
+  provider: string;
+  model: string;
+  calls: number;
+  sessions: number;
+  tokens: number;
+  failures: number;
+  cost: number;
+  formattedCost: string;
+  knownCostEntries: number;
+}
+
+export interface AnalyticsTrendEntry {
+  date: string;
+  sessions: number;
+  cost: number;
+  formattedCost: string;
+}
+
+export interface ModelLeaderboardEntry {
+  model: string;
+  winRate: number;
+  reviews: number;
+  alpha: number;
+  beta: number;
+}
+
+export interface AnalyticsStatus {
+  sessionCount: number;
+  sessionsWithKnownCost: number;
+  unknownCostSessions: number;
+  totalCost: number;
+  formattedTotalCost: string;
+  averageCost: number;
+  formattedAverageCost: string;
+  breakdown: AnalyticsBreakdownEntry[];
+  trends: AnalyticsTrendEntry[];
+  leaderboard: ModelLeaderboardEntry[];
+}
+
 export interface RepoInfo {
   path: string;
   gitRoot?: string;

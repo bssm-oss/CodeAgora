@@ -49,6 +49,7 @@ const requiredCommands = [
   'get_mcp_status',
   'get_github_action_status',
   'get_evidence_status',
+  'get_analytics_status',
 ];
 
 for (const command of requiredCommands) {

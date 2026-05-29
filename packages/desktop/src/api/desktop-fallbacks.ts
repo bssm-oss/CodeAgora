@@ -7,6 +7,7 @@ import type {
   McpStatus,
   GitHubActionStatus,
   EvidenceStatus,
+  AnalyticsStatus,
   DesktopCommandContract,
   ReviewRunSnapshot,
   SessionCostSummary,
@@ -150,6 +151,50 @@ export function fallbackEvidenceStatus(): EvidenceStatus {
   };
 }
 
+export function fallbackAnalyticsStatus(): AnalyticsStatus {
+  return {
+    sessionCount: 2,
+    sessionsWithKnownCost: 1,
+    unknownCostSessions: 1,
+    totalCost: 0.0428,
+    formattedTotalCost: '$0.0428',
+    averageCost: 0.0428,
+    formattedAverageCost: '$0.0428',
+    breakdown: [
+      {
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        calls: 6,
+        sessions: 1,
+        tokens: 18420,
+        failures: 0,
+        cost: 0.0305,
+        formattedCost: '$0.0305',
+        knownCostEntries: 3,
+      },
+      {
+        provider: 'anthropic',
+        model: 'claude-sonnet-4',
+        calls: 3,
+        sessions: 1,
+        tokens: 9200,
+        failures: 1,
+        cost: 0.0123,
+        formattedCost: '$0.0123',
+        knownCostEntries: 2,
+      },
+    ],
+    trends: [
+      { date: '2026-04-27', sessions: 1, cost: 0.0428, formattedCost: '$0.0428' },
+      { date: '2026-04-26', sessions: 1, cost: 0, formattedCost: 'unknown' },
+    ],
+    leaderboard: [
+      { model: 'openai/gpt-5-mini', winRate: 0.78, reviews: 16, alpha: 14, beta: 4 },
+      { model: 'anthropic/claude-sonnet-4', winRate: 0.62, reviews: 10, alpha: 8, beta: 5 },
+    ],
+  };
+}
+
 export function fallbackRepoInfo(): RepoInfo {
   return {
     path: window.location.pathname.includes('/packages/desktop/') ? 'browser preview' : window.location.pathname,
@@ -186,6 +231,14 @@ export function fallbackCommandContract(): DesktopCommandContract[] {
       mutatesProject: true,
       spawnsProcess: true,
       notes: 'Disabled in browser preview.',
+    },
+    {
+      name: 'get_analytics_status',
+      classification: 'read-only',
+      readsProject: true,
+      mutatesProject: false,
+      spawnsProcess: false,
+      notes: 'Browser preview fallback.',
     },
   ];
 }

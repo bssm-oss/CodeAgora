@@ -11,6 +11,7 @@ import type {
   McpStatus,
   GitHubActionStatus,
   EvidenceStatus,
+  AnalyticsStatus,
   RepoInfo,
   DesktopCommandContract,
   NotificationPreferences,
@@ -30,6 +31,7 @@ import {
   fallbackMcpStatus,
   fallbackGitHubActionStatus,
   fallbackEvidenceStatus,
+  fallbackAnalyticsStatus,
   fallbackRepoInfo,
   fallbackCommandContract,
 } from './desktop-fallbacks.js';
@@ -174,6 +176,55 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
   };
 }
 
+function normalizeAnalyticsStatus(value: unknown): AnalyticsStatus {
+  const raw = asObject(value) ?? {};
+  const breakdown = Array.isArray(raw.breakdown) ? raw.breakdown : [];
+  const trends = Array.isArray(raw.trends) ? raw.trends : [];
+  const leaderboard = Array.isArray(raw.leaderboard) ? raw.leaderboard : [];
+  return {
+    sessionCount: asNumber(raw.sessionCount) ?? 0,
+    sessionsWithKnownCost: asNumber(raw.sessionsWithKnownCost) ?? 0,
+    unknownCostSessions: asNumber(raw.unknownCostSessions) ?? 0,
+    totalCost: asNumber(raw.totalCost) ?? 0,
+    formattedTotalCost: asString(raw.formattedTotalCost, 'unknown'),
+    averageCost: asNumber(raw.averageCost) ?? 0,
+    formattedAverageCost: asString(raw.formattedAverageCost, 'unknown'),
+    breakdown: breakdown.map((item) => {
+      const entry = asObject(item) ?? {};
+      return {
+        provider: asString(entry.provider, 'unknown'),
+        model: asString(entry.model, 'unknown'),
+        calls: asNumber(entry.calls) ?? 0,
+        sessions: asNumber(entry.sessions) ?? 0,
+        tokens: asNumber(entry.tokens) ?? 0,
+        failures: asNumber(entry.failures) ?? 0,
+        cost: asNumber(entry.cost) ?? 0,
+        formattedCost: asString(entry.formattedCost, 'unknown'),
+        knownCostEntries: asNumber(entry.knownCostEntries) ?? 0,
+      };
+    }),
+    trends: trends.map((item) => {
+      const entry = asObject(item) ?? {};
+      return {
+        date: asString(entry.date, 'unknown'),
+        sessions: asNumber(entry.sessions) ?? 0,
+        cost: asNumber(entry.cost) ?? 0,
+        formattedCost: asString(entry.formattedCost, 'unknown'),
+      };
+    }),
+    leaderboard: leaderboard.map((item) => {
+      const entry = asObject(item) ?? {};
+      return {
+        model: asString(entry.model, 'unknown'),
+        winRate: asNumber(entry.winRate) ?? 0,
+        reviews: asNumber(entry.reviews) ?? 0,
+        alpha: asNumber(entry.alpha) ?? 0,
+        beta: asNumber(entry.beta) ?? 0,
+      };
+    }),
+  };
+}
+
 // ── Bridge API ───────────────────────────────────────────────────
 
 export async function listSessions(forceRefresh = false): Promise<SessionSummary[]> {
@@ -268,6 +319,12 @@ export async function getEvidenceStatus(): Promise<EvidenceStatus> {
   const result = await tauriCall<EvidenceStatus>('get_evidence_status');
   if (result) return result;
   return fallbackEvidenceStatus();
+}
+
+export async function getAnalyticsStatus(): Promise<AnalyticsStatus> {
+  const result = await tauriCall<unknown>('get_analytics_status');
+  if (result) return normalizeAnalyticsStatus(result);
+  return fallbackAnalyticsStatus();
 }
 
 export async function getRepoInfo(): Promise<RepoInfo> {

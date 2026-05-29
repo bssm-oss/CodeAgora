@@ -2,6 +2,7 @@ import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
 import {
   getRepoInfo,
   getCommandContract,
+  getAnalyticsStatus,
   cancelReviewRun,
   getEvidenceStatus,
   exportSession,
@@ -21,6 +22,7 @@ import {
   type ConfigValidation,
   type DesktopCommandContract,
   type EvidenceStatus,
+  type AnalyticsStatus,
   type GitHubActionStatus,
   type McpStatus,
   type NotificationPreferences,
@@ -32,7 +34,7 @@ import {
   type SessionSummary,
 } from './api/desktop-bridge.js';
 
-type View = 'sessions' | 'run' | 'config' | 'setup';
+type View = 'sessions' | 'run' | 'config' | 'analytics' | 'setup';
 type DesktopLocale = 'en' | 'ko';
 type DesktopLocalePreference = DesktopLocale | 'auto';
 type DesktopThemePreference = 'system' | 'light' | 'dark';
@@ -80,6 +82,7 @@ interface AppState {
   mcpStatus?: McpStatus;
   githubActionStatus?: GitHubActionStatus;
   evidenceStatus?: EvidenceStatus;
+  analyticsStatus?: AnalyticsStatus;
   notice?: string;
   toasts: Toast[];
   localePreference: DesktopLocalePreference;
@@ -224,6 +227,13 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 
   if (isMeta && event.key === '4') {
+    event.preventDefault();
+    setView('analytics');
+    if (!state.analyticsStatus) void loadAnalytics();
+    return;
+  }
+
+  if (isMeta && event.key === '5') {
     event.preventDefault();
     setView('setup');
     if (state.providers.length === 0) void loadSetup();
@@ -644,6 +654,7 @@ async function openRepo(path: string): Promise<void> {
     state.repoInput = state.repoInfo.path;
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
+    state.analyticsStatus = undefined;
     state.attentionCount = 0;
     updateBadgeState();
     resetConfigState();
@@ -686,6 +697,31 @@ async function loadSetup(): Promise<void> {
     state.busy = false;
     render();
   }
+}
+
+async function loadAnalytics(): Promise<void> {
+  state.busy = true;
+  render();
+  try {
+    state.analyticsStatus = await getAnalyticsStatus();
+  } catch (error) {
+    pushToast(error instanceof Error ? error.message : String(error), 'error')
+  } finally {
+    state.busy = false;
+    render();
+  }
+}
+
+function refreshCurrentView(): void {
+  if (state.view === 'setup') {
+    void loadSetup();
+    return;
+  }
+  if (state.view === 'analytics') {
+    void loadAnalytics();
+    return;
+  }
+  void refreshSessions(state.view === 'sessions' && !state.selected, true);
 }
 
 async function selectSession(id: string): Promise<void> {
@@ -929,12 +965,14 @@ function renderShell(): HTMLElement {
     ['sessions', t('desktop.nav.cockpit'), 'button-sessions'],
     ['run', t('desktop.nav.runReview'), 'button-run-review'],
     ['config', t('desktop.nav.config'), 'button-config'],
+    ['analytics', t('desktop.nav.analytics'), 'button-analytics'],
     ['setup', t('desktop.nav.setup'), 'button-setup'],
   ];
   for (const [view, label, testId] of navItems) {
     const navButton = button(label, () => {
       setView(view);
       if (view === 'config' && !state.configRaw) void loadConfig();
+      if (view === 'analytics' && !state.analyticsStatus) void loadAnalytics();
       if (view === 'setup' && state.providers.length === 0) void loadSetup();
     }, state.view === view ? 'ca-nav-button ca-active' : 'ca-nav-button', testId);
     nav.append(navButton);
@@ -1060,7 +1098,7 @@ function renderToolbar(): HTMLElement {
   preferences.append(localeControl, themeControl, notificationControl, soundControl, badgeControl);
   actions.append(preferences);
 
-  actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected, true), 'ca-button', 'button-refresh'));
+  actions.append(button(t('desktop.action.refresh'), refreshCurrentView, 'ca-button', 'button-refresh'));
   const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'ca-button ca-primary', 'button-quick-review');
   quickReview.disabled = state.busy || !runReadiness().ready;
   actions.append(quickReview);
@@ -1072,6 +1110,7 @@ function viewTitle(): string {
   if (state.view === 'sessions') return t('desktop.title.cockpit');
   if (state.view === 'run') return t('desktop.title.launch');
   if (state.view === 'config') return t('desktop.title.config');
+  if (state.view === 'analytics') return t('desktop.title.analytics');
   return t('desktop.title.setup');
 }
 
@@ -1090,6 +1129,7 @@ function renderSkeleton(view: View): HTMLElement {
     sidebar.append(el('div', 'ca-skeleton ca-skeleton-title'));
     sidebar.append(el('div', 'ca-skeleton ca-skeleton-text'));
     sidebar.append(el('div', 'ca-skeleton-sidebar-nav'));
+    sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
     sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
     sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
     sidebar.append(el('div', 'ca-skeleton ca-skeleton-nav-item'));
@@ -1130,6 +1170,7 @@ function renderContent(): HTMLElement {
     if (state.view === 'sessions') content.append(renderSessions());
     if (state.view === 'run') content.append(renderRunReview());
     if (state.view === 'config') content.append(renderConfig());
+    if (state.view === 'analytics') content.append(renderAnalytics());
     if (state.view === 'setup') content.append(renderSetup());
   }
   return content;
@@ -1291,6 +1332,10 @@ function renderCockpitOverview(): HTMLElement {
     setView('config');
     if (!state.configRaw) void loadConfig();
   }, 'ca-button', 'button-cockpit-config'));
+  links.append(button(t('desktop.nav.analytics'), () => {
+    setView('analytics');
+    if (!state.analyticsStatus) void loadAnalytics();
+  }, 'ca-button', 'button-cockpit-analytics'));
   links.append(button(t('desktop.nav.setup'), () => {
     setView('setup');
     if (state.providers.length === 0) void loadSetup();
@@ -1760,6 +1805,117 @@ function renderConfigFacts(): HTMLElement {
   appendMetric(facts, t('desktop.config.providers'), String(providers));
   appendMetric(facts, t('desktop.config.validation'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'ca-warn' : 'ca-good');
   return facts;
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+function renderAnalytics(): HTMLElement {
+  const panel = el('div', 'ca-analytics-panel');
+  panel.dataset.testid = 'analytics-panel';
+  const header = el('div', 'ca-section-head ca-analytics-hero');
+  const copy = el('div');
+  copy.append(el('span', 'ca-eyebrow', t('desktop.analytics.eyebrow')));
+  copy.append(el('h2', '', t('desktop.analytics.title')));
+  copy.append(el('p', '', t('desktop.analytics.body')));
+  header.append(copy);
+  header.append(button(t('desktop.action.refreshAnalytics'), () => void loadAnalytics(), 'ca-button', 'button-refresh-analytics'));
+  panel.append(header);
+
+  const analytics = state.analyticsStatus;
+  if (!analytics) {
+    const empty = el('div', 'ca-empty-state');
+    empty.append(el('strong', '', t('desktop.analytics.notLoaded')));
+    empty.append(el('p', '', t('desktop.analytics.notLoadedHint')));
+    empty.append(button(t('desktop.action.refreshAnalytics'), () => void loadAnalytics(), 'ca-button ca-subtle', 'button-refresh-analytics-empty'));
+    panel.append(empty);
+    return panel;
+  }
+
+  const metrics = el('div', 'ca-analytics-metrics');
+  appendMetric(metrics, t('desktop.analytics.metric.sessions'), String(analytics.sessionCount));
+  appendMetric(metrics, t('desktop.analytics.metric.totalCost'), analytics.formattedTotalCost, analytics.sessionsWithKnownCost > 0 ? 'ca-good' : 'ca-warn');
+  appendMetric(metrics, t('desktop.analytics.metric.averageCost'), analytics.formattedAverageCost, analytics.sessionsWithKnownCost > 0 ? 'ca-good' : 'ca-warn');
+  appendMetric(metrics, t('desktop.analytics.metric.unknownCosts'), String(analytics.unknownCostSessions), analytics.unknownCostSessions > 0 ? 'ca-warn' : 'ca-good');
+  panel.append(metrics);
+
+  const note = el('p', analytics.unknownCostSessions > 0 ? 'ca-repo-note ca-warn' : 'ca-repo-note');
+  note.textContent = analytics.unknownCostSessions > 0
+    ? t('desktop.analytics.unknownCostNote', { count: analytics.unknownCostSessions })
+    : t('desktop.analytics.knownCostNote');
+  panel.append(note);
+
+  const columns = el('div', 'ca-analytics-columns');
+  columns.append(renderAnalyticsBreakdown(analytics));
+  columns.append(renderAnalyticsLeaderboard(analytics));
+  panel.append(columns);
+  panel.append(renderAnalyticsTrends(analytics));
+  return panel;
+}
+
+function renderAnalyticsBreakdown(analytics: AnalyticsStatus): HTMLElement {
+  const section = el('section', 'ca-integration-section ca-analytics-section');
+  section.append(el('h3', '', t('desktop.analytics.breakdownTitle')));
+  if (analytics.breakdown.length === 0) {
+    section.append(el('p', 'ca-empty', t('desktop.analytics.breakdownEmpty')));
+    return section;
+  }
+  const list = el('div', 'ca-analytics-list');
+  for (const entry of analytics.breakdown) {
+    const row = el('div', 'ca-analytics-row');
+    const model = el('div');
+    model.append(el('strong', '', `${entry.provider}/${entry.model}`));
+    model.append(el('span', '', t('desktop.analytics.breakdownMeta', { sessions: entry.sessions, calls: entry.calls, tokens: entry.tokens })));
+    row.append(model);
+    const cost = el('div', 'ca-analytics-row-metrics');
+    cost.append(el('span', entry.knownCostEntries > 0 ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-optional ca-status-pill', entry.formattedCost));
+    cost.append(el('span', entry.failures > 0 ? 'ca-provider-missing ca-status-pill' : 'ca-provider-ok ca-status-pill', t('desktop.analytics.failures', { count: entry.failures })));
+    row.append(cost);
+    list.append(row);
+  }
+  section.append(list);
+  return section;
+}
+
+function renderAnalyticsLeaderboard(analytics: AnalyticsStatus): HTMLElement {
+  const section = el('section', 'ca-integration-section ca-analytics-section');
+  section.append(el('h3', '', t('desktop.analytics.leaderboardTitle')));
+  if (analytics.leaderboard.length === 0) {
+    section.append(el('p', 'ca-empty', t('desktop.analytics.leaderboardEmpty')));
+    return section;
+  }
+  const list = el('div', 'ca-analytics-list');
+  for (const entry of analytics.leaderboard) {
+    const row = el('div', 'ca-analytics-row');
+    const model = el('div');
+    model.append(el('strong', '', entry.model));
+    model.append(el('span', '', t('desktop.analytics.leaderboardMeta', { reviews: entry.reviews, alpha: entry.alpha.toFixed(1), beta: entry.beta.toFixed(1) })));
+    row.append(model);
+    row.append(el('span', 'ca-provider-ok ca-status-pill', formatPercent(entry.winRate)));
+    list.append(row);
+  }
+  section.append(list);
+  return section;
+}
+
+function renderAnalyticsTrends(analytics: AnalyticsStatus): HTMLElement {
+  const section = el('section', 'ca-integration-section ca-analytics-section');
+  section.append(el('h3', '', t('desktop.analytics.trendsTitle')));
+  if (analytics.trends.length === 0) {
+    section.append(el('p', 'ca-empty', t('desktop.analytics.trendsEmpty')));
+    return section;
+  }
+  const list = el('div', 'ca-analytics-trends');
+  for (const trend of analytics.trends) {
+    const row = el('div', 'ca-analytics-trend-row');
+    row.append(el('strong', '', trend.date));
+    row.append(el('span', '', t('desktop.analytics.trendSessions', { count: trend.sessions })));
+    row.append(el('span', trend.cost > 0 ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-optional ca-status-pill', trend.formattedCost));
+    list.append(row);
+  }
+  section.append(list);
+  return section;
 }
 
 function renderSetup(): HTMLElement {
