@@ -36,6 +36,7 @@ type View = 'sessions' | 'run' | 'config' | 'setup';
 type DesktopLocale = 'en' | 'ko';
 type DesktopLocalePreference = DesktopLocale | 'auto';
 type DesktopThemePreference = 'system' | 'light' | 'dark';
+type ReviewerConfigField = 'id' | 'backend' | 'provider' | 'model' | 'enabled';
 const sessionPageSize = 50;
 
 const recentReposKey = 'codeagora.desktop.recentRepos';
@@ -367,6 +368,68 @@ function sessionHasDegradedSignal(session?: SessionDetail): boolean {
 function runHasDegradedSignal(run?: ReviewRunSnapshot): boolean {
   if (!run) return false;
   return run.events.some((event) => /degraded/i.test(event.kind) || /degraded/i.test(event.message));
+}
+
+function parseConfigObject(raw = state.configRaw): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function reviewerObjects(config = parseConfigObject()): Array<{ index: number; reviewer: Record<string, unknown> }> {
+  const reviewers = config?.reviewers;
+  if (!Array.isArray(reviewers)) return [];
+  return reviewers
+    .map((reviewer, index) => ({ index, reviewer: typeof reviewer === 'object' && reviewer !== null && !Array.isArray(reviewer) ? reviewer as Record<string, unknown> : {} }))
+    .filter(({ reviewer }) => Object.keys(reviewer).length > 0);
+}
+
+function reviewerText(reviewer: Record<string, unknown>, key: ReviewerConfigField): string {
+  const value = reviewer[key];
+  if (typeof value === 'boolean') return String(value);
+  return typeof value === 'string' ? value : '';
+}
+
+function reviewerEnabled(reviewer: Record<string, unknown>): boolean {
+  return typeof reviewer.enabled === 'boolean' ? reviewer.enabled : true;
+}
+
+function updateConfigRawFromObject(config: Record<string, unknown>): void {
+  state.configRaw = `${JSON.stringify(config, null, 2)}\n`;
+  state.configDirty = state.configRaw !== state.configOriginal;
+  state.configValidation = undefined;
+  render();
+}
+
+function updateReviewerField(index: number, field: ReviewerConfigField, value: string | boolean): void {
+  const config = parseConfigObject();
+  if (!config) return;
+  const reviewers = Array.isArray(config.reviewers) ? [...config.reviewers] : [];
+  const current = reviewers[index];
+  const reviewer = typeof current === 'object' && current !== null && !Array.isArray(current)
+    ? { ...(current as Record<string, unknown>) }
+    : {};
+  reviewer[field] = value;
+  reviewers[index] = reviewer;
+  config.reviewers = reviewers;
+  updateConfigRawFromObject(config);
+}
+
+function addReviewerConfig(): void {
+  const config = parseConfigObject() ?? {};
+  const reviewers = Array.isArray(config.reviewers) ? [...config.reviewers] : [];
+  reviewers.push({
+    id: `r${reviewers.length + 1}`,
+    backend: 'api',
+    provider: 'groq',
+    model: 'llama-3.3-70b-versatile',
+    enabled: true,
+  });
+  config.reviewers = reviewers;
+  updateConfigRawFromObject(config);
 }
 
 function timestampValue(value?: string): number {
@@ -1464,6 +1527,7 @@ function renderRunReview(): HTMLElement {
   panel.append(readinessPanel);
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
+  panel.append(renderReviewerSelection());
 
   const actions = el('div', 'ca-launch-cards');
   const staged = launchCard(t('desktop.run.stagedTitle'), t('desktop.run.stagedEyebrow'), t('desktop.run.stagedBody'), true, () => void startReview(true), 'button-review-staged-changes');
@@ -1489,6 +1553,115 @@ function launchCard(label: string, eyebrow: string, description: string, primary
   node.append(el('strong', '', label));
   node.append(el('span', '', description));
   return node;
+}
+
+function optionValues(current: string, values: string[]): string[] {
+  return [...new Set([current, ...values].filter(Boolean))];
+}
+
+function reviewerSelect(label: string, value: string, values: string[], onChange: (value: string) => void, testId: string): HTMLLabelElement {
+  const control = el('label', 'ca-reviewer-field') as HTMLLabelElement;
+  control.append(el('span', 'ca-toolbar-select-label', label));
+  const select = el('select', 'ca-toolbar-select-input') as HTMLSelectElement;
+  select.dataset.testid = testId;
+  select.setAttribute('aria-label', label);
+  for (const optionValue of optionValues(value, values)) {
+    const option = el('option', '', optionValue) as HTMLOptionElement;
+    option.value = optionValue;
+    option.selected = optionValue === value;
+    select.append(option);
+  }
+  select.disabled = state.busy;
+  select.addEventListener('change', () => onChange(select.value));
+  control.append(select);
+  return control;
+}
+
+function reviewerTextField(label: string, value: string, onChange: (value: string) => void, testId: string): HTMLLabelElement {
+  const control = el('label', 'ca-reviewer-field') as HTMLLabelElement;
+  control.append(el('span', 'ca-toolbar-select-label', label));
+  const input = el('input', 'ca-filter-input') as HTMLInputElement;
+  input.dataset.testid = testId;
+  input.type = 'text';
+  input.value = value;
+  input.setAttribute('aria-label', label);
+  input.disabled = state.busy;
+  input.addEventListener('change', () => onChange(input.value.trim()));
+  control.append(input);
+  return control;
+}
+
+function renderReviewerSelection(): HTMLElement {
+  const section = el('section', 'ca-reviewer-selection');
+  section.dataset.testid = 'reviewer-selection';
+  const isYaml = state.configPath.endsWith('.yml') || state.configPath.endsWith('.yaml');
+  const config = parseConfigObject();
+  const header = el('div', 'ca-section-head');
+  const copy = el('div');
+  copy.append(el('span', 'ca-eyebrow', t('desktop.reviewers.eyebrow')));
+  copy.append(el('h3', '', t('desktop.reviewers.title')));
+  copy.append(el('p', 'ca-repo-note', t('desktop.reviewers.body')));
+  header.append(copy);
+  const headerActions = el('div', 'ca-run-actions');
+  const addButton = button(t('desktop.action.addReviewer'), addReviewerConfig, 'ca-button', 'button-add-reviewer');
+  addButton.disabled = state.busy || isYaml || !config;
+  const saveButton = button(t('desktop.action.saveReviewerSelection'), () => void saveConfig(state.configRaw), 'ca-button ca-primary', 'button-save-reviewer-selection');
+  saveButton.disabled = state.busy || isYaml || !config;
+  headerActions.append(addButton);
+  headerActions.append(saveButton);
+  header.append(headerActions);
+  section.append(header);
+
+  if (!config) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.reviewers.invalidTitle')));
+    empty.append(el('p', '', t('desktop.reviewers.invalidBody')));
+    empty.append(button(t('desktop.nav.config'), () => setView('config'), 'ca-button ca-subtle', 'button-open-config-from-reviewers'));
+    section.append(empty);
+    return section;
+  }
+  if (isYaml) {
+    const yaml = el('p', 'ca-repo-note ca-warn', t('desktop.reviewers.yamlReadOnly'));
+    section.append(yaml);
+  }
+
+  const reviewerList = reviewerObjects(config);
+  if (reviewerList.length === 0) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.reviewers.emptyTitle')));
+    empty.append(el('p', '', t('desktop.reviewers.emptyBody')));
+    section.append(empty);
+  } else {
+    const grid = el('div', 'ca-reviewer-grid');
+    const providerValues = optionValues('', [...state.providers.map((provider) => provider.name), 'groq', 'openai', 'anthropic', 'google', 'openrouter', 'github-models']);
+    const backendValues = ['api', 'claude', 'codex', 'gemini', 'opencode', 'copilot', 'qwen-code'];
+    for (const { index, reviewer } of reviewerList) {
+      const card = el('article', reviewerEnabled(reviewer) ? 'ca-reviewer-card' : 'ca-reviewer-card ca-disabled-reviewer');
+      const top = el('div', 'ca-provider-card-top');
+      const enabled = checkboxControl(t('desktop.reviewers.enabled'), reviewerEnabled(reviewer), (checked) => updateReviewerField(index, 'enabled', checked), `reviewer-${index}-enabled`);
+      top.append(enabled);
+      top.append(el('span', reviewerEnabled(reviewer) ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-optional ca-status-pill', reviewerEnabled(reviewer) ? t('desktop.value.ready') : t('desktop.value.optional')));
+      card.append(top);
+      const fields = el('div', 'ca-reviewer-fields');
+      fields.append(reviewerTextField(t('desktop.reviewers.id'), reviewerText(reviewer, 'id') || `r${index + 1}`, (value) => updateReviewerField(index, 'id', value || `r${index + 1}`), `reviewer-${index}-id`));
+      fields.append(reviewerSelect(t('desktop.reviewers.backend'), reviewerText(reviewer, 'backend') || 'api', backendValues, (value) => updateReviewerField(index, 'backend', value), `reviewer-${index}-backend`));
+      fields.append(reviewerSelect(t('desktop.reviewers.provider'), reviewerText(reviewer, 'provider') || 'groq', providerValues, (value) => updateReviewerField(index, 'provider', value), `reviewer-${index}-provider`));
+      fields.append(reviewerTextField(t('desktop.reviewers.model'), reviewerText(reviewer, 'model'), (value) => updateReviewerField(index, 'model', value), `reviewer-${index}-model`));
+      card.append(fields);
+      grid.append(card);
+    }
+    section.append(grid);
+  }
+
+  const footer = el('p', state.configDirty ? 'ca-repo-note ca-warn' : 'ca-repo-note');
+  footer.textContent = state.configDirty ? t('desktop.reviewers.unsaved') : t('desktop.reviewers.saved');
+  section.append(footer);
+  if (isYaml) {
+    section.querySelectorAll('input, select, button').forEach((node) => {
+      if (node instanceof HTMLInputElement || node instanceof HTMLSelectElement || node instanceof HTMLButtonElement) node.disabled = true;
+    });
+  }
+  return section;
 }
 
 function renderReviewRun(): HTMLElement {

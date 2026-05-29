@@ -862,6 +862,7 @@ h3 {
 .ca-issues,
 .ca-repo-section,
 .ca-repo-picker,
+.ca-reviewer-selection,
 .ca-review-run,
 .ca-command-contract,
 .ca-integration-section,
@@ -949,6 +950,7 @@ summary {
 }
 
 .ca-repo-grid,
+.ca-reviewer-grid,
 .ca-provider-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -958,6 +960,35 @@ summary {
 .ca-provider-grid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-3);
+}
+
+.ca-reviewer-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.ca-reviewer-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.ca-reviewer-card.ca-disabled-reviewer {
+  opacity: 0.72;
+}
+
+.ca-reviewer-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.ca-reviewer-field {
+  display: grid;
+  gap: var(--space-1);
 }
 
 .ca-launch-cards {
@@ -1270,6 +1301,7 @@ summary {
   .ca-cockpit-overview,
   .ca-sessions-layout,
   .ca-repo-grid,
+  .ca-reviewer-grid,
   .ca-provider-grid {
     grid-template-columns: 1fr;
   }
@@ -1289,6 +1321,7 @@ summary {
   .ca-session-controls,
   .ca-repo-picker,
   .ca-launch-cards,
+  .ca-reviewer-fields,
   .ca-count-grid,
   .ca-cockpit-metrics,
   .ca-summary-cards,
