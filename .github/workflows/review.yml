@@ -49,9 +49,7 @@ jobs:
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
-              { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
-              { "id": "r3", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+              { "id": "r1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
             ],
             "supporters": {
               "pool": [
@@ -64,7 +62,7 @@ jobs:
               "personaAssignment": "random"
             },
             "moderator": { "model": "gpt-4o-mini", "backend": "api", "provider": "github-models" },
-            "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
+            "discussion": { "maxRounds": 1, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 5 },
             "head": { "backend": "api", "model": "gpt-4o-mini", "provider": "github-models", "enabled": true },
             "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
           }
@@ -76,7 +74,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '5000'
+          max-diff-lines: '250'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

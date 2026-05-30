@@ -17,6 +17,7 @@ CodeAgora docs are organized by audience.
 | [`for-users/CLI_REFERENCE.md`](./for-users/CLI_REFERENCE.md) | CLI commands and options. |
 | [`for-users/CONFIGURATION.md`](./for-users/CONFIGURATION.md) | CodeAgora configuration. |
 | [`for-users/PROVIDERS.md`](./for-users/PROVIDERS.md) | Provider setup and status. |
+| [`for-users/GITHUB_ACTIONS_SETUP.md`](./for-users/GITHUB_ACTIONS_SETUP.md) | Step-by-step GitHub Actions setup guide. |
 | [`for-users/5_GITHUB_INTEGRATION.md`](./for-users/5_GITHUB_INTEGRATION.md) | GitHub Action and PR integration. |
 | [`for-users/TROUBLESHOOTING.md`](./for-users/TROUBLESHOOTING.md) | Common failures and fixes. |
 
