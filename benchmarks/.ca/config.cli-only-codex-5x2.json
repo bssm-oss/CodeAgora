@@ -1,0 +1,30 @@
+{
+  "mode": "pragmatic",
+  "language": "en",
+  "reviewers": [
+    { "id": "r-codex-1", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 },
+    { "id": "r-codex-2", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 },
+    { "id": "r-codex-3", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 },
+    { "id": "r-codex-4", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 },
+    { "id": "r-codex-5", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 }
+  ],
+  "supporters": {
+    "pool": [
+      { "id": "s-codex-1", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 },
+      { "id": "s-codex-2", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 }
+    ],
+    "pickCount": 2,
+    "pickStrategy": "random",
+    "devilsAdvocate": { "id": "da-codex", "model": "gpt-5.5", "backend": "codex", "enabled": true, "timeout": 180 },
+    "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
+    "personaAssignment": "random"
+  },
+  "moderator": { "model": "gpt-5.5", "backend": "codex" },
+  "discussion": {
+    "maxRounds": 2,
+    "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null },
+    "codeSnippetRange": 10
+  },
+  "head": { "backend": "codex", "model": "gpt-5.5", "enabled": true },
+  "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+}

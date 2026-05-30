@@ -1,0 +1,30 @@
+{
+  "mode": "pragmatic",
+  "language": "en",
+  "reviewers": [
+    { "id": "r-claude-1", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 },
+    { "id": "r-claude-2", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 },
+    { "id": "r-claude-3", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 },
+    { "id": "r-claude-4", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 },
+    { "id": "r-claude-5", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 }
+  ],
+  "supporters": {
+    "pool": [
+      { "id": "s-claude-1", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 },
+      { "id": "s-claude-2", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 }
+    ],
+    "pickCount": 2,
+    "pickStrategy": "random",
+    "devilsAdvocate": { "id": "da-claude", "model": "sonnet", "backend": "claude", "enabled": true, "timeout": 180 },
+    "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
+    "personaAssignment": "random"
+  },
+  "moderator": { "model": "sonnet", "backend": "claude" },
+  "discussion": {
+    "maxRounds": 2,
+    "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null },
+    "codeSnippetRange": 10
+  },
+  "head": { "backend": "claude", "model": "sonnet", "enabled": true },
+  "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+}

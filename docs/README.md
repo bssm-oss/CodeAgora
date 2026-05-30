@@ -29,6 +29,7 @@ CodeAgora docs are organized by audience.
 | [`for-agents/ARCHITECTURE.md`](./for-agents/ARCHITECTURE.md) | Current pipeline architecture. |
 | [`for-agents/AGENT_CONTRACT.md`](./for-agents/AGENT_CONTRACT.md) | Agent/reviewer contract. |
 | [`for-agents/BENCHMARK_MEASUREMENT_PLAN.md`](./for-agents/BENCHMARK_MEASUREMENT_PLAN.md) | Benchmark measurement dimensions and model matrix. |
+| [`for-agents/BENCHMARK_RESULTS_2026_05_30.md`](./for-agents/BENCHMARK_RESULTS_2026_05_30.md) | Latest live golden-bug benchmark results and model/config comparison. |
 | [`for-agents/PRODUCTION_READINESS_ROADMAP.md`](./for-agents/PRODUCTION_READINESS_ROADMAP.md) | Release readiness gates and roadmap. |
 | [`for-agents/papers/`](./for-agents/papers/) | Topic papers for the system design. |
 
