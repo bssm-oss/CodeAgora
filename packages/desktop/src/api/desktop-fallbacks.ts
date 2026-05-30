@@ -1,7 +1,6 @@
 import type {
   SessionSummary,
   SessionDetail,
-  SeverityCounts,
   RepoInfo,
   ProviderStatus,
   McpStatus,
@@ -10,8 +9,6 @@ import type {
   AnalyticsStatus,
   DesktopCommandContract,
   ReviewRunSnapshot,
-  SessionCostSummary,
-  TopIssue,
 } from './desktop-bridge.types.js';
 
 /** Stub session data used when running outside Tauri context. */
