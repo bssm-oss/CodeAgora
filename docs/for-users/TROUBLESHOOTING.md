@@ -48,6 +48,8 @@ agora review path/to/my.diff
 
 ## GitHub Actions
 
+For a complete setup checklist, recommended workflow snippets, provider secrets, permissions, and context-limit guidance, see [GitHub Actions Setup Guide](./GITHUB_ACTIONS_SETUP.md).
+
 ### Fork PR review skipped
 Fork PRs don't have access to repository secrets. The review will be skipped with a warning. Options:
 1. Ask the maintainer to run the review manually
