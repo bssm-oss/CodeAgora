@@ -178,6 +178,7 @@ Note: Use the `v0.1.0-rc.3` Action tag for the scoped prerelease package line; `
 | [Configuration](docs/for-users/CONFIGURATION.md) | Config file guide |
 | [Providers](docs/for-users/PROVIDERS.md) | Full provider list with tiers |
 | [Architecture](docs/for-agents/ARCHITECTURE.md) | Pipeline design and project structure |
+| [Benchmark Results](docs/for-agents/BENCHMARK_RESULTS_2026_05_30.md) | Latest live golden-bug benchmark evidence and model/config comparison |
 | [Extensions](docs/for-users/EXTENSIONS.md) | MCP and desktop direction |
 | [Production Readiness Roadmap](docs/for-agents/PRODUCTION_READINESS_ROADMAP.md) | Gates for production-ready CLI, GitHub Action, and MCP releases |
 | [Agent Contract](docs/for-agents/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
@@ -229,7 +230,7 @@ pnpm bench:fn:run -- --results ./bench-out
 pnpm bench:fn     -- --results ./bench-out
 ```
 
-The driver uses `benchmarks/.ca/config.json` by default. Dedicated run configs live under `benchmarks/.ca/`, including `config.free-smoke.json` for a one-fixture free-model gate and `config.low-cost-diverse.json` for the current low-cost diverse benchmark. Add `--fixtures id1,id2` to restrict, `--skip-head` to skip the L3 verdict stage.
+The driver uses `benchmarks/.ca/config.json` by default. Dedicated run configs live under `benchmarks/.ca/`, including `config.cli-mixed.json`, `config.cli-only-codex-5x2.json`, `config.cli-only-claude-5x2.json`, and OpenRouter comparison configs. Add `--fixtures id1,id2` to restrict, `--skip-head` to skip the L3 verdict stage.
 
 Two fixture kinds live side by side:
 
@@ -238,9 +239,25 @@ Two fixture kinds live side by side:
 
 Current reference fixtures: 14 recall cases + 6 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format and reference-gate semantics.
 
-### Latest low-cost diverse aggregate (2026-04-28 KST)
+### Latest live benchmark snapshot (2026-05-30 KST)
 
-Full report: [`docs/archived/golden-bug-benchmark-report-2026-04-27.md`](docs/archived/golden-bug-benchmark-report-2026-04-27.md).
+Full report: [`docs/for-agents/BENCHMARK_RESULTS_2026_05_30.md`](docs/for-agents/BENCHMARK_RESULTS_2026_05_30.md).
+
+This snapshot is an internal golden-bug benchmark, not a universal leaderboard. The best measured baseline is the Claude/Codex CLI mixed configuration.
+
+| Config | TP | FP | FN | Precision | Recall | Clean FP regressions | Interpretation |
+|---|---:|---:|---:|---:|---:|---:|---|
+| CLI mixed usable mean | 16.0 | 1.0 | 0.0 | 94.4% | 100.0% | 0/6 | Best measured baseline |
+| CLI only Codex | 16 | 2 | 0 | 88.9% | 100.0% | 1/6 | Best clean single-CLI baseline |
+| CLI only Claude | 12 | 0 | 4 | 100.0% | 75.0% | 0/6 | Session-limit capacity failure, not a clean quality score |
+| OpenRouter non-Claude quality | 16 | 6 | 0 | 72.7% | 100.0% | 1/6 | FP-heavy and slow |
+| OpenRouter low-cost fixed | 16 | 6 | 0 | 72.7% | 100.0% | 2/6 | Cost baseline only (`$0.0344`) |
+
+Use these results as configuration-comparison evidence. Do not describe them as production readiness proof or as a universal LLM code-review leaderboard.
+
+### Historical low-cost diverse aggregate (2026-04-28 KST)
+
+Historical report: [`docs/archived/golden-bug-benchmark-report-2026-04-27.md`](docs/archived/golden-bug-benchmark-report-2026-04-27.md).
 
 Smoke gate:
 
