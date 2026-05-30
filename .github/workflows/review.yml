@@ -44,31 +44,50 @@ jobs:
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         run: |
           mkdir -p .ca
-          cat > .ca/config.json << 'CONF'
+          if [ -n "${OPENROUTER_API_KEY:-}" ]; then
+            PROVIDER="openrouter"
+            REVIEWER_MODEL="qwen/qwen3-coder-30b-a3b-instruct"
+            SUPPORTER_MODEL="baidu/ernie-4.5-21b-a3b-thinking"
+            HEAD_MODEL="deepseek/deepseek-v3.2"
+          elif [ -n "${GROQ_API_KEY:-}" ]; then
+            PROVIDER="groq"
+            REVIEWER_MODEL="llama-3.3-70b-versatile"
+            SUPPORTER_MODEL="llama-3.3-70b-versatile"
+            HEAD_MODEL="llama-3.3-70b-versatile"
+          else
+            PROVIDER="github-models"
+            REVIEWER_MODEL="gpt-4o-mini"
+            SUPPORTER_MODEL="gpt-4o-mini"
+            HEAD_MODEL="gpt-4o-mini"
+          fi
+
+          cat > .ca/config.json << CONF
           {
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
-              { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
-              { "id": "r3", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+              { "id": "r1", "model": "$REVIEWER_MODEL", "backend": "api", "provider": "$PROVIDER", "enabled": true, "timeout": 120 },
+              { "id": "r2", "model": "$REVIEWER_MODEL", "backend": "api", "provider": "$PROVIDER", "enabled": true, "timeout": 120 }
             ],
             "supporters": {
               "pool": [
-                { "id": "s1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+                { "id": "s1", "model": "$SUPPORTER_MODEL", "backend": "api", "provider": "$PROVIDER", "enabled": true, "timeout": 120 }
               ],
               "pickCount": 1,
               "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+              "devilsAdvocate": { "id": "da", "model": "$SUPPORTER_MODEL", "backend": "api", "provider": "$PROVIDER", "enabled": true, "timeout": 120 },
               "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
               "personaAssignment": "random"
             },
-            "moderator": { "model": "gpt-4o-mini", "backend": "api", "provider": "github-models" },
-            "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
-            "head": { "backend": "api", "model": "gpt-4o-mini", "provider": "github-models", "enabled": true },
+            "moderator": { "model": "$HEAD_MODEL", "backend": "api", "provider": "$PROVIDER" },
+            "discussion": { "maxRounds": 1, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 5 },
+            "head": { "backend": "api", "model": "$HEAD_MODEL", "provider": "$PROVIDER", "enabled": true },
             "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
           }
           CONF
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 
       - name: CodeAgora Review
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
@@ -76,7 +95,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '5000'
+          max-diff-lines: ${{ secrets.OPENROUTER_API_KEY != '' && '2500' || '800' }}
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
