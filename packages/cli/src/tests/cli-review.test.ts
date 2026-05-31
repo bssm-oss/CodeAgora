@@ -999,6 +999,23 @@ describe('review command — action handler', () => {
       const isInvalid = postReview && !pr;
       expect(isInvalid).toBe(false);
     });
+
+    it('hasGitHubAppAuth allows app id plus key or key path', async () => {
+      const { hasGitHubAppAuth } = await import('../commands/review.js');
+
+      delete process.env['GITHUB_TOKEN'];
+      process.env['CODEAGORA_APP_ID'] = '123';
+      process.env['CODEAGORA_APP_PRIVATE_KEY'] = 'key';
+      expect(hasGitHubAppAuth()).toBe(true);
+
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+      process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'] = '/tmp/key.pem';
+      expect(hasGitHubAppAuth()).toBe(true);
+
+      delete process.env['CODEAGORA_APP_ID'];
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'];
+      expect(hasGitHubAppAuth()).toBe(false);
+    });
   });
 });
 

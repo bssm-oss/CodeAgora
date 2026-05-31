@@ -63,6 +63,13 @@ interface ReviewStartupDiagnostics {
   contextLines: number;
 }
 
+export function hasGitHubAppAuth(): boolean {
+  const appId = process.env['CODEAGORA_APP_ID'];
+  const privateKey = process.env['CODEAGORA_APP_PRIVATE_KEY'];
+  const privateKeyPath = process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'];
+  return Boolean(appId && (privateKey || privateKeyPath));
+}
+
 export function emitReviewStartupDiagnostics(
   diagnostics: ReviewStartupDiagnostics,
   machineReadableStdout: boolean,
@@ -117,6 +124,13 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
 
     if (options.postReview && !options.pr) {
       console.error('--post-review requires --pr to specify the target PR');
+      process.exit(2);
+    }
+
+    if (options.postReview && !process.env['GITHUB_TOKEN'] && !hasGitHubAppAuth()) {
+      console.error(
+        '--post-review requires GITHUB_TOKEN or GitHub App auth (CODEAGORA_APP_ID + CODEAGORA_APP_PRIVATE_KEY or CODEAGORA_APP_PRIVATE_KEY_PATH)'
+      );
       process.exit(2);
     }
 

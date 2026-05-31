@@ -17,10 +17,12 @@ const mockListComments = vi.fn();
 const mockUpdateComment = vi.fn();
 const mockPullsGet = vi.fn();
 const mockPaginate = vi.fn();
+const mockOctokitCtor = vi.hoisted(() => vi.fn());
 
 vi.mock('@octokit/rest', () => {
   return {
-    Octokit: vi.fn().mockImplementation(() => ({
+    Octokit: mockOctokitCtor.mockImplementation((options?: { auth?: string }) => ({
+      options,
       pulls: {
         get: mockPullsGet,
       },
@@ -111,6 +113,7 @@ describe('parseGitRemote', () => {
 describe('createGitHubConfig', () => {
   beforeEach(() => {
     delete process.env['GITHUB_TOKEN'];
+    mockOctokitCtor.mockClear();
   });
 
   it('creates config from token + prUrl', () => {
@@ -138,10 +141,9 @@ describe('createGitHubConfig', () => {
     expect(config.token).toBe('env_token');
   });
 
-  it('throws when no token is available', () => {
-    expect(() =>
-      createGitHubConfig({ prUrl: 'https://github.com/acme/api/pull/1' })
-    ).toThrow(/token/i);
+  it('allows missing token for read-only PR fetches', () => {
+    const config = createGitHubConfig({ prUrl: 'https://github.com/acme/api/pull/1' });
+    expect(config).toEqual({ token: '', owner: 'acme', repo: 'api', prNumber: 1 });
   });
 
   it('throws when prUrl is invalid', () => {
@@ -154,6 +156,22 @@ describe('createGitHubConfig', () => {
     expect(() =>
       createGitHubConfig({ token: 'ghp_test' })
     ).toThrow();
+  });
+
+  it('creates unauthenticated Octokit when token is empty', async () => {
+    const { createOctokit } = await import('@codeagora/github/client.js');
+
+    createOctokit({ token: '', owner: 'acme', repo: 'api' });
+
+    expect(mockOctokitCtor).toHaveBeenCalledWith({});
+  });
+
+  it('creates authenticated Octokit when token is present', async () => {
+    const { createOctokit } = await import('@codeagora/github/client.js');
+
+    createOctokit({ token: 'ghp_test', owner: 'acme', repo: 'api' });
+
+    expect(mockOctokitCtor).toHaveBeenCalledWith({ auth: 'ghp_test' });
   });
 });
 
