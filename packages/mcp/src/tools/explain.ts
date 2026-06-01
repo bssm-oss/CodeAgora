@@ -5,7 +5,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { explainSession } from '@codeagora/cli/commands/explain.js';
-import { errorMessage, mcpErrorResponse } from './shared-response.js';
+import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
 
 export function registerExplain(server: McpServer): void {
   server.tool(
@@ -13,10 +13,16 @@ export function registerExplain(server: McpServer): void {
     'Read session artifacts and produce a narrative summary of a past review. No LLM calls.',
     {
       session: z.string().describe('Session path (e.g. 2026-03-19/001)'),
+      repo_path: z.string().optional().describe('Repo root path for session lookup; must stay within the current repository boundary'),
     },
-    async ({ session }) => {
+    async ({ session, repo_path }) => {
       try {
-        const result = await explainSession(process.cwd(), session);
+        const repoPath = await resolveRepoPathOrError(repo_path);
+        if (!repoPath.ok) {
+          return mcpErrorResponse(repoPath.error.code, repoPath.error.message, repoPath.error.details);
+        }
+
+        const result = await explainSession(repoPath.repoPath ?? process.cwd(), session);
         return { content: [{ type: 'text' as const, text: result.narrative }] };
       } catch (err) {
         return mcpErrorResponse('EXPLAIN_SESSION_FAILED', errorMessage(err), { session });

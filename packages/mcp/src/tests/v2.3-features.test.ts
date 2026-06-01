@@ -299,6 +299,7 @@ describe('review_pr extended schema', () => {
 describe('config_get schema', () => {
   const schema = z.object({
     key: z.string().optional(),
+    repo_path: z.string().optional(),
   });
 
   it('accepts empty (full config)', () => {
@@ -322,6 +323,7 @@ describe('config_set schema', () => {
   const schema = z.object({
     key: z.string(),
     value: z.union([z.string(), z.number(), z.boolean()]),
+    repo_path: z.string().optional(),
   });
 
   it('accepts string value', () => {

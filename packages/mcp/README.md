@@ -62,11 +62,11 @@ Deterministic benchmark CI gates such as `pnpm bench:ci` do not require live pro
 - `review_full`: full L0-L3 review with debate and head verdict.
 - `review_pr`: PR-oriented review flow.
 - `dry_run`: validate diff/config without a full review.
-- `explain_session`: explain a previous session.
+- `explain_session`: explain a previous session (`repo_path` optional).
 - `get_leaderboard`: inspect model ranking data.
-- `get_stats`: inspect review statistics.
-- `config_get`: read current reviewer configuration.
-- `config_set`: update supported configuration fields.
+- `get_stats`: inspect review statistics (`repo_path` optional).
+- `config_get`: read current reviewer configuration (`repo_path` optional).
+- `config_set`: update supported configuration fields (`repo_path` optional).
 
 Default MCP review responses are compact to preserve agent context. Request `output_format: "json"` from review tools when you need the versioned `codeagora.review.v1` machine contract.
 

@@ -70,6 +70,7 @@ function createServerStub() {
 
 vi.mock('@codeagora/core/config/loader.js', () => ({
   loadConfig: vi.fn(),
+  loadConfigFrom: vi.fn(),
 }));
 
 vi.mock('@codeagora/cli/commands/config-set.js', () => ({
@@ -84,6 +85,10 @@ vi.mock('@codeagora/core/l0/leaderboard.js', () => ({
 vi.mock('@codeagora/core/session/queries.js', () => ({
   getSessionStats: vi.fn(),
   formatSessionStats: vi.fn(),
+}));
+
+vi.mock('@codeagora/cli/commands/explain.js', () => ({
+  explainSession: vi.fn(),
 }));
 
 vi.mock('../helpers.js', () => ({
@@ -112,8 +117,8 @@ describe('config_get handler', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('returns full config when no key given', async () => {
-    const { loadConfig } = await import('@codeagora/core/config/loader.js');
-    vi.mocked(loadConfig).mockResolvedValue({ discussion: { maxRounds: 3 } } as never);
+    const { loadConfigFrom } = await import('@codeagora/core/config/loader.js');
+    vi.mocked(loadConfigFrom).mockResolvedValue({ discussion: { maxRounds: 3 } } as never);
 
     const { registerConfigGet } = await import('../tools/config-get.js');
     const { server, getHandler } = createServerStub();
@@ -126,8 +131,8 @@ describe('config_get handler', () => {
   });
 
   it('returns specific key via dot notation', async () => {
-    const { loadConfig } = await import('@codeagora/core/config/loader.js');
-    vi.mocked(loadConfig).mockResolvedValue({ discussion: { maxRounds: 5 } } as never);
+    const { loadConfigFrom } = await import('@codeagora/core/config/loader.js');
+    vi.mocked(loadConfigFrom).mockResolvedValue({ discussion: { maxRounds: 5 } } as never);
 
     const { registerConfigGet } = await import('../tools/config-get.js');
     const { server, getHandler } = createServerStub();
@@ -139,8 +144,8 @@ describe('config_get handler', () => {
   });
 
   it('returns error for non-existent key', async () => {
-    const { loadConfig } = await import('@codeagora/core/config/loader.js');
-    vi.mocked(loadConfig).mockResolvedValue({ discussion: {} } as never);
+    const { loadConfigFrom } = await import('@codeagora/core/config/loader.js');
+    vi.mocked(loadConfigFrom).mockResolvedValue({ discussion: {} } as never);
 
     const { registerConfigGet } = await import('../tools/config-get.js');
     const { server, getHandler } = createServerStub();
@@ -158,8 +163,8 @@ describe('config_get handler', () => {
   });
 
   it('returns error when loadConfig throws', async () => {
-    const { loadConfig } = await import('@codeagora/core/config/loader.js');
-    vi.mocked(loadConfig).mockRejectedValue(new Error('no config'));
+    const { loadConfigFrom } = await import('@codeagora/core/config/loader.js');
+    vi.mocked(loadConfigFrom).mockRejectedValue(new Error('no config'));
 
     const { registerConfigGet } = await import('../tools/config-get.js');
     const { server, getHandler } = createServerStub();
@@ -173,6 +178,18 @@ describe('config_get handler', () => {
       code: 'CONFIG_GET_FAILED',
       message: 'no config',
     });
+  });
+
+  it('resolves repo_path before loading config', async () => {
+    const { loadConfigFrom } = await import('@codeagora/core/config/loader.js');
+    vi.mocked(loadConfigFrom).mockResolvedValue({ discussion: { maxRounds: 3 } } as never);
+
+    const { registerConfigGet } = await import('../tools/config-get.js');
+    const { server, getHandler } = createServerStub();
+    registerConfigGet(server as never);
+
+    await getHandler('config_get')({ repo_path: process.cwd() });
+    expect(loadConfigFrom).toHaveBeenCalledWith(await fs.realpath(process.cwd()));
   });
 });
 
@@ -379,6 +396,21 @@ describe('config_set handler', () => {
     expect(setConfigValue).toHaveBeenCalledWith(expect.any(String), 'discussion.maxRounds', '5');
   });
 
+  it('rejects invalid repo_path before mutating config', async () => {
+    const { setConfigValue } = await import('@codeagora/cli/commands/config-set.js');
+
+    const { registerConfigSet } = await import('../tools/config-set.js');
+    const { server, getHandler } = createServerStub();
+    registerConfigSet(server as never);
+
+    const result = await getHandler('config_set')({ key: 'mode', value: 'auto', repo_path: path.parse(process.cwd()).root });
+    const parsed = parseToolJson(result);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({ status: 'error', code: 'INVALID_REPO_PATH' });
+    expect(setConfigValue).not.toHaveBeenCalled();
+  });
+
   it('returns error when setConfigValue throws', async () => {
     const { setConfigValue } = await import('@codeagora/cli/commands/config-set.js');
     vi.mocked(setConfigValue).mockRejectedValue(new Error('invalid key'));
@@ -475,6 +507,54 @@ describe('get_stats handler', () => {
       code: 'STATS_FAILED',
       message: 'no sessions dir',
     });
+  });
+
+  it('accepts repo_path and resolves it before stats lookup', async () => {
+    const { getSessionStats } = await import('@codeagora/core/session/queries.js');
+    vi.mocked(getSessionStats).mockResolvedValue({ total: 10 } as never);
+
+    const { registerStats } = await import('../tools/stats.js');
+    const { server, getHandler } = createServerStub();
+    registerStats(server as never);
+
+    await getHandler('get_stats')({ repo_path: process.cwd() });
+    expect(getSessionStats).toHaveBeenCalledWith(await fs.realpath(process.cwd()));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// explain_session
+// ---------------------------------------------------------------------------
+
+describe('explain_session handler', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('rejects invalid repo_path before explanation', async () => {
+    const { explainSession } = await import('@codeagora/cli/commands/explain.js');
+
+    const { registerExplain } = await import('../tools/explain.js');
+    const { server, getHandler } = createServerStub();
+    registerExplain(server as never);
+
+    const result = await getHandler('explain_session')({ session: '2026-03-19/001', repo_path: path.parse(process.cwd()).root });
+    const parsed = parseToolJson(result);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({ status: 'error', code: 'INVALID_REPO_PATH' });
+    expect(explainSession).not.toHaveBeenCalled();
+  });
+
+  it('passes validated repo_path to explainSession', async () => {
+    const { explainSession } = await import('@codeagora/cli/commands/explain.js');
+    vi.mocked(explainSession).mockResolvedValue({ sessionPath: '2026-03-19/001', narrative: 'ok' } as never);
+
+    const { registerExplain } = await import('../tools/explain.js');
+    const { server, getHandler } = createServerStub();
+    registerExplain(server as never);
+
+    const result = await getHandler('explain_session')({ session: '2026-03-19/001', repo_path: process.cwd() });
+    expect(result.isError).toBeUndefined();
+    expect(explainSession).toHaveBeenCalledWith(await fs.realpath(process.cwd()), '2026-03-19/001');
   });
 });
 
