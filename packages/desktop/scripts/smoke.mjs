@@ -25,7 +25,10 @@ assert(fs.existsSync(path.join(root, 'dist/index.html')), 'dist/index.html is mi
 assert(fs.existsSync(path.join(root, 'dist/main.js')), 'dist/main.js is missing');
 assert(fs.existsSync(path.join(root, 'dist/styles.css')), 'dist/styles.css is missing');
 
+const builtJs = readText('dist/main.js');
 const builtCss = readText('dist/styles.css').toLowerCase();
+assert(!builtJs.includes('from "@tauri-apps/api/'), 'Built JS must bundle @tauri-apps/api imports for the Tauri webview');
+assert(!builtJs.includes("from '@tauri-apps/api/"), 'Built JS must bundle @tauri-apps/api imports for the Tauri webview');
 assert(builtCss.includes('#191a51'), 'Built CSS is missing logo navy #191A51');
 assert(builtCss.includes('#05a6b9'), 'Built CSS is missing logo cyan #05A6B9');
 

@@ -30,9 +30,26 @@ function fixtureWorkspace() {
   const git = spawnSync('git', ['init', '--initial-branch', 'main'], { cwd: dir, stdio: 'ignore' });
   assert(git.status === 0, 'Failed to initialize temporary git workspace');
   writeFile(path.join(dir, 'README.md'), '# CodeAgora desktop WebDriver fixture\n');
+  const reviewer = { id: 'codex', backend: 'opencode', provider: 'openai', model: 'gpt-5', enabled: true, timeout: 120 };
+  const supporter = { id: 'supporter', backend: 'opencode', provider: 'openai', model: 'gpt-5', enabled: true, timeout: 120 };
   writeFile(path.join(dir, '.ca', 'config.json'), `${JSON.stringify({
     language: 'ko',
-    reviewers: [{ id: 'codex', backend: 'opencode', provider: 'openai', model: 'gpt-5' }],
+    reviewers: [reviewer],
+    supporters: {
+      pool: [supporter],
+      pickCount: 1,
+      pickStrategy: 'random',
+      devilsAdvocate: { ...supporter, id: 'devils-advocate' },
+      personaPool: ['builtin:security'],
+      personaAssignment: 'random',
+    },
+    moderator: { backend: 'opencode', provider: 'openai', model: 'gpt-5' },
+    discussion: {
+      maxRounds: 1,
+      registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },
+      codeSnippetRange: 10,
+    },
+    errorHandling: { maxRetries: 0, forfeitThreshold: 1 },
   }, null, 2)}\n`);
   const sessionDir = path.join(dir, '.ca', 'sessions', '2026-05-06', 'webdriver-001');
   writeFile(path.join(sessionDir, 'metadata.json'), JSON.stringify({ status: 'completed', completedAt: Date.now() }));

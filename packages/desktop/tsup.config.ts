@@ -17,7 +17,7 @@ export default defineConfig({
   clean: true,
   outDir: 'dist',
   bundle: true,
-  noExternal: ['@codeagora/shared'],
+  noExternal: ['@codeagora/shared', '@tauri-apps/api'],
   splitting: false,
   onSuccess: copyAssets,
 });
