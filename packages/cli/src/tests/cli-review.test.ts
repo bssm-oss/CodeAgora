@@ -999,6 +999,57 @@ describe('review command — action handler', () => {
       const isInvalid = postReview && !pr;
       expect(isInvalid).toBe(false);
     });
+
+    it('hasGitHubAppAuth allows app id plus key or key path', async () => {
+      const { hasGitHubAppAuth } = await import('../commands/review.js');
+
+      delete process.env['GITHUB_TOKEN'];
+      process.env['CODEAGORA_APP_ID'] = '123';
+      process.env['CODEAGORA_APP_PRIVATE_KEY'] = 'key';
+      expect(hasGitHubAppAuth()).toBe(true);
+
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+      process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'] = '/tmp/key.pem';
+      expect(hasGitHubAppAuth()).toBe(true);
+
+      delete process.env['CODEAGORA_APP_ID'];
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'];
+      expect(hasGitHubAppAuth()).toBe(false);
+    });
+
+    it('createPrFetchOctokit uses GitHub App auth when token is absent', async () => {
+      const { createPrFetchOctokit } = await import('../commands/review.js');
+      const { createAppOctokit } = await import('@codeagora/github/client.js');
+      const appKit = { pulls: { get: vi.fn() } } as never;
+
+      process.env['CODEAGORA_APP_ID'] = '123';
+      process.env['CODEAGORA_APP_PRIVATE_KEY'] = 'key';
+      vi.mocked(createAppOctokit).mockResolvedValue(appKit);
+
+      const result = await createPrFetchOctokit({ token: '', owner: 'acme', repo: 'api' }, { postReview: true });
+
+      expect(result).toBe(appKit);
+      expect(createAppOctokit).toHaveBeenCalledWith('acme', 'api');
+
+      delete process.env['CODEAGORA_APP_ID'];
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+    });
+
+    it('createPrFetchOctokit fails posting when configured GitHub App auth cannot initialize', async () => {
+      const { createPrFetchOctokit } = await import('../commands/review.js');
+      const { createAppOctokit } = await import('@codeagora/github/client.js');
+
+      process.env['CODEAGORA_APP_ID'] = '123';
+      process.env['CODEAGORA_APP_PRIVATE_KEY'] = 'key';
+      vi.mocked(createAppOctokit).mockResolvedValue(null);
+
+      await expect(
+        createPrFetchOctokit({ token: '', owner: 'acme', repo: 'api' }, { postReview: true })
+      ).rejects.toThrow(/installation auth could not be initialized/i);
+
+      delete process.env['CODEAGORA_APP_ID'];
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+    });
   });
 });
 

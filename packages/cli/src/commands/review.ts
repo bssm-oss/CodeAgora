@@ -5,6 +5,7 @@
  */
 
 import type { Command } from 'commander';
+import type { Octokit } from '@octokit/rest';
 import path from 'path';
 import fs from 'fs/promises';
 import ora from 'ora';
@@ -12,12 +13,11 @@ import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
 import { dryRun, formatDryRunText } from '@codeagora/core/pipeline/dryrun.js';
 import { loadConfig } from '@codeagora/core/config/loader.js';
 import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
-import { parsePrUrl, createGitHubConfig } from '@codeagora/github/client.js';
+import { parsePrUrl, createGitHubConfig, createOctokit, createAppOctokit, type GitHubConfig } from '@codeagora/github/client.js';
 import { fetchPrDiff } from '@codeagora/github/pr-diff.js';
 import { buildDiffPositionIndex } from '@codeagora/github/diff-parser.js';
 import { mapToGitHubReview } from '@codeagora/github/mapper.js';
 import { postReview, setCommitStatus } from '@codeagora/github/poster.js';
-import { createAppOctokit } from '@codeagora/github/client.js';
 import { t } from '@codeagora/shared/i18n/index.js';
 import { formatOutput, type OutputFormat } from '../formatters/review-output.js';
 import { parseReviewerOption, readStdin } from '../options/review-options.js';
@@ -61,6 +61,29 @@ interface ReviewStartupDiagnostics {
   discussion: boolean;
   repoPath?: string;
   contextLines: number;
+}
+
+export function hasGitHubAppAuth(): boolean {
+  const appId = process.env['CODEAGORA_APP_ID'];
+  const privateKey = process.env['CODEAGORA_APP_PRIVATE_KEY'];
+  const privateKeyPath = process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'];
+  return Boolean(appId && (privateKey || privateKeyPath));
+}
+
+export async function createPrFetchOctokit(
+  ghConfig: GitHubConfig,
+  options: { postReview: boolean },
+): Promise<Octokit | undefined> {
+  if (ghConfig.token || !hasGitHubAppAuth()) return undefined;
+
+  const appKit = await createAppOctokit(ghConfig.owner, ghConfig.repo);
+  if (!appKit && options.postReview) {
+    throw new Error(
+      'GitHub App auth is configured but installation auth could not be initialized for this repository. Check CODEAGORA_APP_ID and private key settings, and ensure the App is installed on the repo.'
+    );
+  }
+
+  return appKit ?? undefined;
 }
 
 export function emitReviewStartupDiagnostics(
@@ -120,6 +143,13 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       process.exit(2);
     }
 
+    if (options.postReview && !process.env['GITHUB_TOKEN'] && !hasGitHubAppAuth()) {
+      console.error(
+        '--post-review requires GITHUB_TOKEN or GitHub App auth (CODEAGORA_APP_ID + CODEAGORA_APP_PRIVATE_KEY or CODEAGORA_APP_PRIVATE_KEY_PATH)'
+      );
+      process.exit(2);
+    }
+
     // Handle --staged: run git diff --staged and use as input
     if (options.staged) {
       const { execFileSync } = await import('child_process');
@@ -145,6 +175,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     // Handle --pr: fetch diff from GitHub
     let resolvedPath: string;
     let prContext: { owner: string; repo: string; prNumber: number; headSha: string; diff: string } | undefined;
+    let prOctokit: Octokit | undefined;
 
     if (options.pr) {
       const parsed = parsePrUrl(options.pr);
@@ -165,7 +196,8 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       }
 
       if (!options.quiet) console.error(t('cli.info.fetchingPR', { prNumber: String(ghConfig.prNumber) }));
-      const prInfo = await fetchPrDiff(ghConfig, ghConfig.prNumber);
+      prOctokit = await createPrFetchOctokit(ghConfig, { postReview: Boolean(options.postReview) });
+      const prInfo = await fetchPrDiff(ghConfig, ghConfig.prNumber, prOctokit);
 
       const tmpDir = path.join(process.cwd(), '.ca');
       await fs.mkdir(tmpDir, { recursive: true });
@@ -175,13 +207,12 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       resolvedPath = stdinTmpPath;
 
       // Save PR context for --post-review
-      const { createOctokit } = await import('@codeagora/github/client.js');
-      const kit = createOctokit(ghConfig);
-      const { data: prData } = await kit.pulls.get({
+      const kit = prOctokit ?? createOctokit(ghConfig);
+      const prData = prOctokit && prInfo.headSha ? { head: { sha: prInfo.headSha } } : (await kit.pulls.get({
         owner: ghConfig.owner,
         repo: ghConfig.repo,
         pull_number: ghConfig.prNumber,
-      });
+      })).data;
       prContext = {
         owner: ghConfig.owner,
         repo: ghConfig.repo,
@@ -471,10 +502,9 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
           ? new Map(Object.entries(result.supporterModelMap))
           : undefined,
       });
-      const appKit = await createAppOctokit(prContext.owner, prContext.repo);
-      if (appKit && !options.quiet) console.error(t('cli.info.usingAppAuth'));
-      const postResult = await postReview(ghConfig, prContext.prNumber, review, appKit ?? undefined);
-      await setCommitStatus(ghConfig, prContext.headSha, postResult.verdict, postResult.reviewUrl, appKit ?? undefined);
+      if (prOctokit && !options.quiet) console.error(t('cli.info.usingAppAuth'));
+      const postResult = await postReview(ghConfig, prContext.prNumber, review, prOctokit);
+      await setCommitStatus(ghConfig, prContext.headSha, postResult.verdict, postResult.reviewUrl, prOctokit);
       if (!options.quiet) console.error(t('cli.info.reviewPosted', { url: postResult.reviewUrl }));
     }
 

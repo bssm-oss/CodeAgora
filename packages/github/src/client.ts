@@ -11,9 +11,11 @@ import { validateDiffPath } from '@codeagora/shared/utils/path-validation.js';
 
 /**
  * Create a reusable Octokit instance from a GitHubConfig.
+ * Read-only PR fetches can use an unauthenticated client; posting still
+ * requires a token or GitHub App installation auth.
  */
 export function createOctokit(config: GitHubConfig): Octokit {
-  return new Octokit({ auth: config.token });
+  return config.token ? new Octokit({ auth: config.token }) : new Octokit({});
 }
 
 /**
@@ -144,10 +146,11 @@ export function parseGitRemote(
  * Create a GitHubConfig with PR number from the provided options.
  *
  * Resolution order:
- * - token: options.token ?? process.env.GITHUB_TOKEN
+ * - token: options.token ?? process.env.GITHUB_TOKEN ?? ''
  * - owner/repo/prNumber: parsed from prUrl if provided, else remoteUrl + prNumber
  *
- * Throws if token is missing or if required fields cannot be resolved.
+ * Read-only PR diff fetches can proceed without a token; posting requires
+ * token or GitHub App auth.
  */
 export function createGitHubConfig(options: {
   token?: string;
@@ -155,12 +158,7 @@ export function createGitHubConfig(options: {
   remoteUrl?: string;
   prNumber?: number;
 }): GitHubConfig & { prNumber: number } {
-  const token = options.token ?? process.env['GITHUB_TOKEN'];
-  if (!token) {
-    throw new Error(
-      'GitHub token is required. Pass --token or set the GITHUB_TOKEN environment variable.'
-    );
-  }
+  const token = options.token ?? process.env['GITHUB_TOKEN'] ?? '';
 
   if (options.prUrl) {
     const parsed = parsePrUrl(options.prUrl);

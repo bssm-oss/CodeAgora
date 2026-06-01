@@ -145,7 +145,7 @@ Every meaningful false positive or annoying low-value pattern should become an
 | JSON output contract pollution | RC blocker | Logger/progress lines appeared before JSON in successful `--output json --quiet` runs | Runtime owner | Ensure machine output formats write only the requested format to stdout; move logs to stderr or structured channels. | Rerun one baseline artifact and parse with `jq` without manual normalization | open |
 | Low-confidence high-severity noise | RC blocker | R3-02 emitted CRITICAL/HARSHLY_CRITICAL findings at `4%` to `18%` confidence | Quality owner | Tune L3 triage and confidence/severity interaction before quality claims. | Rerun R3-02 after rc.4 tuning | open |
 | Invalid final location | RC blocker | R3-02 emitted `unknown:0` final finding | Quality owner | Filter or quarantine findings with invalid file/line grounding. | Regression fixture for invalid final locations | open |
-| Direct PR mode requires `GITHUB_TOKEN` | Known surface blocker | First `pnpm dev review --pr <id>` attempts failed with `GitHub token is required` | Runtime owner | Set `GITHUB_TOKEN` before direct `--pr` runs, or continue using local patch inputs for baseline evidence. | Direct `--pr` run for one sample | open |
+| Direct PR mode requires `GITHUB_TOKEN` | Known surface blocker | First `pnpm dev review --pr <id>` attempts failed with `GitHub token is required` | Runtime owner | Read-only public PR fetch now works without a token; posting/private runs still require `GITHUB_TOKEN` or GitHub App auth. | Direct `--pr` read-only run for one sample | open |
 
 ## Known Limits
 
@@ -153,7 +153,7 @@ Every meaningful false positive or annoying low-value pattern should become an
 - The selected samples are historical merged or closed PRs. Live posting behavior is not proven by these samples; Action posting remains covered by separate live Action smoke evidence.
 - Provider/model set is fixed for the baseline: OpenRouter low-cost diverse from `benchmarks/.ca/config.low-cost-diverse.json`.
 - `OPENROUTER_API_KEY` was made available through the local CodeAgora credential store for the successful rerun. The key value is intentionally not recorded here.
-- Direct GitHub PR mode was not proven because this environment still has no `GITHUB_TOKEN`; patch-file input is the rc.3 baseline surface.
+- Direct GitHub PR mode can fetch public PR diffs without a token; posting and private-repo access still require `GITHUB_TOKEN` or GitHub App auth.
 
 ## Owner Checklist
 
@@ -187,7 +187,9 @@ work, but it is not good enough for quality claims: R3-02 and R3-04 show noisy
 `NEEDS_HUMAN` behavior, low-confidence high-severity findings, and at least one
 invalid final location. Successful JSON output also had logger/progress prelude
 lines before the JSON object and required artifact normalization before `jq`
-could parse it.
+could parse it. Direct public PR fetching is now read-only and no longer blocked
+by missing `GITHUB_TOKEN`; posting/private access still needs token or GitHub
+App auth.
 
 Next action: start rc.4 false-positive/noise reduction by fixing the JSON stdout
 contract, filtering invalid final locations, and calibrating low-confidence
