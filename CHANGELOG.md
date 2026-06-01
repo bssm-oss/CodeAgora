@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-rc.4 (2026-06-01)
+
+### Release Candidate Metadata
+- Promoted workspace package metadata, the desktop Tauri manifest, and generated GitHub Action examples from `0.1.0-rc.3` to `0.1.0-rc.4`.
+
+### Improvements
+- Added GitHub PR diff fetch and App auth updates, refreshed the bundled Action example, fixed MCP test working-directory handling, and aligned benchmark/action documentation.
+
+### Verification
+- Release metadata and user-facing examples updated for the `0.1.0-rc.4` cut.
+
 ## 0.1.0-rc.3 (2026-05-14)
 
 ### Real Repository Baseline

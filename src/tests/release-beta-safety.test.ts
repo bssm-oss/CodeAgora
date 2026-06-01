@@ -34,7 +34,7 @@ describe('prerelease safety', () => {
     const rootVersion = readPackageVersion('package.json');
     const mcpVersion = readPackageVersion('packages/mcp/package.json');
 
-    expect(rootVersion).toBe('0.1.0-rc.3');
+    expect(rootVersion).toBe('0.1.0-rc.4');
     expect(mcpVersion).toBe(rootVersion);
   });
 
@@ -45,7 +45,7 @@ describe('prerelease safety', () => {
       'README.md',
       'packages/cli/src/commands/init.ts',
       'packages/shared/src/data/github-actions-template.yml',
-      'docs/archived/RELEASE_CHECKLIST.md',
+      'docs/for-users/GITHUB_ACTIONS_SETUP.md',
     ];
 
     for (const file of files) {

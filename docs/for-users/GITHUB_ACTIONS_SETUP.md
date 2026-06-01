@@ -100,7 +100,7 @@ jobs:
           fetch-depth: 0
 
       - name: CodeAgora Review
-        uses: bssm-oss/CodeAgora@v0.1.0-rc.3
+        uses: bssm-oss/CodeAgora@v0.1.0-rc.4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
@@ -170,7 +170,7 @@ Example with Groq:
 
 ```yaml
 - name: CodeAgora Review
-  uses: bssm-oss/CodeAgora@v0.1.0-rc.3
+  uses: bssm-oss/CodeAgora@v0.1.0-rc.4
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     fail-on-reject: 'true'

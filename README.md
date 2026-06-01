@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: bssm-oss/CodeAgora@v0.1.0-rc.3
+      - uses: bssm-oss/CodeAgora@v0.1.0-rc.4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
@@ -165,7 +165,7 @@ Every PR gets inline review comments, a summary verdict, and a commit status che
 
 For GitHub Models, fork PR handling, provider secrets, permissions, and context-limit tuning, see the [GitHub Actions setup guide](docs/for-users/GITHUB_ACTIONS_SETUP.md).
 
-Note: Use the `v0.1.0-rc.3` Action tag for the scoped prerelease package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
+Note: Use the `v0.1.0-rc.4` Action tag for the scoped prerelease package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
 
 ---
 
