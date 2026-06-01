@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.0-rc.5 (2026-06-01)
+
+### MCP And IDE Experience
+- Added optional `repo_path` handling for session, stats, and config MCP tools so IDE/agent clients can target repositories explicitly.
+
+### Desktop Private Preview
+- Hardened desktop bridge contract coverage, bundled the Tauri API for WebDriver execution, and aligned Tauri JavaScript/Rust versions so macOS bundle smoke passes.
+
+### Release Candidate Metadata
+- Promoted workspace package metadata, private-preview desktop metadata, docs, tests, and generated GitHub Action examples from `0.1.0-rc.4` to `0.1.0-rc.5`.
+
+### Verification
+- `pnpm rc:desktop-gate` passed locally on macOS, including typecheck, smoke, Tauri check, app E2E, macOS WebDriver E2E, evidence generation, and bundle smoke.
+
 ## 0.1.0-rc.4 (2026-06-01)
 
 ### Release Candidate Metadata

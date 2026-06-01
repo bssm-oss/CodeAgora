@@ -2,7 +2,7 @@
 
 CodeAgora docs are organized by audience.
 
-Current release: `0.1.0-rc.4`.
+Current release: `0.1.0-rc.5`.
 
 ## Start here
 

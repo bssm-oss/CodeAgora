@@ -651,7 +651,7 @@ function isKorean(): boolean {
 // GitHub Actions workflow
 // ============================================================================
 
-const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-rc.4';
+const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-rc.5';
 
 /**
  * Write the GitHub Actions workflow template to {baseDir}/.github/workflows/codeagora-review.yml.
