@@ -4,7 +4,7 @@ CodeAgora MCP server for Claude Code, Cursor, and other MCP-compatible clients.
 
 ## Install
 
-Beta local smoke uses a packed tarball instead of publishing:
+Release/local smoke uses a packed tarball before publishing:
 
 ```bash
 pnpm --filter @codeagora/mcp build
@@ -14,7 +14,7 @@ pnpm --filter @codeagora/mcp pack --dry-run
 For published installs, users can run the package with:
 
 ```bash
-npx -y @codeagora/mcp@beta
+npx -y @codeagora/mcp@rc
 ```
 
 ## Client Configuration
@@ -24,13 +24,13 @@ npx -y @codeagora/mcp@beta
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@beta"]
+      "args": ["-y", "@codeagora/mcp@rc"]
     }
   }
 }
 ```
 
-For local beta validation, point your client at the built workspace binary instead:
+For local validation, point your client at the built workspace binary instead:
 
 ```json
 {

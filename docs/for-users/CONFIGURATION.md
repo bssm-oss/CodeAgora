@@ -4,6 +4,19 @@ CodeAgora reads `.ca/config.json`, `.ca/config.yaml`, or `.ca/config.yml` from t
 
 If multiple config files exist, load precedence is `config.json` > `config.yaml` > `config.yml`. Run `agora init` to generate a starter config, or create one manually.
 
+> **Current schema quick map**
+>
+> | Section | Purpose |
+> |---|---|
+> | `reviewers` | L1 reviewer pool |
+> | `supporters` | L2 supporters, including `pool`, `pickCount`, and `devilsAdvocate` |
+> | `moderator` / `head` | L2/L3 moderation and final verdict agent |
+> | `discussion` | Debate rounds and severity thresholds |
+> | `errorHandling` | Retry / forfeiture behavior |
+> | `reviewContext` | Extra project context passed into reviews |
+>
+> YAML and JSON both map to the same schema; when both exist, `config.json` wins, then `config.yaml`, then `config.yml`.
+
 ## Example Config
 
 ```json

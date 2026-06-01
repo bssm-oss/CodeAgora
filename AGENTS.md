@@ -66,6 +66,17 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - Shell args sanitized via `validateArg()` + `spawn()` (never `exec`)
 - Error handling: L1 try-catch, L2 Promise.allSettled, security boundaries use Result<T>
 
+## Repository Map
+
+A full codemap is available at `codemap.md` in the project root.
+
+Before working on any task, read `codemap.md` to understand:
+- Project architecture and entry points
+- Directory responsibilities and design patterns
+- Data flow and integration points between modules
+
+For deep work on a specific folder, also read that folder's `codemap.md`.
+
 ## Dependencies
 
 ### External

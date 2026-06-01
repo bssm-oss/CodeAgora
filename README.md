@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">CodeAgora</h1>
-<p align="center"><strong>Where LLMs Debate Your Code</strong></p>
+<p align="center"><strong>Where LLMs debate your code.</strong></p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@codeagora/review"><img src="https://img.shields.io/npm/v/@codeagora/review?color=%2305A6B9" alt="Version"></a>
@@ -12,129 +12,43 @@
   <img src="https://img.shields.io/badge/license-MIT-%23191A51" alt="License">
 </p>
 
-Multiple LLMs review your code in parallel, debate conflicting opinions, then a head agent delivers the final verdict. Different models catch different bugs — consensus filters the noise.
-
----
+CodeAgora runs multiple LLM reviewers in parallel, lets them challenge each other, and returns a final review verdict with evidence.
 
 ## Quick Start
 
 ```bash
-npm i -g @codeagora/review@beta
+npm i -g @codeagora/review@rc
 agora init
 git diff | agora review
 ```
 
-> Package line note: `codeagora@2.x` is now the legacy package line. Review-focused releases restart as `@codeagora/review@0.x` while keeping the `codeagora` and `agora` CLI binaries.
+Current release: `0.1.0-rc.4`.
 
-`agora init` auto-detects your API keys and CLI tools, then generates a config.
+## Why CodeAgora
 
----
+- parallel reviewers catch different issues
+- debate and filtering reduce noisy findings
+- works from the CLI, GitHub Actions, and MCP-compatible editors
 
-## Supported Providers (Tier 1)
+## How it works
 
-| Provider | Type | Cost |
-|----------|------|------|
-| Groq | API | Free |
-| Anthropic | API | Paid |
-| Claude Code | CLI | Subscription |
-| Gemini CLI | CLI | Free |
-| Codex CLI | CLI | Subscription |
+1. pre-analysis enriches the diff
+2. specialist reviewers inspect in parallel
+3. hallucination and dedupe filters remove weak claims
+4. discussion resolves disputes
+5. a head agent returns `ACCEPT`, `REJECT`, or `NEEDS_HUMAN`
 
-[Full provider list (24+ API, 12 CLI) ->](docs/for-users/PROVIDERS.md)
+## Common ways to use it
 
----
+### CLI
 
-## How It Works
-
-```
-git diff | agora review
-
-  Pre  --- Semantic Diff Classification
-       --- TypeScript Diagnostics
-       --- Change Impact Analysis
-            |
-  L1   --- Reviewer A (security) --+
-       --- Reviewer B (logic)    --+-- parallel specialist reviews
-       --- Reviewer C (general)  --+
-            |
-  Filter -- Hallucination Check (file/line validation)
-       --- Self-contradiction Filter
-       --- Evidence Dedup
-            |
-  L2   --- Adversarial Discussion (supporters must disprove)
-       --- Static analysis evidence in debate
-            |
-  L3   --- Head Agent --> ACCEPT / REJECT / NEEDS_HUMAN
-            |
-  Output -- Triage: N must-fix / N verify / N ignore
+```bash
+agora review path/to/diff.patch
 ```
 
----
+`agora init` detects keys and tools, then writes a starter config.
 
-## Desktop App
-
-The old web dashboard and terminal TUI are being consolidated toward a planned cross-platform Tauri desktop app.
-
-The CLI remains the primary automation surface for LLM agents and CI. The desktop app is intended to become the human-facing local UI for review history, configuration, progress, costs, and result exploration, but it is not part of the stable support surface yet.
-
-An initial private preview scaffold lives in `packages/desktop` while the desktop MVP takes shape.
-
----
-
-## MCP Server (Claude Code / Cursor)
-
-9-tool MCP server for AI IDE integration.
-
-```json
-// claude_desktop_config.json or .cursor/mcp.json
-{
-  "mcpServers": {
-    "codeagora": {
-      "command": "npx",
-      "args": ["-y", "@codeagora/mcp@beta"]
-    }
-  }
-}
-```
-
-Tools: `review_quick`, `review_full`, `review_pr`, `dry_run`, `explain_session`, `get_leaderboard`, `get_stats`, `config_get`, `config_set`.
-
-Package-local MCP onboarding: [`packages/mcp/README.md`](packages/mcp/README.md).
-
----
-
-## Extensions
-
-All extensions are optional — install only what you need.
-
-| Package | Install | What it does |
-|---------|---------|-------------|
-| [@codeagora/mcp](https://www.npmjs.com/package/@codeagora/mcp) | `npm i -g @codeagora/mcp@beta` | MCP server (9 tools) — integrates with Claude Code, Cursor, and any MCP-compatible IDE |
-
-The core `codeagora` CLI includes everything needed for command-line reviews and GitHub Actions. Human-facing UI work is moving into the desktop app.
-
-[Extension guide ->](docs/for-users/EXTENSIONS.md)
-
----
-
-## GitHub Actions
-
-Add CodeAgora to any repo in 3 steps:
-
-**1. Create `.ca/config.json`** (or run `agora init`):
-
-```json
-{
-  "mode": "pragmatic",
-  "reviewers": [
-    { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
-    { "id": "r2", "model": "qwen/qwen3-32b", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
-    { "id": "r3", "model": "meta-llama/llama-4-scout-17b-16e-instruct", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
-  ]
-}
-```
-
-**2. Add the workflow** (`.github/workflows/codeagora-review.yml`):
+### GitHub Actions
 
 ```yaml
 name: CodeAgora Review
@@ -159,174 +73,44 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 ```
 
-**3. Add `GROQ_API_KEY`** to your repo's Settings > Secrets > Actions.
+Use `.ca/config.json` as the default config path. See [GitHub Actions setup](docs/for-users/GITHUB_ACTIONS_SETUP.md) for fork handling, secrets, permissions, and tuning.
 
-Every PR gets inline review comments, a summary verdict, and a commit status check. Add `review:skip` label to any PR to bypass.
+### MCP
 
-For GitHub Models, fork PR handling, provider secrets, permissions, and context-limit tuning, see the [GitHub Actions setup guide](docs/for-users/GITHUB_ACTIONS_SETUP.md).
+```json
+{
+  "mcpServers": {
+    "codeagora": {
+      "command": "npx",
+      "args": ["-y", "@codeagora/mcp@rc"]
+    }
+  }
+}
+```
 
-Note: Use the `v0.1.0-rc.4` Action tag for the scoped prerelease package line; `v2` belongs to the legacy `codeagora@2.x` line. The Action defaults to `.ca/config.json` in the repo root. You can override this via the `config-path` input (CLI flag wins, then the `CONFIG_PATH` env). `fail-on-reject` defaults to `true` (Action exits with code 1 on REJECT). The `review:skip` label is caller-owned and will not be modified by the Action. Any degraded/skipped run surfaces `degraded` and `degraded-reason` outputs.
+See [`packages/mcp/README.md`](packages/mcp/README.md) for tool details.
 
----
+### Desktop preview
 
-## Documentation
+The desktop app is an early preview in `packages/desktop`. It is not the stable support surface yet.
 
-| Doc | Content |
-|-----|---------|
+## Docs map
+
+| Doc | Purpose |
+|---|---|
 | [Docs index](docs/README.md) | Audience-based documentation map |
-| [CLI Reference](docs/for-users/CLI_REFERENCE.md) | All commands and options |
+| [CLI reference](docs/for-users/CLI_REFERENCE.md) | Commands and options |
 | [Configuration](docs/for-users/CONFIGURATION.md) | Config file guide |
-| [Providers](docs/for-users/PROVIDERS.md) | Full provider list with tiers |
-| [Architecture](docs/for-agents/ARCHITECTURE.md) | Pipeline design and project structure |
-| [Benchmark Results](docs/for-agents/BENCHMARK_RESULTS_2026_05_30.md) | Latest live golden-bug benchmark evidence and model/config comparison |
-| [Extensions](docs/for-users/EXTENSIONS.md) | MCP and desktop direction |
-| [Production Readiness Roadmap](docs/for-agents/PRODUCTION_READINESS_ROADMAP.md) | Gates for production-ready CLI, GitHub Action, and MCP releases |
-| [Agent Contract](docs/for-agents/AGENT_CONTRACT.md) | Stable JSON, NDJSON, exit codes, and MCP output semantics |
-| [Troubleshooting](docs/for-users/TROUBLESHOOTING.md) | Common errors and fixes, exit codes |
-| [FAQ](docs/for-users/FAQ.md) | Frequently asked questions |
-| [Archived Korean Docs](docs/archived/archive/ko/README.md) | Historical Korean translations; English root docs are canonical |
+| [Providers](docs/for-users/PROVIDERS.md) | Provider list and tiers |
+| [Architecture](docs/for-agents/ARCHITECTURE.md) | Pipeline and system design |
+| [Development notes](docs/for-agents/DEVELOPMENT.md) | Setup, checks, release/doc pointers |
+| [Benchmarks](docs/for-agents/BENCHMARKS.md) | Fixture set and benchmark notes |
+| [GitHub Actions setup](docs/for-users/GITHUB_ACTIONS_SETUP.md) | Full action guide |
+| [Troubleshooting](docs/for-users/TROUBLESHOOTING.md) | Common errors and fixes |
 
----
+## Development and benchmarks
 
-## Development
-
-```bash
-pnpm install && pnpm build
-pnpm test          # run the Vitest suite
-pnpm test:coverage # with coverage report
-pnpm typecheck
-pnpm dev review path/to/diff.patch
-```
-
----
-
-## Benchmarks
-
-Golden-bug fixtures under `benchmarks/golden-bugs/` drive the false-negative and FP-regression framework (see #472). The current deterministic offline gate covers 20 fixtures: 14 recall cases and 6 FP-regression cases.
-
-**Required offline gate** (fast, no API calls):
-
-```bash
-pnpm bench:ci                                      # schema + reference gate for CI
-pnpm bench:fn -- --validate-only                   # schema-check fixtures
-pnpm bench:reference -- --validate-only            # validate the 20-fixture reference gate
-```
-
-The required gate is provider-free and protects schema/reference regressions. Live benchmark runs are separate manual evidence artifacts for quality claims, and `bench-out*` result directories stay uncommitted; CI/workflows should upload artifacts instead. The latest stable-candidate live benchmark capture is [docs/archived/live-benchmark-report.md](docs/archived/live-benchmark-report.md).
-
-**Score pre-computed results** (fast, no API calls):
-
-```bash
-pnpm bench:fn -- --results path/to/results-dir       # score against pre-computed review output
-pnpm bench:fn -- --results path/to/results-dir --json  # CI-friendly JSON report
-pnpm bench:fn:compare -- --baseline old-results --candidate new-results
-```
-
-**Run the live pipeline against every fixture** (produces the results dir above):
-
-```bash
-export OPENROUTER_API_KEY=...
-pnpm bench:fn:run -- --results ./bench-out
-pnpm bench:fn     -- --results ./bench-out
-```
-
-The driver uses `benchmarks/.ca/config.json` by default. Dedicated run configs live under `benchmarks/.ca/`, including `config.cli-mixed.json`, `config.cli-only-codex-5x2.json`, `config.cli-only-claude-5x2.json`, and OpenRouter comparison configs. Add `--fixtures id1,id2` to restrict, `--skip-head` to skip the L3 verdict stage.
-
-Two fixture kinds live side by side:
-
-- **Recall cases** (`expectedFindings` non-empty) — review must surface each listed bug. Misses count as FN.
-- **FP regression cases** (`expectedFindings` is `[]`) — review must report nothing. Any finding is a regression.
-
-Current reference fixtures: 14 recall cases + 6 FP regression cases. See `benchmarks/golden-bugs/README.md` for fixture format and reference-gate semantics.
-
-### Latest live benchmark snapshot (2026-05-30 KST)
-
-Full report: [`docs/for-agents/BENCHMARK_RESULTS_2026_05_30.md`](docs/for-agents/BENCHMARK_RESULTS_2026_05_30.md).
-
-This snapshot is an internal golden-bug benchmark, not a universal leaderboard. The best measured baseline is the Claude/Codex CLI mixed configuration.
-
-| Config | TP | FP | FN | Precision | Recall | Clean FP regressions | Interpretation |
-|---|---:|---:|---:|---:|---:|---:|---|
-| CLI mixed usable mean | 16.0 | 1.0 | 0.0 | 94.4% | 100.0% | 0/6 | Best measured baseline |
-| CLI only Codex | 16 | 2 | 0 | 88.9% | 100.0% | 1/6 | Best clean single-CLI baseline |
-| CLI only Claude | 12 | 0 | 4 | 100.0% | 75.0% | 0/6 | Session-limit capacity failure, not a clean quality score |
-| OpenRouter non-Claude quality | 16 | 6 | 0 | 72.7% | 100.0% | 1/6 | FP-heavy and slow |
-| OpenRouter low-cost fixed | 16 | 6 | 0 | 72.7% | 100.0% | 2/6 | Cost baseline only (`$0.0344`) |
-
-Use these results as configuration-comparison evidence. Do not describe them as production readiness proof or as a universal LLM code-review leaderboard.
-
-### Historical low-cost diverse aggregate (2026-04-28 KST)
-
-Historical report: [`docs/archived/golden-bug-benchmark-report-2026-04-27.md`](docs/archived/golden-bug-benchmark-report-2026-04-27.md).
-
-Smoke gate:
-
-```bash
-pnpm bench:fn:run -- --results ./bench-out-smoke \
-  --config benchmarks/.ca/config.free-smoke.json \
-  --fixtures authz-admin-bypass \
-  --skip-head
-pnpm bench:fn -- --results ./bench-out-smoke
-```
-
-The smoke run executed only `authz-admin-bypass` and passed that fixture (`1/1`, `fp=0`). The full-suite aggregate for `bench-out-smoke` is intentionally not meaningful because the other fixtures were not run.
-
-Full low-cost diverse run:
-
-```bash
-pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
-  --config benchmarks/.ca/config.low-cost-diverse.json \
-  --skip-head
-pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
-```
-
-The 2026-04-28 follow-up added `auth-session-dual` as a non-quota same-file multi-bug recall fixture, then reran that fixture into the same results directory:
-
-```bash
-pnpm bench:fn:run -- --results ./bench-out-low-cost-confirmed-20260427 \
-  --config benchmarks/.ca/config.low-cost-diverse.json \
-  --fixtures auth-session-dual \
-  --skip-head
-pnpm bench:fn -- --results ./bench-out-low-cost-confirmed-20260427
-```
-
-| Metric | Result |
-|---|---:|
-| Total fixtures | 12 |
-| Recall / FP-regression fixtures | 8 / 4 |
-| Expected findings | 10 |
-| Actual findings | 32 |
-| TP / FP / FN | 10 / 0 / 0 |
-| Precision | 100.0% |
-| Recall | 100.0% |
-| F1 | 100.0% |
-| FP clean-rate | 100.0% |
-| mean recall@3 / @5 / @10 | 100.0% / 100.0% / 100.0% |
-| FP regressions triggered | 0/4 |
-
-Per-fixture result: every recall fixture passed with `fp=0` and `r@3=100.0%`; every FP regression fixture passed. `quota-manager-dual` and `auth-session-dual` both score `2/2`, `fp=0`, and `r@3=100.0%` in the confirmed aggregate.
-
-`bench:fn:run` also writes per-fixture runtime metadata under `<results>/_meta/`. For the targeted `auth-session-dual` run, `_meta/auth-session-dual.json` recorded `4` backend calls, `31,504ms` total backend latency, `32,636ms` wall time, and cost `N/A` because no token usage was returned for those calls.
-
-Session baseline before tuning was `TP=5 FP=20 FN=3`, precision `20.0%`, recall `62.5%`, F1 `30.3%`, and FP clean-rate `50.0%` on the low-cost diverse run.
-
-### Baseline (n=3, 2026-04-20)
-
-Three live runs with the default 3-reviewer OpenRouter config ([#24666562754](https://github.com/bssm-oss/CodeAgora/actions/runs/24666562754), [#24667305646](https://github.com/bssm-oss/CodeAgora/actions/runs/24667305646), [#24667897271](https://github.com/bssm-oss/CodeAgora/actions/runs/24667897271)):
-
-| Metric | Mean | Min | Max |
-|---|---|---|---|
-| recall@3 | 100.0% | 100.0% | 100.0% |
-| recall@5 | 100.0% | 100.0% | 100.0% |
-| recall@10 | 100.0% | 100.0% | 100.0% |
-| FPs per fp-regression fixture | 2.3 | 2 | 3 |
-| fp-regression triggered | 3/3 runs |
-
-**Recall stable** — all three recall cases (off-by-one, null-deref, SQL injection) caught in top-3 on every run.
-
-**FP regression triggered on every run** — but the *content* of the phantom findings shifts between runs: CRITICAL×3 about unhandled `JSON.parse` on run 1, WARNING×2 about regex DoS + input size on run 2, WARNING + CRITICAL about unbounded string + missing type import on run 3. Each individual claim is a plausible-sounding, code-level assertion that the review would make against a real diff, which is exactly why the current calibration stack does not filter them. This confirms the "high-confidence corroborated FP" blind spot documented in `project_calibration_stack.md`. This fixture is the regression gate for future calibration work (see #468).
-
----
+See [Development](docs/for-agents/DEVELOPMENT.md) and [Benchmarks](docs/for-agents/BENCHMARKS.md).
 
 ## License
 

@@ -2,6 +2,8 @@
 
 CodeAgora docs are organized by audience.
 
+Current release: `0.1.0-rc.4`.
+
 ## Start here
 
 | Audience | Path | Use when |
@@ -17,8 +19,8 @@ CodeAgora docs are organized by audience.
 | [`for-users/CLI_REFERENCE.md`](./for-users/CLI_REFERENCE.md) | CLI commands and options. |
 | [`for-users/CONFIGURATION.md`](./for-users/CONFIGURATION.md) | CodeAgora configuration. |
 | [`for-users/PROVIDERS.md`](./for-users/PROVIDERS.md) | Provider setup and status. |
-| [`for-users/GITHUB_ACTIONS_SETUP.md`](./for-users/GITHUB_ACTIONS_SETUP.md) | Step-by-step GitHub Actions setup guide. |
-| [`for-users/5_GITHUB_INTEGRATION.md`](./for-users/5_GITHUB_INTEGRATION.md) | GitHub Action and PR integration. |
+| [`for-users/GITHUB_ACTIONS_SETUP.md`](./for-users/GITHUB_ACTIONS_SETUP.md) | Quick-start/current GitHub Actions setup guide. |
+| [`for-users/5_GITHUB_INTEGRATION.md`](./for-users/5_GITHUB_INTEGRATION.md) | Deep GitHub integration/spec reference. |
 | [`for-users/TROUBLESHOOTING.md`](./for-users/TROUBLESHOOTING.md) | Common failures and fixes. |
 
 ## Key agent/maintainer docs
@@ -28,6 +30,8 @@ CodeAgora docs are organized by audience.
 | [`for-agents/1_PRD.md`](./for-agents/1_PRD.md) | Product requirements and target scope. |
 | [`for-agents/ARCHITECTURE.md`](./for-agents/ARCHITECTURE.md) | Current pipeline architecture. |
 | [`for-agents/AGENT_CONTRACT.md`](./for-agents/AGENT_CONTRACT.md) | Agent/reviewer contract. |
+| [`for-agents/DEVELOPMENT.md`](./for-agents/DEVELOPMENT.md) | Local setup, checks, and release/doc pointers. |
+| [`for-agents/BENCHMARKS.md`](./for-agents/BENCHMARKS.md) | Benchmark fixture set, offline gate, and live snapshot notes. |
 | [`for-agents/BENCHMARK_MEASUREMENT_PLAN.md`](./for-agents/BENCHMARK_MEASUREMENT_PLAN.md) | Benchmark measurement dimensions and model matrix. |
 | [`for-agents/BENCHMARK_RESULTS_2026_05_30.md`](./for-agents/BENCHMARK_RESULTS_2026_05_30.md) | Latest live golden-bug benchmark results and model/config comparison. |
 | [`for-agents/PRODUCTION_READINESS_ROADMAP.md`](./for-agents/PRODUCTION_READINESS_ROADMAP.md) | Release readiness gates and roadmap. |
