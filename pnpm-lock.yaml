@@ -193,11 +193,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@tauri-apps/api':
-        specifier: ^2.11.0
+        specifier: 2.11.0
         version: 2.11.0
     devDependencies:
       '@tauri-apps/cli':
-        specifier: ^2.11.0
+        specifier: 2.11.0
         version: 2.11.0
       tsup:
         specifier: ^8.0.1

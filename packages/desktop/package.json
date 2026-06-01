@@ -21,10 +21,10 @@
   "dependencies": {
     "@codeagora/core": "workspace:*",
     "@codeagora/shared": "workspace:*",
-    "@tauri-apps/api": "^2.11.0"
+    "@tauri-apps/api": "2.11.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.0",
+    "@tauri-apps/cli": "2.11.0",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   }
