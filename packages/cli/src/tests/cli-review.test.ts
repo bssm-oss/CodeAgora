@@ -1016,6 +1016,40 @@ describe('review command — action handler', () => {
       delete process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'];
       expect(hasGitHubAppAuth()).toBe(false);
     });
+
+    it('createPrFetchOctokit uses GitHub App auth when token is absent', async () => {
+      const { createPrFetchOctokit } = await import('../commands/review.js');
+      const { createAppOctokit } = await import('@codeagora/github/client.js');
+      const appKit = { pulls: { get: vi.fn() } } as never;
+
+      process.env['CODEAGORA_APP_ID'] = '123';
+      process.env['CODEAGORA_APP_PRIVATE_KEY'] = 'key';
+      vi.mocked(createAppOctokit).mockResolvedValue(appKit);
+
+      const result = await createPrFetchOctokit({ token: '', owner: 'acme', repo: 'api' }, { postReview: true });
+
+      expect(result).toBe(appKit);
+      expect(createAppOctokit).toHaveBeenCalledWith('acme', 'api');
+
+      delete process.env['CODEAGORA_APP_ID'];
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+    });
+
+    it('createPrFetchOctokit fails posting when configured GitHub App auth cannot initialize', async () => {
+      const { createPrFetchOctokit } = await import('../commands/review.js');
+      const { createAppOctokit } = await import('@codeagora/github/client.js');
+
+      process.env['CODEAGORA_APP_ID'] = '123';
+      process.env['CODEAGORA_APP_PRIVATE_KEY'] = 'key';
+      vi.mocked(createAppOctokit).mockResolvedValue(null);
+
+      await expect(
+        createPrFetchOctokit({ token: '', owner: 'acme', repo: 'api' }, { postReview: true })
+      ).rejects.toThrow(/installation auth could not be initialized/i);
+
+      delete process.env['CODEAGORA_APP_ID'];
+      delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+    });
   });
 });
 

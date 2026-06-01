@@ -16,6 +16,7 @@ const mockCreateComment = vi.fn();
 const mockListComments = vi.fn();
 const mockUpdateComment = vi.fn();
 const mockPullsGet = vi.fn();
+const mockAppsGetRepoInstallation = vi.fn();
 const mockPaginate = vi.fn();
 const mockOctokitCtor = vi.hoisted(() => vi.fn());
 
@@ -23,6 +24,9 @@ vi.mock('@octokit/rest', () => {
   return {
     Octokit: mockOctokitCtor.mockImplementation((options?: { auth?: string }) => ({
       options,
+      apps: {
+        getRepoInstallation: mockAppsGetRepoInstallation,
+      },
       pulls: {
         get: mockPullsGet,
       },
@@ -113,7 +117,11 @@ describe('parseGitRemote', () => {
 describe('createGitHubConfig', () => {
   beforeEach(() => {
     delete process.env['GITHUB_TOKEN'];
+    delete process.env['CODEAGORA_APP_ID'];
+    delete process.env['CODEAGORA_APP_PRIVATE_KEY'];
+    delete process.env['CODEAGORA_APP_PRIVATE_KEY_PATH'];
     mockOctokitCtor.mockClear();
+    mockAppsGetRepoInstallation.mockReset();
   });
 
   it('creates config from token + prUrl', () => {
@@ -172,6 +180,25 @@ describe('createGitHubConfig', () => {
     createOctokit({ token: 'ghp_test', owner: 'acme', repo: 'api' });
 
     expect(mockOctokitCtor).toHaveBeenCalledWith({ auth: 'ghp_test' });
+  });
+
+  it('creates app-authenticated Octokit when app env is set and token is absent', async () => {
+    const { createAppOctokit } = await import('@codeagora/github/client.js');
+
+    process.env['CODEAGORA_APP_ID'] = '123';
+    process.env['CODEAGORA_APP_PRIVATE_KEY'] = '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----';
+    mockAppsGetRepoInstallation.mockResolvedValue({ data: { id: 88 } });
+
+    await createAppOctokit('acme', 'api');
+
+    expect(mockOctokitCtor).toHaveBeenNthCalledWith(1, {
+      authStrategy: expect.any(Function),
+      auth: { appId: 123, privateKey: process.env['CODEAGORA_APP_PRIVATE_KEY'] },
+    });
+    expect(mockOctokitCtor).toHaveBeenNthCalledWith(2, {
+      authStrategy: expect.any(Function),
+      auth: { appId: 123, privateKey: process.env['CODEAGORA_APP_PRIVATE_KEY'], installationId: 88 },
+    });
   });
 });
 

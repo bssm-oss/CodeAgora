@@ -8,6 +8,7 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MCP_ERROR_CODES } from '@codeagora/shared/contracts/stable.js';
@@ -23,6 +24,27 @@ type ToolHandler = (params: Record<string, unknown>) => Promise<{
 
 function parseToolJson(result: { content: Array<{ text: string }> }): Record<string, unknown> {
   return JSON.parse(result.content[0]!.text) as Record<string, unknown>;
+}
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+
+async function resolveToolDir() {
+  const candidates = [
+    path.resolve(testDir, '..', 'tools'),
+    path.join(process.cwd(), 'src', 'tools'),
+    path.join(process.cwd(), 'packages', 'mcp', 'src', 'tools'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // Try next candidate.
+    }
+  }
+
+  throw new Error(`Unable to locate tools directory from ${testDir}`);
 }
 
 function createServerStub() {
@@ -477,7 +499,7 @@ describe('stable MCP error contract', () => {
   });
 
   it('keeps tool implementations off ad-hoc text and unversioned error bodies', async () => {
-    const toolDir = path.join(process.cwd(), 'packages', 'mcp', 'src', 'tools');
+    const toolDir = await resolveToolDir();
     const entries = await fs.readdir(toolDir);
     const toolFiles = entries.filter((entry) => entry.endsWith('.ts') && !entry.startsWith('shared-'));
 
