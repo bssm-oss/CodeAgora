@@ -2,7 +2,7 @@
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@beta"]
+      "args": ["-y", "@codeagora/mcp@rc"]
     }
   }
 }

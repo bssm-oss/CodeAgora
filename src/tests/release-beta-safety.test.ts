@@ -55,7 +55,7 @@ describe('prerelease safety', () => {
     }
   });
 
-  it('keeps prerelease install examples on the beta dist-tag', () => {
+  it('keeps prerelease install examples on the rc dist-tag', () => {
     const readme = readText('README.md');
     const mcpReadme = readText('packages/mcp/README.md');
     const extensions = readText('docs/for-users/EXTENSIONS.md');
@@ -63,16 +63,15 @@ describe('prerelease safety', () => {
     const mcpConfig = readText('.mcp.json');
     const checkUpdate = readText('packages/cli/src/commands/check-update.ts');
 
-    expect(readme).toContain('npm i -g @codeagora/review@beta');
-    expect(readme).toContain('npm i -g @codeagora/mcp@beta');
-    expect(readme).toContain('"@codeagora/mcp@beta"');
-    expect(mcpReadme).toContain('npx -y @codeagora/mcp@beta');
-    expect(mcpReadme).toContain('"@codeagora/mcp@beta"');
-    expect(extensions).toContain('npm i -g @codeagora/mcp@beta');
-    expect(extensions).toContain('"@codeagora/mcp@beta"');
-    expect(troubleshooting).toContain('"@codeagora/mcp@beta"');
-    expect(mcpConfig).toContain('"@codeagora/mcp@beta"');
-    expect(checkUpdate).toContain("current.includes('-') ? 'beta' : 'latest'");
+    expect(readme).toContain('npm i -g @codeagora/review@rc');
+    expect(readme).toContain('"@codeagora/mcp@rc"');
+    expect(mcpReadme).toContain('npx -y @codeagora/mcp@rc');
+    expect(mcpReadme).toContain('"@codeagora/mcp@rc"');
+    expect(extensions).toContain('npm i -g @codeagora/mcp@rc');
+    expect(extensions).toContain('"@codeagora/mcp@rc"');
+    expect(troubleshooting).toContain('"@codeagora/mcp@rc"');
+    expect(mcpConfig).toContain('"@codeagora/mcp@rc"');
+    expect(checkUpdate).toContain("current.includes('-') ? 'rc' : 'latest'");
     expect(checkUpdate).toContain('@codeagora/review@${distTag}');
   });
 });

@@ -92,7 +92,7 @@ See [`packages/mcp/README.md`](packages/mcp/README.md) for tool details.
 
 ### Desktop preview
 
-The desktop app is an early preview in `packages/desktop`. It is not the stable support surface yet.
+The desktop app is a private preview in `packages/desktop`. It is not the stable support surface yet.
 
 ## Docs map
 
