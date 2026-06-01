@@ -68,4 +68,12 @@ describe('GitHub Actions runtime readiness', () => {
     expect(bench).toContain('BENCH_DELAY_MS');
     expect(bench).toContain('--delay-ms "$BENCH_DELAY_MS"');
   });
+
+  it('rebuilds the action bundle when the action contract changes', () => {
+    const buildAction = readText('.github/workflows/build-action.yml');
+
+    expect(buildAction).toContain("- 'action.yml'");
+    expect(buildAction).toContain('scripts/build-action.mjs');
+    expect(buildAction).toContain('dist/action.js');
+  });
 });
