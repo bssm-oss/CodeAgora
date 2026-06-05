@@ -11,6 +11,12 @@ import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 const execFile = promisify(execFileCb);
 
+const REPO_PATH_NEXT_STEPS = [
+  'Omit repo_path when the MCP server already runs in the target workspace.',
+  'Pass the exact repository root directory only when it is inside the server cwd or detected git repository boundary.',
+  'Keep repo_path inside the MCP server cwd or detected git repository root.',
+];
+
 export interface McpStructuredError {
   status: 'error';
   code: string;
@@ -56,6 +62,14 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function repoPathErrorDetails(repoPath: string, details: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    repoPath,
+    ...details,
+    next_steps: REPO_PATH_NEXT_STEPS,
+  };
+}
+
 async function getRepoRoot(): Promise<string | undefined> {
   try {
     const { stdout } = await execFile('git', ['rev-parse', '--show-toplevel']);
@@ -86,8 +100,7 @@ export async function validateRepoPathOption(repoPath: string | undefined): Prom
     return {
       ok: false,
       error: createStructuredError('INVALID_REPO_PATH', 'repo_path is outside the allowed repository boundary', {
-        repoPath,
-        reason: validation.error,
+        ...repoPathErrorDetails(repoPath, { reason: validation.error }),
       }),
     };
   }
@@ -98,8 +111,7 @@ export async function validateRepoPathOption(repoPath: string | undefined): Prom
       return {
         ok: false,
         error: createStructuredError('INVALID_REPO_PATH', 'repo_path must not be a symbolic link', {
-          repoPath,
-          resolvedPath: validation.data,
+          ...repoPathErrorDetails(repoPath, { resolvedPath: validation.data }),
         }),
       };
     }
@@ -108,8 +120,7 @@ export async function validateRepoPathOption(repoPath: string | undefined): Prom
       return {
         ok: false,
         error: createStructuredError('INVALID_REPO_PATH', 'repo_path must reference an accessible directory', {
-          repoPath,
-          resolvedPath: validation.data,
+          ...repoPathErrorDetails(repoPath, { resolvedPath: validation.data }),
         }),
       };
     }
@@ -123,9 +134,7 @@ export async function validateRepoPathOption(repoPath: string | undefined): Prom
       return {
         ok: false,
         error: createStructuredError('INVALID_REPO_PATH', 'repo_path is outside the allowed repository boundary', {
-          repoPath,
-          resolvedPath: validation.data,
-          realPath: realRepoPath,
+          ...repoPathErrorDetails(repoPath, { resolvedPath: validation.data, realPath: realRepoPath }),
         }),
       };
     }
@@ -135,9 +144,7 @@ export async function validateRepoPathOption(repoPath: string | undefined): Prom
     return {
       ok: false,
       error: createStructuredError('INVALID_REPO_PATH', 'repo_path must reference an accessible directory', {
-        repoPath,
-        resolvedPath: validation.data,
-        reason: errorMessage(error),
+        ...repoPathErrorDetails(repoPath, { resolvedPath: validation.data, reason: errorMessage(error) }),
       }),
     };
   }

@@ -43,7 +43,7 @@ async function resolvePrUrl(prUrl?: string, prNumber?: number, repoPath?: string
 export function registerReviewPr(server: McpServer): void {
   server.tool(
     'review_pr',
-    'Review a GitHub PR — fetches the diff automatically and runs full multi-LLM review. Supports PR URL (https://github.com/owner/repo/pull/123) or just a PR number (auto-detects owner/repo from git remote). Can post results back as PR comments with --post_review.',
+    'Review a GitHub pull request by fetching its diff, then running the full multi-LLM review. Use pr_url for an explicit PR or pr_number with repo_path/current git remote for workspace-relative PRs. Can optionally post review comments when post_review=true.',
     {
       pr_url: z.string()
         .regex(
@@ -53,7 +53,7 @@ export function registerReviewPr(server: McpServer): void {
         .optional()
         .describe('GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)'),
       pr_number: z.number().int().positive().optional()
-        .describe('PR number (auto-detects owner/repo from git remote)'),
+        .describe('PR number. Requires repo_path or the server cwd to be a git repo with a GitHub origin remote.'),
       ...reviewOptionsSchema,
       ...postReviewSchema,
     },

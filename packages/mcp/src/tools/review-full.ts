@@ -12,9 +12,9 @@ import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared
 export function registerReviewFull(server: McpServer): void {
   server.tool(
     'review_full',
-    'Thorough code review — multiple AI models review your diff, then debate disagreements to reach consensus (~30s). Returns verdict + issues with confidence scores + debate summary. More accurate than review_quick.',
+    'Thorough code review for final IDE/agent checks. Use when you have a unified diff or staged git changes and want the full L0→L1→L2→L3 pipeline with debate and final verdict. Returns compact JSON by default; set output_format=json for the versioned codeagora.review.v1 contract.',
     {
-      diff: z.string().optional().describe('Unified diff content (optional if staged=true)'),
+      diff: z.string().optional().describe('Unified diff content. Omit only when staged=true.'),
       ...reviewOptionsSchema,
       ...stagedSchema,
     },
@@ -27,7 +27,13 @@ export function registerReviewFull(server: McpServer): void {
 
         const diff = params.staged ? await getStagedDiff(repoPath.repoPath) : params.diff;
         if (!diff || diff.trim().length === 0) {
-          return mcpErrorResponse('INVALID_INPUT', 'Either diff or staged=true is required');
+          return mcpErrorResponse('INVALID_INPUT', 'Either diff or staged=true is required', {
+            next_steps: [
+              'Pass unified diff text in the diff field.',
+              'Or set staged=true to review git staged changes.',
+              'If staged changes are in a target repo inside the server boundary, pass repo_path as that repo root.',
+            ],
+          });
         }
 
         const options: ReviewOptions = {

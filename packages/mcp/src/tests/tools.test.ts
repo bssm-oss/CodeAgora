@@ -109,6 +109,24 @@ describe('review_quick input schema', () => {
   });
 });
 
+describe('shared MCP review schema guidance', () => {
+  it('keeps repo_path optional and explains how IDE agents should use it', async () => {
+    const { reviewOptionsSchema, REPO_PATH_DESCRIPTION } = await import('@codeagora/mcp/tools/shared-schema.js');
+
+    expect(REPO_PATH_DESCRIPTION).toContain('Omit it when the MCP server already runs in the target repo');
+    expect(reviewOptionsSchema.repo_path.isOptional()).toBe(true);
+    expect(reviewOptionsSchema.repo_path.description).toContain('exact repository root');
+    expect(reviewOptionsSchema.repo_path.description).toContain('server cwd');
+  });
+
+  it('keeps output_format guidance tied to the stable agent contract', async () => {
+    const { reviewOptionsSchema } = await import('@codeagora/mcp/tools/shared-schema.js');
+
+    expect(reviewOptionsSchema.output_format.isOptional()).toBe(true);
+    expect(reviewOptionsSchema.output_format.description).toContain('codeagora.review.v1');
+  });
+});
+
 describe('review_full input schema', () => {
   const schema = z.object({ diff: z.string() });
 

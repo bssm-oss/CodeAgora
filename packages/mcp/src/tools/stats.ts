@@ -6,13 +6,14 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { getSessionStats, formatSessionStats } from '@codeagora/core/session/queries.js';
 import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
+import { REPO_PATH_DESCRIPTION } from './shared-schema.js';
 
 export function registerStats(server: McpServer): void {
   server.tool(
     'get_stats',
-    'Show aggregate review session statistics. No LLM calls.',
+    'Show aggregate local review session statistics for the target workspace. Use to audit recent CodeAgora activity, success rates, and historical metrics. No LLM calls.',
     {
-      repo_path: z.string().optional().describe('Repo root path for session stats; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe(REPO_PATH_DESCRIPTION),
     },
     async ({ repo_path }) => {
       try {

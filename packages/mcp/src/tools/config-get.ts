@@ -6,6 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { errorMessage, mcpErrorResponse } from './shared-response.js';
 import { resolveRepoPathOrError } from './shared-response.js';
+import { REPO_PATH_DESCRIPTION } from './shared-schema.js';
 
 /**
  * Get a nested value from an object using dot notation.
@@ -27,10 +28,10 @@ function getNestedKey(obj: Record<string, unknown>, dotKey: string): unknown {
 export function registerConfigGet(server: McpServer): void {
   server.tool(
     'config_get',
-    'Read CodeAgora configuration. Returns full config or a specific value by dot-notation key.',
+    'Read CodeAgora configuration for an IDE/agent. Use to inspect the full active config or one dot-notation key before running review tools.',
     {
       key: z.string().optional().describe('Dot-notation key (e.g. "discussion.maxRounds"). Omit for full config.'),
-      repo_path: z.string().optional().describe('Repo root path for config lookup; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe(REPO_PATH_DESCRIPTION),
     },
     async ({ key, repo_path }) => {
       try {

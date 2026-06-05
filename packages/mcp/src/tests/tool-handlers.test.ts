@@ -718,6 +718,35 @@ describe('review_quick handler', () => {
       code: 'INVALID_REPO_PATH',
     });
     expect(parsed.message).toContain('repo_path');
+    expect(parsed.details).toMatchObject({
+      next_steps: expect.arrayContaining([
+        'Omit repo_path when the MCP server already runs in the target workspace.',
+        'Pass the exact repository root directory only when it is inside the server cwd or detected git repository boundary.',
+      ]),
+    });
+    expect(runReviewCompact).not.toHaveBeenCalled();
+  });
+
+  it('returns retry guidance when diff and staged are both missing', async () => {
+    const { runReviewCompact } = await import('../helpers.js');
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { server, getHandler } = createServerStub();
+    registerReviewQuick(server as never);
+
+    const result = await getHandler('review_quick')({});
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      details: {
+        next_steps: expect.arrayContaining([
+          'Pass unified diff text in the diff field.',
+          'Or set staged=true to review git staged changes.',
+        ]),
+      },
+    });
     expect(runReviewCompact).not.toHaveBeenCalled();
   });
 
@@ -759,6 +788,11 @@ describe('review_quick handler', () => {
         status: 'error',
         code: 'INVALID_REPO_PATH',
         message: 'repo_path must not be a symbolic link',
+      });
+      expect(parsed.details).toMatchObject({
+        next_steps: expect.arrayContaining([
+          'Keep repo_path inside the MCP server cwd or detected git repository root.',
+        ]),
       });
       expect(runReviewCompact).not.toHaveBeenCalled();
     } finally {

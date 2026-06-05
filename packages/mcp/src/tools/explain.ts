@@ -6,14 +6,15 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { explainSession } from '@codeagora/cli/commands/explain.js';
 import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
+import { REPO_PATH_DESCRIPTION } from './shared-schema.js';
 
 export function registerExplain(server: McpServer): void {
   server.tool(
     'explain_session',
-    'Read session artifacts and produce a narrative summary of a past review. No LLM calls.',
+    'Explain a past CodeAgora review session from local artifacts. Use after review_quick/review_full or CLI runs when an IDE agent needs a narrative summary. No LLM calls.',
     {
       session: z.string().describe('Session path (e.g. 2026-03-19/001)'),
-      repo_path: z.string().optional().describe('Repo root path for session lookup; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe(REPO_PATH_DESCRIPTION),
     },
     async ({ session, repo_path }) => {
       try {

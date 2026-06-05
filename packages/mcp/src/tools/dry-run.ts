@@ -10,14 +10,19 @@ import { errorMessage, mcpErrorResponse } from './shared-response.js';
 export function registerDryRun(server: McpServer): void {
   server.tool(
     'dry_run',
-    'Estimate review cost and complexity without making any LLM calls. Instant response.',
+    'Preflight a diff without making LLM calls. Use before review_quick/review_full to estimate complexity, files, line counts, security-sensitive paths, and approximate review cost.',
     {
-      diff: z.string().describe('Unified diff content'),
+      diff: z.string().describe('Unified diff content to preflight before running a review'),
     },
     async ({ diff }) => {
       try {
         if (diff.trim().length === 0) {
-          return mcpErrorResponse('INVALID_INPUT', 'diff must not be empty');
+          return mcpErrorResponse('INVALID_INPUT', 'diff must not be empty', {
+            next_steps: [
+              'Pass unified diff text in the diff field.',
+              'Use review_quick or review_full with staged=true for staged git changes.',
+            ],
+          });
         }
 
         const complexity = estimateDiffComplexity(diff);

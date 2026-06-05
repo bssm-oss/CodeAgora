@@ -13,9 +13,9 @@ import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared
 export function registerReviewQuick(server: McpServer): void {
   server.tool(
     'review_quick',
-    'Quick code review — 3 AI reviewers scan your diff in parallel (~10s). Returns verdict (ACCEPT/REJECT) + issues grouped as must-fix/verify/ignore with severity, confidence %, and file locations. No debate phase. Use for rapid feedback on small changes.',
+    'Quick code review for fast IDE feedback. Use when you have a unified diff or staged git changes and want a compact verdict without debate. Returns compact JSON with verdict plus must-fix/verify/ignore issues, severity, confidence, and file locations.',
     {
-      diff: z.string().optional().describe('Unified diff content (optional if staged=true)'),
+      diff: z.string().optional().describe('Unified diff content. Omit only when staged=true.'),
       ...reviewOptionsSchema,
       ...stagedSchema,
     },
@@ -28,7 +28,13 @@ export function registerReviewQuick(server: McpServer): void {
 
         const diff = params.staged ? await getStagedDiff(repoPath.repoPath) : params.diff;
         if (!diff || diff.trim().length === 0) {
-          return mcpErrorResponse('INVALID_INPUT', 'Either diff or staged=true is required');
+          return mcpErrorResponse('INVALID_INPUT', 'Either diff or staged=true is required', {
+            next_steps: [
+              'Pass unified diff text in the diff field.',
+              'Or set staged=true to review git staged changes.',
+              'If staged changes are in a target repo inside the server boundary, pass repo_path as that repo root.',
+            ],
+          });
         }
 
         const options: ReviewOptions = {

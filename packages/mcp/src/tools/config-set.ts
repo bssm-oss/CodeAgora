@@ -6,15 +6,16 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { errorMessage, mcpErrorResponse } from './shared-response.js';
 import { resolveRepoPathOrError } from './shared-response.js';
+import { REPO_PATH_DESCRIPTION } from './shared-schema.js';
 
 export function registerConfigSet(server: McpServer): void {
   server.tool(
     'config_set',
-    'Set a CodeAgora configuration value using dot-notation key. Validates against config schema.',
+    'Update a CodeAgora configuration value for the target workspace. Use only after config_get confirms the key; values are validated against the config schema.',
     {
       key: z.string().describe('Dot-notation key (e.g. "discussion.maxRounds")'),
       value: z.union([z.string(), z.number(), z.boolean()]).describe('Value to set'),
-      repo_path: z.string().optional().describe('Repo root path for config mutation; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe(REPO_PATH_DESCRIPTION),
     },
     async ({ key, value, repo_path }) => {
       try {
