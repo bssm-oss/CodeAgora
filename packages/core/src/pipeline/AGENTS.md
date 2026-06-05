@@ -25,7 +25,10 @@ Pipeline Orchestrator connects all 4 review layers (L0-L3) into a single cohesiv
 | `dsl-types.ts` | DSL type definitions |
 
 ## Subdirectories
-None (orchestration layer, flat module structure)
+
+| Directory | Purpose |
+|-----------|---------|
+| `analyzers/` | Pre-analysis modules that enrich review context before pipeline execution |
 
 ## For AI Agents
 
