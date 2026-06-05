@@ -14,6 +14,7 @@ describe('formatError() hint matching', () => {
     const output = formatError(new Error('Config file not found at .ca/config.json'), false);
     expect(output).toContain('Hint:');
     expect(output).toContain('agora init');
+    expect(output).toContain('agora doctor');
   });
 
   it('shows config hint for config.json reference', () => {
@@ -25,6 +26,7 @@ describe('formatError() hint matching', () => {
     const output = formatError(new Error('Invalid API key provided'), false);
     expect(output).toContain('Hint:');
     expect(output).toContain('agora providers');
+    expect(output).toContain('*_API_KEY');
   });
 
   it('shows API key hint for API_KEY env var issues', () => {
@@ -58,6 +60,7 @@ describe('formatError() hint matching', () => {
     const output = formatError(new Error('Unexpected token in JSON'), false);
     expect(output).toContain('Hint:');
     expect(output).toContain('config file syntax');
+    expect(output).toContain('agora doctor');
   });
 
   it('shows syntax hint for YAML parse error', () => {

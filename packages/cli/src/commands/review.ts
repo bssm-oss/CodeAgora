@@ -11,6 +11,7 @@ import fs from 'fs/promises';
 import ora from 'ora';
 import { runPipeline } from '@codeagora/core/pipeline/orchestrator.js';
 import { dryRun, formatDryRunText } from '@codeagora/core/pipeline/dryrun.js';
+import type { DryRunResult } from '@codeagora/core/pipeline/dryrun.js';
 import { loadConfig } from '@codeagora/core/config/loader.js';
 import { ProgressEmitter } from '@codeagora/core/pipeline/progress.js';
 import { parsePrUrl, createGitHubConfig, createOctokit, createAppOctokit, type GitHubConfig } from '@codeagora/github/client.js';
@@ -101,6 +102,12 @@ export function emitReviewStartupDiagnostics(
   if (diagnostics.repoPath) writeLine(`  Context lines: ${diagnostics.contextLines}`);
   else if (diagnostics.contextLines > 0) writeLine('  Context: disabled (not a git repo)');
   writeLine('---');
+}
+
+export function formatDryRunJson(report: DryRunResult): string {
+  const stableReport: Record<string, unknown> = { ...report };
+  delete stableReport['readiness'];
+  return JSON.stringify(stableReport, null, 2);
 }
 
 // ============================================================================
@@ -345,7 +352,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       const report = await dryRun(config, diffContent);
 
       if (options.output === 'json') {
-        console.log(JSON.stringify(report, null, 2));
+        console.log(formatDryRunJson(report));
         return;
       }
       console.log(formatDryRunText(report));

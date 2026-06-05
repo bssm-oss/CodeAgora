@@ -35,16 +35,22 @@ export interface FormatOptions {
  */
 export function formatText(result: PipelineResult, options?: FormatOptions): string {
   const lines: string[] = [];
+  const sessionPath = `.ca/sessions/${result.date}/${result.sessionId}/`;
 
   if (result.status === 'error') {
     lines.push(t('review.failed', { error: result.error ?? 'unknown error' }));
     lines.push(dim(`  ${t('review.session', { date: result.date, sessionId: result.sessionId })}`));
+    lines.push(dim(`  Session path: ${sessionPath}`));
+    lines.push(dim('  Degraded output'));
+    lines.push(dim('  Follow-up: agora sessions'));
     return lines.join('\n');
   }
 
   if (!result.summary) {
     lines.push(t('review.complete'));
     lines.push(`  ${t('review.session', { date: result.date, sessionId: result.sessionId })}`);
+    lines.push(dim(`  Session path: ${sessionPath}`));
+    lines.push(dim('  Follow-up: agora sessions'));
     return lines.join('\n');
   }
 
@@ -208,6 +214,12 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
 
   // ── Session footer ──
   lines.push(dim(`  Session ${result.date}/${result.sessionId}`));
+  lines.push(dim(`  Session path: ${sessionPath}`));
+  if (s.forfeitedReviewers > 0) {
+    lines.push(dim(`  Partial review: ${s.forfeitedReviewers} reviewer(s) forfeited`));
+  }
+  lines.push(dim('  Follow-up: agora sessions'));
+  lines.push(dim(`  Explain: agora explain ${result.date}/${result.sessionId}`));
 
   return lines.join('\n');
 }

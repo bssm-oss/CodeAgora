@@ -91,6 +91,27 @@ describe('formatText() with undefined summary', () => {
   });
 });
 
+describe('formatText() footer actionability', () => {
+  it('includes session path and follow-up commands', () => {
+    const output = formatText(makeResult());
+    expect(output).toContain('.ca/sessions/2026-03-21/sess-001/');
+    expect(output).toContain('agora sessions');
+    expect(output).toContain('agora explain 2026-03-21/sess-001');
+  });
+
+  it('marks forfeited reviewers as partial output', () => {
+    const output = formatText(makeResult({ summary: { ...makeSummary(), forfeitedReviewers: 1 } }));
+    expect(output).toContain('Partial review');
+    expect(output).toContain('forfeited');
+  });
+
+  it('marks error output as degraded', () => {
+    const output = formatText(makeResult({ status: 'error', error: 'Pipeline failed' } as unknown as PipelineResult));
+    expect(output).toContain('Degraded output');
+    expect(output).toContain('.ca/sessions/2026-03-21/sess-001/');
+  });
+});
+
 // ============================================================================
 // formatHtml — escaping of special characters
 // ============================================================================

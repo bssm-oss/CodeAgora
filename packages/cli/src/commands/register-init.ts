@@ -6,7 +6,22 @@
 import type { Command } from 'commander';
 import path from 'path';
 import fs from 'fs/promises';
-import { runInit, runInitInteractive, UserCancelledError } from './init.js';
+import { runInit, runInitInteractive, UserCancelledError, type InitResult } from './init.js';
+
+function printInitNextSteps(result: InitResult): void {
+  if (result.created.length === 0 && result.skipped.length > 0) {
+    console.log('\nNext steps:');
+    console.log('  1. Reuse existing config, or rerun with --force to regenerate it.');
+    console.log('  2. Check setup: agora doctor');
+    console.log('  3. Preflight a review: agora review --dry-run <diff.patch>');
+    return;
+  }
+
+  console.log('\nNext steps:');
+  console.log('  1. Check setup: agora doctor');
+  console.log('  2. Preflight a review: agora review --dry-run <diff.patch>');
+  console.log('  3. Run your first review: git diff | agora review');
+}
 
 export function registerInitCommand(program: Command): void {
   program
@@ -35,6 +50,7 @@ export function registerInitCommand(program: Command): void {
           for (const f of result.skipped) console.log(`  skipped: ${f} (already exists, use --force to overwrite)`);
           for (const w of result.warnings) console.warn(`  warning: ${w}`);
           if (result.created.length > 0) console.log('CodeAgora initialized successfully.');
+          printInitNextSteps(result);
           if (options.ci && result.created.some(f => f.includes('codeagora-review.yml'))) {
             console.log('Created: .github/workflows/codeagora-review.yml');
             console.log('  Add GROQ_API_KEY to your repository secrets:');
@@ -54,13 +70,11 @@ export function registerInitCommand(program: Command): void {
             const configPath = path.join(caDir, format === 'yaml' ? 'config.yaml' : 'config.json');
             await fs.writeFile(configPath, JSON.stringify(config, null, 2));
             console.log(`\u2713 Config created with ${existing.name} (${existing.envVar} detected)`);
-            console.log(`\nRun your first review:`);
-            console.log(`  git diff | agora review`);
+            printInitNextSteps({ created: [configPath], skipped: [], warnings: [] });
             return;
           }
           await runInlineSetup(process.cwd());
-          console.log(`\nRun your first review:`);
-          console.log(`  git diff | agora review`);
+          printInitNextSteps({ created: [path.join(process.cwd(), '.ca')], skipped: [], warnings: [] });
           console.log(`\nFor full customization: agora init --advanced`);
           return;
         }
@@ -83,6 +97,7 @@ export function registerInitCommand(program: Command): void {
         for (const f of result.skipped) console.log(`  skipped: ${f} (already exists, use --force to overwrite)`);
         for (const w of result.warnings) console.warn(`  warning: ${w}`);
         if (result.created.length > 0) console.log('CodeAgora initialized successfully.');
+        printInitNextSteps(result);
         if (options.ci && result.created.some(f => f.includes('codeagora-review.yml'))) {
           console.log('Created: .github/workflows/codeagora-review.yml');
           console.log('  Add GROQ_API_KEY to your repository secrets:');

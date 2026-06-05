@@ -10,8 +10,47 @@ import path from 'path';
 import { runInit, generateReviewIgnore } from '@codeagora/cli/commands/init.js';
 import { runDoctor, formatDoctorReport } from '@codeagora/cli/commands/doctor.js';
 import { listProviders, formatProviderList } from '@codeagora/cli/commands/providers.js';
+import { formatDryRunJson } from '@codeagora/cli/commands/review.js';
+import { buildDefaultConfig } from '@codeagora/core/config/loader.js';
 
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
+
+describe('formatDryRunJson()', () => {
+  it('preserves stable dry-run JSON without text-only readiness guidance', () => {
+    const json = formatDryRunJson({
+      readiness: {
+        classification: 'ready',
+        reasons: [],
+        nextActions: ['agora review --staged'],
+      },
+      config: {
+        reviewerCount: 1,
+        supporterCount: 0,
+        maxDiscussionRounds: 0,
+      },
+      reviewers: [],
+      estimation: {
+        estimatedL1Tokens: 0,
+        estimatedL1Cost: 'N/A',
+        estimatedL2Tokens: 0,
+        estimatedL2Cost: 'N/A',
+        estimatedL3Tokens: 0,
+        estimatedL3Cost: 'N/A',
+        totalEstimatedCost: 'N/A',
+      },
+      health: [],
+      warnings: [],
+    });
+
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(parsed).not.toHaveProperty('readiness');
+    expect(parsed).toHaveProperty('config');
+    expect(parsed).toHaveProperty('reviewers');
+    expect(parsed).toHaveProperty('estimation');
+    expect(parsed).toHaveProperty('health');
+    expect(parsed).toHaveProperty('warnings');
+  });
+});
 
 // ============================================================================
 // init
@@ -145,6 +184,27 @@ describe('runDoctor()', () => {
     const configCheck = result.checks.find((c) => c.name === 'Config file');
     expect(configCheck).toBeDefined();
     expect(configCheck!.status).toBe('fail');
+    expect(configCheck!.message).toContain('agora init');
+  });
+
+  it('reports invalid config with config path and remediation', async () => {
+    await fs.mkdir(path.join(tmpDir, '.ca'), { recursive: true });
+    const invalidConfig = buildDefaultConfig('groq');
+    delete (invalidConfig.moderator as { provider?: string }).provider;
+    await fs.writeFile(
+      path.join(tmpDir, '.ca', 'config.json'),
+      JSON.stringify(invalidConfig, null, 2),
+      'utf-8'
+    );
+
+    const result = await runDoctor(tmpDir);
+    const validityCheck = result.checks.find((c) => c.name === 'Config validity');
+
+    expect(validityCheck).toBeDefined();
+    expect(validityCheck!.status).toBe('fail');
+    expect(validityCheck!.message).toContain('.ca/config.json');
+    expect(validityCheck!.message).toContain('provider is required');
+    expect(validityCheck!.message).toContain('agora init --force');
   });
 
   it('reports config as pass when valid config.json exists', async () => {
@@ -204,6 +264,26 @@ describe('formatDoctorReport()', () => {
     expect(report).toContain('1 passed');
     expect(report).toContain('1 failed');
     expect(report).toContain('1 warnings');
+  });
+
+  it('groups checks and includes actionable next steps for missing setup', () => {
+    const result = {
+      checks: [
+        { name: 'Node.js version', status: 'pass' as const, message: 'Node.js v25.0.0' },
+        { name: '.ca/ directory', status: 'fail' as const, message: ".ca/ directory missing — next: run 'agora init'" },
+        { name: 'GROQ_API_KEY', status: 'warn' as const, message: "GROQ_API_KEY: missing — set with 'export GROQ_API_KEY=<your-key>' or run 'agora providers'" },
+      ],
+      summary: { pass: 1, fail: 1, warn: 1 },
+    };
+
+    const report = stripAnsi(formatDoctorReport(result));
+
+    expect(report).toContain('Blocking issues');
+    expect(report).toContain('Warnings');
+    expect(report).toContain('Ready checks');
+    expect(report).toContain('Next steps');
+    expect(report).toContain('Create project config: agora init');
+    expect(report).toContain('export GROQ_API_KEY=<your-key>');
   });
 });
 

@@ -22,6 +22,11 @@ export type { TokenUsage };
 // ============================================================================
 
 export interface DryRunResult {
+  readiness?: {
+    classification: 'ready' | 'blocked' | 'risky';
+    reasons: string[];
+    nextActions: string[];
+  };
   diffMetadata?: ChunkMetadata;
   config: {
     reviewerCount: number;
@@ -209,6 +214,14 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
     }
   }
 
+  const readiness = computeDryRunReadiness({
+    diffContent,
+    diffMetadata: chunkResult.metadata,
+    reviewers,
+    health,
+    warnings,
+  });
+
   return {
     config: {
       reviewerCount: reviewers.length,
@@ -225,10 +238,55 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
       estimatedL3Cost: formatCost(l3Cost),
       totalEstimatedCost,
     },
+    readiness,
     health,
     diffMetadata: chunkResult.metadata,
     warnings,
   };
+}
+
+function computeDryRunReadiness(params: {
+  diffContent: string;
+  diffMetadata?: ChunkMetadata;
+  reviewers: DryRunResult['reviewers'];
+  health: DryRunResult['health'];
+  warnings: string[];
+}): NonNullable<DryRunResult['readiness']> {
+  const nextActions = new Set<string>();
+  const reasons: string[] = [];
+  const reviewableFiles = params.diffMetadata?.includedFiles ?? [];
+  const availableProviders = params.health.filter((h) => h.status === 'available');
+  const hasWarnings = params.warnings.length > 0;
+  const hasUnknownHealth = params.health.some((h) => h.status === 'unknown');
+  const hasNoApiKey = params.health.some((h) => h.status === 'no-api-key');
+  const hasAnyReviewers = params.reviewers.length > 0;
+
+  if (!params.diffContent.trim()) reasons.push('blocked: empty diff');
+  if (params.diffMetadata && reviewableFiles.length === 0) reasons.push('blocked: no reviewable files');
+  if (!hasAnyReviewers) reasons.push('blocked: no reviewers configured');
+  if (params.health.length > 0 && availableProviders.length === 0) reasons.push('blocked: no usable provider credentials');
+  if (hasUnknownHealth) reasons.push('blocked: provider health unavailable');
+  if (hasWarnings) reasons.push(...params.warnings.map((warning) => `warning: ${warning}`));
+
+  nextActions.add('agora doctor');
+  nextActions.add('agora review --staged');
+  if (params.diffContent.trim()) nextActions.add('agora review --quick <diff.patch>');
+  if (hasNoApiKey) {
+    for (const h of params.health) {
+      if (h.status === 'no-api-key') {
+        nextActions.add(`export ${getProviderEnvVar(h.provider) ?? h.provider}=<your-key> for ${h.provider}`);
+      }
+    }
+  }
+
+  const hasBlockers = reasons.some((reason) => reason.startsWith('blocked:'));
+  const classification = hasBlockers ? 'blocked' : hasWarnings ? 'risky' : 'ready';
+
+  return { classification, reasons, nextActions: [...nextActions] };
+}
+
+function getProviderEnvVar(provider: string): string | undefined {
+  return PROVIDER_ENV_VARS[provider];
 }
 
 // ============================================================================
@@ -329,6 +387,23 @@ export function formatDryRunText(result: DryRunResult): string {
     lines.push('Warnings:');
     for (const w of result.warnings) {
       lines.push(`  ⚠ ${w}`);
+    }
+  }
+
+  if (result.readiness) {
+    lines.push('');
+    lines.push(`Readiness: ${result.readiness.classification}`);
+    if (result.readiness.reasons.length > 0) {
+      lines.push('Reasons:');
+      for (const reason of result.readiness.reasons) {
+        lines.push(`  - ${reason}`);
+      }
+    }
+    if (result.readiness.nextActions.length > 0) {
+      lines.push('Next actions:');
+      for (const action of result.readiness.nextActions) {
+        lines.push(`  - ${action}`);
+      }
     }
   }
 

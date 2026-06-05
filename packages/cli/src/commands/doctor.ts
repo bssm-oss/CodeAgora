@@ -90,7 +90,7 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
   checks.push({
     name: '.ca/ directory',
     status: caExists ? 'pass' : 'fail',
-    message: caExists ? `.ca/ directory found` : `.ca/ directory missing — run 'agora init' to set up`,
+    message: caExists ? `.ca/ directory found` : `.ca/ directory missing — next: run 'agora init'`,
   });
 
   // 3. Config file existence
@@ -118,7 +118,7 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
     status: configExists ? 'pass' : 'fail',
     message: configExists
       ? `Config: ${configFile}`
-      : `Config file not found in .ca/ — run 'init' to create one`,
+      : `Config file not found in .ca/ — next: run 'agora init'`,
   });
 
   // 4. Config validity (only if config exists)
@@ -132,7 +132,7 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
         checks.push({
           name: 'Config validity',
           status: 'fail',
-          message: `Config errors: ${validation.errors.join('; ')}`,
+          message: `Config errors in ${configFile}: ${validation.errors.join('; ')} — next: fix these fields or rerun 'agora init --force'`,
         });
       } else {
         checks.push({
@@ -143,7 +143,11 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      checks.push({ name: 'Config validity', status: 'fail', message: `Config load failed: ${msg}` });
+      checks.push({
+        name: 'Config validity',
+        status: 'fail',
+        message: `Config load failed for ${configFile}: ${msg} — next: fix syntax or rerun 'agora init --force'`,
+      });
     }
   }
 
@@ -157,7 +161,7 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
     checks.push({
       name: `${envVarName}`,
       status: isSet ? 'pass' : 'warn',
-      message: isSet ? `${envVarName}: set` : `${envVarName}: missing`,
+      message: isSet ? `${envVarName}: set` : `${envVarName}: missing — set with 'export ${envVarName}=<your-key>' or run 'agora providers'`,
     });
   }
 
@@ -195,6 +199,7 @@ export { getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 // ============================================================================
 
 const LIVE_CHECK_TIMEOUT_MS = 10_000;
+const DEFAULT_SETUP_ENV_VAR = 'GROQ_API_KEY';
 
 /**
  * Collect unique provider+model pairs from all enabled agents in config.
@@ -315,19 +320,44 @@ export function formatLiveCheckReport(liveChecks: LiveCheckResult[]): string {
 
 export function formatDoctorReport(result: DoctorResult): string {
   const lines: string[] = [];
-  for (const check of result.checks) {
-    const icon =
-      check.status === 'pass'
-        ? statusColor.pass('✓')
-        : check.status === 'fail'
-        ? statusColor.fail('✗')
-        : statusColor.warn('!');
-    lines.push(`${icon} ${check.message}`);
-  }
+  const failed = result.checks.filter((check) => check.status === 'fail');
+  const warnings = result.checks.filter((check) => check.status === 'warn');
+  const passed = result.checks.filter((check) => check.status === 'pass');
+
+  const appendChecks = (title: string, checks: DoctorCheck[]): void => {
+    if (checks.length === 0) return;
+    if (lines.length > 0) lines.push('');
+    lines.push(title);
+    lines.push('─'.repeat(title.length));
+    for (const check of checks) {
+      const icon =
+        check.status === 'pass'
+          ? statusColor.pass('✓')
+          : check.status === 'fail'
+          ? statusColor.fail('✗')
+          : statusColor.warn('!');
+      lines.push(`${icon} ${check.message}`);
+    }
+  };
+
+  appendChecks('Blocking issues', failed);
+  appendChecks('Warnings', warnings);
+  appendChecks('Ready checks', passed);
+
   lines.push('');
   lines.push(
     `Summary: ${statusColor.pass(String(result.summary.pass))} passed, ${statusColor.fail(String(result.summary.fail))} failed, ${statusColor.warn(String(result.summary.warn))} warnings`
   );
+
+  const nextSteps = getDoctorNextSteps(result);
+  if (nextSteps.length > 0) {
+    lines.push('');
+    lines.push('Next steps');
+    lines.push('──────────');
+    nextSteps.forEach((step, index) => {
+      lines.push(`${index + 1}. ${step}`);
+    });
+  }
 
   if (result.liveChecks && result.liveChecks.length > 0) {
     lines.push('');
@@ -335,4 +365,42 @@ export function formatDoctorReport(result: DoctorResult): string {
   }
 
   return lines.join('\n');
+}
+
+function getDoctorNextSteps(result: DoctorResult): string[] {
+  const steps: string[] = [];
+  const hasMissingSetup = result.checks.some(
+    (check) =>
+      check.status === 'fail' &&
+      (check.name === '.ca/ directory' || check.name === 'Config file')
+  );
+  const hasConfigValidityFailure = result.checks.some(
+    (check) => check.status === 'fail' && check.name === 'Config validity'
+  );
+  const providerChecks = result.checks.filter(
+    (check) =>
+      check.name === check.name.toUpperCase() &&
+      (check.message === `${check.name}: set` || check.message.startsWith(`${check.name}: missing`))
+  );
+  const hasAnyProviderKey = providerChecks.some((check) => check.status === 'pass');
+
+  if (hasMissingSetup) {
+    steps.push('Create project config: agora init');
+  }
+  if (hasConfigValidityFailure) {
+    steps.push('Fix the config field(s) shown above, then run: agora doctor');
+  }
+  if (providerChecks.length > 0 && !hasAnyProviderKey) {
+    steps.push(
+      `Set at least one provider key, for example: export ${DEFAULT_SETUP_ENV_VAR}=<your-key>; then run: agora doctor`
+    );
+  }
+  if (steps.length === 0 && result.summary.warn > 0) {
+    steps.push('Review the warnings above, then run: agora review --dry-run <diff.patch>');
+  }
+  if (steps.length === 0 && result.summary.fail === 0) {
+    steps.push('Run a preflight review: agora review --dry-run <diff.patch>');
+  }
+
+  return steps;
 }

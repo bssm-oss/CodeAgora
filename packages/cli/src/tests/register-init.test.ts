@@ -29,7 +29,7 @@ describe('registerInitCommand', () => {
       warnings: [],
     });
 
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const program = new Command();
     registerInitCommand(program);
@@ -45,6 +45,33 @@ describe('registerInitCommand', () => {
       preset: 'budget',
     });
     expect(runInitInteractive).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith('\nNext steps:');
+    expect(logSpy).toHaveBeenCalledWith('  1. Check setup: agora doctor');
+    expect(logSpy).toHaveBeenCalledWith('  2. Preflight a review: agora review --dry-run <diff.patch>');
+    expect(logSpy).toHaveBeenCalledWith('  3. Run your first review: git diff | agora review');
+  });
+
+  it('prints reuse guidance when init skips existing files', async () => {
+    vi.spyOn(init, 'runInit').mockResolvedValue({
+      created: [],
+      skipped: ['/tmp/.ca/config.json'],
+      warnings: [],
+    });
+    vi.spyOn(init, 'runInitInteractive').mockResolvedValue({
+      created: [],
+      skipped: [],
+      warnings: [],
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const program = new Command();
+    registerInitCommand(program);
+
+    await program.parseAsync(['node', 'agora', 'init', '--yes']);
+
+    expect(logSpy).toHaveBeenCalledWith('  1. Reuse existing config, or rerun with --force to regenerate it.');
+    expect(logSpy).toHaveBeenCalledWith('  2. Check setup: agora doctor');
+    expect(logSpy).toHaveBeenCalledWith('  3. Preflight a review: agora review --dry-run <diff.patch>');
   });
 
   it('builds schema-valid generated groq config for non-interactive init paths', () => {

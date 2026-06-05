@@ -254,6 +254,59 @@ describe('dryRun', () => {
     expect(result.config.maxDiscussionRounds).toBe(3);
   });
 
+  it('adds readiness data for a healthy diff', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    process.env.GOOGLE_API_KEY = 'test-key';
+    process.env.MISTRAL_API_KEY = 'test-key';
+
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
+
+    expect(result.readiness).toEqual(expect.objectContaining({
+      classification: 'ready',
+      reasons: [],
+    }));
+    expect(result.readiness?.nextActions).toEqual(expect.arrayContaining([
+      'agora doctor',
+      'agora review --staged',
+      'agora review --quick <diff.patch>',
+    ]));
+  });
+
+  it('marks empty diffs as blocked with next actions', async () => {
+    const result = await dryRun(makeConfig(), '');
+
+    expect(result.readiness?.classification).toBe('blocked');
+    expect(result.readiness?.reasons).toEqual(expect.arrayContaining(['blocked: empty diff']));
+    expect(result.readiness?.nextActions).toEqual(expect.arrayContaining([
+      'agora doctor',
+      'agora review --staged',
+    ]));
+  });
+
+  it('marks missing credentials as blocked and adds env guidance', async () => {
+    delete process.env.GROQ_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.MISTRAL_API_KEY;
+
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
+
+    expect(result.readiness?.classification).toBe('blocked');
+    expect(result.readiness?.reasons.some((reason) => reason.includes('no usable provider credentials'))).toBe(true);
+    expect(result.readiness?.nextActions.some((a) => a.includes('export') && a.includes('_API_KEY'))).toBe(true);
+  });
+
+  it('marks warnings-only runs as risky', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.MISTRAL_API_KEY;
+
+    const result = await dryRun(makeConfig(), SAMPLE_DIFF);
+
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.readiness?.classification).toBe('risky');
+    expect(result.readiness?.reasons.some((reason) => reason.startsWith('warning:'))).toBe(true);
+  });
+
   it('declarative reviewers config: static + auto slots', async () => {
     delete process.env.GROQ_API_KEY;
 
