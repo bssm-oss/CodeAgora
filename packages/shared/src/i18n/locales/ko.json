@@ -44,11 +44,11 @@
   "sessions.stats": "전체: {total}개 | 성공률: {rate}%",
 
   "error.configNotFound": "설정 파일을 찾을 수 없습니다.",
-  "error.configHint": "'agora init'으로 설정 파일을 생성하세요.",
-  "error.apiKeyHint": "'agora providers'에서 필요한 API 키를 확인하세요.",
-  "error.doctorHint": "'agora doctor'로 환경을 점검하세요.",
-  "error.pathHint": "파일 경로를 확인하고 다시 시도하세요.",
-  "error.syntaxHint": "설정 파일 문법을 확인하세요.",
+  "error.configHint": "'agora init'으로 설정 파일을 만든 뒤 'agora doctor'를 실행하세요.",
+  "error.apiKeyHint": "'agora providers'로 필요한 API 키를 확인한 뒤 해당 *_API_KEY 값을 export 하세요.",
+  "error.doctorHint": "'agora doctor'로 설정을 점검하고 다음 명령을 확인하세요.",
+  "error.pathHint": "파일 경로를 확인하고 다시 시도하거나 'git diff | agora review'를 사용하세요.",
+  "error.syntaxHint": "설정 파일 문법을 확인한 뒤 'agora doctor'를 실행하세요.",
 
   "statusbar.home": "↑↓: 이동 | Enter: 선택 | q: 종료",
   "statusbar.reviewSetup": "Enter: 다음 | Esc: 뒤로 | q: 홈",

@@ -44,11 +44,11 @@
   "sessions.stats": "Total: {total} | Success rate: {rate}%",
 
   "error.configNotFound": "Config file not found.",
-  "error.configHint": "Run 'agora init' to create a config file.",
-  "error.apiKeyHint": "Check 'agora providers' for required API keys.",
-  "error.doctorHint": "Run 'agora doctor' to check your setup.",
-  "error.pathHint": "Check the file path and try again.",
-  "error.syntaxHint": "Check your config file syntax.",
+  "error.configHint": "Run 'agora init' to create a config file, then run 'agora doctor'.",
+  "error.apiKeyHint": "Run 'agora providers' to see required API keys, then export the matching *_API_KEY value.",
+  "error.doctorHint": "Run 'agora doctor' to check setup and get the next command.",
+  "error.pathHint": "Check the file path and try again, or use 'git diff | agora review'.",
+  "error.syntaxHint": "Check your config file syntax, then run 'agora doctor'.",
 
   "statusbar.home": "↑↓: navigate | Enter: select | q: quit",
   "statusbar.reviewSetup": "Enter: next | Esc: back | q: home",

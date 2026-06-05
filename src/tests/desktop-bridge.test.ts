@@ -64,7 +64,7 @@ describe('desktop bridge browser fallback contract', () => {
     const bridge = await importBridge();
 
     const sessions = await bridge.listSessions();
-    expect(sessions).toHaveLength(2);
+    expect(sessions).toHaveLength(3);
     expect(sessions[0]).toMatchObject({
       id: expect.any(String),
       status: expect.any(String),

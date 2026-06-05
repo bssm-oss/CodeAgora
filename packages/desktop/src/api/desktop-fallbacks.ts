@@ -10,9 +10,84 @@ import type {
   ReviewRunSnapshot,
 } from './desktop-bridge.types.js';
 
+const demoTopIssues = [
+  {
+    severity: 'CRITICAL',
+    filePath: 'packages/mcp/src/tools/review-pr.ts',
+    lineRange: [73, 73] as [number, number],
+    title: 'PR diff fetch can hang without an explicit timeout',
+    confidence: 72,
+  },
+  {
+    severity: 'WARNING',
+    filePath: 'packages/cli/src/commands/review.ts',
+    lineRange: [264, 291] as [number, number],
+    title: 'Zero-config setup may create config in an unexpected working directory',
+    confidence: 64,
+  },
+  {
+    severity: 'CRITICAL',
+    filePath: 'packages/core/src/pipeline/dryrun.ts',
+    lineRange: [196, 196] as [number, number],
+    title: 'Dry-run provider health can be mistaken for live review readiness',
+    confidence: 47,
+  },
+  {
+    severity: 'SUGGESTION',
+    filePath: 'docs/for-users/TROUBLESHOOTING.md',
+    lineRange: [1, 1] as [number, number],
+    title: 'Add a short MCP dry-run example',
+    confidence: 38,
+  },
+];
+
+const demoSession: SessionSummary = {
+  id: '2026-06-04/007',
+  date: '2026-06-04',
+  sessionId: '007',
+  status: 'completed',
+  decision: 'NEEDS_HUMAN',
+  reasoning: 'One blocking concern was confirmed by multiple reviewers, and one low-confidence critical finding needs human verification before merge.',
+  severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 2, WARNING: 1, SUGGESTION: 1 },
+  topIssues: demoTopIssues.slice(0, 3),
+  updatedAt: '2026-06-04T12:00:00.000Z',
+};
+
+function demoSessionDetail(): SessionDetail {
+  return {
+    ...demoSession,
+    findings: demoTopIssues,
+    evidenceCount: 4,
+    discussionsCount: 2,
+    costSummary: {
+      known: true,
+      formattedTotalCost: '$0.1088',
+      totalCost: 0.1088,
+      callCount: 6,
+      totalTokens: 249744,
+      source: 'demo-result',
+    },
+    markdown: [
+      '# Review 2026-06-04/007',
+      '',
+      'Decision: NEEDS_HUMAN',
+      '',
+      demoSession.reasoning ?? '',
+      '',
+      '## Findings',
+      '',
+      '- [CRITICAL] packages/mcp/src/tools/review-pr.ts:73 — PR diff fetch can hang without an explicit timeout (72%)',
+      '- [WARNING] packages/cli/src/commands/review.ts:264 — Zero-config setup may create config in an unexpected working directory (64%)',
+      '- [CRITICAL] packages/core/src/pipeline/dryrun.ts:196 — Dry-run provider health can be mistaken for live review readiness (47%)',
+      '- [SUGGESTION] docs/for-users/TROUBLESHOOTING.md:1 — Add a short MCP dry-run example (38%)',
+    ].join('\n'),
+  };
+}
+
 /** Stub session data used when running outside Tauri context. */
 export function fallbackSessions(): SessionSummary[] {
   return [
+    demoSession,
     {
       id: '2026-04-27/001',
       date: '2026-04-27',
@@ -47,6 +122,7 @@ export function fallbackSessions(): SessionSummary[] {
 }
 
 export function fallbackSessionDetail(id: string, sessions: SessionSummary[]): SessionDetail {
+  if (id === demoSession.id) return demoSessionDetail();
   const session = sessions.find((item) => item.id === id) ?? sessions[0]!;
   return {
     ...session,
