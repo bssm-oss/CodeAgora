@@ -73,3 +73,19 @@ agora providers
 ```
 
 `agora init` auto-detects installed CLI tools and available API keys.
+
+## CLI Backends in GitHub Actions
+
+CLI backends such as Claude Code (`claude`) and Codex (`codex`) can run in CI, but CodeAgora does not install or authenticate those CLIs for you. If `.ca/config.json` uses `"backend": "cli"`, install and authenticate the matching CLI before running CodeAgora.
+
+For OAuth-based Claude Code automation in GitHub Actions, use the official Claude Code Action as a companion workflow or step. Its OAuth token is passed to that action, not to CodeAgora directly:
+
+```yaml
+- uses: anthropics/claude-code-action@v1
+  with:
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    prompt: |
+      Review this PR for correctness, security, and maintainability risks.
+```
+
+Use CodeAgora's CLI backend path when the runner already has the CLI installed and authenticated. Use the companion action path when you want Claude Code's own GitHub Action behavior, OAuth handling, tools, and PR automation.

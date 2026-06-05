@@ -18,7 +18,7 @@ import { createAppOctokit } from './client.js';
 import { fetchPrMetadata } from './pr-diff.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
 import { loadConfigFile } from '@codeagora/core/config/loader.js';
-import { determineActionPolicy, isStaleHead, parseActionInputs, validateActionDiffPath, validateActionOutputPath } from './action-policy.js';
+import { determineActionPolicy, formatActionWarning, isStaleHead, parseActionInputs, validateActionDiffPath, validateActionOutputPath } from './action-policy.js';
 import type { ActionDegradedReason } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
@@ -47,7 +47,11 @@ async function main(): Promise<void> {
   }
 
   if (!actionPolicy.shouldRunReview) {
-    console.log(`::warning::CodeAgora review skipped: ${actionPolicy.degradedReason ?? 'degraded'}`);
+    console.log(formatActionWarning(
+      actionPolicy.degradedReason ?? 'degraded',
+      getActionNextStep(actionPolicy.degradedReason ?? 'degraded'),
+      getActionContext(actionPolicy.degradedReason ?? 'degraded', inputs),
+    ));
     setActionOutput('verdict', actionPolicy.verdictOverride ?? 'SKIPPED');
     return;
   }
@@ -57,7 +61,11 @@ async function main(): Promise<void> {
     const diffContent = await fs.readFile(safeDiffPath, 'utf-8');
     const lineCount = diffContent.split('\n').length;
     if (lineCount > inputs.maxDiffLines) {
-      console.log(`::warning::Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}). Skipping review.`);
+      console.log(formatActionWarning(
+        'diff-too-large',
+        `Reduce the PR size or raise max-diff-lines if your reviewer/model can handle it.`,
+        `Diff lines=${lineCount}, limit=${inputs.maxDiffLines}`,
+      ));
       setActionDegraded('diff-too-large');
       setActionOutput('verdict', 'SKIPPED');
       return;
@@ -71,7 +79,11 @@ async function main(): Promise<void> {
   const configPath = inputs.configPath;
   const config = await loadConfigFile(configPath, { rootDir: process.cwd() }).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(`::warning::Config load degraded: ${message}`);
+    console.log(formatActionWarning(
+      'config-load-failed',
+      `Fix the config path or file contents, then rerun the Action.`,
+      `configPath=${configPath}; ${redactActionMessage(message)}`,
+    ));
     setActionDegraded('config-load-failed');
     return null;
   });
@@ -143,7 +155,11 @@ async function main(): Promise<void> {
     console.log('::group::Posting review to GitHub');
     const currentPr = await fetchPrMetadata(ghConfig, inputs.pr, appKit ?? undefined);
     if (isStaleHead(inputs.sha, currentPr.headSha)) {
-      console.log(`::warning::PR head changed from ${inputs.sha} to ${currentPr.headSha}; skipping stale posting.`);
+      console.log(formatActionWarning(
+        'stale-head-sha',
+        'Rerun the workflow on the current PR HEAD SHA so comments and status target the latest commit.',
+        `expected=${inputs.sha}; current=${currentPr.headSha}`,
+      ));
       setActionDegraded('stale-head-sha');
       setActionOutput('verdict', 'SKIPPED');
       console.log('::endgroup::');
@@ -166,12 +182,20 @@ async function main(): Promise<void> {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.log(`::warning::GitHub posting degraded: ${message}`);
+      console.log(formatActionWarning(
+        'github-post-failed',
+        'Verify the token permissions and rerun; review computation completed but GitHub posting failed.',
+        redactActionMessage(message),
+      ));
       setActionDegraded('github-post-failed');
     }
     console.log('::endgroup::');
   } else {
-    console.log(`::warning::GitHub posting skipped: ${actionPolicy.degradedReason ?? 'posting-disabled'}`);
+    console.log(formatActionWarning(
+      actionPolicy.degradedReason ?? 'posting-disabled',
+      getActionNextStep(actionPolicy.degradedReason ?? 'posting-disabled'),
+      getActionContext(actionPolicy.degradedReason ?? 'posting-disabled', inputs),
+    ));
   }
 
   // Generate SARIF output — validate path to prevent traversal attacks
@@ -183,7 +207,11 @@ async function main(): Promise<void> {
     console.log(`SARIF report written to ${safeSarifPath}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`::warning::SARIF output path rejected: ${message}`);
+    console.error(formatActionWarning(
+      'sarif-write-failed',
+      'Fix the SARIF path or permissions, then rerun if code scanning export is required.',
+      redactActionMessage(message),
+    ));
     setActionDegraded('sarif-write-failed');
   }
 
@@ -228,6 +256,50 @@ function setActionOutput(name: string, value: string): void {
 function setActionDegraded(reason: ActionDegradedReason): void {
   setActionOutput('degraded', 'true');
   setActionOutput('degraded-reason', reason);
+}
+
+function getActionContext(reason: string, inputs: { repo: string; pr: number; postResults: boolean }): string {
+  switch (reason) {
+    case 'missing-github-token':
+      return 'GITHUB_TOKEN was not provided to the Action.';
+    case 'missing-provider-secrets':
+      return 'No provider secret was available for the configured reviewers/supporters.';
+    case 'fork-missing-provider-secrets':
+      return `Fork PR ${inputs.repo}#${inputs.pr} cannot read repository secrets.`;
+    case 'posting-disabled':
+      return 'post-results=false disabled GitHub posting by configuration.';
+    default:
+      return `repo=${inputs.repo}; pr=${inputs.pr}`;
+  }
+}
+
+function getActionNextStep(reason: string): string {
+  switch (reason) {
+    case 'missing-github-token':
+      return 'Pass github-token (usually ${{ secrets.GITHUB_TOKEN }}) or disable posting explicitly.';
+    case 'missing-provider-secrets':
+      return 'Add the required provider secret(s) or switch the config to GitHub Models.';
+    case 'fork-missing-provider-secrets':
+      return 'Run on a same-repository PR, use GitHub Models, or gate fork PRs before CodeAgora.';
+    case 'posting-disabled':
+      return 'Set post-results=true if you want PR comments and status checks.';
+    case 'diff-too-large':
+      return 'Lower the diff size, raise max-diff-lines, or split the PR.';
+    case 'config-load-failed':
+      return 'Fix .ca/config.json or the configured config-path and rerun.';
+    case 'stale-head-sha':
+      return 'Rerun the workflow on the updated commit SHA.';
+    case 'github-post-failed':
+      return 'Check token scopes, branch protections, and permission warnings in the logs.';
+    case 'sarif-write-failed':
+      return 'Use a writable SARIF path or disable/export elsewhere in the workflow.';
+    default:
+      return 'Review the warning context and rerun after fixing the reported issue.';
+  }
+}
+
+function redactActionMessage(message: string): string {
+  return message.replace(/gh[pousr]_[A-Za-z0-9_]+/g, '[redacted-token]');
 }
 
 main().catch((err) => {

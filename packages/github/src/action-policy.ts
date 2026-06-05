@@ -140,6 +140,20 @@ export function isStaleHead(expectedHeadSha: string, currentHeadSha: string | un
   return Boolean(currentHeadSha && currentHeadSha !== expectedHeadSha);
 }
 
+export function formatActionWarning(reason: string, nextStep: string, context?: string): string {
+  const parts = [`CodeAgora ${reason}`];
+  if (context) parts.push(`Context: ${context}`);
+  parts.push(`Next step: ${nextStep}`);
+  return `::warning::${escapeWorkflowCommandMessage(parts.join(' | '))}`;
+}
+
+function escapeWorkflowCommandMessage(message: string): string {
+  return message
+    .replace(/%/g, '%25')
+    .replace(/\r/g, '%0D')
+    .replace(/\n/g, '%0A');
+}
+
 export async function validateActionDiffPath(
   diffPath: string,
   workspaceRoot: string = process.cwd(),

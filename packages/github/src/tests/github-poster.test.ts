@@ -150,6 +150,7 @@ describe('postReview()', () => {
   it('falls back to summary-only review on 422 position error without duplicate probe reviews', async () => {
     const positionError = Object.assign(new Error('Unprocessable Entity'), { status: 422 });
     const octokit = makeOctokit();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     // First call with inline comments → 422.
     // Second call posts the summary only. There are no successful probe reviews,
@@ -176,6 +177,9 @@ describe('postReview()', () => {
     const lastCall = octokit.pulls.createReview.mock.calls[octokit.pulls.createReview.mock.calls.length - 1][0];
     expect(lastCall.comments).toEqual([]);
     expect(lastCall.body).toContain('could not place 2 inline review comments');
+    expect(warnSpy.mock.calls.flat().join(' ')).toContain('GitHub rejected inline comment positions (422)');
+    expect(warnSpy.mock.calls.flat().join(' ')).toContain('Rebase or refresh the diff');
+    warnSpy.mockRestore();
   });
 
   it('throws for non-position API errors', async () => {
@@ -198,6 +202,7 @@ describe('postReview()', () => {
       { status: 422 },
     );
     const octokit = makeOctokit();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     // First call (event=APPROVE) → 422 permission error
     // Second call (event=COMMENT downgrade) → success
@@ -224,6 +229,8 @@ describe('postReview()', () => {
     expect(secondCall.event).toBe('COMMENT');
     // Body + comments preserved
     expect(secondCall.body).toBe('Looks good.');
+    expect(warnSpy.mock.calls.flat().join(' ')).toContain('Approval permission blocked by GitHub Actions token');
+    warnSpy.mockRestore();
   });
 
   it('does NOT downgrade for unrelated 422 errors on APPROVE', async () => {

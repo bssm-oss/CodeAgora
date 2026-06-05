@@ -85,6 +85,11 @@ The PR diff exceeds the configured limit (default: 5000 lines). Options:
 - `repo_path` is optional, but when provided it must point to a real directory inside the current repository checkout.
 - Symlinks and paths outside the repo are rejected on purpose so MCP tools do not read or write unrelated files.
 - If you only need the current workspace, omit `repo_path` and let the server use its current working directory.
+- When reviewing another target repository inside the server cwd or detected git boundary, pass the exact repository root, for example `{ "repo_path": "/absolute/path/to/repository", "staged": true }`.
+
+### "Either diff or staged=true is required"
+- Pass a unified diff string in `diff`, or stage files and retry with `{ "staged": true }`.
+- If the MCP client is already opened in the target repo, omit `repo_path`; otherwise include the exact repository root only when it is inside the server cwd or detected git boundary.
 
 ## Exit Codes
 

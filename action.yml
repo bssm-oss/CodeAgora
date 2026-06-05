@@ -61,7 +61,7 @@ outputs:
       Stable reason code for degraded or skipped mode.
       Values include missing-github-token, missing-provider-secrets, fork-missing-provider-secrets,
       posting-disabled, diff-too-large, config-load-failed, stale-head-sha,
-      github-post-failed, and sarif-write-failed.
+      github-post-failed, and sarif-write-failed. Check the Action logs for a short why/next-step hint.
       Always set if degraded is true.
     value: ${{ steps.review.outputs.degraded-reason }}
 

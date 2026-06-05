@@ -45,6 +45,13 @@ function extractSeverityPriority(body: string): number {
   return 4; // unknown severity — lowest priority
 }
 
+function formatPostingWarning(reason: string, nextStep: string, context?: string): string {
+  const parts = [`[GitHub] ${reason}`];
+  if (context) parts.push(`context=${context}`);
+  parts.push(`next-step=${nextStep}`);
+  return parts.join(' | ');
+}
+
 /**
  * Check if an error is a 422 position/validation error.
  */
@@ -108,7 +115,11 @@ async function createReviewWithRateLimit(
     } catch (err: unknown) {
       if (is429Error(err) && attempt < MAX_RATE_LIMIT_RETRIES) {
         const delayMs = getRetryAfterMs(err) * (attempt + 1); // linear backoff multiplier
-        console.warn(`[GitHub] Rate limited (429). Retry ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES} after ${delayMs}ms`);
+        console.warn(formatPostingWarning(
+          'Rate limited (429) while posting review',
+          `Retrying automatically in ${delayMs}ms (${attempt + 1}/${MAX_RATE_LIMIT_RETRIES}).`,
+          'GitHub API temporarily rejected the request.',
+        ));
         await sleep(delayMs);
         continue;
       }
@@ -162,7 +173,11 @@ async function postReviewWithRetry(
     // restriction). Downgrade to COMMENT so the summary + inline findings
     // still land on the PR. Verdict still conveyed via the body.
     if (isApprovalPermissionError(err) && effectiveEvent === 'APPROVE') {
-      console.warn('[GitHub] GITHUB_TOKEN cannot approve PRs; downgrading APPROVE → COMMENT to preserve review body + inline comments.');
+      console.warn(formatPostingWarning(
+        'Approval permission blocked by GitHub Actions token',
+        'Keep the COMMENT fallback or use a token with approval permissions from a trusted context.',
+        'GitHub Actions tokens cannot submit APPROVE reviews on pull requests.',
+      ));
       effectiveEvent = 'COMMENT';
       try {
         const response = await createReviewWithRateLimit(kit, {
@@ -198,7 +213,11 @@ async function postReviewWithRetry(
       return response.data;
     }
 
-    console.warn(`[GitHub] 422 error with ${totalCount} inline comment(s). Retrying once without inline comments to avoid duplicate probe side effects.`);
+    console.warn(formatPostingWarning(
+      'GitHub rejected inline comment positions (422)',
+      'Rebase or refresh the diff; CodeAgora will post the summary without inline comments to avoid duplicates.',
+      `${totalCount} inline comment(s) could not be mapped to valid diff positions`,
+    ));
     const response = await createReviewWithRateLimit(kit, {
       owner: config.owner,
       repo: config.repo,
@@ -282,7 +301,12 @@ export async function postReview(
       issue_number: prNumber,
       body: comment.body,
     }).catch((err) => {
-      console.warn(`[GitHub] Failed to post file-level comment: ${err instanceof Error ? err.message : err}`);
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(formatPostingWarning(
+        'Failed to post a file-level PR comment',
+        'Check issue-comment permissions or rerun after resolving the GitHub API error.',
+        redactSecrets(message),
+      ));
     });
   }
 
@@ -329,7 +353,13 @@ export async function handleNeedsHuman(
       pull_number: prNumber,
       reviewers,
       team_reviewers: teams,
-    }).catch(() => { /* non-fatal: reviewers may not be collaborators */ });
+    }).catch(() => {
+      console.warn(formatPostingWarning(
+        'Could not request human reviewers',
+        'Add collaborators/teams or request reviewers manually.',
+        'Non-fatal permission or membership issue.',
+      ));
+    });
   }
 
   // Add label
@@ -339,7 +369,13 @@ export async function handleNeedsHuman(
     repo: config.repo,
     issue_number: prNumber,
     labels: [label],
-  }).catch(() => { /* non-fatal */ });
+  }).catch(() => {
+    console.warn(formatPostingWarning(
+      'Could not add the needs-human label',
+      'Add the label manually or grant issues:write permission.',
+      'Non-fatal label permission issue.',
+    ));
+  });
 }
 
 /**

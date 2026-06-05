@@ -179,6 +179,54 @@ Example with Groq:
     GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 ```
 
+## Claude Code / Codex companion workflows
+
+CodeAgora already supports CLI reviewers such as Claude Code (`claude`) and Codex (`codex`) through `backend: "cli"`, but the GitHub Action does not install or authenticate those CLIs. In GitHub Actions, choose one of these patterns:
+
+1. **CodeAgora Action with API/GitHub Models reviewers** — recommended default for rc.6.
+2. **CodeAgora Action with CLI reviewers** — install and authenticate the CLI on the runner before running CodeAgora.
+3. **Companion agent workflow** — run Claude Code or Codex as a separate GitHub Action alongside CodeAgora.
+
+For Claude Code OAuth, use the official Claude Code Action. Generate the token locally with `claude setup-token`, save it as `CLAUDE_CODE_OAUTH_TOKEN`, then reference it from the workflow:
+
+```yaml
+name: Claude Companion Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this PR for correctness, security, API contract issues,
+            and maintainability risks. Keep findings concise.
+          claude_args: |
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*)"
+```
+
+This is separate from CodeAgora's reviewer config. CodeAgora still owns its consensus verdict, session artifacts, and stable Action outputs; Claude Code or Codex can provide an additional agentic review/commenting lane.
+
+Fork PRs cannot read repository secrets such as `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`. Keep the same fork guard pattern used for CodeAgora before running companion agent workflows.
+
 ## Action inputs
 
 | Input | Default | Description |
@@ -232,6 +280,18 @@ Then add this condition to later steps:
 ```yaml
 if: steps.fork-check.outputs.skip != 'true'
 ```
+
+When CodeAgora itself reports a degraded/skipped run, use the `degraded-reason` output and the logs together:
+
+- `missing-github-token`: pass `github-token` or disable posting
+- `missing-provider-secrets`: add the provider secret or switch to GitHub Models
+- `fork-missing-provider-secrets`: use a same-repository PR or a fork gate
+- `posting-disabled`: set `post-results: 'true'`
+- `diff-too-large`: lower the PR size, raise `max-diff-lines`, or split the PR
+- `config-load-failed`: fix `.ca/config.json` or `config-path`
+- `stale-head-sha`: rerun on the updated commit SHA
+- `github-post-failed`: check permissions/token scopes and rerun
+- `sarif-write-failed`: use a writable SARIF path or export SARIF elsewhere
 
 ## Choosing `max-diff-lines`
 

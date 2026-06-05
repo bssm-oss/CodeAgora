@@ -263,11 +263,33 @@ github-post-failed
 sarif-write-failed
 ```
 
+Action logs now pair each stable reason with a short why + next step. Common fixes:
+
+| Reason | What it usually means | Next step |
+|---|---|---|
+| `missing-github-token` | The Action cannot post review/status updates. | Pass `github-token` (usually `${{ secrets.GITHUB_TOKEN }}`) or disable posting explicitly. |
+| `missing-provider-secrets` | The config needs a provider secret that is not present. | Add the required provider secret(s) or switch the config to GitHub Models. |
+| `fork-missing-provider-secrets` | Fork PR secrets are unavailable. | Use a same-repository PR, GitHub Models, or a fork gate before running CodeAgora. |
+| `posting-disabled` | Posting was turned off by workflow input. | Set `post-results: 'true'` if you want PR comments and status checks. |
+| `diff-too-large` | The diff exceeded `max-diff-lines`. | Lower the PR size, raise `max-diff-lines`, or split the PR. |
+| `config-load-failed` | The config path or JSON/YAML file could not be read. | Fix `.ca/config.json` or `config-path` and rerun. |
+| `stale-head-sha` | The PR head changed before posting. | Rerun the workflow on the updated commit SHA. |
+| `github-post-failed` | GitHub rejected a posting operation. | Check token scopes and the Action log, then rerun. |
+| `sarif-write-failed` | The SARIF file path was not writable/safe. | Use a writable SARIF path or export SARIF elsewhere. |
+
 ### 3.2 How the Action Gets the Diff
 
 **PR diff (preferred):** `gh pr diff {number}` returns the unified diff of all files changed in the PR. This is the same diff a reviewer sees in the GitHub UI, and it strips binary files automatically.
 
 **Local fallback:** if GitHub API diff retrieval fails, the action falls back to local `git diff` using the pull request base and head SHAs. This fallback requires a `pull_request` event context and an earlier `actions/checkout` step.
+
+### 3.2.1 Agent CLI and Companion Action Notes
+
+CodeAgora supports CLI reviewer backends such as Claude Code and Codex when those CLIs are installed and authenticated on the runner. The CodeAgora GitHub Action itself does not install or log in to those CLIs; it runs the bundled `dist/action.js` runtime and delegates reviewer execution to the configured backend.
+
+For OAuth-based Claude Code automation, use `anthropics/claude-code-action@v1` as a separate companion workflow/step with `claude_code_oauth_token`. That companion action can post its own PR feedback, while CodeAgora continues to provide the multi-reviewer verdict, sessions, SARIF, and stable Action outputs.
+
+Do not run OAuth-backed companion agent workflows on untrusted fork PRs unless your repository has an explicit approval/gating policy, because GitHub Actions secrets are not available to those runs.
 
 ### 3.3 Comment Deduplication
 

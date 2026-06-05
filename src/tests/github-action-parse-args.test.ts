@@ -6,6 +6,7 @@ import fs from 'fs';
 import { describe, it, expect } from 'vitest';
 import { ACTION_DEGRADED_REASONS } from '@codeagora/shared/contracts/stable.js';
 import {
+  formatActionWarning,
   determineActionPolicy,
   hasProviderCredentials,
   isForkContext,
@@ -98,6 +99,20 @@ describe('github-action parseActionInputs', () => {
   it('defaults configPath to .ca/config.json if neither CLI arg nor env present', () => {
     const result = parseActionInputs(validArgv, env({ GITHUB_TOKEN: TOKEN }));
     expect(result.configPath).toBe('.ca/config.json');
+  });
+
+  it('formats actionable action warnings with reason, context, and next step', () => {
+    const warning = formatActionWarning('missing-provider-secrets', 'Add the required provider secret(s) or switch the config to GitHub Models.', 'No provider secret was available.');
+
+    expect(warning).toContain('::warning::CodeAgora missing-provider-secrets');
+    expect(warning).toContain('Context: No provider secret was available.');
+    expect(warning).toContain('Next step: Add the required provider secret(s) or switch the config to GitHub Models.');
+  });
+
+  it('escapes workflow command control characters in action warnings', () => {
+    const warning = formatActionWarning('github-post-failed', 'Retry after fixing permissions.', 'line one\nline two with 100% value');
+
+    expect(warning).toContain('line one%0Aline two with 100%25 value');
   });
 });
 
