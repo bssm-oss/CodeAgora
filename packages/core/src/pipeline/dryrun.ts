@@ -12,7 +12,7 @@ import {
   isDeclarativeReviewers,
   expandDeclarativeReviewers,
 } from '../config/loader.js';
-import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { PROVIDER_ENV_VARS, getProviderEnvVar as resolveProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 import { chunkDiffWithMetadata, type ChunkMetadata } from './chunker.js';
 
 export type { TokenUsage };
@@ -184,7 +184,9 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
   for (const r of reviewers) {
     if (!r.isAuto && r.provider !== 'unknown') seenProviders.add(r.provider);
   }
-  seenProviders.add(modProvider);
+  if (config.moderator.backend === 'api' || config.moderator.provider) {
+    seenProviders.add(modProvider);
+  }
   for (const s of enabledSupporters) {
     if (s.provider) seenProviders.add(s.provider);
   }
@@ -256,8 +258,8 @@ function computeDryRunReadiness(params: {
   const reasons: string[] = [];
   const reviewableFiles = params.diffMetadata?.includedFiles ?? [];
   const availableProviders = params.health.filter((h) => h.status === 'available');
+  const unknownProviders = params.health.filter((h) => h.status === 'unknown');
   const hasWarnings = params.warnings.length > 0;
-  const hasUnknownHealth = params.health.some((h) => h.status === 'unknown');
   const hasNoApiKey = params.health.some((h) => h.status === 'no-api-key');
   const hasAnyReviewers = params.reviewers.length > 0;
 
@@ -265,28 +267,28 @@ function computeDryRunReadiness(params: {
   if (params.diffMetadata && reviewableFiles.length === 0) reasons.push('blocked: no reviewable files');
   if (!hasAnyReviewers) reasons.push('blocked: no reviewers configured');
   if (params.health.length > 0 && availableProviders.length === 0) reasons.push('blocked: no usable provider credentials');
-  if (hasUnknownHealth) reasons.push('blocked: provider health unavailable');
+  if (unknownProviders.length > 0) {
+    const unknownReason = `provider health unavailable for ${unknownProviders.map((h) => h.provider).join(', ')}`;
+    reasons.push(availableProviders.length === 0 ? `blocked: ${unknownReason}` : `warning: ${unknownReason}`);
+  }
   if (hasWarnings) reasons.push(...params.warnings.map((warning) => `warning: ${warning}`));
 
   nextActions.add('agora doctor');
   nextActions.add('agora review --staged');
   if (params.diffContent.trim()) nextActions.add('agora review --quick <diff.patch>');
-  if (hasNoApiKey) {
+  if (hasNoApiKey || unknownProviders.length > 0) {
     for (const h of params.health) {
-      if (h.status === 'no-api-key') {
-        nextActions.add(`export ${getProviderEnvVar(h.provider) ?? h.provider}=<your-key> for ${h.provider}`);
+      if (h.status === 'no-api-key' || h.status === 'unknown') {
+        nextActions.add(`export ${resolveProviderEnvVar(h.provider)}=<your-key> for ${h.provider}`);
       }
     }
   }
 
   const hasBlockers = reasons.some((reason) => reason.startsWith('blocked:'));
-  const classification = hasBlockers ? 'blocked' : hasWarnings ? 'risky' : 'ready';
+  const hasRiskWarnings = reasons.some((reason) => reason.startsWith('warning:'));
+  const classification = hasBlockers ? 'blocked' : hasRiskWarnings ? 'risky' : 'ready';
 
   return { classification, reasons, nextActions: [...nextActions] };
-}
-
-function getProviderEnvVar(provider: string): string | undefined {
-  return PROVIDER_ENV_VARS[provider];
 }
 
 // ============================================================================

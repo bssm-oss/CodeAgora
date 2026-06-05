@@ -76,7 +76,7 @@ agora providers
 
 ## CLI Backends in GitHub Actions
 
-CLI backends such as Claude Code (`claude`) and Codex (`codex`) can run in CI, but CodeAgora does not install or authenticate those CLIs for you. If `.ca/config.json` uses `"backend": "cli"`, install and authenticate the matching CLI before running CodeAgora.
+CLI backends such as Claude Code (`"backend": "claude"`) and Codex (`"backend": "codex"`) can run in CI, but CodeAgora does not install or authenticate those CLIs for you. If `.ca/config.json` uses a concrete CLI backend, install and authenticate the matching CLI before running CodeAgora. If the same config keeps API-based moderator or supporter agents, keep those provider secrets configured too.
 
 For OAuth-based Claude Code automation in GitHub Actions, use the official Claude Code Action as a companion workflow or step. Its OAuth token is passed to that action, not to CodeAgora directly:
 

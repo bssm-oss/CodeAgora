@@ -307,6 +307,49 @@ describe('dryRun', () => {
     expect(result.readiness?.reasons.some((reason) => reason.startsWith('warning:'))).toBe(true);
   });
 
+  it('marks unknown provider health as risky when another provider is available', async () => {
+    process.env.GROQ_API_KEY = 'test-key';
+
+    const result = await dryRun(makeConfig({
+      reviewers: [
+        {
+          id: 'r1-groq',
+          model: 'llama-3.3-70b-versatile',
+          backend: 'api',
+          provider: 'groq',
+          enabled: true,
+          timeout: 120,
+        },
+        {
+          id: 'r2-custom',
+          model: 'custom-model',
+          backend: 'api',
+          provider: 'custom-provider',
+          enabled: true,
+          timeout: 120,
+        },
+      ],
+      supporters: {
+        ...makeConfig().supporters,
+        pool: [],
+        pickCount: 1,
+      },
+      moderator: {
+        backend: 'api',
+        model: 'llama-3.3-70b-versatile',
+        provider: 'groq',
+      },
+    }), SAMPLE_DIFF);
+
+    expect(result.readiness?.classification).toBe('risky');
+    expect(result.readiness?.reasons).toEqual(expect.arrayContaining([
+      'warning: provider health unavailable for custom-provider',
+    ]));
+    expect(result.readiness?.nextActions).toEqual(expect.arrayContaining([
+      'export CUSTOM_PROVIDER_API_KEY=<your-key> for custom-provider',
+    ]));
+  });
+
   it('declarative reviewers config: static + auto slots', async () => {
     delete process.env.GROQ_API_KEY;
 

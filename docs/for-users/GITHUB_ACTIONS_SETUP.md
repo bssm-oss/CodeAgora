@@ -181,10 +181,10 @@ Example with Groq:
 
 ## Claude Code / Codex companion workflows
 
-CodeAgora already supports CLI reviewers such as Claude Code (`claude`) and Codex (`codex`) through `backend: "cli"`, but the GitHub Action does not install or authenticate those CLIs. In GitHub Actions, choose one of these patterns:
+CodeAgora already supports CLI reviewers such as Claude Code and Codex through concrete CLI backend values like `backend: "claude"` or `backend: "codex"`, but the GitHub Action does not install or authenticate those CLIs. In GitHub Actions, choose one of these patterns:
 
 1. **CodeAgora Action with API/GitHub Models reviewers** — recommended default for rc.6.
-2. **CodeAgora Action with CLI reviewers** — install and authenticate the CLI on the runner before running CodeAgora.
+2. **CodeAgora Action with CLI reviewers** — install and authenticate the configured CLI backend on the runner before running CodeAgora. If your moderator/supporters still use API providers, keep the matching provider secrets configured too.
 3. **Companion agent workflow** — run Claude Code or Codex as a separate GitHub Action alongside CodeAgora.
 
 For Claude Code OAuth, use the official Claude Code Action. Generate the token locally with `claude setup-token`, save it as `CLAUDE_CODE_OAUTH_TOKEN`, then reference it from the workflow:
