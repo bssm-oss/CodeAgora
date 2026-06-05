@@ -1,10 +1,10 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-05 -->
 
 # MCP Package (@codeagora/mcp)
 
 ## Purpose
-MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code review pipeline as tools for Claude and other AI agents. Wraps the core pipeline with 9 specialized tools: quick review, full review, PR review, dry-run, explain, leaderboard, stats, and config get/set. Runs as a CLI subprocess using stdio transport.
+MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code review pipeline as tools for Claude and other AI agents. Wraps the core pipeline with review, dry-run, leaderboard/stats, session/config, and explanation tools. Runs as a CLI subprocess using stdio transport.
 
 ## Key Files
 
@@ -21,6 +21,8 @@ MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code revi
 | `src/tools/stats.ts` | `stats` tool — Session statistics and historical metrics |
 | `src/tools/config-get.ts` | `config_get` tool — Read current reviewer configuration |
 | `src/tools/config-set.ts` | `config_set` tool — Update reviewer configuration settings |
+| `src/tools/shared-response.ts` | Shared compact response and structured error helpers |
+| `src/tools/shared-schema.ts` | Shared tool input schemas, including repo-path handling |
 
 ## Subdirectories
 
@@ -34,8 +36,8 @@ MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code revi
 
 **Language & Tools:**
 - TypeScript (strict mode)
-- No test suite (integration via MCP protocol)
-- Build: skip (compiled by root tsup)
+- Tool handler tests live in package-local tests plus root `src/tests/`
+- Build through root/package tsup; package startup is covered by release smoke
 
 **MCP Protocol:**
 - Server: `McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`
@@ -50,8 +52,10 @@ MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code revi
 - `zod` — input validation schemas
 
 **Key Commands:**
-- `pnpm typecheck` — type-check this package
+- `pnpm vitest run packages/mcp/src/tests/tool-handlers.test.ts packages/mcp/src/tests/tools.test.ts`
+- `pnpm --filter @codeagora/mcp build`
 - Built binary: `node dist/index.js` or `codeagora-mcp` (via bin entry in package.json)
+- Package smoke is included in `pnpm release:beta-smoke`
 
 ### Common Patterns
 
@@ -82,9 +86,10 @@ server.tool(
 - Return JSON response: `{ content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }`
 
 **Error Handling:**
-- Wrap pipeline calls in try-catch
-- Return error decision: `{ decision: 'ERROR', reasoning: 'message', issues: [], ... }`
-- Log errors but do not throw (MCP expects structured responses)
+- Wrap tool execution in try-catch and return structured tool errors.
+- Preserve stable `status`, `code`, `message`, and optional `details` fields for agent callers.
+- For `repo_path`, tell callers whether to omit it, pass the workspace root, or stay inside the server/repo boundary.
+- Do not leak raw filesystem, provider secret, token, or transport internals into compact responses.
 
 ### Tool Catalog
 
@@ -113,8 +118,9 @@ server.tool(
 
 ### Architecture Notes
 - All tools call `runReviewWithDiff()` or variants in helpers.ts
-- Diff is written to temp file, passed to `runPipeline()`, temp file cleaned up in finally block
-- Results formatted with `formatCompact()` for consistent response structure
+- Diff is written to temp file, passed to the shared review path, then cleaned up in finally block
+- Results formatted with compact/shared response helpers for consistent response structure
+- Tools may accept explicit `repo_path`; validate it before reading config/session state
 - No async state — each tool call is independent
 - stdio transport handles incoming MCP requests and outgoing responses
 
