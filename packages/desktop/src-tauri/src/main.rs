@@ -455,10 +455,7 @@ fn parse_review_stream_event(line: &str) -> ParsedReviewStreamEvent {
         .and_then(Value::as_str)
         .map(redact_sensitive)
         .unwrap_or(redacted_line);
-    let session_id = payload
-        .get("sessionId")
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    let session_id = review_contract_session_id(&payload);
 
     let degraded_signal = payload
         .get("degraded")
@@ -503,10 +500,7 @@ fn parse_review_contract_event(payload: Value, redacted_line: String) -> ParsedR
         .get("progress")
         .and_then(Value::as_u64)
         .map(|value| value.min(100) as u8);
-    let session_id = payload
-        .get("sessionId")
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    let session_id = review_contract_session_id(&payload);
     let degraded_reason = payload
         .get("degradedReason")
         .and_then(Value::as_str)
@@ -547,6 +541,23 @@ fn parse_review_contract_event(payload: Value, redacted_line: String) -> ParsedR
         ),
         session_id,
     }
+}
+
+fn review_contract_session_id(payload: &Value) -> Option<String> {
+    let session_id = payload.get("sessionId").and_then(Value::as_str)?.trim();
+    if session_id.is_empty() {
+        return None;
+    }
+    if session_id.contains('/') {
+        return Some(session_id.to_string());
+    }
+    payload
+        .get("date")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|date| !date.is_empty())
+        .map(|date| format!("{date}/{session_id}"))
+        .or_else(|| Some(session_id.to_string()))
 }
 
 fn review_contract_message(payload: &Value, event_type: &str, redacted_line: &str) -> String {
@@ -2252,6 +2263,9 @@ fn main() {
         builder
     };
 
+    #[cfg(debug_assertions)]
+    let builder = builder.plugin(tauri_plugin_mcp_bridge::init());
+
     builder
         .manage(WorkspaceState {
             repo_root: Mutex::new(None),
@@ -2702,7 +2716,7 @@ mod tests {
 
         assert_eq!(parsed.event.kind, "result");
         assert_eq!(parsed.event.message, "Review result: ACCEPT");
-        assert_eq!(parsed.session_id.as_deref(), Some("001"));
+        assert_eq!(parsed.session_id.as_deref(), Some("2026-05-06/001"));
         assert_eq!(parsed.event.event_type.as_deref(), Some("result"));
     }
 }

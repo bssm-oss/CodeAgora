@@ -16,3 +16,4 @@ tauri = { version = "=2.11.0", features = [] }
 tauri-plugin-notification = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-webdriver-automation = { version = "0.1.3", optional = true }
+tauri-plugin-mcp-bridge = "0.11.2"

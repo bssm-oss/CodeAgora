@@ -8,15 +8,20 @@
     "build": "tsup",
     "build:watch": "tsup --watch",
     "bundle:smoke": "pnpm tauri:build && node scripts/bundle-smoke.mjs",
-    "dev": "pnpm build && echo \"Open packages/desktop/dist/index.html for the scaffold preview\"",
+    "debug:mcp": "tauri-mcp driver-session start --port 9223",
+    "debug:mcp:logs": "tauri-mcp read-logs --source console",
+    "debug:mcp:snapshot": "tauri-mcp webview-dom-snapshot --type structure",
+    "dev": "pnpm tauri:dev",
     "evidence": "pnpm smoke && node scripts/evidence.mjs",
     "app:e2e": "pnpm build && cd src-tauri && cargo test desktop_app_e2e -- --nocapture",
-    "macos:webdriver-e2e": "pnpm build && cd src-tauri && cargo build --features webdriver-automation && cd .. && node scripts/macos-webdriver-e2e.mjs",
+    "macos:webdriver-e2e": "pnpm build && tauri build --debug --features webdriver-automation && node scripts/macos-webdriver-e2e.mjs",
+    "preview": "pnpm build && echo \"Open packages/desktop/dist/index.html for the browser fallback preview\"",
     "smoke": "pnpm build && node scripts/smoke.mjs",
     "tauri:build": "tauri build",
     "tauri:check": "pnpm build && cd src-tauri && cargo check",
     "tauri:dev": "pnpm build && cd src-tauri && cargo run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "visual:qa": "pnpm build && node scripts/visual-qa.mjs"
   },
   "dependencies": {
     "@codeagora/core": "workspace:*",

@@ -7,7 +7,12 @@ import process from 'node:process';
 const root = path.resolve(import.meta.dirname, '..');
 const repoRoot = path.resolve(root, '..', '..');
 const tauriRoot = path.join(root, 'src-tauri');
-const binary = path.join(tauriRoot, 'target', 'debug', 'codeagora-desktop');
+const debugBundle = path.join(tauriRoot, 'target', 'debug', 'bundle', 'macos', 'CodeAgora.app');
+const debugBundleBinary = path.join(debugBundle, 'Contents', 'MacOS', 'codeagora-desktop');
+const debugBinary = path.join(tauriRoot, 'target', 'debug', 'codeagora-desktop');
+const binary = process.env.CODEAGORA_DESKTOP_WEBDRIVER_BINARY
+  ?? (fs.existsSync(debugBundleBinary) ? debugBundleBinary : debugBinary);
+const binaryLabel = binary === debugBundleBinary ? 'debug .app bundle' : 'debug executable';
 const port = Number(process.env.CODEAGORA_DESKTOP_WEBDRIVER_PORT ?? 4444);
 const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -30,8 +35,9 @@ function fixtureWorkspace() {
   const git = spawnSync('git', ['init', '--initial-branch', 'main'], { cwd: dir, stdio: 'ignore' });
   assert(git.status === 0, 'Failed to initialize temporary git workspace');
   writeFile(path.join(dir, 'README.md'), '# CodeAgora desktop WebDriver fixture\n');
-  const reviewer = { id: 'codex', backend: 'opencode', provider: 'openai', model: 'gpt-5', enabled: true, timeout: 120 };
-  const supporter = { id: 'supporter', backend: 'opencode', provider: 'openai', model: 'gpt-5', enabled: true, timeout: 120 };
+  writeFile(path.join(dir, 'src', 'app.ts'), 'export const value = 1;\n');
+  const reviewer = { id: 'codex', backend: 'codex', model: 'gpt-5', enabled: true, timeout: 120 };
+  const supporter = { id: 'supporter', backend: 'codex', model: 'gpt-5', enabled: true, timeout: 120 };
   writeFile(path.join(dir, '.ca', 'config.json'), `${JSON.stringify({
     language: 'ko',
     reviewers: [reviewer],
@@ -43,12 +49,13 @@ function fixtureWorkspace() {
       personaPool: ['builtin:security'],
       personaAssignment: 'random',
     },
-    moderator: { backend: 'opencode', provider: 'openai', model: 'gpt-5' },
+    moderator: { backend: 'codex', model: 'gpt-5' },
     discussion: {
       maxRounds: 1,
       registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },
       codeSnippetRange: 10,
     },
+    head: { backend: 'codex', model: 'gpt-5', enabled: true },
     errorHandling: { maxRetries: 0, forfeitThreshold: 1 },
   }, null, 2)}\n`);
   const sessionDir = path.join(dir, '.ca', 'sessions', '2026-05-06', 'webdriver-001');
@@ -84,6 +91,55 @@ function fixtureWorkspace() {
   writeFile(path.join(dir, 'docs', 'RELEASE_EVIDENCE.md'), '# Release Evidence\n');
   writeFile(path.join(dir, 'docs', 'live-benchmark-report.md'), '# Live Benchmark\n');
   writeFile(path.join(dir, '.sisyphus', 'evidence', 'evidence-manifest.json'), '{"schemaVersion":"codeagora.release-evidence.v1"}\n');
+  spawnSync('git', ['add', '.'], { cwd: dir, stdio: 'ignore' });
+  spawnSync('git', ['commit', '-m', 'fixture'], {
+    cwd: dir,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'CodeAgora WebDriver',
+      GIT_AUTHOR_EMAIL: 'webdriver@example.invalid',
+      GIT_COMMITTER_NAME: 'CodeAgora WebDriver',
+      GIT_COMMITTER_EMAIL: 'webdriver@example.invalid',
+    },
+  });
+  writeFile(path.join(dir, 'src', 'app.ts'), 'export const value = 2;\n');
+  spawnSync('git', ['add', 'src/app.ts'], { cwd: dir, stdio: 'ignore' });
+  return dir;
+}
+
+function fakeAgoraBin() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-fake-agora-'));
+  const script = path.join(dir, 'agora');
+  writeFile(script, `#!/bin/sh
+set -eu
+if [ "\${1:-}" = "config" ]; then
+  printf '%s\\n' '{"valid":true,"errors":[],"warnings":[]}'
+  exit 0
+fi
+if [ -f ".ca/fail-next-review" ]; then
+  rm -f ".ca/fail-next-review"
+  printf '%s\\n' '{"schemaVersion":"codeagora.review.v1","type":"progress","stage":"review","event":"stage-update","progress":18,"message":"로컬 리뷰 도구 상태를 확인하고 있습니다."}'
+  printf '%s\\n' 'review tool unavailable' >&2
+  exit 2
+fi
+session_root=".ca/sessions/2026-06-08/webdriver-run-001"
+mkdir -p "$session_root/reviews"
+cat > "$session_root/metadata.json" <<'JSON'
+{"status":"completed","completedAt":1780848000000}
+JSON
+cat > "$session_root/head-verdict.json" <<'JSON'
+{"decision":"ACCEPT","reasoning":"자동 리뷰 완료: 변경 사항을 받아들일 수 있습니다.","issues":[]}
+JSON
+cat > "$session_root/report.md" <<'MARKDOWN'
+# WebDriver run result
+
+Decision: ACCEPT
+MARKDOWN
+printf '%s\\n' '{"schemaVersion":"codeagora.review.v1","type":"progress","stage":"review","event":"stage-update","progress":42,"message":"변경 사항을 확인하고 있습니다.","sessionId":"2026-06-08/webdriver-run-001"}'
+printf '%s\\n' '{"schemaVersion":"codeagora.review.v1","type":"result","status":"success","date":"2026-06-08","sessionId":"webdriver-run-001","summary":{"decision":"ACCEPT"}}'
+`);
+  fs.chmodSync(script, 0o755);
   return dir;
 }
 
@@ -140,16 +196,20 @@ async function text(sessionId, selector) {
 
 async function waitForText(sessionId, selector, expected) {
   const started = Date.now();
+  let lastValue = '';
+  let lastError = '';
   while (Date.now() - started < 20_000) {
     try {
       const value = await text(sessionId, selector);
+      lastValue = String(value);
       if (value.includes(expected)) return value;
-    } catch {
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
       // Keep polling while the app initializes or rerenders.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Timed out waiting for ${selector} to contain ${expected}`);
+  throw new Error(`Timed out waiting for ${selector} to contain ${expected}. Last text: ${lastValue || '<empty>'}. Last error: ${lastError || '<none>'}`);
 }
 
 if (process.platform !== 'darwin') {
@@ -157,17 +217,25 @@ if (process.platform !== 'darwin') {
   process.exit(0);
 }
 
-assert(fs.existsSync(binary), `Debug Tauri binary is missing: ${path.relative(repoRoot, binary)}`);
+assert(fs.existsSync(binary), `Tauri WebDriver target is missing: ${path.relative(repoRoot, binary)}`);
+if (!process.env.CODEAGORA_DESKTOP_WEBDRIVER_BINARY) {
+  assert(
+    binary === debugBundleBinary,
+    `macOS WebDriver E2E must run against the debug .app bundle. Missing ${path.relative(repoRoot, debugBundleBinary)}`,
+  );
+}
 const tauriWd = process.env.TAURI_WD ?? which('tauri-wd');
 assert(tauriWd, 'tauri-wd not found. Install with: cargo install tauri-webdriver-automation');
 
 const workspace = fixtureWorkspace();
+const fakeAgoraPath = fakeAgoraBin();
 const server = spawn(tauriWd, ['--port', String(port)], {
   cwd: repoRoot,
   env: {
     ...process.env,
     CODEAGORA_DESKTOP_REPO: workspace,
     CODEAGORA_DESKTOP_WEBDRIVER: '1',
+    PATH: `${fakeAgoraPath}${path.delimiter}${process.env.PATH ?? ''}`,
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -195,16 +263,35 @@ try {
 
   await waitForText(sessionId, '[data-testid="desktop-shell"]', 'CodeAgora');
   await waitForText(sessionId, '[data-testid="desktop-shell"]', '리뷰 콕핏');
-  await waitForText(sessionId, '[data-testid="session-detail"]', 'WebDriver fixture finding');
+  await waitForText(sessionId, '[data-testid="cockpit-overview"]', '로컬 리뷰 준비 상태');
+
+  await click(sessionId, '[data-testid="button-run-review"]');
+  await waitForText(sessionId, '[data-testid="run-panel"]', '리뷰 결과 만들기');
+  await waitForText(sessionId, '[data-testid="button-review-staged-changes"]', '커밋할 변경 확인');
+  await waitForText(sessionId, '[data-testid="button-review-working-tree"]', '전체 로컬 변경 확인');
+  await click(sessionId, '[data-testid="button-review-staged-changes"]');
+  await waitForText(sessionId, '[data-testid="desktop-shell"]', '자동 리뷰 완료');
+  await waitForText(sessionId, '[data-testid="acceptance-panel"]', '이 리뷰 결과를 받아들일 수 있습니다');
+  writeFile(path.join(workspace, '.ca', 'fail-next-review'), '1\n');
+  await click(sessionId, '[data-testid="button-run-review"]');
+  await waitForText(sessionId, '[data-testid="run-panel"]', '리뷰 결과 만들기');
+  await click(sessionId, '[data-testid="button-review-staged-changes"]');
+  await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '리뷰를 완료하지 못했습니다');
+  await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '다시 실행');
+  await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '셋업 확인');
 
   await click(sessionId, '[data-testid="button-config"]');
   await waitForText(sessionId, '[data-testid="config-panel"]', '설정 유효함');
+  await waitForText(sessionId, '[data-testid="config-status-panel"]', '현재 설정으로 리뷰를 실행할 수 있습니다');
+  await waitForText(sessionId, '[data-testid="config-panel"]', '전문가 설정 편집');
 
   await click(sessionId, '[data-testid="button-setup"]');
-  await waitForText(sessionId, '[data-testid="setup-panel"]', 'MCP 서버');
-  await waitForText(sessionId, '[data-testid="setup-panel"]', '릴리즈 증거');
+  await waitForText(sessionId, '[data-testid="setup-overview"]', '로컬 리뷰');
+  await waitForText(sessionId, '[data-testid="setup-overview"]', 'PR 자동화');
+  await waitForText(sessionId, '[data-testid="setup-overview"]', '결과 증거');
+  await waitForText(sessionId, '[data-testid="setup-panel"]', '로컬 자동화 세부 정보');
 
-  console.log('CodeAgora desktop macOS WebDriver E2E passed');
+  console.log(`CodeAgora desktop macOS WebDriver E2E passed (${binaryLabel}: ${path.relative(repoRoot, binary)})`);
 } catch (error) {
   console.error(serverOutput);
   throw error;
@@ -214,4 +301,5 @@ try {
   }
   server.kill('SIGTERM');
   fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(fakeAgoraPath, { recursive: true, force: true });
 }

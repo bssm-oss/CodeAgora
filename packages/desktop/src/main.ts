@@ -1,7 +1,6 @@
 import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
 import {
   getRepoInfo,
-  getCommandContract,
   cancelReviewRun,
   getEvidenceStatus,
   exportSession,
@@ -19,7 +18,6 @@ import {
   writeConfig,
   IS_TAURI,
   type ConfigValidation,
-  type DesktopCommandContract,
   type EvidenceStatus,
   type GitHubActionStatus,
   type McpStatus,
@@ -65,7 +63,6 @@ interface AppState {
   repoInfo?: RepoInfo;
   repoInput: string;
   recentRepoPaths: string[];
-  commandContract: DesktopCommandContract[];
   activeRun?: ReviewRunSnapshot;
   sessionSearch: string;
   sessionStatus: 'all' | SessionSummary['status'];
@@ -95,7 +92,6 @@ const state: AppState = {
   repoPath: '',
   repoInput: '',
   recentRepoPaths: loadRecentRepoPaths(),
-  commandContract: [],
   sessionSearch: '',
   sessionStatus: 'all',
   sessionSort: 'date-desc',
@@ -230,10 +226,6 @@ function onKeyDown(event: KeyboardEvent): void {
     return;
   }
 
-  if (event.key === '?' || (event.shiftKey && event.key === '/')) {
-    event.preventDefault();
-    pushToast(t('desktop.shortcuts.global'), 'info');
-  }
 }
 
 function normalizeLocale(value?: string): DesktopLocale | undefined {
@@ -316,7 +308,20 @@ function filteredSessions(): SessionSummary[] {
   let result = state.sessions;
   if (state.sessionSearch.trim()) {
     const q = state.sessionSearch.toLowerCase();
-    result = result.filter((s) => s.id.toLowerCase().includes(q) || (s.decision ?? '').toLowerCase().includes(q));
+    result = result.filter((s) => {
+      const issueMatch = s.topIssues?.some((issue) =>
+        issue.filePath.toLowerCase().includes(q) ||
+        issue.title.toLowerCase().includes(q) ||
+        issue.severity.toLowerCase().includes(q),
+      );
+      return Boolean(
+        s.id.toLowerCase().includes(q) ||
+        (s.decision ?? '').toLowerCase().includes(q) ||
+        s.status.toLowerCase().includes(q) ||
+        s.reasoning?.toLowerCase().includes(q) ||
+        issueMatch,
+      );
+    });
   }
   if (state.sessionStatus !== 'all') {
     result = result.filter((s) => s.status === state.sessionStatus);
@@ -337,6 +342,19 @@ type SeveritySource = {
   severityCounts?: Partial<Record<SeverityKey, number>>;
 };
 
+type CockpitTone = 'good' | 'warn' | 'danger' | 'info';
+
+interface CockpitStatus {
+  tone: CockpitTone;
+  label: string;
+  title: string;
+  body: string;
+  primaryLabel: string;
+  primaryView: View;
+  secondaryLabel: string;
+  secondaryView: View;
+}
+
 function severityCount(source: SeveritySource, key: SeverityKey): number {
   return source.severityCounts?.[key] ?? 0;
 }
@@ -347,6 +365,55 @@ function blockerCount(source: SeveritySource): number {
 
 function latestSession(): SessionSummary | undefined {
   return [...state.sessions].sort((a, b) => timestampValue(b.updatedAt) - timestampValue(a.updatedAt))[0];
+}
+
+function plainDecision(decision?: string, fallback?: string): string {
+  if (decision === 'ACCEPT') return t('desktop.decision.accept');
+  if (decision === 'REJECT') return t('desktop.decision.reject');
+  if (decision === 'NEEDS_HUMAN') return t('desktop.decision.needsHuman');
+  return fallback ?? decision ?? t('desktop.value.unknown');
+}
+
+function plainSessionStatus(status?: SessionSummary['status'] | SessionDetail['status']): string {
+  if (status === 'completed') return t('desktop.value.completed');
+  if (status === 'failed') return t('desktop.value.failed');
+  if (status === 'interrupted') return t('desktop.value.interrupted');
+  if (status === 'in_progress') return t('desktop.value.inProgress');
+  if (status === 'unknown') return t('desktop.value.unknown');
+  return status ?? t('desktop.value.unknown');
+}
+
+function sessionDisplayTitle(session: SessionSummary): string {
+  if (session.status === 'in_progress') return t('desktop.sessions.rowTitleRunning');
+  if (session.decision === 'ACCEPT') return t('desktop.sessions.rowTitleAccepted');
+  if (session.decision === 'NEEDS_HUMAN') return t('desktop.sessions.rowTitleHuman');
+  const blockers = blockerCount(session);
+  if (session.decision === 'REJECT' || blockers > 0) return t('desktop.sessions.rowTitleBlocked', { count: blockers });
+  return t('desktop.sessions.rowTitleReview');
+}
+
+function severityLabel(severity: SeverityKey | string): string {
+  switch (severity) {
+    case 'HARSHLY_CRITICAL':
+      return t('desktop.severity.blocker');
+    case 'CRITICAL':
+      return t('desktop.severity.critical');
+    case 'WARNING':
+      return t('desktop.severity.warning');
+    case 'SUGGESTION':
+      return t('desktop.severity.suggestion');
+    default:
+      return severity;
+  }
+}
+
+function decisionTone(session: Pick<SessionSummary, 'decision' | 'status' | 'severityCounts'>): CockpitTone {
+  if (session.decision === 'ACCEPT') return 'good';
+  if (session.decision === 'REJECT' || blockerCount(session) > 0) return 'danger';
+  if (session.decision === 'NEEDS_HUMAN') return 'warn';
+  if (session.status === 'failed' || session.status === 'interrupted') return 'danger';
+  if (session.status === 'in_progress') return 'info';
+  return 'warn';
 }
 
 function runReadiness(): { ready: boolean; reasons: string[] } {
@@ -367,6 +434,84 @@ function sessionHasDegradedSignal(session?: SessionDetail): boolean {
 function runHasDegradedSignal(run?: ReviewRunSnapshot): boolean {
   if (!run) return false;
   return run.events.some((event) => /degraded/i.test(event.kind) || /degraded/i.test(event.message));
+}
+
+function cockpitStatus(latest: SessionSummary | undefined, readiness: { ready: boolean; reasons: string[] }): CockpitStatus {
+  if (state.activeRun && isReviewRunning(state.activeRun)) {
+    return {
+      tone: 'info',
+      label: t('desktop.cockpit.status.runningLabel'),
+      title: t('desktop.cockpit.status.runningTitle'),
+      body: state.activeRun.message || t('desktop.cockpit.status.runningBody'),
+      primaryLabel: t('desktop.action.openTimeline'),
+      primaryView: 'run',
+      secondaryLabel: t('desktop.action.reviewResults'),
+      secondaryView: 'sessions',
+    };
+  }
+
+  if (!readiness.ready) {
+    return {
+      tone: 'warn',
+      label: t('desktop.cockpit.status.setupLabel'),
+      title: t('desktop.cockpit.status.setupTitle'),
+      body: readiness.reasons[0] ?? t('desktop.readiness.blockedBody'),
+      primaryLabel: t('desktop.action.fixSetup'),
+      primaryView: 'setup',
+      secondaryLabel: t('desktop.action.openRepository'),
+      secondaryView: 'run',
+    };
+  }
+
+  if (!latest) {
+    return {
+      tone: 'info',
+      label: t('desktop.cockpit.status.noReviewLabel'),
+      title: t('desktop.cockpit.status.noReviewTitle'),
+      body: t('desktop.cockpit.status.noReviewBody'),
+      primaryLabel: t('desktop.action.runStagedReview'),
+      primaryView: 'run',
+      secondaryLabel: t('desktop.action.checkSetup'),
+      secondaryView: 'setup',
+    };
+  }
+
+  if (latest.decision === 'ACCEPT') {
+    return {
+      tone: 'good',
+      label: plainDecision(latest.decision),
+      title: t('desktop.cockpit.status.acceptTitle'),
+      body: latest.reasoning ?? t('desktop.cockpit.status.acceptBody'),
+      primaryLabel: t('desktop.action.reviewResults'),
+      primaryView: 'sessions',
+      secondaryLabel: t('desktop.action.runAgain'),
+      secondaryView: 'run',
+    };
+  }
+
+  if (latest.decision === 'REJECT' || blockerCount(latest) > 0) {
+    return {
+      tone: 'danger',
+      label: plainDecision(latest.decision, t('desktop.cockpit.status.blockedLabel')),
+      title: t('desktop.cockpit.status.rejectTitle', { count: blockerCount(latest) }),
+      body: latest.reasoning ?? t('desktop.cockpit.status.rejectBody'),
+      primaryLabel: t('desktop.action.reviewFindings'),
+      primaryView: 'sessions',
+      secondaryLabel: t('desktop.action.rerunReview'),
+      secondaryView: 'run',
+    };
+  }
+
+  return {
+    tone: 'warn',
+    label: plainDecision(latest.decision),
+    title: t('desktop.cockpit.status.needsHumanTitle'),
+    body: latest.reasoning ?? t('desktop.cockpit.status.needsHumanBody'),
+    primaryLabel: t('desktop.action.reviewFindings'),
+    primaryView: 'sessions',
+    secondaryLabel: t('desktop.action.exportDecision'),
+    secondaryView: 'sessions',
+  };
 }
 
 function timestampValue(value?: string): number {
@@ -618,6 +763,47 @@ async function refreshSessions(selectFirst = false, forceRefresh = false): Promi
   }
 }
 
+function sessionCandidatesFromRun(run: ReviewRunSnapshot): string[] {
+  const candidates = [run.sessionId, ...run.events.map((event) => event.sessionId)]
+    .filter((candidate): candidate is string => Boolean(candidate?.trim()));
+  return [...new Set(candidates)];
+}
+
+function findSessionForRun(run: ReviewRunSnapshot): SessionSummary | undefined {
+  const candidates = sessionCandidatesFromRun(run);
+  for (const candidate of candidates) {
+    const normalized = candidate.trim();
+    const match = state.sessions.find((session) =>
+      session.id === normalized ||
+      session.sessionId === normalized ||
+      session.id.endsWith(`/${normalized}`),
+    );
+    if (match) return match;
+  }
+  const latest = latestSession();
+  const runStarted = timestampValue(run.startedAt);
+  return run.status === 'completed' && latest && timestampValue(latest.updatedAt) >= runStarted
+    ? latest
+    : undefined;
+}
+
+async function openReviewResultFromRun(run: ReviewRunSnapshot, forceRefresh = true): Promise<boolean> {
+  if (forceRefresh) {
+    state.sessions = await listSessions(true);
+    state.sessionVisibleCount = sessionPageSize;
+  }
+  const match = findSessionForRun(run);
+  if (!match) {
+    pushToast(t('desktop.notice.reviewResultMissing'), 'warning');
+    return false;
+  }
+  state.selected = await getSessionDetail(match.id, forceRefresh);
+  state.attentionCount = 0;
+  setView('sessions');
+  pushToast(t('desktop.notice.reviewResultReady'), 'success');
+  return true;
+}
+
 async function loadRepoInfo(): Promise<void> {
   try {
     state.repoInfo = await getRepoInfo();
@@ -657,31 +843,25 @@ async function openRepo(path: string): Promise<void> {
   }
 }
 
-async function loadCommandContract(): Promise<void> {
-  try {
-    state.commandContract = await getCommandContract();
-  } catch (error) {
-    pushToast(error instanceof Error ? error.message : String(error), 'error')
-  }
-  render();
-}
-
 async function loadSetup(): Promise<void> {
   state.busy = true;
   render();
   try {
-    const [providers, mcp, githubAction, evidence] = await Promise.all([
+    const [providers, mcp, githubAction, evidence] = await Promise.allSettled([
       getProviderStatus(),
       getMcpStatus(),
       getGitHubActionStatus(),
       getEvidenceStatus(),
     ]);
-    state.providers = providers;
-    state.mcpStatus = mcp;
-    state.githubActionStatus = githubAction;
-    state.evidenceStatus = evidence;
+    state.providers = providers.status === 'fulfilled' ? providers.value : [];
+    state.mcpStatus = mcp.status === 'fulfilled' ? mcp.value : undefined;
+    state.githubActionStatus = githubAction.status === 'fulfilled' ? githubAction.value : undefined;
+    state.evidenceStatus = evidence.status === 'fulfilled' ? evidence.value : undefined;
+    for (const result of [providers, mcp, githubAction, evidence]) {
+      if (result.status === 'rejected') console.warn(result.reason);
+    }
   } catch (error) {
-    pushToast(error instanceof Error ? error.message : String(error), 'error')
+    console.warn(error);
   } finally {
     state.busy = false;
     render();
@@ -814,32 +994,53 @@ function reviewProgress(events: ReviewRunEvent[]): { stage: string; percent: num
   }
 
   const kinds = events.map((e) => e.kind);
-  if (kinds.includes('completed')) return { stage: 'Verdict', percent: 100 };
-  if (kinds.includes('pipeline-complete')) return { stage: 'Complete', percent: 100 };
-  if (kinds.includes('stage-complete')) return { stage: 'Review', percent: 100 };
-  if (kinds.includes('l3')) return { stage: 'L3 Verdict', percent: 90 };
-  if (kinds.includes('l2')) return { stage: 'L2 Debate', percent: 70 };
-  if (kinds.includes('l1')) return { stage: 'L1 Review', percent: 40 };
-  if (kinds.includes('l0')) return { stage: 'L0 Model Selection', percent: 20 };
-  if (kinds.includes('started')) return { stage: 'Pre-analysis', percent: 10 };
-  return { stage: 'Initializing', percent: 0 };
+  if (kinds.includes('completed')) return { stage: t('desktop.run.stageVerdict'), percent: 100 };
+  if (kinds.includes('pipeline-complete')) return { stage: t('desktop.run.stageComplete'), percent: 100 };
+  if (kinds.includes('stage-complete')) return { stage: t('desktop.run.stageReview'), percent: 100 };
+  if (kinds.includes('l3')) return { stage: t('desktop.run.stageVerdict'), percent: 90 };
+  if (kinds.includes('l2')) return { stage: t('desktop.run.stageDiscuss'), percent: 70 };
+  if (kinds.includes('l1')) return { stage: t('desktop.run.stageReview'), percent: 40 };
+  if (kinds.includes('l0')) return { stage: t('desktop.run.stagePrepare'), percent: 20 };
+  if (kinds.includes('started')) return { stage: t('desktop.run.stagePrepare'), percent: 10 };
+  return { stage: t('desktop.run.stageStarting'), percent: 0 };
 }
 
 function reviewStageLabel(stage: string): string {
   switch (stage) {
     case 'init':
-      return 'Init';
+      return t('desktop.run.stageStarting');
     case 'review':
-      return 'L1 Review';
+      return t('desktop.run.stageReview');
     case 'discuss':
-      return 'L2 Debate';
+      return t('desktop.run.stageDiscuss');
     case 'verdict':
-      return 'L3 Verdict';
+      return t('desktop.run.stageVerdict');
     case 'complete':
-      return 'Complete';
+      return t('desktop.run.stageComplete');
     default:
       return stage;
   }
+}
+
+function plainRunStatus(status: string): string {
+  if (status === 'running') return t('desktop.run.statusRunning');
+  if (status === 'completed') return t('desktop.run.statusCompleted');
+  if (status === 'failed') return t('desktop.run.statusFailed');
+  if (status === 'cancelled') return t('desktop.run.statusCancelled');
+  if (status === 'cancelling') return t('desktop.run.statusCancelling');
+  return status;
+}
+
+function reviewEventKindLabel(kind: string): string {
+  if (kind === 'started') return t('desktop.run.eventStarted');
+  if (kind === 'completed' || kind === 'pipeline-complete') return t('desktop.run.eventCompleted');
+  if (kind === 'failed') return t('desktop.run.eventFailed');
+  if (kind === 'stage-complete') return t('desktop.run.eventStageComplete');
+  if (kind === 'l0') return t('desktop.run.stagePrepare');
+  if (kind === 'l1') return t('desktop.run.stageReview');
+  if (kind === 'l2') return t('desktop.run.stageDiscuss');
+  if (kind === 'l3') return t('desktop.run.stageVerdict');
+  return kind;
 }
 
 function scheduleReviewPoll(): void {
@@ -860,7 +1061,12 @@ async function pollReviewRun(runId: string): Promise<void> {
     if (!terminal.includes(snapshot.status)) {
       reviewPollHandle = window.setTimeout(() => pollReviewRun(runId), 2000);
     } else {
-      markReviewAttention(snapshot.status);
+      if (snapshot.status === 'completed') {
+        const opened = await openReviewResultFromRun(snapshot);
+        if (!opened) markReviewAttention(snapshot.status);
+      } else {
+        markReviewAttention(snapshot.status);
+      }
     }
   } catch (error) {
     pollRetryCount++;
@@ -951,9 +1157,9 @@ function renderShell(): HTMLElement {
 
 function renderToolbar(): HTMLElement {
   const toolbar = el('header', 'ca-toolbar');
-  const title = el('div');
+  const title = el('div', 'ca-toolbar-title');
   title.append(el('h1', '', viewTitle()));
-  title.append(el('p', '', repoSubtitle()));
+  title.append(el('p', 'ca-repo-subtitle', repoSubtitle()));
   toolbar.append(title);
 
   const actions = el('div', 'ca-toolbar-actions');
@@ -1077,10 +1283,16 @@ function viewTitle(): string {
 
 function repoSubtitle(): string {
   const repo = state.repoInfo;
-  if (!repo) return state.repoPath || t('desktop.repo.loading');
+  if (!repo) return state.repoPath ? shortRepoLabel(state.repoPath) : t('desktop.repo.loading');
   const branch = repo.branch ? ` · ${repo.branch}` : '';
-  const head = repo.headSha ? ` @ ${repo.headSha}` : '';
-  return `${repo.path}${branch}${head}`;
+  const head = repo.headSha ? ` @ ${repo.headSha.slice(0, 10)}` : '';
+  return `${shortRepoLabel(repo.path)}${branch}${head}`;
+}
+
+function shortRepoLabel(repoPath: string): string {
+  const normalized = repoPath.replace(/[/\\]+$/, '');
+  const parts = normalized.split(/[/\\]/).filter(Boolean);
+  return parts.at(-1) || repoPath;
 }
 
 function renderSkeleton(view: View): HTMLElement {
@@ -1235,10 +1447,11 @@ function renderSessions(): HTMLElement {
     }, state.selected?.id === session.id ? 'ca-session-row is-selected' : 'ca-session-row');
     item.dataset.testid = `session-row-${session.id.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
     const top = el('div', 'ca-session-row-top');
-    top.append(el('strong', '', session.id));
-    top.append(el('span', decisionClass(session.decision), session.decision ?? session.status));
+    top.append(el('strong', '', sessionDisplayTitle(session)));
+    top.append(el('span', decisionClass(session.decision), plainDecision(session.decision, plainSessionStatus(session.status))));
     item.append(top);
     item.append(el('span', 'ca-session-meta', t('desktop.sessions.rowMeta', { blockers: blockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
+    item.append(el('span', 'ca-session-meta ca-session-id-inline', t('desktop.sessions.rowId', { id: session.id })));
     listPanel.append(item);
   }
   if (visibleSessions.length < sessions.length) {
@@ -1261,20 +1474,44 @@ function renderCockpitOverview(): HTMLElement {
   section.dataset.testid = 'cockpit-overview';
   const latest = latestSession();
   const repo = state.repoInfo;
+  const readiness = runReadiness();
+  const status = cockpitStatus(latest, readiness);
   const hero = el('div', 'ca-cockpit-hero');
-  hero.append(el('span', 'ca-eyebrow', t('desktop.cockpit.eyebrow')));
-  hero.append(el('span', 'ca-preview-chip', t('desktop.preview.privatePreview')));
-  hero.append(el('h2', '', latest ? t('desktop.cockpit.latestVerdict', { verdict: latest.decision ?? latest.status }) : t('desktop.cockpit.readyTitle')));
-  hero.append(el('p', '', latest?.reasoning ?? t('desktop.cockpit.readyBody')));
+  const labelRow = el('div', 'ca-status-label-row');
+  labelRow.append(el('span', 'ca-eyebrow', t('desktop.cockpit.eyebrow')));
+  labelRow.append(el('span', `ca-status-label ca-${status.tone}`, status.label));
+  hero.append(labelRow);
+  hero.append(el('h2', '', status.title));
+  hero.append(el('p', '', status.body));
   const actions = el('div', 'ca-cockpit-actions');
-  actions.append(button(t('desktop.action.runStagedReview'), () => setView('run'), 'ca-button ca-primary', 'button-run-staged-review'));
-  actions.append(button(t('desktop.action.openRepository'), () => setView('run'), 'ca-button', 'button-open-repository'));
-  actions.append(button(t('desktop.action.setupGuide'), () => {
-    setView('setup');
-    if (state.providers.length === 0) void loadSetup();
-  }, 'ca-button ca-subtle', 'button-setup-guide'));
+  actions.append(button(status.primaryLabel, () => setView(status.primaryView), 'ca-button ca-primary', 'button-cockpit-primary-action'));
+  actions.append(button(status.secondaryLabel, () => {
+    setView(status.secondaryView);
+    if (status.secondaryView === 'setup' && state.providers.length === 0) void loadSetup();
+    if (status.secondaryView === 'config' && !state.configRaw) void loadConfig();
+  }, 'ca-button', 'button-cockpit-secondary-action'));
   hero.append(actions);
   section.append(hero);
+
+  const actionPanel = el('div', `ca-decision-panel ca-${status.tone}`);
+  actionPanel.dataset.testid = 'cockpit-decision-panel';
+  actionPanel.append(el('span', 'ca-eyebrow', t('desktop.cockpit.nextActionEyebrow')));
+  actionPanel.append(el('strong', '', status.primaryLabel));
+  actionPanel.append(el('p', '', t('desktop.cockpit.nextActionBody')));
+  const flow = el('div', 'ca-review-flow');
+  const flowItems = [
+    [t('desktop.flow.workspace'), repo?.trusted ? t('desktop.value.ready') : t('desktop.value.needsFixes'), repo?.trusted ? 'good' : 'warn'],
+    [t('desktop.flow.review'), latest ? plainDecision(latest.decision, plainSessionStatus(latest.status)) : t('desktop.value.notStarted'), latest ? status.tone : 'info'],
+    [t('desktop.flow.acceptance'), latest?.decision === 'ACCEPT' ? t('desktop.value.ready') : t('desktop.value.pending'), latest?.decision === 'ACCEPT' ? 'good' : 'warn'],
+  ] as const;
+  for (const [label, value, tone] of flowItems) {
+    const step = el('div', `ca-flow-step ca-${tone}`);
+    step.append(el('span', '', label));
+    step.append(el('strong', '', value));
+    flow.append(step);
+  }
+  actionPanel.append(flow);
+  section.append(actionPanel);
 
   const metrics = el('div', 'ca-cockpit-metrics');
   appendMetric(metrics, t('desktop.metric.workspace'), repo?.trusted ? t('desktop.value.trusted') : t('desktop.value.needsTrust'), repo?.trusted ? 'ca-good' : 'ca-warn');
@@ -1301,8 +1538,35 @@ function renderCockpitOverview(): HTMLElement {
 
 function formatTimestamp(value?: string): string {
   if (!value) return t('desktop.value.noTimestamp');
-  const date = new Date(value);
+  const normalized = /^\d+$/.test(value)
+    ? new Date(Number(value.length <= 10 ? `${value}000` : value))
+    : new Date(value);
+  const date = normalized;
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function decisionSummaryText(selected: SessionDetail): string {
+  const lines = [
+    `# CodeAgora review decision`,
+    '',
+    `- Session: ${selected.id}`,
+    `- Verdict: ${plainDecision(selected.decision, plainSessionStatus(selected.status))}`,
+    `- Blockers: ${blockerCount(selected)}`,
+    `- Findings: ${severityTotal(selected)}`,
+    `- Updated: ${formatTimestamp(selected.updatedAt)}`,
+    '',
+    selected.reasoning ?? t('desktop.detail.noReasoning'),
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+async function copyDecisionSummary(selected: SessionDetail): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(decisionSummaryText(selected));
+    pushToast(t('desktop.toast.copied'), 'success');
+  } catch {
+    pushToast(t('desktop.toast.copyFailed'), 'error');
+  }
 }
 
 function renderSessionDetail(): HTMLElement {
@@ -1321,11 +1585,12 @@ function renderSessionDetail(): HTMLElement {
   const banner = el('div', `ca-verdict-banner ${selected.decision === 'REJECT' ? 'ca-danger' : selected.decision === 'ACCEPT' ? 'ca-good' : 'ca-warn'}`);
   const bannerText = el('div');
   bannerText.append(el('span', 'ca-eyebrow', t('desktop.detail.finalVerdict')));
-  bannerText.append(el('h2', '', selected.decision ?? selected.status));
+  bannerText.append(el('h2', '', plainDecision(selected.decision, plainSessionStatus(selected.status))));
   bannerText.append(el('p', '', selected.reasoning ?? t('desktop.detail.noReasoning')));
   banner.append(bannerText);
-  banner.append(el('span', decisionClass(selected.decision), selected.id));
+  banner.append(el('span', decisionClass(selected.decision), plainDecision(selected.decision, plainSessionStatus(selected.status))));
   detail.append(banner);
+  detail.append(renderAcceptancePanel(selected));
 
   const detailHeader = el('div', 'ca-detail-header');
   const idRow = el('div', 'ca-session-id-row');
@@ -1364,7 +1629,7 @@ function renderSessionDetail(): HTMLElement {
   const countGrid = el('div', 'ca-count-grid');
   for (const key of ['HARSHLY_CRITICAL', 'CRITICAL', 'WARNING', 'SUGGESTION'] as const) {
     const cell = el('div', key === 'HARSHLY_CRITICAL' || key === 'CRITICAL' ? 'ca-count-cell ca-danger' : 'ca-count-cell');
-    cell.append(el('span', '', key.replace('_', ' ')));
+    cell.append(el('span', '', severityLabel(key)));
     cell.append(el('strong', '', String(counts[key] ?? 0)));
     countGrid.append(cell);
   }
@@ -1406,7 +1671,7 @@ function renderSessionDetail(): HTMLElement {
     for (const issue of findings) {
       const row = el('div', 'ca-issue-row ca-issue-card');
       const confidence = issue.confidence === undefined ? t('desktop.detail.confidenceUnavailable') : t('desktop.detail.confidencePercent', { confidence: Math.round(issue.confidence) });
-      row.append(el('span', 'ca-issue-severity', issue.severity));
+      row.append(el('span', 'ca-issue-severity', severityLabel(issue.severity)));
       row.append(el('strong', '', issue.title));
       row.append(el('span', '', `${issue.filePath}:${issue.lineRange[0]} · ${confidence}`));
       issues.append(row);
@@ -1439,6 +1704,34 @@ function renderSessionDetail(): HTMLElement {
   return detail;
 }
 
+function renderAcceptancePanel(selected: SessionDetail): HTMLElement {
+  const blockers = blockerCount(selected);
+  const tone = decisionTone(selected);
+  const panel = el('section', `ca-acceptance-panel ca-${tone}`);
+  panel.dataset.testid = 'acceptance-panel';
+  panel.append(el('span', 'ca-eyebrow', t('desktop.acceptance.eyebrow')));
+
+  if (selected.decision === 'ACCEPT' && blockers === 0) {
+    panel.append(el('strong', '', t('desktop.acceptance.acceptTitle')));
+    panel.append(el('p', '', t('desktop.acceptance.acceptBody')));
+  } else if (selected.decision === 'REJECT' || blockers > 0) {
+    panel.append(el('strong', '', t('desktop.acceptance.rejectTitle', { count: blockers })));
+    panel.append(el('p', '', t('desktop.acceptance.rejectBody')));
+  } else if (selected.decision === 'NEEDS_HUMAN') {
+    panel.append(el('strong', '', t('desktop.acceptance.humanTitle')));
+    panel.append(el('p', '', t('desktop.acceptance.humanBody')));
+  } else {
+    panel.append(el('strong', '', t('desktop.acceptance.pendingTitle')));
+    panel.append(el('p', '', t('desktop.acceptance.pendingBody')));
+  }
+
+  const actions = el('div', 'ca-acceptance-actions');
+  actions.append(button(t('desktop.action.copyDecisionSummary'), () => void copyDecisionSummary(selected), 'ca-button ca-primary', 'button-copy-decision-summary'));
+  actions.append(button(t('desktop.action.copyMarkdown'), () => void exportSelected('markdown'), 'ca-button', 'button-copy-decision-markdown'));
+  panel.append(actions);
+  return panel;
+}
+
 function renderRunReview(): HTMLElement {
   const panel = el('div', 'ca-run-panel');
   panel.dataset.testid = 'run-panel';
@@ -1447,7 +1740,6 @@ function renderRunReview(): HTMLElement {
   intro.append(el('span', 'ca-eyebrow', t('desktop.run.eyebrow')));
   intro.append(el('h2', '', t('desktop.run.title')));
   intro.append(el('p', '', t('desktop.run.body')));
-  intro.append(el('p', 'ca-shortcut-hint', t('desktop.shortcuts.run')));
   panel.append(intro);
 
   const readinessPanel = el('section', readiness.ready ? 'ca-readiness-panel ca-ready' : 'ca-readiness-panel ca-blocked');
@@ -1475,7 +1767,6 @@ function renderRunReview(): HTMLElement {
   }
   panel.append(actions);
   panel.append(renderReviewRun());
-  panel.append(renderCommandContract());
   return panel;
 }
 
@@ -1513,12 +1804,18 @@ function renderReviewRun(): HTMLElement {
   }
 
   const summary = el('div', 'ca-review-run-summary');
-  summary.append(el('span', statusClass(run.status), run.status));
-  summary.append(el('strong', '', run.runId));
+  summary.append(el('span', statusClass(run.status), plainRunStatus(run.status)));
+  summary.append(el('strong', '', t('desktop.run.reviewRecord')));
   summary.append(el('span', '', run.staged ? t('desktop.run.stagedDiff') : t('desktop.run.workingTreeDiff')));
   if (run.sessionId) summary.append(el('span', '', t('desktop.run.sessionLabel', { sessionId: run.sessionId })));
+  summary.append(el('span', 'ca-run-id', run.runId));
+  if (run.status === 'completed') {
+    summary.append(button(t('desktop.action.reviewResults'), () => void openReviewResultFromRun(run), 'ca-button ca-subtle', 'button-open-review-result'));
+  }
   section.append(summary);
   section.append(el('p', 'ca-repo-note', run.message));
+  const outcome = renderRunOutcomePanel(run);
+  if (outcome) section.append(outcome);
 
   if (state.activeRun && isReviewRunning(state.activeRun)) {
     const progress = reviewProgress(state.activeRun.events);
@@ -1532,17 +1829,55 @@ function renderReviewRun(): HTMLElement {
 
   const events = el('div', 'ca-event-list timeline');
   events.tabIndex = 0;
-    events.setAttribute('aria-label', t('desktop.a11y.eventsScrollable'));
+  events.setAttribute('aria-label', t('desktop.a11y.eventsScrollable'));
   for (const event of run.events.slice(-12).reverse()) {
     const row = el('div', 'ca-event-row');
     row.append(el('span', 'ca-event-dot', ''));
-    row.append(el('span', 'ca-event-kind', event.kind));
+    row.append(el('span', 'ca-event-kind', reviewEventKindLabel(event.kind)));
     row.append(el('span', '', event.message));
     row.append(el('time', '', formatTimestamp(event.timestamp)));
     events.append(row);
   }
   section.append(events);
   return section;
+}
+
+function renderRunOutcomePanel(run: ReviewRunSnapshot): HTMLElement | undefined {
+  if (!['failed', 'cancelled', 'completed'].includes(run.status)) return undefined;
+  const missingResult = run.status === 'completed' && !run.sessionId;
+  if (run.status === 'completed' && !missingResult) return undefined;
+
+  const tone = run.status === 'failed' ? 'danger' : run.status === 'cancelled' ? 'warn' : 'info';
+  const panel = el('section', `ca-run-outcome ca-${tone}`);
+  panel.dataset.testid = 'review-outcome-panel';
+  panel.append(el('span', 'ca-eyebrow', t('desktop.run.outcomeEyebrow')));
+
+  if (run.status === 'failed') {
+    panel.append(el('strong', '', t('desktop.run.outcomeFailedTitle')));
+    panel.append(el('p', '', t('desktop.run.outcomeFailedBody')));
+  } else if (run.status === 'cancelled') {
+    panel.append(el('strong', '', t('desktop.run.outcomeCancelledTitle')));
+    panel.append(el('p', '', t('desktop.run.outcomeCancelledBody')));
+  } else {
+    panel.append(el('strong', '', t('desktop.run.outcomeMissingTitle')));
+    panel.append(el('p', '', t('desktop.run.outcomeMissingBody')));
+  }
+
+  if (run.message) {
+    panel.append(el('p', 'ca-run-outcome-detail', t('desktop.run.outcomeDetail', { detail: run.message })));
+  }
+
+  const actions = el('div', 'ca-run-outcome-actions');
+  if (run.status === 'failed' || run.status === 'cancelled') {
+    actions.append(button(t('desktop.action.rerunReview'), () => void startReview(run.staged), 'ca-button ca-primary', 'button-rerun-failed-review'));
+    actions.append(button(t('desktop.action.checkSetup'), () => {
+      setView('setup');
+      void loadSetup();
+    }, 'ca-button', 'button-check-setup-after-run'));
+  }
+  actions.append(button(t('desktop.action.refreshEvidence'), () => void refreshSessions(true, true), 'ca-button ca-subtle', 'button-refresh-after-run'));
+  panel.append(actions);
+  return panel;
 }
 
 function statusClass(status: string): string {
@@ -1616,39 +1951,16 @@ function renderRepoFacts(): HTMLElement {
   return wrapper;
 }
 
-function renderCommandContract(): HTMLElement {
-  const section = el('section', 'ca-command-contract');
-  section.append(el('h3', '', t('desktop.command.title')));
-  if (state.commandContract.length === 0) {
-    section.append(el('p', 'ca-empty', t('desktop.command.notLoaded')));
-    return section;
-  }
-
-  for (const item of state.commandContract) {
-    const row = el('div', 'ca-command-row');
-    const title = el('div');
-    title.append(el('strong', '', item.name));
-    title.append(el('span', '', item.notes));
-    row.append(title);
-    const flags = el('div', 'ca-command-flags');
-    flags.append(el('span', 'ca-fact', item.classification));
-    if (item.readsProject) flags.append(el('span', 'ca-fact', t('desktop.command.readsProject')));
-    if (item.mutatesProject) flags.append(el('span', 'ca-fact ca-warn', t('desktop.command.mutatesProject')));
-    if (item.spawnsProcess) flags.append(el('span', 'ca-fact ca-warn', t('desktop.command.spawnsProcess')));
-    row.append(flags);
-    section.append(row);
-  }
-  return section;
-}
-
 function renderConfig(): HTMLElement {
   const panel = el('div', 'ca-config-panel');
   panel.dataset.testid = 'config-panel';
   const header = el('div', 'ca-config-hero');
   header.append(el('span', 'ca-eyebrow', t('desktop.config.eyebrow')));
-  header.append(el('h2', '', state.configPath));
+  header.append(el('h2', '', t('desktop.config.title')));
   header.append(el('p', '', t('desktop.config.body')));
+  header.append(el('span', 'ca-config-path', state.configPath));
   panel.append(header);
+  panel.append(renderConfigStatusPanel());
   panel.append(renderConfigFacts());
   panel.append(renderConfigValidation());
 
@@ -1664,7 +1976,6 @@ function renderConfig(): HTMLElement {
   }
 
   const advanced = el('details', 'ca-advanced-config') as HTMLDetailsElement;
-  advanced.open = true;
   advanced.append(el('summary', '', t('desktop.config.advancedEditor')));
   const textarea = el('textarea', 'ca-config-editor') as HTMLTextAreaElement;
   textarea.dataset.testid = 'config-editor';
@@ -1676,8 +1987,6 @@ function renderConfig(): HTMLElement {
     render();
   });
   advanced.append(textarea);
-  panel.append(advanced);
-
   const actions = el('div', 'ca-config-actions');
   actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(textarea.value), 'ca-button', 'button-validate-config'));
   const saveButton = button(t('desktop.action.saveConfig'), () => void saveConfig(textarea.value), 'ca-button ca-primary', 'button-save-config');
@@ -1686,6 +1995,22 @@ function renderConfig(): HTMLElement {
     saveButton.title = t('desktop.config.yamlReadOnlyBanner');
   }
   actions.append(saveButton);
+  advanced.append(actions);
+  panel.append(advanced);
+  return panel;
+}
+
+function renderConfigStatusPanel(): HTMLElement {
+  const validation = state.configValidation;
+  const ready = validation?.valid !== false;
+  const panel = el('section', ready ? 'ca-config-status ca-good' : 'ca-config-status ca-danger');
+  panel.dataset.testid = 'config-status-panel';
+  panel.append(el('span', 'ca-eyebrow', t('desktop.config.statusEyebrow')));
+  panel.append(el('strong', '', ready ? t('desktop.config.statusReadyTitle') : t('desktop.config.statusBlockedTitle')));
+  panel.append(el('p', '', ready ? t('desktop.config.statusReadyBody') : t('desktop.config.statusBlockedBody')));
+  const actions = el('div', 'ca-config-status-actions');
+  actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(state.configRaw), 'ca-button', 'button-validate-config-status'));
+  actions.append(button(t('desktop.nav.runReview'), () => setView('run'), 'ca-button ca-primary', 'button-run-from-config-status'));
   panel.append(actions);
   return panel;
 }
@@ -1737,29 +2062,62 @@ function renderNextActionPanel(selected: SessionDetail): HTMLElement {
 
 function renderConfigFacts(): HTMLElement {
   const facts = el('div', 'ca-config-facts ca-summary-cards');
-  let parsed: Record<string, unknown> | undefined;
+  let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(state.configRaw) as Record<string, unknown>;
   } catch {
-    appendMetric(facts, 'JSON', t('desktop.value.invalid'), 'ca-warn');
-    appendMetric(facts, t('desktop.config.reviewers'), t('desktop.value.unknown'));
-    appendMetric(facts, t('desktop.config.providers'), t('desktop.value.unknown'));
+    appendMetric(facts, t('desktop.config.policyStatus'), t('desktop.value.invalid'), 'ca-warn');
+    appendMetric(facts, t('desktop.config.reviewDepth'), t('desktop.value.unknown'));
+    appendMetric(facts, t('desktop.config.finalJudge'), t('desktop.value.unknown'));
     return facts;
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    appendMetric(facts, 'JSON', t('desktop.value.invalidShape'), 'ca-warn');
-    appendMetric(facts, t('desktop.config.reviewers'), t('desktop.value.unknown'));
-    appendMetric(facts, t('desktop.config.providers'), t('desktop.value.unknown'));
+    appendMetric(facts, t('desktop.config.policyStatus'), t('desktop.value.invalidShape'), 'ca-warn');
+    appendMetric(facts, t('desktop.config.reviewDepth'), t('desktop.value.unknown'));
+    appendMetric(facts, t('desktop.config.finalJudge'), t('desktop.value.unknown'));
     return facts;
   }
-  const language = typeof parsed.language === 'string' ? parsed.language : t('desktop.value.unset');
-  const reviewers = Array.isArray(parsed.reviewers) ? parsed.reviewers.length : 0;
-  const providers = Array.isArray(parsed.providers) ? parsed.providers.length : 0;
-  appendMetric(facts, t('desktop.config.language'), language);
-  appendMetric(facts, t('desktop.config.reviewers'), String(reviewers));
-  appendMetric(facts, t('desktop.config.providers'), String(providers));
-  appendMetric(facts, t('desktop.config.validation'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'ca-warn' : 'ca-good');
+  const mode = typeof parsed.mode === 'string' ? parsed.mode : t('desktop.value.unset');
+  const reviewers = reviewerCountLabel(parsed.reviewers);
+  const supporters = supporterCount(parsed.supporters);
+  const finalJudge = agentLabel((parsed.head as Record<string, unknown> | undefined) ?? parsed.moderator);
+  appendMetric(facts, t('desktop.config.policyStatus'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'ca-warn' : 'ca-good');
+  appendMetric(facts, t('desktop.config.reviewMode'), mode);
+  appendMetric(facts, t('desktop.config.reviewDepth'), t('desktop.config.reviewDepthValue', { reviewers, supporters }));
+  appendMetric(facts, t('desktop.config.finalJudge'), finalJudge);
   return facts;
+}
+
+function reviewerCountLabel(value: unknown): string {
+  if (Array.isArray(value)) return String(value.filter((entry) => isEnabledConfigEntry(entry)).length);
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const count = (value as { count?: unknown }).count;
+    return typeof count === 'number' ? String(count) : t('desktop.value.unknown');
+  }
+  return t('desktop.value.unknown');
+}
+
+function supporterCount(value: unknown): string {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return '0';
+  const supporters = value as { pool?: unknown; devilsAdvocate?: unknown };
+  const pool = Array.isArray(supporters.pool) ? supporters.pool.filter((entry) => isEnabledConfigEntry(entry)).length : 0;
+  return String(pool + (supporters.devilsAdvocate ? 1 : 0));
+}
+
+function isEnabledConfigEntry(value: unknown): boolean {
+  return typeof value !== 'object' || value === null || Array.isArray(value)
+    ? true
+    : (value as { enabled?: unknown }).enabled !== false;
+}
+
+function agentLabel(value: unknown): string {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return t('desktop.value.unknown');
+  const agent = value as { backend?: unknown; provider?: unknown; model?: unknown; enabled?: unknown };
+  if (agent.enabled === false) return t('desktop.value.disabled');
+  const provider = typeof agent.provider === 'string' ? agent.provider : undefined;
+  const backend = typeof agent.backend === 'string' ? agent.backend : undefined;
+  const model = typeof agent.model === 'string' ? agent.model : undefined;
+  return [provider ?? backend, model].filter(Boolean).join(' / ') || t('desktop.value.unknown');
 }
 
 function renderSetup(): HTMLElement {
@@ -1770,11 +2128,13 @@ function renderSetup(): HTMLElement {
   copy.append(el('span', 'ca-eyebrow', t('desktop.setup.eyebrow')));
   copy.append(el('h2', '', t('desktop.setup.title')));
   copy.append(el('p', '', t('desktop.setup.body')));
-  copy.append(el('p', 'ca-shortcut-hint', t('desktop.shortcuts.setup')));
   header.append(copy);
   header.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button', 'button-refresh-setup'));
   panel.append(header);
+  panel.append(renderSetupOverview());
 
+  const providerDetails = el('details', 'ca-integration-section') as HTMLDetailsElement;
+  providerDetails.append(el('summary', '', t('desktop.setup.reviewEngines')));
   const grid = el('div', 'ca-provider-grid');
   for (const provider of state.providers) {
     const card = el('div', provider.configured ? 'ca-provider-card ca-configured ca-checklist-card' : 'ca-provider-card ca-checklist-card');
@@ -1807,10 +2167,11 @@ function renderSetup(): HTMLElement {
     empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button ca-subtle', 'button-refresh-setup-empty'));
     grid.append(empty);
   }
-  panel.append(grid);
+  providerDetails.append(grid);
 
   const providerHint = el('p', 'ca-setup-hint', t('desktop.setup.providerHint'));
-  panel.append(providerHint);
+  providerDetails.append(providerHint);
+  panel.append(providerDetails);
 
   panel.append(renderMcpSetup());
   panel.append(renderGitHubActionSetup());
@@ -1818,9 +2179,48 @@ function renderSetup(): HTMLElement {
   return panel;
 }
 
+function renderSetupOverview(): HTMLElement {
+  const overview = el('section', 'ca-setup-overview');
+  overview.dataset.testid = 'setup-overview';
+  const hasConfiguredProvider = state.providers.some((provider) => provider.configured);
+  const providerKnown = state.providers.length > 0;
+  appendSetupStatusCard(
+    overview,
+    t('desktop.setup.localReview'),
+    hasConfiguredProvider ? t('desktop.value.ready') : providerKnown ? t('desktop.value.optional') : t('desktop.value.unknown'),
+    hasConfiguredProvider ? t('desktop.setup.localReviewReadyBody') : t('desktop.setup.localReviewOptionalBody'),
+    hasConfiguredProvider ? 'good' : 'warn',
+  );
+  const actionReady = Boolean(state.githubActionStatus && state.githubActionStatus.codeagoraWorkflowCount > 0);
+  appendSetupStatusCard(
+    overview,
+    t('desktop.setup.prAutomation'),
+    actionReady ? t('desktop.value.ready') : state.githubActionStatus ? t('desktop.value.missing') : t('desktop.value.unknown'),
+    actionReady ? t('desktop.setup.prAutomationReadyBody') : t('desktop.setup.prAutomationMissingBody'),
+    actionReady ? 'good' : 'warn',
+  );
+  const evidenceReady = Boolean(state.evidenceStatus?.hasReleaseEvidence && state.evidenceStatus?.hasEvidenceManifest);
+  appendSetupStatusCard(
+    overview,
+    t('desktop.setup.resultEvidence'),
+    evidenceReady ? t('desktop.value.ready') : state.evidenceStatus ? t('desktop.value.needsFixes') : t('desktop.value.unknown'),
+    evidenceReady ? t('desktop.setup.resultEvidenceReadyBody') : t('desktop.setup.resultEvidenceMissingBody'),
+    evidenceReady ? 'good' : 'warn',
+  );
+  return overview;
+}
+
+function appendSetupStatusCard(parent: HTMLElement, label: string, value: string, body: string, tone: 'good' | 'warn'): void {
+  const card = el('div', `ca-setup-status-card ca-${tone}`);
+  card.append(el('span', 'ca-eyebrow', label));
+  card.append(el('strong', '', value));
+  card.append(el('p', '', body));
+  parent.append(card);
+}
+
 function renderMcpSetup(): HTMLElement {
-  const section = el('section', 'ca-integration-section');
-  section.append(el('h3', '', t('desktop.setup.mcpServer')));
+  const section = el('details', 'ca-integration-section') as HTMLDetailsElement;
+  section.append(el('summary', '', t('desktop.setup.localAutomationDetails')));
   const mcp = state.mcpStatus;
   if (!mcp) {
     section.append(el('p', 'ca-empty', t('desktop.setup.mcpNotLoaded')));
@@ -1843,8 +2243,8 @@ function renderMcpSetup(): HTMLElement {
 }
 
 function renderGitHubActionSetup(): HTMLElement {
-  const section = el('section', 'ca-integration-section');
-  section.append(el('h3', '', t('desktop.setup.githubAction')));
+  const section = el('details', 'ca-integration-section') as HTMLDetailsElement;
+  section.append(el('summary', '', t('desktop.setup.prAutomationDetails')));
   const status = state.githubActionStatus;
   if (!status) {
     section.append(el('p', 'ca-empty', t('desktop.setup.githubActionNotLoaded')));
@@ -1873,8 +2273,8 @@ function renderGitHubActionSetup(): HTMLElement {
 }
 
 function renderEvidenceSetup(): HTMLElement {
-  const section = el('section', 'ca-integration-section');
-  section.append(el('h3', '', t('desktop.setup.releaseEvidence')));
+  const section = el('details', 'ca-integration-section') as HTMLDetailsElement;
+  section.append(el('summary', '', t('desktop.setup.resultEvidenceDetails')));
   const evidence = state.evidenceStatus;
   if (!evidence) {
     section.append(el('p', 'ca-empty', t('desktop.setup.evidenceNotLoaded')));
@@ -2026,7 +2426,6 @@ async function bootstrap(): Promise<void> {
     render();
     void refreshSessions(true);
     void loadRepoInfo();
-    void loadCommandContract();
 
     // Keyboard shortcuts (Tauri context only)
     if (IS_TAURI) {
