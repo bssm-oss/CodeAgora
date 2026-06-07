@@ -124,6 +124,41 @@ struct EvidenceStatus {
     has_evidence_manifest: bool,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorCheck {
+    name: String,
+    status: String,
+    message: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorSummary {
+    pass: usize,
+    fail: usize,
+    warn: usize,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LiveCheckResult {
+    provider: String,
+    model: String,
+    status: String,
+    latency_ms: Option<u64>,
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LiveDoctorStatus {
+    command: String,
+    checks: Vec<DoctorCheck>,
+    summary: DoctorSummary,
+    live_checks: Vec<LiveCheckResult>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RepoInfo {
@@ -625,6 +660,10 @@ fn command_stdout(program: &str, args: &[&str], cwd: &Path) -> Option<String> {
     }
 }
 
+fn command_output(program: &str, args: &[&str], cwd: &Path) -> io::Result<std::process::Output> {
+    Command::new(program).args(args).current_dir(cwd).output()
+}
+
 fn git_stdout(args: &[&str], cwd: &Path) -> Option<String> {
     command_stdout("git", args, cwd)
 }
@@ -777,6 +816,14 @@ fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
             mutates_project: false,
             spawns_process: true,
             notes: "Detects provider environment variables and local CLI backend binaries without exposing secrets.",
+        },
+        DesktopCommandContract {
+            name: "get_live_doctor_status",
+            classification: "read-only",
+            reads_project: true,
+            mutates_project: false,
+            spawns_process: true,
+            notes: "Runs agora doctor --live --json for the selected workspace and returns live provider health.",
         },
         DesktopCommandContract {
             name: "get_mcp_status",
@@ -2154,6 +2201,47 @@ fn validate_config(
     Ok(validate_config_raw(&raw, &root, format))
 }
 
+fn parse_doctor_report(stdout: &str) -> Result<(Vec<DoctorCheck>, DoctorSummary, Vec<LiveCheckResult>), String> {
+    if stdout.trim().is_empty() {
+        return Err("Failed to run agora doctor".to_string());
+    }
+    let parsed: serde_json::Value =
+        serde_json::from_str(stdout).map_err(|e| format!("Failed to parse doctor output: {e}"))?;
+    let checks: Vec<DoctorCheck> = serde_json::from_value(
+        parsed
+            .get("checks")
+            .cloned()
+            .unwrap_or_else(|| serde_json::Value::Array(vec![])),
+    )
+    .map_err(|e| format!("Failed to parse doctor checks: {e}"))?;
+    let summary: DoctorSummary = serde_json::from_value(
+        parsed
+            .get("summary")
+            .cloned()
+            .ok_or_else(|| "Missing doctor summary".to_string())?,
+    )
+    .map_err(|e| format!("Failed to parse doctor summary: {e}"))?;
+    let live_checks: Vec<LiveCheckResult> = serde_json::from_value(
+        parsed
+            .get("liveChecks")
+            .cloned()
+            .unwrap_or_else(|| serde_json::Value::Array(vec![])),
+    )
+    .map_err(|e| format!("Failed to parse live doctor checks: {e}"))?;
+    Ok((checks, summary, live_checks))
+}
+
+fn run_doctor_report(root: &Path, live: bool) -> Result<(Vec<DoctorCheck>, DoctorSummary, Vec<LiveCheckResult>), String> {
+    let args: &[&str] = if live {
+        &["doctor", "--live", "--json"]
+    } else {
+        &["doctor", "--json"]
+    };
+    let output = command_output("agora", args, root).map_err(|error| error.to_string())?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    parse_doctor_report(&stdout)
+}
+
 #[tauri::command]
 fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
     let output = command_stdout(
@@ -2224,6 +2312,18 @@ fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
 }
 
 #[tauri::command]
+fn get_live_doctor_status(state: State<'_, WorkspaceState>) -> Result<LiveDoctorStatus, String> {
+    let root = active_repo_root(&state)?;
+    let (checks, summary, live_checks) = run_doctor_report(&root, true)?;
+    Ok(LiveDoctorStatus {
+        command: "agora doctor --live --json".to_string(),
+        checks,
+        summary,
+        live_checks,
+    })
+}
+
+#[tauri::command]
 fn get_mcp_status() -> Result<McpStatus, String> {
     Ok(mcp_status())
 }
@@ -2284,6 +2384,7 @@ fn main() {
             read_config,
             validate_config,
             get_provider_status,
+            get_live_doctor_status,
             get_mcp_status,
             get_github_action_status,
             get_evidence_status,
@@ -2556,6 +2657,31 @@ mod tests {
             updated
         );
         assert!(!root.join(".ca/config.json.tmp").exists());
+    }
+
+    #[test]
+    fn desktop_app_e2e_parses_live_doctor_report() {
+        let report = r#"{
+  "checks": [
+    { "name": "Node.js version", "status": "pass", "message": "Node.js v22.0.0" }
+  ],
+  "summary": { "pass": 1, "fail": 0, "warn": 1 },
+  "liveChecks": [
+    { "provider": "openai", "model": "gpt-5", "status": "ok", "latencyMs": 42 },
+    { "provider": "anthropic", "model": "claude-4", "status": "timeout", "error": "timeout (10s)" }
+  ]
+}"#;
+        let (checks, summary, live_checks) = parse_doctor_report(report).expect("parse live doctor report");
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].name, "Node.js version");
+        assert_eq!(summary.pass, 1);
+        assert_eq!(summary.fail, 0);
+        assert_eq!(summary.warn, 1);
+        assert_eq!(live_checks.len(), 2);
+        assert_eq!(live_checks[0].provider, "openai");
+        assert_eq!(live_checks[0].status, "ok");
+        assert_eq!(live_checks[0].latency_ms, Some(42));
+        assert_eq!(live_checks[1].status, "timeout");
     }
 
     #[test]

@@ -5,6 +5,7 @@ import {
   getEvidenceStatus,
   exportSession,
   getGitHubActionStatus,
+  getLiveDoctorStatus,
   getMcpStatus,
   getProviderStatus,
   getReviewRun,
@@ -20,6 +21,7 @@ import {
   type ConfigValidation,
   type EvidenceStatus,
   type GitHubActionStatus,
+  type LiveDoctorStatus,
   type McpStatus,
   type NotificationPreferences,
   type ProviderStatus,
@@ -74,6 +76,9 @@ interface AppState {
   configDirty: boolean;
   configOriginal: string;
   providers: ProviderStatus[];
+  liveDoctorStatus?: LiveDoctorStatus;
+  liveDoctorLoading: boolean;
+  liveDoctorError?: string;
   mcpStatus?: McpStatus;
   githubActionStatus?: GitHubActionStatus;
   evidenceStatus?: EvidenceStatus;
@@ -101,6 +106,7 @@ const state: AppState = {
   configDirty: false,
   configOriginal: '',
   providers: [],
+  liveDoctorLoading: false,
   localePreference: loadLocalePreference(),
   themePreference: loadThemePreference(),
   notificationPreferences: loadNotificationPreferences(),
@@ -831,6 +837,8 @@ async function openRepo(path: string): Promise<void> {
     rememberRepoPath(state.repoInfo.path);
     state.selected = undefined;
     state.attentionCount = 0;
+    state.liveDoctorStatus = undefined;
+    state.liveDoctorError = undefined;
     updateBadgeState();
     resetConfigState();
     await refreshSessions(true, true);
@@ -839,6 +847,22 @@ async function openRepo(path: string): Promise<void> {
     state.notice = error instanceof Error ? error.message : String(error);
   } finally {
     state.busy = false;
+    render();
+  }
+}
+
+async function loadLiveDoctorStatus(): Promise<void> {
+  if (state.liveDoctorLoading) return;
+  state.liveDoctorLoading = true;
+  state.liveDoctorError = undefined;
+  render();
+  try {
+    state.liveDoctorStatus = await getLiveDoctorStatus();
+  } catch (error) {
+    state.liveDoctorStatus = undefined;
+    state.liveDoctorError = error instanceof Error ? error.message : String(error);
+  } finally {
+    state.liveDoctorLoading = false;
     render();
   }
 }
@@ -2172,6 +2196,7 @@ function renderSetup(): HTMLElement {
   const providerHint = el('p', 'ca-setup-hint', t('desktop.setup.providerHint'));
   providerDetails.append(providerHint);
   panel.append(providerDetails);
+  panel.append(renderLiveDoctorSetup());
 
   panel.append(renderMcpSetup());
   panel.append(renderGitHubActionSetup());
@@ -2207,15 +2232,107 @@ function renderSetupOverview(): HTMLElement {
     evidenceReady ? t('desktop.setup.resultEvidenceReadyBody') : t('desktop.setup.resultEvidenceMissingBody'),
     evidenceReady ? 'good' : 'warn',
   );
+  const live = state.liveDoctorStatus;
+  const liveChecks = live?.liveChecks ?? [];
+  const liveOk = liveChecks.filter((check) => check.status === 'ok').length;
+  const liveFailed = liveChecks.filter((check) => check.status !== 'ok').length;
+  const liveError = state.liveDoctorError;
+  appendSetupStatusCard(
+    overview,
+    t('desktop.setup.liveReview'),
+    live
+      ? liveChecks.length > 0
+        ? `${liveOk}/${liveChecks.length} ${t('desktop.value.ready')}`
+        : t('desktop.value.optional')
+      : liveError
+        ? t('desktop.value.needsFixes')
+      : t('desktop.value.unknown'),
+    live
+      ? liveFailed > 0
+        ? t('desktop.setup.liveReviewBlockedBody')
+        : t('desktop.setup.liveReviewReadyBody')
+      : liveError
+        ? liveError
+      : t('desktop.setup.liveReviewMissingBody'),
+    live ? (liveFailed > 0 ? 'danger' : 'good') : liveError ? 'danger' : 'warn',
+  );
   return overview;
 }
 
-function appendSetupStatusCard(parent: HTMLElement, label: string, value: string, body: string, tone: 'good' | 'warn'): void {
+function appendSetupStatusCard(parent: HTMLElement, label: string, value: string, body: string, tone: 'good' | 'warn' | 'danger'): void {
   const card = el('div', `ca-setup-status-card ca-${tone}`);
   card.append(el('span', 'ca-eyebrow', label));
   card.append(el('strong', '', value));
   card.append(el('p', '', body));
   parent.append(card);
+}
+
+function renderLiveDoctorSetup(): HTMLElement {
+  const section = el('details', 'ca-integration-section') as HTMLDetailsElement;
+  section.append(el('summary', '', t('desktop.setup.liveReviewDetails')));
+
+  const command = el('p', 'ca-repo-note', t('desktop.setup.liveReviewHint'));
+  section.append(command);
+
+  const actionRow = el('div', 'ca-cockpit-actions');
+  const refresh = button(
+    state.liveDoctorLoading ? t('desktop.setup.liveReviewLoading') : t('desktop.setup.liveReviewCheck'),
+    () => void loadLiveDoctorStatus(),
+    'ca-button ca-primary',
+    'button-live-review-check',
+  );
+  refresh.disabled = state.liveDoctorLoading;
+  actionRow.append(refresh);
+  section.append(actionRow);
+
+  if (state.liveDoctorError) {
+    const error = el('p', 'ca-repo-note ca-warn', state.liveDoctorError);
+    section.append(error);
+    return section;
+  }
+
+  const live = state.liveDoctorStatus;
+  if (!live) {
+    section.append(el('p', 'ca-empty', t('desktop.setup.liveReviewNotLoaded')));
+    return section;
+  }
+
+  section.append(el('p', 'ca-repo-note', live.command));
+  section.append(
+    el(
+      'p',
+      'ca-repo-note',
+      t('desktop.setup.liveReviewSummary', {
+        pass: String(live.summary.pass),
+        fail: String(live.summary.fail),
+        warn: String(live.summary.warn),
+      }),
+    ),
+  );
+
+  const checks = el('div', 'ca-provider-grid');
+  if (live.liveChecks.length === 0) {
+    const empty = el('div', 'ca-empty-state ca-compact');
+    empty.append(el('strong', '', t('desktop.setup.liveReviewNoChecks')));
+    empty.append(el('p', '', t('desktop.setup.liveReviewNoChecksBody')));
+    checks.append(empty);
+  } else {
+    for (const check of live.liveChecks) {
+      const tone = check.status === 'ok' ? 'good' : check.status === 'timeout' ? 'warn' : 'danger';
+      const card = el('div', `ca-provider-card ca-${tone} ca-checklist-card`);
+      card.append(el('strong', '', `${check.provider} / ${check.model}`));
+      card.append(el('span', '', check.status === 'ok' ? t('desktop.live.status.ok') : check.status === 'timeout' ? t('desktop.live.status.timeout') : t('desktop.live.status.error')));
+      if (check.latencyMs !== undefined) {
+        card.append(el('span', 'ca-provider-meta', `${check.latencyMs}ms`));
+      }
+      if (check.error) {
+        card.append(el('span', 'ca-provider-meta', check.error));
+      }
+      checks.append(card);
+    }
+  }
+  section.append(checks);
+  return section;
 }
 
 function renderMcpSetup(): HTMLElement {

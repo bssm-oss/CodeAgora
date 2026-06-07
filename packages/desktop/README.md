@@ -32,6 +32,7 @@ The current Tauri bridge exposes an explicit command contract through `get_comma
 | `write_config` | project-mutation | yes | no | Validates JSON and writes atomically to `.ca/config.json`; YAML config writes are read-only for now. |
 | `validate_config` | read-only | no | no | Validates desktop config edits before writes. |
 | `get_provider_status` | read-only | no | yes, `which` only | Detects API-key environment variables and local CLI backend binaries without exposing secret values. |
+| `get_live_doctor_status` | read-only | yes | yes, `agora doctor --live --json` | Runs the actual API connectivity check for the active workspace and returns live provider health. |
 | `get_mcp_status` | read-only | no | no | Reports the MCP server command, advertised tool names, and client config snippet. |
 | `get_github_action_status` | read-only | no | no | Reads workflow files from the active workspace and detects CodeAgora Action setup signals. |
 | `get_evidence_status` | read-only | no | no | Detects release evidence, live benchmark report, and evidence manifest files in the active workspace. |
@@ -56,11 +57,14 @@ pnpm --filter @codeagora/desktop smoke
 pnpm --filter @codeagora/desktop app:e2e
 pnpm --filter @codeagora/desktop macos:webdriver-e2e
 pnpm --filter @codeagora/desktop visual:qa
+pnpm --filter @codeagora/desktop live:review-smoke
 pnpm --filter @codeagora/desktop bundle:smoke
 pnpm --filter @codeagora/desktop evidence
 ```
 
 The shell bridge calls the local `agora` CLI for sessions and reviews. Completed or failed review runs emit an OS desktop notification from the Tauri backend.
+
+The setup screen also exposes a live provider check. Use it to verify whether actual model connectivity is available for the current workspace before you rely on live LLM review.
 
 `dev` launches the real Tauri shell. Use `CODEAGORA_DESKTOP_REPO=/path/to/repo pnpm --filter @codeagora/desktop dev` to force the initial trusted workspace.
 
@@ -92,6 +96,8 @@ Hypothesi currently works well for structure DOM snapshots, console logs, backen
 `macos:webdriver-e2e` builds a debug `.app` bundle with `tauri-webdriver-automation`, then drives that app bundle through `tauri-wd`. The test covers the first-run cockpit, review launch success, review launch failure recovery, config readiness, and setup overview.
 
 `visual:qa` launches a debug Tauri app against a temporary Korean fixture workspace, connects through the Hypothesi MCP bridge, resizes the main window to the target size, captures cockpit and setup screenshots, and fails if primary cockpit controls, metrics, flow steps, decision badges, or session titles clip text or create horizontal page overflow. It writes `.sisyphus/evidence/desktop-visual-qa.json`, `.sisyphus/evidence/desktop-visual-qa-cockpit.png`, and `.sisyphus/evidence/desktop-visual-qa-setup.png`.
+
+`live:review-smoke` builds the CLI, creates a temporary git workspace with the active `.ca` configuration, runs `agora review --staged --json-stream`, and fails unless the command emits a successful result event and writes a review session under `.ca/sessions`.
 
 For RC handoff, run the root gate:
 

@@ -1157,7 +1157,7 @@ summary {
 
 .ca-setup-overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-3);
 }
 
@@ -1179,6 +1179,11 @@ summary {
 .ca-setup-status-card.ca-warn {
   border-color: color-mix(in srgb, var(--warn) 42%, var(--border));
   background: var(--warn-soft);
+}
+
+.ca-setup-status-card.ca-danger {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  background: var(--danger-soft);
 }
 
 .ca-setup-status-card strong {
@@ -1478,6 +1483,21 @@ summary {
 .ca-provider-card.ca-configured {
   border-color: color-mix(in srgb, var(--good) 42%, var(--border));
   background: var(--good-soft);
+}
+
+.ca-provider-card.ca-good {
+  border-color: color-mix(in srgb, var(--good) 42%, var(--border));
+  background: var(--good-soft);
+}
+
+.ca-provider-card.ca-warn {
+  border-color: color-mix(in srgb, var(--warn) 42%, var(--border));
+  background: var(--warn-soft);
+}
+
+.ca-provider-card.ca-danger {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  background: var(--danger-soft);
 }
 
 .ca-provider-kind {

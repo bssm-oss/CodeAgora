@@ -231,7 +231,7 @@ try {
   captureScreenshot(cockpitScreenshotPath);
   await openSetupView();
   const setup = inspectSetupState();
-  for (const expected of ['로컬 리뷰', 'PR 자동화', '결과 증거']) {
+  for (const expected of ['로컬 리뷰', 'PR 자동화', '결과 증거', '실제 LLM 리뷰', '실제 리뷰 연결']) {
     assert(setup.setupText.includes(expected), `Desktop setup overview is missing expected text: ${expected}`);
   }
   for (const forbidden of ['"mcpServers"', 'config-path:', 'codeagora-mcp', 'Failed to run agora doctor']) {
@@ -256,6 +256,7 @@ try {
       'Default surface hides internal command-boundary diagnostics',
       'Acceptance panel rendered with accept-oriented decision copy',
       'Cockpit screenshot captured for first-screen product review',
+      'Live review readiness card rendered with actionable placeholder copy',
       'Setup overview rendered with collapsed internal automation details',
       'No horizontal page overflow at the target viewport',
       'No clipped text among primary controls, metrics, flow steps, decisions, and session titles',

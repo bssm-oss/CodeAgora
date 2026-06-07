@@ -62,6 +62,7 @@ const requiredCommands = [
   'validate_config',
   'write_config',
   'get_provider_status',
+  'get_live_doctor_status',
   'get_mcp_status',
   'get_github_action_status',
   'get_evidence_status',

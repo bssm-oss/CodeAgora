@@ -14,6 +14,7 @@
     "dev": "pnpm tauri:dev",
     "evidence": "pnpm smoke && node scripts/evidence.mjs",
     "app:e2e": "pnpm build && cd src-tauri && cargo test desktop_app_e2e -- --nocapture",
+    "live:review-smoke": "pnpm --filter @codeagora/cli build && node scripts/live-review-smoke.mjs",
     "macos:webdriver-e2e": "pnpm build && tauri build --debug --features webdriver-automation && node scripts/macos-webdriver-e2e.mjs",
     "preview": "pnpm build && echo \"Open packages/desktop/dist/index.html for the browser fallback preview\"",
     "smoke": "pnpm build && node scripts/smoke.mjs",
