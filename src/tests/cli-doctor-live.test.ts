@@ -3,8 +3,11 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runLiveHealthCheck, formatLiveCheckReport } from '@codeagora/cli/commands/doctor.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import os from 'os';
+import fs from 'fs/promises';
+import path from 'path';
+import { runLiveHealthCheck, runDoctorWithLive, formatLiveCheckReport, formatDoctorReport, type LiveCheckResult } from '@codeagora/cli/commands/doctor.js';
 import type { Config } from '@codeagora/core/types/config.js';
 
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -12,8 +15,24 @@ const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 // Mock provider registry
 vi.mock('../../packages/core/src/l1/provider-registry.js', () => ({
   getModel: vi.fn(),
-  getSupportedProviders: vi.fn(() => []),
+  getSupportedProviders: vi.fn(() => ['groq', 'openrouter']),
   clearProviderCache: vi.fn(),
+}));
+
+vi.mock('@codeagora/shared/utils/cli-detect.js', () => ({
+  detectCliBackends: vi.fn(() => Promise.resolve([
+    { backend: 'claude', bin: 'claude', available: false },
+    { backend: 'codex', bin: 'codex', available: false },
+  ])),
+}));
+
+vi.mock('@codeagora/shared/data/models-dev.js', () => ({
+  loadModelsCatalog: vi.fn(() => Promise.resolve({})),
+  getTopModels: vi.fn((_catalog, provider: string) => {
+    if (provider === 'groq') return [{ id: 'llama-3.3-70b-versatile' }];
+    if (provider === 'openrouter') return [{ id: 'z-ai/glm-4.5-air:free' }, { id: 'anthropic/claude-sonnet-4.6' }];
+    return [];
+  }),
 }));
 
 // Mock ai SDK
@@ -22,10 +41,33 @@ vi.mock('ai', () => ({
 }));
 
 import { getModel } from '@codeagora/core/l1/provider-registry.js';
+import { loadModelsCatalog } from '@codeagora/shared/data/models-dev.js';
 import { generateText } from 'ai';
 
 const mockGetModel = vi.mocked(getModel);
+const mockLoadModelsCatalog = vi.mocked(loadModelsCatalog);
 const mockGenerateText = vi.mocked(generateText);
+
+function liveCheck(overrides: Partial<LiveCheckResult> = {}): LiveCheckResult {
+  return { ...baseLiveCheck(), ...overrides };
+}
+
+function baseLiveCheck(): LiveCheckResult {
+  return {
+    provider: 'groq',
+    model: 'llama-3.3-70b-versatile',
+    envVar: 'GROQ_API_KEY',
+    agents: ['reviewer:r1'],
+    status: 'ok' as const,
+    latencyMs: 245,
+  };
+}
+
+async function writeConfig(baseDir: string, config: Config): Promise<void> {
+  const caDir = path.join(baseDir, '.ca');
+  await fs.mkdir(caDir, { recursive: true });
+  await fs.writeFile(path.join(caDir, 'config.json'), JSON.stringify(config, null, 2));
+}
 
 // ============================================================================
 // Minimal valid config fixture
@@ -98,6 +140,7 @@ describe('runLiveHealthCheck()', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetModel.mockReturnValue({ modelId: 'test-model' } as any);
+    mockLoadModelsCatalog.mockResolvedValue({} as any);
   });
 
   it('returns ok status with latencyMs on successful ping', async () => {
@@ -122,6 +165,8 @@ describe('runLiveHealthCheck()', () => {
     expect(results).toHaveLength(1);
     expect(results[0].provider).toBe('groq');
     expect(results[0].model).toBe('llama-3.3-70b-versatile');
+    expect(results[0].envVar).toBe('GROQ_API_KEY');
+    expect(results[0].agents).toEqual(['reviewer:r1']);
     expect(results[0].status).toBe('ok');
     expect(typeof results[0].latencyMs).toBe('number');
   });
@@ -196,6 +241,7 @@ describe('runLiveHealthCheck()', () => {
     const results = await runLiveHealthCheck(config);
     // Should only ping once for groq/llama-3.3-70b-versatile
     expect(results).toHaveLength(1);
+    expect(results[0].agents).toEqual(['reviewer:r1', 'reviewer:r2']);
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
@@ -207,7 +253,7 @@ describe('runLiveHealthCheck()', () => {
         { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
       ],
       supporters: {
-        pool: [],
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
         pickCount: 1,
         pickStrategy: 'random',
         devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
@@ -232,7 +278,7 @@ describe('runLiveHealthCheck()', () => {
         { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
       ],
       supporters: {
-        pool: [],
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
         pickCount: 1,
         pickStrategy: 'random',
         devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
@@ -255,7 +301,7 @@ describe('runLiveHealthCheck()', () => {
         { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
       ],
       supporters: {
-        pool: [],
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
         pickCount: 1,
         pickStrategy: 'random',
         devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
@@ -278,7 +324,7 @@ describe('runLiveHealthCheck()', () => {
         { id: 'r1', model: 'claude-3', backend: 'claude', provider: undefined, timeout: 120, enabled: true },
       ],
       supporters: {
-        pool: [],
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
         pickCount: 1,
         pickStrategy: 'random',
         devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
@@ -307,11 +353,84 @@ describe('runLiveHealthCheck()', () => {
     expect(results.every((r) => r.status === 'ok')).toBe(true);
   });
 
+  it('resolves model:auto to a provider health-check model and records the configured model', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
+
+    const config = makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'auto', backend: 'api', provider: 'groq', timeout: 120, enabled: true },
+      ],
+      supporters: {
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
+    });
+
+    const results = await runLiveHealthCheck(config);
+    expect(results).toHaveLength(1);
+    expect(results[0].configuredModel).toBe('auto');
+    expect(results[0].model).toBe('llama-3.3-70b-versatile');
+  });
+
+  it('uses curated smoke defaults for OpenRouter auto instead of the cheapest catalog entry', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
+
+    const config = makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'auto', backend: 'api', provider: 'openrouter', timeout: 120, enabled: true },
+      ],
+      supporters: {
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
+    });
+
+    const results = await runLiveHealthCheck(config);
+    expect(results).toHaveLength(1);
+    expect(results[0].configuredModel).toBe('auto');
+    expect(results[0].model).toBe('anthropic/claude-sonnet-4.6');
+  });
+
+  it('keeps static smoke defaults when the model catalog cannot load', async () => {
+    mockLoadModelsCatalog.mockRejectedValueOnce(new Error('catalog unavailable'));
+    mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
+
+    const config = makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'auto', backend: 'api', provider: 'openrouter', timeout: 120, enabled: true },
+      ],
+      supporters: {
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
+    });
+
+    const results = await runLiveHealthCheck(config);
+    expect(results).toHaveLength(1);
+    expect(results[0].configuredModel).toBe('auto');
+    expect(results[0].model).toBe('anthropic/claude-sonnet-4.6');
+  });
+
   it('returns empty array when no enabled api-backend agents exist', async () => {
     const config = makeConfig({
       reviewers: [],
       supporters: {
-        pool: [],
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
         pickCount: 1,
         pickStrategy: 'random',
         devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
@@ -326,6 +445,91 @@ describe('runLiveHealthCheck()', () => {
   });
 });
 
+describe('runDoctorWithLive()', () => {
+  let tmpDir: string;
+  let savedGroq: string | undefined;
+  let savedOpenRouter: string | undefined;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-doctor-live-'));
+    savedGroq = process.env['GROQ_API_KEY'];
+    savedOpenRouter = process.env['OPENROUTER_API_KEY'];
+    process.env['GROQ_API_KEY'] = 'gsk_test_key_for_live_doctor';
+    delete process.env['OPENROUTER_API_KEY'];
+    vi.clearAllMocks();
+    mockGetModel.mockReturnValue({ modelId: 'test-model' } as any);
+  });
+
+  afterEach(async () => {
+    if (savedGroq === undefined) {
+      delete process.env['GROQ_API_KEY'];
+    } else {
+      process.env['GROQ_API_KEY'] = savedGroq;
+    }
+    if (savedOpenRouter === undefined) {
+      delete process.env['OPENROUTER_API_KEY'];
+    } else {
+      process.env['OPENROUTER_API_KEY'] = savedOpenRouter;
+    }
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('adds live API health to doctor summary when live checks pass', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
+    await writeConfig(tmpDir, makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: true },
+      ],
+      supporters: {
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'api', model: 'llama-3.3-70b-versatile', provider: 'groq' },
+    }));
+
+    const result = await runDoctorWithLive(tmpDir);
+    const liveHealth = result.checks.find((check) => check.name === 'Live API health');
+
+    expect(liveHealth?.status).toBe('pass');
+    expect(result.liveChecks).toHaveLength(1);
+    expect(result.liveChecks?.[0].agents).toContain('reviewer:r1');
+    expect(result.liveChecks?.[0].agents).toContain('moderator');
+    expect(result.summary.fail).toBe(0);
+  });
+
+  it('turns live API errors into blocking doctor checks with redacted messages', async () => {
+    mockGenerateText.mockRejectedValue(new Error('authentication failed for sk-1234567890secret'));
+    await writeConfig(tmpDir, makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: true },
+      ],
+      supporters: {
+        pool: [{ id: 's1', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false }],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'api', model: 'llama-3.3-70b-versatile', provider: 'groq' },
+    }));
+
+    const result = await runDoctorWithLive(tmpDir);
+    const liveHealth = result.checks.find((check) => check.name === 'Live API health');
+    const report = stripAnsi(formatDoctorReport(result));
+
+    expect(liveHealth?.status).toBe('fail');
+    expect(result.summary.fail).toBeGreaterThan(0);
+    expect(result.liveChecks?.[0].error).toContain('[REDACTED]');
+    expect(result.liveChecks?.[0].error).not.toContain('sk-1234567890secret');
+    expect(report).toContain('Fix the live provider errors above');
+  });
+});
+
 // ============================================================================
 // formatLiveCheckReport
 // ============================================================================
@@ -333,8 +537,14 @@ describe('runLiveHealthCheck()', () => {
 describe('formatLiveCheckReport()', () => {
   it('contains provider names in output', () => {
     const checks = [
-      { provider: 'groq', model: 'llama-3.3-70b-versatile', status: 'ok' as const, latencyMs: 245 },
-      { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6', status: 'ok' as const, latencyMs: 380 },
+      liveCheck(),
+      liveCheck({
+        provider: 'openrouter',
+        model: 'anthropic/claude-sonnet-4.6',
+        envVar: 'OPENROUTER_API_KEY',
+        agents: ['head'],
+        latencyMs: 380,
+      }),
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('groq/llama-3.3-70b-versatile');
@@ -343,15 +553,37 @@ describe('formatLiveCheckReport()', () => {
 
   it('contains latency for ok checks', () => {
     const checks = [
-      { provider: 'groq', model: 'llama-3.3-70b-versatile', status: 'ok' as const, latencyMs: 245 },
+      liveCheck({ latencyMs: 245 }),
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('245ms');
   });
 
+  it('contains env var and configured agent labels', () => {
+    const output = stripAnsi(formatLiveCheckReport([
+      liveCheck({ envVar: 'GROQ_API_KEY', agents: ['reviewer:r1', 'moderator'] }),
+    ]));
+    expect(output).toContain('GROQ_API_KEY');
+    expect(output).toContain('used by reviewer:r1, moderator');
+  });
+
+  it('shows configured auto model when a health-check model was substituted', () => {
+    const output = stripAnsi(formatLiveCheckReport([
+      liveCheck({ configuredModel: 'auto', model: 'llama-3.3-70b-versatile' }),
+    ]));
+    expect(output).toContain('configured=auto');
+  });
+
   it('shows timeout for timeout status', () => {
     const checks = [
-      { provider: 'mistral', model: 'mistral-large', status: 'timeout' as const, latencyMs: 10000, error: 'timeout (10s)' },
+      liveCheck({
+        provider: 'mistral',
+        model: 'mistral-large',
+        envVar: 'MISTRAL_API_KEY',
+        status: 'timeout',
+        latencyMs: 10000,
+        error: 'timeout (10s)',
+      }),
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('timeout');
@@ -360,7 +592,7 @@ describe('formatLiveCheckReport()', () => {
 
   it('shows error message for error status', () => {
     const checks = [
-      { provider: 'groq', model: 'bad-model', status: 'error' as const, error: 'model not found' },
+      liveCheck({ model: 'bad-model', status: 'error', error: 'model not found' }),
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('model not found');
@@ -368,8 +600,15 @@ describe('formatLiveCheckReport()', () => {
 
   it('includes summary line with passed/failed counts', () => {
     const checks = [
-      { provider: 'groq', model: 'llama', status: 'ok' as const, latencyMs: 100 },
-      { provider: 'mistral', model: 'large', status: 'timeout' as const, error: 'timeout (10s)' },
+      liveCheck({ model: 'llama', latencyMs: 100 }),
+      liveCheck({
+        provider: 'mistral',
+        model: 'large',
+        envVar: 'MISTRAL_API_KEY',
+        agents: ['head'],
+        status: 'timeout',
+        error: 'timeout (10s)',
+      }),
     ];
     const output = stripAnsi(formatLiveCheckReport(checks));
     expect(output).toContain('1 passed');
@@ -378,8 +617,8 @@ describe('formatLiveCheckReport()', () => {
 
   it('shows ✓ for ok and ✗ for failed', () => {
     const checks = [
-      { provider: 'groq', model: 'llama', status: 'ok' as const, latencyMs: 100 },
-      { provider: 'bad', model: 'model', status: 'error' as const, error: 'fail' },
+      liveCheck({ model: 'llama', latencyMs: 100 }),
+      liveCheck({ provider: 'bad', model: 'model', envVar: 'BAD_API_KEY', status: 'error', error: 'fail' }),
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('✓');

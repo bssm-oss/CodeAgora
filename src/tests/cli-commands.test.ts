@@ -374,7 +374,7 @@ describe('formatDoctorReport()', () => {
     };
 
     const report = stripAnsi(formatDoctorReport(result));
-    expect(report).toContain('Set an API key if you want API-backed reviews');
+    expect(report).toContain('agora env set openrouter <api-key>');
     expect(report).toContain('agora doctor --live');
   });
 });

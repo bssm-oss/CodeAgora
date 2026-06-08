@@ -30,7 +30,7 @@ import { registerResearchCommand } from './commands/research.js';
 import { addHelpExamples } from './commands/help-text.js';
 
 // Command logic imports (for simple inline wiring)
-import { runDoctor, formatDoctorReport, runLiveHealthCheck } from './commands/doctor.js';
+import { runDoctor, runDoctorWithLive, formatDoctorReport } from './commands/doctor.js';
 import { listProviders, formatProviderList } from './commands/providers.js';
 import { getModelLeaderboard, formatLeaderboard } from './commands/models.js';
 import { explainSession } from './commands/explain.js';
@@ -41,6 +41,7 @@ import { getCostSummary } from './commands/costs.js';
 import { getStatus } from './commands/status.js';
 import { setConfigValue, editConfig } from './commands/config-set.js';
 import { testProviders, formatProviderTestResults } from './commands/providers-test.js';
+import { formatEnvironmentCredentials, formatEnvSetResult, listEnvironmentCredentials, setEnvironmentCredential } from './commands/env.js';
 
 // Load API keys from ~/.config/codeagora/credentials
 await loadCredentials();
@@ -161,15 +162,9 @@ program.command('doctor').description('Check environment and configuration')
   .option('--json', 'output JSON', false)
   .action(async (options: { live: boolean; json: boolean }) => {
     try {
-      const result = await runDoctor(process.cwd());
-      if (options.live) {
-        try {
-          const config = await loadConfig();
-          result.liveChecks = await runLiveHealthCheck(config);
-        } catch (liveErr) {
-          console.error('Live check failed:', liveErr instanceof Error ? liveErr.message : liveErr);
-        }
-      }
+      const result = options.live
+        ? await runDoctorWithLive(process.cwd())
+        : await runDoctor(process.cwd());
       if (options.json) {
         console.log(JSON.stringify(result));
       } else {
@@ -189,6 +184,27 @@ program.command('providers').description('List supported providers and API key s
   try { cliBackends = await detectCliBackends(); } catch { /* optional */ }
   console.log(formatProviderList(listProviders(catalog), cliBackends));
 });
+
+const envCommand = program.command('env').description('Manage CodeAgora API keys');
+envCommand.action(() => {
+  console.log(formatEnvironmentCredentials(listEnvironmentCredentials()));
+});
+envCommand
+  .command('set <provider-or-env> [api-key]')
+  .description('Save an API key to the CodeAgora credential store')
+  .option('--stdin', 'read API key from stdin', false)
+  .action(async (target: string, apiKey: string | undefined, options: { stdin: boolean }) => {
+    try {
+      const value = options.stdin ? await readStdinText() : apiKey;
+      if (!value) {
+        throw new Error('API key is required. Example: agora env set openrouter sk-or-...');
+      }
+      console.log(formatEnvSetResult(await setEnvironmentCredential(target, value)));
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
 
 program.command('models').description('Show model performance leaderboard').action(async () => {
   try {
@@ -341,6 +357,7 @@ program.action(() => {
   console.log(`    ${b}agora review --quick${r}    ${d}Fast review (L1 only)${r}`);
   console.log(`    ${b}agora review --verbose${r}  ${d}Show full issue details${r}`);
   console.log(`    ${b}agora providers${r}         ${d}Show available providers${r}`);
+  console.log(`    ${b}agora env${r}               ${d}Manage API keys${r}`);
   console.log(`    ${b}agora doctor${r}            ${d}Check setup health${r}`);
   console.log(`    ${b}agora language${r}          ${d}Switch language (en/ko)${r}\n`);
   console.log(`  ${y}Free tier:${r} ${d}Groq can run low-cost/free API-backed reviews${r}`);
