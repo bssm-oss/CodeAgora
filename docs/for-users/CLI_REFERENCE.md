@@ -39,7 +39,7 @@ agora review --fail-on-reject                # Exit 1 on REJECT
 | `--pr <url-or-number>` | GitHub PR URL or number | — |
 | `--post-review` | Post comments back to PR (requires `--pr`) | — |
 | `--post-results` | Enable PR comment/status posting for GitHub Action parity; implied by `--post-review` | `false` |
-| `--dry-run` | Validate config only | — |
+| `--dry-run` | Readiness preflight with ready/blocked/risky guidance | — |
 | `--quiet` | Suppress progress output | — |
 | `--verbose` | Show detailed info | — |
 
@@ -55,6 +55,8 @@ agora review --fail-on-reject                # Exit 1 on REJECT
 `--output json` and `--json-stream` use the stable agent contract documented in [Agent Contract](../for-agents/AGENT_CONTRACT.md). JSON result objects include `schemaVersion: "codeagora.review.v1"`; NDJSON stream lines include a `type` discriminator (`progress` or `result`). Presentation formats such as `text`, `md`, `github`, `html`, `junit`, and `sarif` remain beta-changing renderers, not stable machine contracts.
 
 For Action-specific inputs, posting behavior, degraded/skipped outputs, and exit semantics, see [GitHub Actions setup](GITHUB_ACTIONS_SETUP.md) and [GitHub integration spec](5_GITHUB_INTEGRATION.md).
+
+`--dry-run` is the canonical preflight: use it to see whether review is ready, blocked, or risky before spending provider calls. When it is blocked or risky, the output includes the next command or fix to try.
 
 ## `agora init`
 

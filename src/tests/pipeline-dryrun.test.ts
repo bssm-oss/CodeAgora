@@ -364,6 +364,52 @@ describe('formatDryRunText', () => {
     expect(text).toContain('Run `agora review --staged` or repeat the same review command with this diff.');
   });
 
+  it('unknown provider shows provider-mapping guidance even without warnings', async () => {
+    process.env.GROQ_API_KEY = 'key1';
+    process.env.GOOGLE_API_KEY = 'key2';
+    process.env.MISTRAL_API_KEY = 'key3';
+
+    const result = await dryRun(makeConfig({
+      reviewers: [
+        {
+          id: 'r1-custom',
+          model: 'custom-model',
+          backend: 'api',
+          provider: 'custom-provider',
+          enabled: true,
+          timeout: 120,
+        },
+      ],
+      supporters: {
+        pool: [],
+        pickCount: 0,
+        pickStrategy: 'random',
+        devilsAdvocate: {
+          id: 'da',
+          model: 'custom-model',
+          backend: 'api',
+          provider: 'custom-provider',
+          enabled: true,
+          timeout: 120,
+        },
+        personaPool: [],
+        personaAssignment: 'random',
+      },
+      moderator: {
+        backend: 'api',
+        model: 'custom-model',
+        provider: 'custom-provider',
+      },
+    }), SAMPLE_DIFF);
+
+    const text = formatDryRunText(result);
+
+    expect(text).toContain('Readiness: RISKY');
+    expect(text).toContain('unknown provider');
+    expect(text).toContain('Check the provider mapping above, then rerun `agora doctor --live`.');
+    expect(text).not.toContain('Review the warnings above, then rerun `agora doctor --live`.');
+  });
+
   it('auto reviewer shows "auto" label in output', async () => {
     const config = makeConfig({
       reviewers: [

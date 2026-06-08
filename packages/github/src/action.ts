@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   const actionPolicy = determineActionPolicy(inputs);
   if (actionPolicy.degraded) {
-    if (actionPolicy.degradedReason && !actionPolicy.shouldRunReview) {
+    if (actionPolicy.degradedReason) {
       setActionDegraded(actionPolicy.degradedReason);
       logActionDiagnostic(
         actionPolicy.shouldRunReview ? 'Running in degraded mode' : 'Review skipped',

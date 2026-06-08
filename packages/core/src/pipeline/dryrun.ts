@@ -82,14 +82,19 @@ export function formatDryRunNextSteps(result: DryRunResult): string[] {
   const readiness = classifyDryRunReadiness(result);
   if (readiness === 'blocked') {
     return [
-      'Set the missing provider API keys above, then rerun `agora doctor` and `agora review --dry-run`.',
+      'Set the missing provider API keys above, then rerun `agora doctor --live` and `agora review --dry-run`.',
     ];
   }
   if (readiness === 'risky') {
-    return [
-      'Review the warnings above, then rerun `agora doctor --live`.',
-      'If the workspace still looks good, run `agora review --staged` or repeat the same review command.',
-    ];
+    const nextSteps: string[] = [];
+    if (result.health.some((item) => item.status === 'unknown')) {
+      nextSteps.push('Check the provider mapping above, then rerun `agora doctor --live`.');
+    }
+    if (result.warnings.length > 0) {
+      nextSteps.push('Review the warnings above, then rerun `agora doctor --live`.');
+    }
+    nextSteps.push('If the workspace still looks good, run `agora review --staged` or repeat the same review command.');
+    return nextSteps;
   }
   return [
     'Run `agora review --staged` or repeat the same review command with this diff.',

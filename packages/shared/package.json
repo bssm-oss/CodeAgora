@@ -1,6 +1,6 @@
 {
   "name": "@codeagora/shared",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.0-rc.6",
   "type": "module",
   "main": "./dist/index.js",
   "exports": {

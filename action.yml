@@ -7,7 +7,8 @@ name: CodeAgora Review
 #   (examples: missing credentials, diff too large, posting failures, stale PR head). Runtime
 #   logs and the job summary include the matching reason plus next-step guidance. Loading the
 #   repository config uses a default path; failures to load the config are surfaced via degraded
-#   outputs but do not change input precedence (CLI > env > default).
+#   outputs but do not change input precedence (CLI > env > default). When review posting is
+#   disabled, the run still executes but is marked degraded.
 #
 description: Multi-agent debate-driven code review for pull requests
 
@@ -40,7 +41,8 @@ outputs:
   verdict:
     description: >
       Final verdict — ACCEPT, REJECT, NEEDS_HUMAN, or SKIPPED.
-      SKIPPED is returned if the skip label is present or config-path is missing/invalid.
+      SKIPPED is returned if the skip label is present or the run cannot start because
+      required credentials are missing.
     value: ${{ steps.review.outputs.verdict }}
 
   review-url:
@@ -54,7 +56,8 @@ outputs:
   degraded:
     description: >
       Whether the action ran in degraded or skipped mode (true if SKIPPED or degraded).
-      All skip and config-path failures set this to true.
+      Disabled posting, missing credentials, diff limits, stale heads, config failures, and
+      posting failures set this to true.
     value: ${{ steps.review.outputs.degraded }}
 
   degraded-reason:

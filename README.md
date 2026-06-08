@@ -22,7 +22,7 @@ agora init
 git diff | agora review
 ```
 
-Current release: `0.1.0-rc.5`.
+Current release: `0.1.0-rc.6`.
 
 ## Why CodeAgora
 
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: bssm-oss/CodeAgora@v0.1.0-rc.5
+      - uses: bssm-oss/CodeAgora@v0.1.0-rc.6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
