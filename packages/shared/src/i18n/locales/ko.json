@@ -194,7 +194,7 @@
   "cli.init.created": "설정 파일이 {path}에 생성되었습니다",
   "cli.init.preset.quick": "빠른 리뷰 (Groq만 사용)",
   "cli.init.preset.thorough": "심층 리뷰 (멀티 프로바이더)",
-  "cli.init.preset.free": "무료 리뷰 (Groq + GitHub Models)",
+  "cli.init.preset.free": "무료 리뷰 (Groq)",
   "cli.init.healthCheck": "프로바이더 연결을 확인하는 중...",
   "cli.costs.total": "총 비용",
   "cli.costs.sessions": "세션 수",

@@ -47,9 +47,9 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
       pool: [
         {
           id: 's1',
-          model: 'gemini-pro',
+          model: 'anthropic/claude-sonnet-4.6',
           backend: 'api',
-          provider: 'google',
+          provider: 'openrouter',
           timeout: 120,
           enabled: true,
         },
@@ -199,6 +199,54 @@ describe('runLiveHealthCheck()', () => {
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
+  it('includes enabled head agent in live checks', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
+
+    const config = makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+      ],
+      supporters: {
+        pool: [],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
+      head: { backend: 'api', provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6', timeout: 120, enabled: true },
+    });
+
+    const results = await runLiveHealthCheck(config);
+    expect(results).toHaveLength(1);
+    expect(results[0].provider).toBe('openrouter');
+    expect(results[0].model).toBe('anthropic/claude-sonnet-4.6');
+  });
+
+  it('skips disabled head agent', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
+
+    const config = makeConfig({
+      reviewers: [
+        { id: 'r1', model: 'llama-3.3-70b-versatile', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+      ],
+      supporters: {
+        pool: [],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: { id: 'da', model: 'x', backend: 'api', provider: 'groq', timeout: 120, enabled: false },
+        personaPool: ['critic'],
+        personaAssignment: 'random',
+      },
+      moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
+      head: { backend: 'api', provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6', timeout: 120, enabled: false },
+    });
+
+    const results = await runLiveHealthCheck(config);
+    expect(results).toHaveLength(0);
+  });
+
   it('skips disabled agents', async () => {
     mockGenerateText.mockResolvedValue({ text: 'OK' } as any);
 
@@ -286,11 +334,11 @@ describe('formatLiveCheckReport()', () => {
   it('contains provider names in output', () => {
     const checks = [
       { provider: 'groq', model: 'llama-3.3-70b-versatile', status: 'ok' as const, latencyMs: 245 },
-      { provider: 'google', model: 'gemini-pro', status: 'ok' as const, latencyMs: 380 },
+      { provider: 'openrouter', model: 'anthropic/claude-sonnet-4.6', status: 'ok' as const, latencyMs: 380 },
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('groq/llama-3.3-70b-versatile');
-    expect(output).toContain('google/gemini-pro');
+    expect(output).toContain('openrouter/anthropic/claude-sonnet-4.6');
   });
 
   it('contains latency for ok checks', () => {

@@ -72,9 +72,12 @@ agora init --ci             # Also create beta GitHub Actions workflow
 agora init --force          # Overwrite existing
 ```
 
+Interactive first-run setup accepts either a raw provider key or `ENV_VAR=value`.
+For example, paste `OPENROUTER_API_KEY=...` to save that credential and create an OpenRouter starter config.
+
 ## `agora doctor`
 
-Health check — Node.js version, config validity, API keys.
+Health check — Node.js version, config validity, configured API credentials, configured CLI backends, and overall review readiness.
 
 ```bash
 agora doctor          # Basic checks

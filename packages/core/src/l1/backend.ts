@@ -154,46 +154,22 @@ function buildCommand(input: BackendInput): CliCommand {
         args: ['-s', '--allow-all', '--model', validateArg(model, 'model')],
         useStdin: true,
       };
-    case 'aider':
-      return {
-        bin: 'aider',
-        args: ['--yes-always', '--no-auto-commits'],
-        useStdin: true,
-      };
-    case 'goose':
-      return {
-        bin: 'goose',
-        args: ['run', '--no-session'],
-        useStdin: true,
-      };
-    case 'cline':
-      return {
-        bin: 'cline',
-        args: ['-y'],
-        useStdin: true,
-      };
-    case 'qwen-code':
-      return {
-        bin: 'qwen',
-        args: [],
-        useStdin: true,
-      };
-    case 'vibe':
-      return {
-        bin: 'vibe',
-        args: [],
-        useStdin: true,
-      };
-    case 'kiro':
-      return {
-        bin: 'kiro-cli',
-        args: ['chat', '--no-interactive', '--trust-all-tools'],
-        useStdin: true,
-      };
     case 'cursor':
       return {
         bin: 'agent',
         args: [],
+        useStdin: true,
+      };
+    case 'antigravity':
+      return {
+        bin: 'agy',
+        args: ['-p', '--model', validateArg(model, 'model')],
+        useStdin: true,
+      };
+    case 'pi':
+      return {
+        bin: 'pi',
+        args: ['-p', '--model', validateArg(model, 'model')],
         useStdin: true,
       };
     default:

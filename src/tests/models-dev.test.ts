@@ -189,43 +189,18 @@ describe('ModelsCatalogSchema', () => {
 // ---------------------------------------------------------------------------
 
 describe('PROVIDER_ID_MAP', () => {
-  it('should have 6 mapped provider IDs', () => {
-    expect(Object.keys(PROVIDER_ID_MAP)).toHaveLength(6);
-  });
-
-  it('should map nvidia-nim to nvidia', () => {
-    expect(PROVIDER_ID_MAP['nvidia-nim']).toBe('nvidia');
-  });
-
-  it('should map together to togetherai', () => {
-    expect(PROVIDER_ID_MAP['together']).toBe('togetherai');
-  });
-
-  it('should map qwen to alibaba', () => {
-    expect(PROVIDER_ID_MAP['qwen']).toBe('alibaba');
+  it('should not require aliases for the curated provider IDs', () => {
+    expect(PROVIDER_ID_MAP).toEqual({});
   });
 });
 
 describe('toModelsDevId', () => {
-  it('should map nvidia-nim to nvidia', () => {
-    expect(toModelsDevId('nvidia-nim')).toBe('nvidia');
-  });
-
-  it('should map together to togetherai', () => {
-    expect(toModelsDevId('together')).toBe('togetherai');
-  });
-
-  it('should map qwen to alibaba', () => {
-    expect(toModelsDevId('qwen')).toBe('alibaba');
-  });
-
   it('should pass through unmapped provider IDs', () => {
     expect(toModelsDevId('groq')).toBe('groq');
     expect(toModelsDevId('openai')).toBe('openai');
     expect(toModelsDevId('anthropic')).toBe('anthropic');
-    expect(toModelsDevId('google')).toBe('google');
-    expect(toModelsDevId('mistral')).toBe('mistral');
-    expect(toModelsDevId('xai')).toBe('xai');
+    expect(toModelsDevId('openrouter')).toBe('openrouter');
+    expect(toModelsDevId('opencode-go')).toBe('opencode-go');
   });
 
   it('should pass through unknown provider IDs', () => {
@@ -234,18 +209,6 @@ describe('toModelsDevId', () => {
 });
 
 describe('fromModelsDevId', () => {
-  it('should reverse-map nvidia to nvidia-nim', () => {
-    expect(fromModelsDevId('nvidia')).toBe('nvidia-nim');
-  });
-
-  it('should reverse-map togetherai to together', () => {
-    expect(fromModelsDevId('togetherai')).toBe('together');
-  });
-
-  it('should reverse-map alibaba to qwen', () => {
-    expect(fromModelsDevId('alibaba')).toBe('qwen');
-  });
-
   it('should pass through unmapped models.dev IDs', () => {
     expect(fromModelsDevId('groq')).toBe('groq');
     expect(fromModelsDevId('openai')).toBe('openai');
@@ -267,27 +230,18 @@ describe('fromModelsDevId', () => {
 describe('SUPPORTED_PROVIDER_IDS', () => {
   it('should include all CodeAgora providers', () => {
     expect(SUPPORTED_PROVIDER_IDS).toContain('groq');
-    expect(SUPPORTED_PROVIDER_IDS).toContain('nvidia-nim');
     expect(SUPPORTED_PROVIDER_IDS).toContain('openai');
     expect(SUPPORTED_PROVIDER_IDS).toContain('anthropic');
+    expect(SUPPORTED_PROVIDER_IDS).toContain('opencode-go');
+    expect(SUPPORTED_PROVIDER_IDS).toContain('opencode-zen');
   });
 
   it('should have correct length matching PROVIDER_ENV_VARS', () => {
-    expect(SUPPORTED_PROVIDER_IDS.length).toBe(24);
+    expect(SUPPORTED_PROVIDER_IDS.length).toBe(6);
   });
 });
 
 describe('SUPPORTED_MODELS_DEV_IDS', () => {
-  it('should map nvidia-nim to nvidia in the list', () => {
-    expect(SUPPORTED_MODELS_DEV_IDS).toContain('nvidia');
-    expect(SUPPORTED_MODELS_DEV_IDS).not.toContain('nvidia-nim');
-  });
-
-  it('should map together to togetherai in the list', () => {
-    expect(SUPPORTED_MODELS_DEV_IDS).toContain('togetherai');
-    expect(SUPPORTED_MODELS_DEV_IDS).not.toContain('together');
-  });
-
   it('should pass through unmapped IDs', () => {
     expect(SUPPORTED_MODELS_DEV_IDS).toContain('groq');
     expect(SUPPORTED_MODELS_DEV_IDS).toContain('openai');
@@ -459,19 +413,18 @@ describe('getTopModels', () => {
     expect(result[1].id).toBe('model-c');
   });
 
-  it('should use toModelsDevId for provider lookup', () => {
+  it('should use provider ID for provider lookup', () => {
     const catalog = makeCatalog({
-      nvidia: makeProvider({
-        id: 'nvidia',
-        name: 'NVIDIA',
+      openrouter: makeProvider({
+        id: 'openrouter',
+        name: 'OpenRouter',
         models: {
           'model-1': makeModel({ id: 'model-1', tool_call: true }),
         },
       }),
     });
 
-    // Use CodeAgora ID "nvidia-nim" which maps to "nvidia"
-    const result = getTopModels(catalog, 'nvidia-nim', 5);
+    const result = getTopModels(catalog, 'openrouter', 5);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('model-1');
   });
@@ -523,19 +476,18 @@ describe('getProviderStats', () => {
     expect(stats.reviewCapable).toBe(2); // free-capable + paid-capable
   });
 
-  it('should use toModelsDevId for provider lookup', () => {
+  it('should use provider ID for stats lookup', () => {
     const catalog = makeCatalog({
-      togetherai: makeProvider({
-        id: 'togetherai',
-        name: 'Together AI',
+      openrouter: makeProvider({
+        id: 'openrouter',
+        name: 'OpenRouter',
         models: {
           'model-1': makeModel({ id: 'model-1' }),
         },
       }),
     });
 
-    // Use CodeAgora ID "together" which maps to "togetherai"
-    const stats = getProviderStats(catalog, 'together');
+    const stats = getProviderStats(catalog, 'openrouter');
     expect(stats.total).toBe(1);
   });
 

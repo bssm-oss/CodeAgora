@@ -10,7 +10,7 @@ Run `agora init` to create a config in `.ca/config.json`.
 2. Set it: `export GROQ_API_KEY=your_key_here`
 3. Verify: `agora doctor`
 
-Provider environment variable names follow the pattern `PROVIDER_API_KEY` (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`). Run `agora providers` to see all supported providers and their required env vars.
+Provider environment variable names follow the pattern `PROVIDER_API_KEY` where possible (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`). Run `agora providers` to see all supported providers and their required env vars.
 
 ### "doctor passes but review fails with API error"
 - Run `agora doctor --live` to test actual API connectivity

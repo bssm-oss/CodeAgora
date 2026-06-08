@@ -194,7 +194,7 @@
   "cli.init.created": "Config created at {path}",
   "cli.init.preset.quick": "Quick review (Groq only)",
   "cli.init.preset.thorough": "Thorough review (multi-provider)",
-  "cli.init.preset.free": "Free review (Groq + GitHub Models)",
+  "cli.init.preset.free": "Free review (Groq)",
   "cli.init.healthCheck": "Checking provider connectivity...",
   "cli.costs.total": "Total",
   "cli.costs.sessions": "Sessions",

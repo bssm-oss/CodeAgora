@@ -343,7 +343,7 @@ program.action(() => {
   console.log(`    ${b}agora providers${r}         ${d}Show available providers${r}`);
   console.log(`    ${b}agora doctor${r}            ${d}Check setup health${r}`);
   console.log(`    ${b}agora language${r}          ${d}Switch language (en/ko)${r}\n`);
-  console.log(`  ${y}Free tier:${r} ${d}Groq + GitHub Models = unlimited free reviews${r}`);
+  console.log(`  ${y}Free tier:${r} ${d}Groq can run low-cost/free API-backed reviews${r}`);
   console.log(`  ${d}Run ${b}agora --help${r}${d} for all commands${r}\n`);
 });
 

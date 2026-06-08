@@ -6,18 +6,14 @@
 import { execFileSync } from 'child_process';
 
 export const CLI_BACKENDS = [
-  { backend: 'aider', bin: 'aider' },
+  { backend: 'antigravity', bin: 'agy' },
   { backend: 'claude', bin: 'claude' },
-  { backend: 'cline', bin: 'cline' },
   { backend: 'codex', bin: 'codex' },
   { backend: 'copilot', bin: 'copilot' },
   { backend: 'cursor', bin: 'agent' },
   { backend: 'gemini', bin: 'gemini' },
-  { backend: 'goose', bin: 'goose' },
-  { backend: 'kiro', bin: 'kiro-cli' },
   { backend: 'opencode', bin: 'opencode' },
-  { backend: 'qwen-code', bin: 'qwen' },
-  { backend: 'vibe', bin: 'vibe' },
+  { backend: 'pi', bin: 'pi' },
 ] as const;
 
 export interface DetectedCli {

@@ -305,6 +305,8 @@ describe('buildEnrichedSection', () => {
       pathRuleNotes: [],
     };
     const result = buildEnrichedSection(ctx);
+    expect(result).toContain('Risk-Focus Pass');
+    expect(result).toContain('AUTH_ACCESS_CONTROL');
     expect(result).toContain('[LOGIC] src/auth.ts');
     expect(result).toContain('[DOCS] README.md');
   });
@@ -371,20 +373,53 @@ describe('buildEnrichedSection', () => {
 
   it('should combine all sections', () => {
     const ctx: EnrichedDiffContext = {
-      fileClassifications: new Map<string, FileClassification>([['src/a.ts', 'logic']]),
+      fileClassifications: new Map<string, FileClassification>([
+        ['src/auth.ts', 'logic'],
+        ['src/payments/ledger.ts', 'logic'],
+      ]),
       tscDiagnostics: [{ file: 'src/a.ts', line: 1, code: 1234, message: 'err' }],
       impactAnalysis: new Map<string, ImpactEntry>([
-        ['foo', { symbol: 'foo', callerCount: 5, importers: [] }],
+        ['persistPayment', { symbol: 'persistPayment', callerCount: 9, importers: [] }],
       ]),
       externalRules: ['[CLAUDE.md] rule1'],
       pathRuleNotes: ['note1'],
     };
     const result = buildEnrichedSection(ctx);
+    expect(result).toContain('Risk-Focus Pass');
     expect(result).toContain('File Classifications');
     expect(result).toContain('TypeScript Diagnostics');
     expect(result).toContain('Change Impact');
     expect(result).toContain('Project Rules');
     expect(result).toContain('Path-Specific Review Notes');
+  });
+
+  it('builds a structured risk-focus pack for auth, security, and data integrity buckets', () => {
+    const ctx: EnrichedDiffContext = {
+      fileClassifications: new Map<string, FileClassification>([
+        ['src/auth/session.ts', 'logic'],
+        ['src/db/payment-ledger.ts', 'logic'],
+        ['src/api/upload.ts', 'logic'],
+      ]),
+      tscDiagnostics: [
+        { file: 'src/auth/session.ts', line: 19, code: 2322, message: 'Token payload can be undefined' },
+      ],
+      impactAnalysis: new Map<string, ImpactEntry>([
+        ['persistPayment', { symbol: 'persistPayment', callerCount: 11, importers: ['src/api/payments.ts'] }],
+        ['executeQuery', { symbol: 'executeQuery', callerCount: 6, importers: ['src/auth/session.ts'] }],
+      ]),
+      externalRules: ['Verify SQL inputs are parameterized and secrets never leak to logs'],
+      pathRuleNotes: ['Review RBAC/permission checks for auth and admin entrypoints'],
+    };
+
+    const result = buildEnrichedSection(ctx);
+
+    expect(result).toContain('## Risk-Focus Pass');
+    expect(result).toContain('AUTH_ACCESS_CONTROL');
+    expect(result).toContain('SECURITY_BOUNDARY');
+    expect(result).toContain('DATA_INTEGRITY');
+    expect(result).toContain('Signals:');
+    expect(result).toContain('touched `src/auth/session.ts`');
+    expect(result).toContain('high-blast export `persistPayment()` with 11 importers');
   });
 });
 

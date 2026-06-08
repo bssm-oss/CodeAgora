@@ -80,12 +80,9 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
 
 export function hasProviderCredentials(
   env: NodeJS.ProcessEnv = process.env,
-  options: { allowGitHubTokenAsProvider?: boolean } = {},
+  _options: { allowGitHubTokenAsProvider?: boolean } = {},
 ): boolean {
-  const allowGitHubToken = options.allowGitHubTokenAsProvider ?? true;
   return Object.values(PROVIDER_ENV_VARS).some((envVar) => {
-    if (envVar === 'GITHUB_TOKEN' && !allowGitHubToken) return false;
-    if (envVar === 'GITHUB_COPILOT_TOKEN') return false;
     return Boolean(env[envVar]);
   });
 }
@@ -110,7 +107,7 @@ export function determineActionPolicy(
     };
   }
 
-  if (!hasProviderCredentials(env, { allowGitHubTokenAsProvider: !fork })) {
+  if (!hasProviderCredentials(env)) {
     return {
       shouldRunReview: false,
       shouldPostResults: false,
@@ -155,16 +152,16 @@ export function getActionGuidance(reason: ActionDegradedReason): ActionGuidance 
       return {
         why: 'The review pipeline cannot start because no provider credential is available.',
         nextSteps: [
-          'Add the provider secret required by your chosen review backend.',
-          'Run the GitHub Models path if you want to avoid external provider secrets.',
+          'Add the provider secret required by your chosen review backend, such as OPENROUTER_API_KEY or GROQ_API_KEY.',
+          'Use a CLI or MCP dry-run locally if you need to inspect the config without provider secrets.',
         ],
       };
     case 'fork-missing-provider-secrets':
       return {
         why: 'Fork PRs cannot read repository secrets, so the review would fail before it starts.',
         nextSteps: [
-          'Use the GitHub Models path for forked pull requests.',
-          'If you need an external provider, run the review from a trusted branch with access to secrets.',
+          'Skip automatic review on untrusted fork PRs.',
+          'Run the review from a trusted branch with access to provider secrets when a maintainer is ready.',
         ],
       };
     case 'posting-disabled':

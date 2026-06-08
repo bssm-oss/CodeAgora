@@ -127,7 +127,7 @@ describe('strictValidateConfig', () => {
   });
 
   // Test 5: valid backends produce no errors
-  it.each(['api', 'codex', 'opencode', 'gemini', 'claude'] as const)(
+  it.each(['api', 'codex', 'opencode', 'gemini', 'claude', 'cursor', 'antigravity', 'pi'] as const)(
     'valid backend %s produces no errors',
     (backend) => {
       // For backends that require provider, supply one

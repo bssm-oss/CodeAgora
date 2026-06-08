@@ -219,6 +219,23 @@ pnpm bench:fn:run -- --results ./bench-out-<name>-smoke \
 pnpm bench:fn -- --results ./bench-out-<name>-smoke
 ```
 
+For category-specific recall work, score the same subset you ran. This avoids
+counting fixtures that were never executed as false negatives:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-<name>-security-smoke \
+  --config benchmarks/.ca/config.<name>.json \
+  --categories held-out-security,cve-shaped,fp-regression \
+  --skip-head
+pnpm bench:fn -- --results ./bench-out-<name>-security-smoke \
+  --categories held-out-security,cve-shaped,fp-regression
+```
+
+Use the security smoke when tuning recall for auth/authz, SSRF, SQL injection,
+tenant/cache, path traversal, webhook signature, secret handling, and clean
+FP-regression behavior. Use fixture IDs for narrower probes when debugging one
+miss at a time.
+
 ### Stage 2: full fixture set
 
 Run full 20-fixture benchmark only for configs that pass smoke:

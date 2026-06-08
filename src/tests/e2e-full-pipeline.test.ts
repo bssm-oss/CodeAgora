@@ -2,18 +2,18 @@
  * E2E Full Pipeline Test — Real API Integration
  *
  * Runs the complete CodeAgora review pipeline (L1 -> L2 -> L3) against real APIs:
- *   - L1 Reviewers: 5x Groq (free tier)
+ *   - L1 Reviewers: Groq or OpenRouter API
  *   - L2 Supporters/Moderator: Claude CLI backend (uses Claude Code)
  *   - L3 Head Verdict: Claude CLI backend (uses Claude Code)
  *   - Input: examples/vulnerable-api/server.ts (intentionally vulnerable code)
  *
  * Requirements:
  *   - CODEAGORA_RUN_LIVE_E2E=1
- *   - GROQ_API_KEY env var set
+ *   - GROQ_API_KEY or OPENROUTER_API_KEY env var set
  *   - `claude` CLI available in PATH (Claude Code)
  *
- * Unless CODEAGORA_RUN_LIVE_E2E=1 is set, or when GROQ_API_KEY is missing
- * or claude CLI is not found, the entire suite is skipped.
+ * Unless CODEAGORA_RUN_LIVE_E2E=1 is set, or when neither provider key is
+ * present, or claude CLI is not found, the entire suite is skipped.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -29,10 +29,12 @@ import { execFileSync } from 'child_process';
 
 const liveE2EEnabled = process.env['CODEAGORA_RUN_LIVE_E2E'] === '1';
 const hasGroq = !!process.env['GROQ_API_KEY'];
+const hasOpenRouter = !!process.env['OPENROUTER_API_KEY'];
+const liveProvider = hasGroq ? 'groq' : hasOpenRouter ? 'openrouter' : null;
 const hasClaude = (() => {
   try { execFileSync('which', ['claude'], { stdio: 'pipe' }); return true; } catch { return false; }
 })();
-const canRun = liveE2EEnabled && hasGroq && hasClaude;
+const canRun = liveE2EEnabled && liveProvider !== null && hasClaude;
 
 const describeFn = canRun ? describe : describe.skip;
 
@@ -66,7 +68,7 @@ async function buildDiff(): Promise<string> {
 // Config for the test
 // ============================================================================
 
-function buildConfig() {
+function buildGroqConfig() {
   return {
     mode: 'strict',
     language: 'en',
@@ -102,6 +104,48 @@ function buildConfig() {
     },
     errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
   };
+}
+
+function buildOpenRouterConfig() {
+  return {
+    mode: 'strict',
+    language: 'en',
+    reviewers: [
+      { id: 'r1', model: 'qwen/qwen3-coder-30b-a3b-instruct', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+      { id: 'r2', model: 'xiaomi/mimo-v2-flash', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+      { id: 'r3', model: 'nvidia/nemotron-3-nano-30b-a3b:nitro', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+      { id: 'r4', model: 'baidu/ernie-4.5-21b-a3b-thinking', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+      { id: 'r5', model: 'tencent/hunyuan-a13b-instruct', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+    ],
+    supporters: {
+      pool: [
+        { id: 's1', model: 'baidu/ernie-4.5-21b-a3b-thinking', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+        { id: 's2', model: 'qwen/qwen3-coder-30b-a3b-instruct', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+      ],
+      pickCount: 2,
+      pickStrategy: 'random',
+      devilsAdvocate: { id: 'da', model: 'deepseek/deepseek-v3.2', backend: 'api', provider: 'openrouter', enabled: true, timeout: 120 },
+      personaPool: ['.ca/personas/strict.md', '.ca/personas/security-focused.md'],
+      personaAssignment: 'random',
+    },
+    moderator: { model: 'deepseek/deepseek-v3.2', backend: 'api', provider: 'openrouter' },
+    head: { model: 'deepseek/deepseek-v3.2', backend: 'api', provider: 'openrouter', enabled: true },
+    discussion: {
+      maxRounds: 3,
+      registrationThreshold: {
+        HARSHLY_CRITICAL: 1,
+        CRITICAL: 1,
+        WARNING: 1,
+        SUGGESTION: null,
+      },
+      codeSnippetRange: 10,
+    },
+    errorHandling: { maxRetries: 2, forfeitThreshold: 0.7 },
+  };
+}
+
+function buildConfig(provider: 'groq' | 'openrouter') {
+  return provider === 'groq' ? buildGroqConfig() : buildOpenRouterConfig();
 }
 
 // ============================================================================
@@ -153,7 +197,7 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
     // Write config
     await fs.writeFile(
       path.join(tmpDir, '.ca', 'config.json'),
-      JSON.stringify(buildConfig(), null, 2),
+      JSON.stringify(buildConfig(liveProvider ?? 'groq'), null, 2),
     );
 
     // Write persona files
@@ -209,13 +253,13 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
       expect(configCheck!.status).toBe('pass');
     }, 30_000);
 
-    it('providers — groq and anthropic API keys detected', async () => {
+    it('providers — live API key and anthropic API detected', async () => {
       const { listProviders } = await import('@codeagora/cli/commands/providers.js');
       const providers = listProviders();
 
-      const groq = providers.find((p) => p.name === 'groq');
-      expect(groq).toBeDefined();
-      expect(groq!.apiKeySet).toBe(true);
+      const live = providers.find((p) => p.name === liveProvider);
+      expect(live).toBeDefined();
+      expect(live!.apiKeySet).toBe(true);
 
       // Claude CLI backend doesn't need an API key — just verify provider exists in list
       const anthropic = providers.find((p) => p.name === 'anthropic');
@@ -268,7 +312,7 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
         noCache: true,
         contextLines: 0,
       });
-    }, 300_000);
+    }, 480_000);
 
     // -- Phase 3: L1 Review --
 
@@ -456,13 +500,13 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
         noCache: true,
         contextLines: 0,
       });
-    }, 180_000);
+    }, 360_000);
 
     afterAll(async () => {
       // Restore full config for subsequent tests
       await fs.writeFile(
         path.join(tmpDir, '.ca', 'config.json'),
-        JSON.stringify(buildConfig(), null, 2),
+        JSON.stringify(buildConfig(liveProvider ?? 'groq'), null, 2),
       );
     });
 
@@ -544,7 +588,7 @@ describeFn('E2E: Full Pipeline with Real APIs', () => {
         noCache: true,
         contextLines: 0,
       });
-    }, 180_000);
+    }, 360_000);
 
     afterAll(async () => {
       // Clean up rules file

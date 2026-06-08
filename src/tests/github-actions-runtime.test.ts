@@ -55,16 +55,18 @@ describe('GitHub Actions runtime readiness', () => {
     execFileSync(process.execPath, ['--check', bundlePath], { stdio: 'pipe' });
   });
 
-  it('uses GitHub Models for live PR and benchmark smoke paths without external provider quota', () => {
+  it('uses retained API providers for live PR and benchmark smoke paths', () => {
     const review = readText('.github/workflows/review.yml');
     const bench = readText('.github/workflows/bench-fn.yml');
 
-    expect(review).toContain('models: read');
-    expect(review).toContain('"provider": "github-models"');
-    expect(review).toContain('"model": "gpt-4o-mini"');
-    expect(bench).toContain('models: read');
-    expect(bench).toContain('config.github-models.json');
-    expect(bench).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(review).not.toContain('models: read');
+    expect(review).toContain('OPENROUTER_API_KEY');
+    expect(review).toContain('GROQ_API_KEY');
+    expect(review).toContain('provider=openrouter');
+    expect(review).toContain('provider=groq');
+    expect(bench).not.toContain('models: read');
+    expect(bench).toContain('config.openrouter-low-cost-5x2.json');
+    expect(bench).toContain('OPENROUTER_API_KEY');
     expect(bench).toContain('BENCH_DELAY_MS');
     expect(bench).toContain('--delay-ms "$BENCH_DELAY_MS"');
   });

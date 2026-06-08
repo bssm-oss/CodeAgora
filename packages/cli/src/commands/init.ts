@@ -363,14 +363,12 @@ export function buildMultiProviderConfig(params: MultiProviderConfigParams): Gen
 // ============================================================================
 
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
+  anthropic: 'claude-sonnet-4-6',
+  openai: 'gpt-4o-mini',
+  openrouter: 'anthropic/claude-sonnet-4.6',
+  'opencode-go': 'deepseek-v4-flash',
+  'opencode-zen': 'gpt-5.4-mini',
   groq: 'llama-3.3-70b-versatile',
-  google: 'gemini-2.0-flash',
-  mistral: 'mistral-large-latest',
-  openrouter: 'meta-llama/llama-3.3-70b-instruct',
-  'nvidia-nim': 'meta/llama-3.1-70b-instruct',
-  cerebras: 'llama3.1-70b',
-  together: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-  xai: 'grok-beta',
 };
 
 // ============================================================================
@@ -400,8 +398,8 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
   },
   {
     id: 'free',
-    label: 'Free review (Groq + GitHub Models)',
-    labelKo: '\uBB34\uB8CC \uB9AC\uBDF0 (Groq + GitHub Models)',
+    label: 'Free review (Groq)',
+    labelKo: '\uBB34\uB8CC \uB9AC\uBDF0 (Groq)',
     providers: ['groq'],
     models: { groq: 'llama-3.3-70b-versatile' },
     reviewerCount: 2,
@@ -417,7 +415,7 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
 /**
  * FREE_PROVIDERS — providers known to offer free models.
  */
-const FREE_PROVIDERS = new Set(['groq', 'cerebras', 'nvidia-nim', 'github-models']);
+const FREE_PROVIDERS = new Set(['groq']);
 
 /**
  * Generate presets dynamically based on detected environment and catalog.
@@ -958,14 +956,14 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
 
     // CLI backend → models.dev provider mapping
     const CLI_TO_PROVIDER: Record<string, string> = {
+      antigravity: 'openrouter',
       claude: 'anthropic',
       codex: 'openai',
       copilot: 'openai',
-      gemini: 'google',
-      aider: 'openai',
-      cline: 'anthropic',
+      gemini: 'openrouter',
       cursor: 'openai',
-      kiro: 'anthropic',
+      opencode: 'openrouter',
+      pi: 'openrouter',
     };
 
     // Per-provider model selection (multiple models per provider for diversity)

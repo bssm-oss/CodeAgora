@@ -10,28 +10,6 @@ import { formatReviewResult, postToGitHub, type OutputFormat } from '../post-act
 import { reviewOptionsSchema, postReviewSchema } from './shared-schema.js';
 import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
 
-const reviewPrInputSchema = z.object({
-  pr_url: z.string()
-    .regex(
-      /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/,
-      'Must be a valid GitHub PR URL: https://github.com/owner/repo/pull/123',
-    )
-    .optional()
-    .describe('GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)'),
-  pr_number: z.number().int().positive().optional()
-    .describe('PR number (auto-detects owner/repo from git remote)'),
-  ...reviewOptionsSchema,
-  ...postReviewSchema,
-}).superRefine((value, ctx) => {
-  if (value.pr_url == null && value.pr_number == null) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Either pr_url or pr_number is required',
-      path: ['pr_url'],
-    });
-  }
-});
-
 /**
  * Resolve a PR URL from either a URL or a number + git remote.
  */
@@ -66,12 +44,32 @@ export function registerReviewPr(server: McpServer): void {
   server.tool(
     'review_pr',
     'Review a GitHub PR — fetches the diff automatically and runs full multi-LLM review. Supports PR URL (https://github.com/owner/repo/pull/123) or just a PR number (auto-detects owner/repo from git remote). Can post results back as PR comments with --post_review.',
-    reviewPrInputSchema,
+    {
+      pr_url: z.string()
+        .regex(
+          /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/,
+          'Must be a valid GitHub PR URL: https://github.com/owner/repo/pull/123',
+        )
+        .optional()
+        .describe('GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)'),
+      pr_number: z.number().int().positive().optional()
+        .describe('PR number (auto-detects owner/repo from git remote)'),
+      ...reviewOptionsSchema,
+      ...postReviewSchema,
+    },
     async (params) => {
       try {
         const repoPath = await resolveRepoPathOrError(params.repo_path);
         if (!repoPath.ok) {
           return mcpErrorResponse(repoPath.error.code, repoPath.error.message, repoPath.error.details);
+        }
+
+        if (params.pr_url == null && params.pr_number == null) {
+          return mcpErrorResponse(
+            'INVALID_INPUT',
+            'Either pr_url or pr_number is required',
+            { pr_url: true, pr_number: true },
+          );
         }
 
         const prUrl = await resolvePrUrl(params.pr_url, params.pr_number, repoPath.repoPath);

@@ -158,8 +158,6 @@ describe('review_pr input schema', () => {
   const schema = z.object({
     pr_url: z.string().optional(),
     pr_number: z.number().int().positive().optional(),
-  }).refine((value) => value.pr_url != null || value.pr_number != null, {
-    message: 'Either pr_url or pr_number is required',
   });
 
   it('accepts a GitHub PR URL', () => {
@@ -170,10 +168,6 @@ describe('review_pr input schema', () => {
 
   it('accepts a PR number', () => {
     expect(schema.safeParse({ pr_number: 42 }).success).toBe(true);
-  });
-
-  it('rejects missing PR reference', () => {
-    expect(schema.safeParse({}).success).toBe(false);
   });
 });
 

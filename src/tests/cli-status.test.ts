@@ -38,12 +38,12 @@ beforeEach(async () => {
   // Save and clear all provider env vars so tests are isolated
   savedEnv = {};
   const providerVars = [
-    'GROQ_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY',
-    'OPENROUTER_API_KEY', 'MISTRAL_API_KEY', 'NVIDIA_API_KEY', 'CEREBRAS_API_KEY',
-    'TOGETHER_API_KEY', 'XAI_API_KEY', 'DEEPSEEK_API_KEY', 'QWEN_API_KEY',
-    'ZAI_API_KEY', 'GITHUB_TOKEN', 'GITHUB_COPILOT_TOKEN', 'FIREWORKS_API_KEY',
-    'COHERE_API_KEY', 'DEEPINFRA_API_KEY', 'MOONSHOT_API_KEY', 'PERPLEXITY_API_KEY',
-    'HUGGINGFACE_API_KEY', 'BASETEN_API_KEY', 'SILICONFLOW_API_KEY', 'NOVITA_API_KEY',
+    'GROQ_API_KEY',
+    'OPENAI_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'OPENROUTER_API_KEY',
+    'OPENCODE_API_KEY',
+    'GITHUB_TOKEN',
   ];
   for (const v of providerVars) {
     savedEnv[v] = process.env[v];

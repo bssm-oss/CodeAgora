@@ -19,7 +19,7 @@ on:
       config:
         description: 'Benchmark config path'
         required: false
-        default: 'benchmarks/.ca/config.github-models.json'
+        default: 'benchmarks/.ca/config.openrouter-low-cost-5x2.json'
       delay_ms:
         description: 'Delay between fixtures in milliseconds'
         required: false
@@ -27,7 +27,6 @@ on:
 
 permissions:
   contents: read
-  models: read
 
 jobs:
   bench:
@@ -36,8 +35,8 @@ jobs:
     steps:
       - name: Check API key
         run: |
-          if [[ "${{ inputs.config }}" != *"config.github-models.json" ]] && [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
-            echo "::error::OPENROUTER_API_KEY secret is not configured for non-GitHub-Models benchmark config"
+          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+            echo "::error::OPENROUTER_API_KEY secret is not configured for benchmark config ${{ inputs.config }}"
             exit 1
           fi
 

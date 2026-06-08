@@ -124,8 +124,8 @@ Assign built-in specialist personas to reviewers:
 {
   "reviewers": [
     { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "persona": "builtin:security" },
-    { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "persona": "builtin:logic" },
-    { "id": "r3", "model": "gemini-2.0-flash", "backend": "api", "provider": "google", "persona": "builtin:api-contract" },
+    { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "openai", "persona": "builtin:logic" },
+    { "id": "r3", "model": "anthropic/claude-sonnet-4.6", "backend": "api", "provider": "openrouter", "persona": "builtin:api-contract" },
     { "id": "r4", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "persona": "builtin:general" }
   ]
 }

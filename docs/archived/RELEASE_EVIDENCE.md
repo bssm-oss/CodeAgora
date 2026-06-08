@@ -69,7 +69,7 @@ GitHub Actions:
 
 | Gate | Location | Classification | Enablement | Stable impact |
 |------|----------|----------------|------------|---------------|
-| Full live pipeline E2E | `src/tests/e2e-full-pipeline.test.ts` | live-only Vitest suite | `CODEAGORA_RUN_LIVE_E2E=1`, `GROQ_API_KEY`, and `claude` CLI in `PATH` | Required before stable live quality claims; non-blocking for deterministic beta gates |
+| Full live pipeline E2E | `src/tests/e2e-full-pipeline.test.ts` | live-only Vitest suite | `CODEAGORA_RUN_LIVE_E2E=1`, `GROQ_API_KEY` or `OPENROUTER_API_KEY`, and `claude` CLI in `PATH` | Required before stable live quality claims; non-blocking for deterministic beta gates |
 | Golden-bug live benchmark | `.github/workflows/bench-fn.yml` / `pnpm bench:fn:run` | live-only workflow | provider credentials or GitHub Models `models: read` permission, selected fixture matrix, and optional rate-limit throttle | Required before stable accuracy or `latest` quality claims |
 | Live GitHub Action PR smoke | external PR workflow run | live-only manual smoke | same-repo PR, fork PR, stale-head, oversized diff, provider-failure, and 422 scenarios | Required before stable GitHub Action support claim |
 | Desktop packaged-app launch | local preview platform and `.sisyphus/evidence/desktop-gate.log` | automated RC gate plus manual/private-preview smoke | `pnpm rc:desktop-gate`; launch Tauri shell, open trusted repo, review/cancel, session export, config validation, setup panels, secret redaction; attach `.sisyphus/evidence/desktop-evidence-manifest.json` | Required before RC handoff that includes desktop private-preview claims; not a stable public desktop launch |

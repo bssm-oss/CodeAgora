@@ -12,6 +12,13 @@ Two kinds of fixture:
 
 See `scripts/bench-fn.ts` (scorer) and `scripts/bench-fn-run.ts` (live-pipeline driver). Matching semantics live in `packages/shared/src/utils/golden-bug-scorer.ts`. Live runs write scored findings to `<results>/<fixture-id>.json` and runtime metadata to `<results>/_meta/<fixture-id>.json`.
 
+Subset runs should be scored with the same filter used for execution:
+
+```bash
+pnpm bench:fn:run -- --results ./bench-out-security --categories held-out-security,cve-shaped,fp-regression --skip-head
+pnpm bench:fn -- --results ./bench-out-security --categories held-out-security,cve-shaped,fp-regression
+```
+
 The Phase 2 reference dataset currently contains 20 fixtures: 14 recall cases and 6 FP-regression cases.
 
 The read-only reference set lives at `benchmarks/references/phase2-quality-gate.json`. It is the deterministic offline RC contract for the current 20-fixture corpus: required gates validate fixture schemas and the reference file without provider keys or network calls. Live provider runs are optional evidence artifacts; score those precomputed result directories separately when comparing model changes.

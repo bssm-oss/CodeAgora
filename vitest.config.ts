@@ -18,7 +18,6 @@ export default defineConfig({
       // Pin npm deps to real pnpm store paths for vi.mock interception
       { find: 'ai', replacement: resolveReal('ai') },
       { find: '@ai-sdk/groq', replacement: resolveReal('@ai-sdk/groq') },
-      { find: '@ai-sdk/google', replacement: resolveReal('@ai-sdk/google') },
       { find: '@ai-sdk/openai', replacement: resolveReal('@ai-sdk/openai') },
       { find: '@ai-sdk/openai-compatible', replacement: resolveReal('@ai-sdk/openai-compatible') },
       { find: '@ai-sdk/anthropic', replacement: resolveReal('@ai-sdk/anthropic') },

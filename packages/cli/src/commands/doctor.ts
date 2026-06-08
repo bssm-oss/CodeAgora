@@ -74,12 +74,207 @@ function checkNodeVersion(): DoctorCheck {
   };
 }
 
+interface ProviderKeyStatus {
+  envVar: string;
+  providers: string[];
+  isSet: boolean;
+}
+
+interface RuntimeRequirements {
+  apiProviders: Set<string>;
+  cliBackends: Set<string>;
+}
+
+function getProviderKeyStatuses(): ProviderKeyStatus[] {
+  const byEnvVar = new Map<string, ProviderKeyStatus>();
+
+  for (const provider of getSupportedProviders()) {
+    const envVar = getProviderEnvVar(provider);
+    const status = byEnvVar.get(envVar);
+    if (status) {
+      status.providers.push(provider);
+    } else {
+      byEnvVar.set(envVar, {
+        envVar,
+        providers: [provider],
+        isSet: Boolean(process.env[envVar]),
+      });
+    }
+  }
+
+  return [...byEnvVar.values()].sort((a, b) => a.envVar.localeCompare(b.envVar));
+}
+
+function formatProviderNames(providers: string[]): string {
+  return providers.sort((a, b) => a.localeCompare(b)).join(', ');
+}
+
+function formatEnvVars(envVars: string[]): string {
+  return envVars.sort((a, b) => a.localeCompare(b)).join(', ');
+}
+
+function addRuntimeRequirement(
+  requirements: RuntimeRequirements,
+  agent: { backend: string; provider?: string; enabled?: boolean },
+): void {
+  if (agent.enabled === false) return;
+  if (agent.backend === 'api') {
+    if (agent.provider) requirements.apiProviders.add(agent.provider);
+    return;
+  }
+  requirements.cliBackends.add(agent.backend);
+}
+
+function collectRuntimeRequirements(config: Config): RuntimeRequirements {
+  const requirements: RuntimeRequirements = {
+    apiProviders: new Set<string>(),
+    cliBackends: new Set<string>(),
+  };
+
+  if (Array.isArray(config.reviewers)) {
+    for (const reviewer of config.reviewers) {
+      if (!('backend' in reviewer)) continue;
+      addRuntimeRequirement(requirements, reviewer);
+    }
+  } else {
+    for (const reviewer of config.reviewers.static ?? []) {
+      addRuntimeRequirement(requirements, reviewer);
+    }
+  }
+
+  for (const supporter of config.supporters.pool) {
+    addRuntimeRequirement(requirements, supporter);
+  }
+  addRuntimeRequirement(requirements, config.supporters.devilsAdvocate);
+  addRuntimeRequirement(requirements, config.moderator);
+  if (config.head) {
+    addRuntimeRequirement(requirements, config.head);
+  }
+
+  return requirements;
+}
+
+function checkConfiguredApiCredentials(config: Config): DoctorCheck | null {
+  const requirements = collectRuntimeRequirements(config);
+  if (requirements.apiProviders.size === 0) return null;
+
+  const missing = [...requirements.apiProviders]
+    .map((provider) => ({ provider, envVar: getProviderEnvVar(provider) }))
+    .filter(({ envVar }) => !process.env[envVar]);
+
+  if (missing.length === 0) {
+    const envVars = [...new Set([...requirements.apiProviders].map((provider) => getProviderEnvVar(provider)))];
+    return {
+      name: 'Configured API credentials',
+      status: 'pass',
+      message: `Config API credentials ready: ${formatEnvVars(envVars)}`,
+    };
+  }
+
+  const details = missing
+    .map(({ provider, envVar }) => `${envVar} for ${provider}`)
+    .sort((a, b) => a.localeCompare(b))
+    .join('; ');
+
+  return {
+    name: 'Configured API credentials',
+    status: 'fail',
+    message: `Missing API keys required by config: ${details}`,
+  };
+}
+
+function checkConfiguredCliBackends(config: Config, cliBackends: DetectedCli[] | undefined): DoctorCheck | null {
+  const requirements = collectRuntimeRequirements(config);
+  if (requirements.cliBackends.size === 0) return null;
+
+  const detectedByBackend = new Map((cliBackends ?? []).map((cli) => [cli.backend, cli]));
+  const missing = [...requirements.cliBackends]
+    .map((backend) => ({ backend, detected: detectedByBackend.get(backend) }))
+    .filter(({ detected }) => !detected?.available)
+    .map(({ backend, detected }) => (detected ? `${backend} (${detected.bin})` : backend));
+
+  if (missing.length === 0) {
+    return {
+      name: 'Configured CLI backends',
+      status: 'pass',
+      message: `Config CLI backends ready: ${formatProviderNames([...requirements.cliBackends])}`,
+    };
+  }
+
+  return {
+    name: 'Configured CLI backends',
+    status: 'fail',
+    message: `Missing CLI backends required by config: ${missing.sort((a, b) => a.localeCompare(b)).join(', ')}`,
+  };
+}
+
+function checkAvailableApiKeys(statuses: ProviderKeyStatus[], hasAvailableCli: boolean): DoctorCheck {
+  const configured = statuses.filter((status) => status.isSet);
+  if (configured.length > 0) {
+    const providerNames = configured.flatMap((status) => status.providers);
+    const envVars = configured.map((status) => status.envVar);
+    return {
+      name: 'Available API keys',
+      status: 'pass',
+      message: `API keys found for ${formatProviderNames(providerNames)} (${formatEnvVars(envVars)})`,
+    };
+  }
+
+  const message = `No API keys found. Set one of: ${formatEnvVars(statuses.map((status) => status.envVar))}`;
+  return {
+    name: 'Available API keys',
+    status: hasAvailableCli ? 'pass' : 'warn',
+    message: hasAvailableCli ? `${message}. CLI backends can still run reviews.` : message,
+  };
+}
+
+function checkAvailableCliBackends(cliBackends: DetectedCli[] | undefined, hasApiKey: boolean): DoctorCheck {
+  const detected = cliBackends ?? [];
+  const available = detected.filter((cli) => cli.available);
+  if (available.length > 0) {
+    const labels = available.map((cli) => `${cli.backend} (${cli.bin})`).sort((a, b) => a.localeCompare(b));
+    return {
+      name: 'Available CLI backends',
+      status: 'pass',
+      message: `CLI backends found: ${labels.join(', ')}`,
+    };
+  }
+
+  const expected = detected.length > 0
+    ? detected.map((cli) => `${cli.backend} (${cli.bin})`).sort((a, b) => a.localeCompare(b)).join(', ')
+    : 'claude, codex, gemini, agy, copilot, agent, opencode, pi';
+  return {
+    name: 'Available CLI backends',
+    status: hasApiKey ? 'pass' : 'warn',
+    message: hasApiKey ? `No CLI backends found. API providers can still run reviews.` : `No CLI backends found. Install/auth one of: ${expected}`,
+  };
+}
+
+function checkReviewBackend(hasApiKey: boolean, hasAvailableCli: boolean): DoctorCheck {
+  if (hasApiKey || hasAvailableCli) {
+    const mode = hasApiKey && hasAvailableCli ? 'API and CLI' : hasApiKey ? 'API' : 'CLI';
+    return {
+      name: 'Review backend',
+      status: 'pass',
+      message: `Review backend ready via ${mode}`,
+    };
+  }
+
+  return {
+    name: 'Review backend',
+    status: 'fail',
+    message: 'No review backend ready. Set an API key or install/auth a supported CLI backend.',
+  };
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
 
 export async function runDoctor(baseDir: string): Promise<DoctorResult> {
   const checks: DoctorCheck[] = [];
+  let loadedConfig: Config | null = null;
+  let cliBackends: DetectedCli[] | undefined;
 
   // 1. Node.js version
   checks.push(checkNodeVersion());
@@ -124,8 +319,8 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
   // 4. Config validity (only if config exists)
   if (configExists) {
     try {
-      const config = await loadConfigFrom(baseDir);
-      const validation = strictValidateConfig(config);
+      loadedConfig = await loadConfigFrom(baseDir);
+      const validation = strictValidateConfig(loadedConfig);
       if (validation.valid && validation.warnings.length === 0) {
         checks.push({ name: 'Config validity', status: 'pass', message: 'Config is valid' });
       } else if (!validation.valid) {
@@ -147,36 +342,29 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
     }
   }
 
-  // 5. Provider API keys
-  const providers = getSupportedProviders();
-  for (const provider of providers) {
-    // Derive the env var name from PROVIDER_FACTORIES indirectly via provider name convention
-    // We'll read the env var by looking up what the registry exposes
-    const envVarName = getProviderEnvVar(provider);
-    const isSet = Boolean(process.env[envVarName]);
-    checks.push({
-      name: `${envVarName}`,
-      status: isSet ? 'pass' : 'warn',
-      message: isSet ? `${envVarName}: set` : `${envVarName}: missing`,
-    });
-  }
-
-  // 6. CLI backend detection
-  let cliBackends: DetectedCli[] | undefined;
+  // 5. CLI backend detection
   try {
     cliBackends = await detectCliBackends();
-    if (cliBackends) {
-      for (const cli of cliBackends) {
-        checks.push({
-          name: `CLI: ${cli.backend}`,
-          status: cli.available ? 'pass' : 'warn',
-          message: cli.available ? `CLI: ${cli.backend} found` : `CLI: ${cli.backend} not found`,
-        });
-      }
-    }
   } catch {
     // CLI detection is optional — skip on failure
   }
+
+  // 6. Runtime readiness
+  const providerKeyStatuses = getProviderKeyStatuses();
+  const hasApiKey = providerKeyStatuses.some((status) => status.isSet);
+  const hasAvailableCli = Boolean(cliBackends?.some((cli) => cli.available));
+
+  if (loadedConfig) {
+    const configuredApiCheck = checkConfiguredApiCredentials(loadedConfig);
+    if (configuredApiCheck) checks.push(configuredApiCheck);
+
+    const configuredCliCheck = checkConfiguredCliBackends(loadedConfig, cliBackends);
+    if (configuredCliCheck) checks.push(configuredCliCheck);
+  }
+
+  checks.push(checkAvailableApiKeys(providerKeyStatuses, hasAvailableCli));
+  checks.push(checkAvailableCliBackends(cliBackends, hasApiKey));
+  checks.push(checkReviewBackend(hasApiKey, hasAvailableCli));
 
   const summary = {
     pass: checks.filter((c) => c.status === 'pass').length,
@@ -237,6 +425,14 @@ function collectAgentPairs(config: Config): Array<{ provider: string; model: str
     if (!seen.has(key)) {
       seen.add(key);
       pairs.push({ provider: config.moderator.provider, model: config.moderator.model });
+    }
+  }
+
+  if (config.head?.enabled !== false && config.head?.backend === 'api' && config.head.provider) {
+    const key = `${config.head.provider}/${config.head.model}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      pairs.push({ provider: config.head.provider, model: config.head.model });
     }
   }
 
@@ -350,8 +546,11 @@ export function formatDoctorReport(result: DoctorResult): string {
   const nextSteps: string[] = [];
   const hasConfigFailure = blocking.some((check) => check.name === 'Config file' || check.name === 'Config validity');
   const hasWorkspaceFailure = blocking.some((check) => check.name === '.ca/ directory');
-  const hasApiWarnings = warnings.some((check) => check.name.endsWith('_API_KEY'));
-  const hasProviderWarnings = warnings.some((check) => check.name.startsWith('CLI: '));
+  const hasConfiguredApiFailure = blocking.some((check) => check.name === 'Configured API credentials');
+  const hasConfiguredCliFailure = blocking.some((check) => check.name === 'Configured CLI backends');
+  const hasReviewBackendFailure = blocking.some((check) => check.name === 'Review backend');
+  const hasApiWarnings = warnings.some((check) => check.name === 'Available API keys');
+  const hasCliWarnings = warnings.some((check) => check.name === 'Available CLI backends');
 
   if (hasWorkspaceFailure) {
     nextSteps.push('Run `agora init` in the workspace to create the missing project files.');
@@ -359,11 +558,18 @@ export function formatDoctorReport(result: DoctorResult): string {
   if (hasConfigFailure && !hasWorkspaceFailure) {
     nextSteps.push('Fix the config errors, then rerun `agora doctor`.');
   }
-  if (hasApiWarnings) {
-    nextSteps.push('Set the missing provider API keys, then rerun `agora doctor --live`.');
+  if (hasConfiguredApiFailure) {
+    nextSteps.push('Set the API keys required by `.ca/config`, then rerun `agora doctor --live`.');
   }
-  if (hasProviderWarnings) {
-    nextSteps.push('Install or enable the missing CLI backends, then rerun `agora doctor`.');
+  if (hasConfiguredCliFailure) {
+    nextSteps.push('Install or authenticate the CLI backends named in `.ca/config`, then rerun `agora doctor`.');
+  }
+  if (hasReviewBackendFailure) {
+    nextSteps.push('Set one API key or install/auth one supported CLI backend, then rerun `agora doctor`.');
+  } else if (hasApiWarnings) {
+    nextSteps.push('Set an API key if you want API-backed reviews, then rerun `agora doctor --live`.');
+  } else if (hasCliWarnings) {
+    nextSteps.push('Install/auth a CLI backend if you want CLI-backed reviews, then rerun `agora doctor`.');
   }
   if (blocking.length === 0 && warnings.length === 0) {
     nextSteps.push('Run `agora review --dry-run` or `agora review --staged` next.');

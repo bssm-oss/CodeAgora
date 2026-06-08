@@ -23,14 +23,14 @@ describe('detectCliBackends', () => {
     vi.resetAllMocks();
   });
 
-  it('returns all 12 CLI backends', async () => {
+  it('returns all curated CLI backends', async () => {
     // All binaries not found
     mockExecFileSync.mockImplementation(() => {
       throw new Error('not found');
     });
 
     const results = await detectCliBackends();
-    expect(results).toHaveLength(12);
+    expect(results).toHaveLength(8);
   });
 
   it('returns correct structure for a found binary', async () => {
@@ -72,7 +72,7 @@ describe('detectCliBackends', () => {
     const results = await detectCliBackends();
 
     // Should not throw, all backends should be unavailable
-    expect(results).toHaveLength(12);
+    expect(results).toHaveLength(8);
     expect(results.every((r) => r.available === false)).toBe(true);
   });
 
@@ -119,7 +119,7 @@ describe('detectCliBackends', () => {
     expect(cursor!.path).toBe('/usr/local/bin/agent');
   });
 
-  it('maps kiro backend to kiro-cli binary', async () => {
+  it('does not include the retired kiro backend', async () => {
     mockExecFileSync.mockImplementation((_cmd, args) => {
       const bin = (args as string[])[0];
       if (bin === 'kiro-cli') return '/usr/local/bin/kiro-cli\n';
@@ -127,11 +127,37 @@ describe('detectCliBackends', () => {
     });
 
     const results = await detectCliBackends();
-    const kiro = results.find((r) => r.backend === 'kiro');
+    expect(results.find((r) => r.backend === 'kiro')).toBeUndefined();
+  });
 
-    expect(kiro).toBeDefined();
-    expect(kiro!.bin).toBe('kiro-cli');
-    expect(kiro!.available).toBe(true);
+  it('maps antigravity backend to agy binary', async () => {
+    mockExecFileSync.mockImplementation((_cmd, args) => {
+      const bin = (args as string[])[0];
+      if (bin === 'agy') return '/usr/local/bin/agy\n';
+      throw new Error('not found');
+    });
+
+    const results = await detectCliBackends();
+    const antigravity = results.find((r) => r.backend === 'antigravity');
+
+    expect(antigravity).toBeDefined();
+    expect(antigravity!.bin).toBe('agy');
+    expect(antigravity!.available).toBe(true);
+  });
+
+  it('maps pi backend to pi binary', async () => {
+    mockExecFileSync.mockImplementation((_cmd, args) => {
+      const bin = (args as string[])[0];
+      if (bin === 'pi') return '/usr/local/bin/pi\n';
+      throw new Error('not found');
+    });
+
+    const results = await detectCliBackends();
+    const pi = results.find((r) => r.backend === 'pi');
+
+    expect(pi).toBeDefined();
+    expect(pi!.bin).toBe('pi');
+    expect(pi!.available).toBe(true);
   });
 
   it('does not include path property when binary is not found', async () => {
@@ -148,8 +174,8 @@ describe('detectCliBackends', () => {
 });
 
 describe('CLI_BACKENDS constant', () => {
-  it('contains exactly 12 entries', () => {
-    expect(CLI_BACKENDS).toHaveLength(12);
+  it('contains exactly 8 entries', () => {
+    expect(CLI_BACKENDS).toHaveLength(8);
   });
 
   it('each entry has backend and bin fields', () => {

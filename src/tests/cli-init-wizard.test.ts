@@ -56,15 +56,15 @@ describe('buildCustomConfig()', () => {
 
   it('assigns the chosen model to all reviewers', () => {
     const config = buildCustomConfig({
-      provider: 'mistral',
-      model: 'mistral-large-latest',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
       reviewerCount: 1,
       discussion: false,
     }) as Record<string, unknown>;
 
     const reviewers = config['reviewers'] as Array<Record<string, unknown>>;
-    expect(reviewers[0]!['model']).toBe('mistral-large-latest');
-    expect(reviewers[0]!['provider']).toBe('mistral');
+    expect(reviewers[0]!['model']).toBe('claude-sonnet-4-6');
+    expect(reviewers[0]!['provider']).toBe('anthropic');
   });
 
   it('includes a supporter and devil\'s advocate', () => {
@@ -85,14 +85,14 @@ describe('buildCustomConfig()', () => {
 
   it('includes moderator with same provider/model', () => {
     const config = buildCustomConfig({
-      provider: 'google',
+      provider: 'openai',
       model: 'gemini-2.0-flash',
       reviewerCount: 1,
       discussion: true,
     }) as Record<string, unknown>;
 
     const moderator = config['moderator'] as Record<string, unknown>;
-    expect(moderator['provider']).toBe('google');
+    expect(moderator['provider']).toBe('openai');
     expect(moderator['model']).toBe('gemini-2.0-flash');
   });
 

@@ -22,18 +22,18 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
         timeout: 120,
       },
       {
-        id: 'r2-google',
-        model: 'gemini-2.5-flash',
+        id: 'r2-openrouter',
+        model: 'anthropic/claude-sonnet-4.6',
         backend: 'api',
-        provider: 'google',
+        provider: 'openrouter',
         enabled: true,
         timeout: 120,
       },
       {
-        id: 'r3-mistral',
-        model: 'mistral-large-latest',
+        id: 'r3-openai',
+        model: 'gpt-4o-mini',
         backend: 'api',
-        provider: 'mistral',
+        provider: 'openai',
         enabled: true,
         timeout: 120,
       },
@@ -50,9 +50,9 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
         },
         {
           id: 's2',
-          model: 'gemini-2.5-flash',
+          model: 'anthropic/claude-sonnet-4.6',
           backend: 'api',
-          provider: 'google',
+          provider: 'openrouter',
           enabled: true,
           timeout: 120,
         },
@@ -147,8 +147,8 @@ describe('dryRun', () => {
 
   it('returns correct reviewer list from array config', async () => {
     delete process.env.GROQ_API_KEY;
-    delete process.env.GOOGLE_API_KEY;
-    delete process.env.MISTRAL_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
@@ -175,8 +175,8 @@ describe('dryRun', () => {
 
   it('provider with no API key gets no-api-key health status', async () => {
     delete process.env.GROQ_API_KEY;
-    delete process.env.GOOGLE_API_KEY;
-    delete process.env.MISTRAL_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
@@ -184,29 +184,29 @@ describe('dryRun', () => {
     expect(groqHealth).toBeDefined();
     expect(groqHealth!.status).toBe('no-api-key');
 
-    const googleHealth = result.health.find((h) => h.provider === 'google');
-    expect(googleHealth).toBeDefined();
-    expect(googleHealth!.status).toBe('no-api-key');
+    const openrouterHealth = result.health.find((h) => h.provider === 'openrouter');
+    expect(openrouterHealth).toBeDefined();
+    expect(openrouterHealth!.status).toBe('no-api-key');
   });
 
   it('provider with API key set gets available health status', async () => {
     process.env.GROQ_API_KEY = 'test-key-groq';
-    delete process.env.GOOGLE_API_KEY;
-    delete process.env.MISTRAL_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
     const groqHealth = result.health.find((h) => h.provider === 'groq');
     expect(groqHealth!.status).toBe('available');
 
-    const googleHealth = result.health.find((h) => h.provider === 'google');
-    expect(googleHealth!.status).toBe('no-api-key');
+    const openrouterHealth = result.health.find((h) => h.provider === 'openrouter');
+    expect(openrouterHealth!.status).toBe('no-api-key');
   });
 
   it('missing API key adds warning message', async () => {
     delete process.env.GROQ_API_KEY;
-    delete process.env.GOOGLE_API_KEY;
-    delete process.env.MISTRAL_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     const result = await dryRun(makeConfig(), SAMPLE_DIFF);
 
@@ -301,8 +301,8 @@ describe('dryRun', () => {
 describe('formatDryRunText', () => {
   beforeEach(() => {
     delete process.env.GROQ_API_KEY;
-    delete process.env.GOOGLE_API_KEY;
-    delete process.env.MISTRAL_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
   });
 
   afterEach(() => {
@@ -327,8 +327,8 @@ describe('formatDryRunText', () => {
     const text = formatDryRunText(result);
 
     expect(text).toContain('r1-groq');
-    expect(text).toContain('r2-google');
-    expect(text).toContain('r3-mistral');
+    expect(text).toContain('r2-openrouter');
+    expect(text).toContain('r3-openai');
   });
 
   it('output contains L1/L2/L3 cost lines', async () => {
@@ -352,8 +352,8 @@ describe('formatDryRunText', () => {
 
   it('output does not contain Warnings section when no warnings', async () => {
     process.env.GROQ_API_KEY = 'key1';
-    process.env.GOOGLE_API_KEY = 'key2';
-    process.env.MISTRAL_API_KEY = 'key3';
+    process.env.OPENROUTER_API_KEY = 'key2';
+    process.env.OPENAI_API_KEY = 'key3';
 
     const result = await dryRun(makeConfig(), SAMPLE_DIFF);
     const text = formatDryRunText(result);
@@ -366,8 +366,8 @@ describe('formatDryRunText', () => {
 
   it('unknown provider shows provider-mapping guidance even without warnings', async () => {
     process.env.GROQ_API_KEY = 'key1';
-    process.env.GOOGLE_API_KEY = 'key2';
-    process.env.MISTRAL_API_KEY = 'key3';
+    process.env.OPENROUTER_API_KEY = 'key2';
+    process.env.OPENAI_API_KEY = 'key3';
 
     const result = await dryRun(makeConfig({
       reviewers: [

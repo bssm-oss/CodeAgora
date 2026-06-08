@@ -9,7 +9,6 @@ permissions:
   pull-requests: write
   statuses: write
   issues: write
-  models: read
 
 jobs:
   review:
@@ -31,8 +30,15 @@ jobs:
         id: key-check
         if: steps.fork-check.outputs.skip != 'true'
         run: |
-          if [ -z "${{ secrets.OPENROUTER_API_KEY }}" ] && [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
-            echo "No external provider key configured; using GitHub Models with the workflow GITHUB_TOKEN."
+          if [ -n "${{ secrets.OPENROUTER_API_KEY }}" ]; then
+            echo "provider=openrouter" >> "$GITHUB_OUTPUT"
+            echo "model=anthropic/claude-sonnet-4.6" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ secrets.GROQ_API_KEY }}" ]; then
+            echo "provider=groq" >> "$GITHUB_OUTPUT"
+            echo "model=llama-3.3-70b-versatile" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No supported provider key configured. Add OPENROUTER_API_KEY or GROQ_API_KEY to enable CodeAgora review."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/checkout@v6
@@ -44,29 +50,33 @@ jobs:
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         run: |
           mkdir -p .ca
+          PROVIDER="${{ steps.key-check.outputs.provider }}"
+          MODEL="${{ steps.key-check.outputs.model }}"
           cat > .ca/config.json << 'CONF'
           {
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+              { "id": "r1", "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__", "enabled": true, "timeout": 120 }
             ],
             "supporters": {
               "pool": [
-                { "id": "s1", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 }
+                { "id": "s1", "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__", "enabled": true, "timeout": 120 }
               ],
               "pickCount": 1,
               "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da", "model": "gpt-4o-mini", "backend": "api", "provider": "github-models", "enabled": true, "timeout": 120 },
+              "devilsAdvocate": { "id": "da", "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__", "enabled": true, "timeout": 120 },
               "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
               "personaAssignment": "random"
             },
-            "moderator": { "model": "gpt-4o-mini", "backend": "api", "provider": "github-models" },
+            "moderator": { "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__" },
             "discussion": { "maxRounds": 1, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 5 },
-            "head": { "backend": "api", "model": "gpt-4o-mini", "provider": "github-models", "enabled": true },
+            "head": { "backend": "api", "model": "__MODEL__", "provider": "__PROVIDER__", "enabled": true },
             "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
           }
           CONF
+          sed -i.bak "s|__MODEL__|${MODEL}|g; s|__PROVIDER__|${PROVIDER}|g" .ca/config.json
+          rm .ca/config.json.bak
 
       - name: CodeAgora Review
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'

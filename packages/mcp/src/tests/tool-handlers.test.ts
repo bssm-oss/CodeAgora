@@ -338,15 +338,19 @@ describe('review_pr handler', () => {
     expect(runReviewCompact).not.toHaveBeenCalled();
   });
 
-  it('rejects missing pr_url and pr_number at the schema layer', async () => {
+  it('returns structured error when both pr_url and pr_number are missing', async () => {
     const { registerReviewPr } = await import('../tools/review-pr.js');
-    const { server, getSchema } = createServerStub();
+    const { server, getHandler } = createServerStub();
     registerReviewPr(server as never);
 
-    const schema = getSchema('review_pr') as { safeParse: (value: unknown) => { success: boolean } };
-    expect(schema.safeParse({}).success).toBe(false);
-    expect(schema.safeParse({ pr_number: 7 }).success).toBe(true);
-    expect(schema.safeParse({ pr_url: 'https://github.com/owner/repo/pull/7' }).success).toBe(true);
+    const result = await getHandler('review_pr')({});
+    const parsed = parseToolJson(result);
+    expect(result.isError).toBe(true);
+    expect(parsed).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      message: 'Either pr_url or pr_number is required',
+    });
   });
 
   it('returns structured error when post_review fails', async () => {

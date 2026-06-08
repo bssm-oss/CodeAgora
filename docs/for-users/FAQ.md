@@ -9,7 +9,7 @@ A CLI tool where multiple AI models collaboratively review your code. Reviewers 
 CodeAgora itself is free and open-source (MIT). You need API keys for LLM providers. [Groq](https://groq.com) offers a free tier that works out-of-the-box.
 
 ### Which providers are supported?
-24+ API providers (OpenAI, Anthropic, Google, Groq, DeepSeek, Mistral, etc.) and 12+ CLI tools (Claude Code, Copilot, Codex, etc.). See [PROVIDERS.md](PROVIDERS.md) for the full list.
+Curated API providers including OpenAI, Anthropic, Groq, OpenRouter, OpenCode Go, and OpenCode Zen, plus local CLI tools such as Claude Code, Codex, Gemini, Antigravity, OpenCode, Pi, Copilot, and Cursor. See [PROVIDERS.md](PROVIDERS.md) for the full list.
 
 ## Reviews
 

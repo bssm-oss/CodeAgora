@@ -237,10 +237,23 @@ async function executeReviewerWithGuards(
             .replace('{{DIFF}}', diffContent)
             .replace('{{SUMMARY}}', prSummary)
             .replace('{{CONTEXT}}', surroundingContext || '')
+            .replace('{{ENRICHED_CONTEXT}}', enrichedSection)
             .replace('{{PROJECT_CONTEXT}}', input.projectContext || '')
-        : buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
+        : buildReviewerPrompt(
+            diffContent,
+            prSummary,
+            surroundingContext,
+            input.projectContext,
+            enrichedSection,
+          );
     } catch {
-      reviewPrompt = buildReviewerPrompt(diffContent, prSummary, surroundingContext, input.projectContext);
+      reviewPrompt = buildReviewerPrompt(
+        diffContent,
+        prSummary,
+        surroundingContext,
+        input.projectContext,
+        enrichedSection,
+      );
     }
   } else {
     const { getLocale } = await import('@codeagora/shared/i18n/index.js');
@@ -599,6 +612,15 @@ Format: \`CRITICAL (85%)\` or \`WARNING (60%)\`
 
 **If your confidence is below 20%, do not report the issue.**
 
+## Targeted Second Pass
+
+If the user message includes a **Risk-Focus Pass** section, do one brief second pass over each flagged bucket before finalizing:
+- \`AUTH_ACCESS_CONTROL\`: authn/authz gaps, privilege escalation, missing tenant scoping, token/session invalidation
+- \`SECURITY_BOUNDARY\`: unsafe input flow into SQL/shell/file/network/secret surfaces, missing sanitization
+- \`DATA_INTEGRITY\`: partial writes, non-idempotent retries, race conditions, transaction/rollback gaps
+
+Use this pass to improve recall in risky areas. Only report a finding when the code proves it.
+
 ## Do NOT Flag (wastes everyone's time)
 
 - **Deleted code** (lines starting with \`-\`) — it's being removed, not introduced
@@ -769,6 +791,8 @@ Before flagging, systematically check:
 - **SUGGESTION**: Not a bug (style, refactor)
 
 State confidence 0–100%. If below 20%, skip the finding — silence is a valid signal.
+
+If the user message includes a **Risk-Focus Pass** section, do one extra targeted pass over the flagged buckets before finalizing. Use it to revisit auth/access control, security boundaries, and data integrity only when the code supports a real finding.
 
 ${useJsonFormat ? `## Output Format
 

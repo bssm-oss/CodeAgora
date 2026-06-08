@@ -4,9 +4,9 @@ This guide shows the recommended ways to run CodeAgora on pull requests.
 
 Use this when you want PR inline comments, a summary verdict, and a commit status check from the `bssm-oss/CodeAgora` GitHub Action.
 
-## Quick start: GitHub Models only
+## Quick start: OpenRouter or Groq
 
-This is the lowest-friction setup for same-repository PRs. It uses the workflow `GITHUB_TOKEN` and does not require external provider secrets.
+This is the recommended PR setup. Add either `OPENROUTER_API_KEY` or `GROQ_API_KEY` as a repository secret before enabling the workflow.
 
 ### 1. Add `.ca/config.json`
 
@@ -17,9 +17,9 @@ This is the lowest-friction setup for same-repository PRs. It uses the workflow 
   "reviewers": [
     {
       "id": "r1",
-      "model": "gpt-4o-mini",
+      "model": "anthropic/claude-sonnet-4.6",
       "backend": "api",
-      "provider": "github-models",
+      "provider": "openrouter",
       "enabled": true,
       "timeout": 120
     }
@@ -28,9 +28,9 @@ This is the lowest-friction setup for same-repository PRs. It uses the workflow 
     "pool": [
       {
         "id": "s1",
-        "model": "gpt-4o-mini",
+        "model": "anthropic/claude-sonnet-4.6",
         "backend": "api",
-        "provider": "github-models",
+        "provider": "openrouter",
         "enabled": true,
         "timeout": 120
       }
@@ -39,16 +39,16 @@ This is the lowest-friction setup for same-repository PRs. It uses the workflow 
     "pickStrategy": "random",
     "devilsAdvocate": {
       "id": "da",
-      "model": "gpt-4o-mini",
+      "model": "anthropic/claude-sonnet-4.6",
       "backend": "api",
-      "provider": "github-models",
+      "provider": "openrouter",
       "enabled": true,
       "timeout": 120
     },
     "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
     "personaAssignment": "random"
   },
-  "moderator": { "model": "gpt-4o-mini", "backend": "api", "provider": "github-models" },
+  "moderator": { "model": "anthropic/claude-sonnet-4.6", "backend": "api", "provider": "openrouter" },
   "discussion": {
     "maxRounds": 1,
     "registrationThreshold": {
@@ -61,15 +61,15 @@ This is the lowest-friction setup for same-repository PRs. It uses the workflow 
   },
   "head": {
     "backend": "api",
-    "model": "gpt-4o-mini",
-    "provider": "github-models",
+    "model": "anthropic/claude-sonnet-4.6",
+    "provider": "openrouter",
     "enabled": true
   },
   "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
 }
 ```
 
-The compact one-reviewer setup is intentional for GitHub Models because some models have small request limits. For larger PRs, keep `max-diff-lines` conservative or use an external provider with a larger context window.
+The compact one-reviewer setup keeps PR latency and cost predictable. For larger PRs, keep `max-diff-lines` conservative or use a stronger OpenRouter/Anthropic model.
 
 ### 2. Add `.github/workflows/codeagora-review.yml`
 
@@ -84,7 +84,6 @@ permissions:
   contents: read
   pull-requests: write
   statuses: write
-  models: read
 
 jobs:
   review:
@@ -105,6 +104,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
           max-diff-lines: '250'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 ```
 
 ### 3. Open or update a PR
@@ -133,7 +135,7 @@ Common secrets:
 | OpenRouter | `OPENROUTER_API_KEY` |
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
-| Google | `GOOGLE_API_KEY` |
+| OpenCode Go / Zen | `OPENCODE_API_KEY` |
 
 See [Providers](./PROVIDERS.md) for the full provider list.
 
@@ -200,12 +202,6 @@ permissions:
   statuses: write
 ```
 
-Add this when using `provider: "github-models"`:
-
-```yaml
-  models: read
-```
-
 `issues: write` is optional for workflows that manage labels themselves. CodeAgora does not mutate the `review:skip` label.
 
 ## Fork PRs
@@ -214,7 +210,7 @@ Repository secrets are not available to untrusted fork PRs. For public repos, pr
 
 - skip CodeAgora for fork PRs and let maintainers run it after review
 - require maintainer approval before running workflows from forks
-- use GitHub Models with only the workflow token if your repository policy allows it
+- run CodeAgora only after a maintainer-triggered workflow has access to retained provider secrets
 
 Example fork guard:
 
@@ -239,7 +235,6 @@ Use a smaller limit for smaller context windows:
 
 | Setup | Suggested `max-diff-lines` |
 |---|---:|
-| GitHub Models `gpt-4o-mini` | `250`–`800` |
 | Groq / OpenRouter compact config | `1000`–`2500` |
 | Larger-context provider models | start with `2500`, then tune upward |
 
@@ -262,9 +257,9 @@ The Action exposes these outputs for downstream workflow steps:
 ## Troubleshooting checklist
 
 1. **Config not found**: commit `.ca/config.json`, set `config-path`, and rerun after the file is valid.
-2. **Missing provider secret**: add the matching secret and pass it through `env:` or use the GitHub Models path.
-3. **GitHub Models fails**: make sure `permissions.models: read` is set and keep the diff/config small.
-4. **Fork PR skipped**: expected when secrets are unavailable to forked PRs; the logs call out the fork-safe path.
+2. **Missing provider secret**: add the matching secret and pass it through `env:`.
+3. **Provider fails**: verify the API key, model name, provider quota, and context size.
+4. **Fork PR skipped**: expected when secrets are unavailable to forked PRs; rerun from a trusted branch if needed.
 5. **Diff too large**: split the PR or raise `max-diff-lines` only if your provider can handle it.
 6. **Action blocks merge**: set `fail-on-reject: 'false'` if you want review results without a required failure gate.
 

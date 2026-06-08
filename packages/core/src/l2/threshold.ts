@@ -62,6 +62,14 @@ export function applyThreshold(
       continue;
     }
 
+    // A single reviewer can still catch a real high-risk boundary issue.
+    // Keep the global WARNING threshold conservative, but do not silently
+    // dismiss auth/security/data-integrity warnings that have concrete signal.
+    if (group.docs.some(isHighRiskWarning)) {
+      discussions.push(createDiscussion(group, 'WARNING', counter));
+      continue;
+    }
+
     // Route individual docs by their own severity — handles both single-reviewer
     // and mixed-severity groups (e.g. 1 CRITICAL + 1 WARNING) that failed to
     // meet threshold. Prevents mixed groups from silently falling into SUGGESTION.
@@ -160,6 +168,29 @@ function severityRank(severity: Severity): number {
     SUGGESTION: 1,
   };
   return ranks[severity];
+}
+
+const HIGH_RISK_WARNING_RE = /\b(auth|authz|authorization|permission|rbac|tenant|session|token|jwt|secret|credential|signature|csrf|ssrf|sql|query|injection|shell|command|path traversal|upload|webhook|payment|refund|quota|ledger|transaction|idempot|rollback|cache|state)\b/i;
+
+function findingConfidence(doc: EvidenceDocument): number | undefined {
+  return doc.confidenceTrace?.final
+    ?? doc.confidenceTrace?.verified
+    ?? doc.confidenceTrace?.corroborated
+    ?? doc.confidence;
+}
+
+function isHighRiskWarning(doc: EvidenceDocument): boolean {
+  if (doc.severity !== 'WARNING') return false;
+  const confidence = findingConfidence(doc);
+  if (confidence !== undefined && confidence < 50) return false;
+  const searchable = [
+    doc.filePath,
+    doc.issueTitle,
+    doc.problem,
+    ...doc.evidence,
+    doc.suggestion,
+  ].join(' ');
+  return HIGH_RISK_WARNING_RE.test(searchable);
 }
 
 // ============================================================================

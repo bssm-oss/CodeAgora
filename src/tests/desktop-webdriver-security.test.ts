@@ -27,7 +27,7 @@ describe('desktop WebDriver automation security boundary', () => {
     expect(rootPackage.scripts['rc:desktop-gate']).toContain('macos:webdriver-e2e');
     expect(rootPackage.scripts['rc:desktop-gate']).not.toContain('--features webdriver-automation');
 
-    expect(desktopPackage.scripts['macos:webdriver-e2e']).toContain('cargo build --features webdriver-automation');
+    expect(desktopPackage.scripts['macos:webdriver-e2e']).toContain('tauri build --debug --features webdriver-automation');
     expect(rootPackage.scripts['desktop:macos-webdriver-e2e']).toContain('macos:webdriver-e2e');
   });
 

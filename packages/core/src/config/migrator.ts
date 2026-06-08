@@ -1,6 +1,6 @@
 /**
  * Config Migrator
- * Migrates CLI backends (opencode/codex/gemini/claude) to API backend.
+ * Migrates legacy CLI backends (opencode/codex/gemini/claude) to API backend.
  */
 
 import type { Config, AgentConfig, ReviewerEntry } from '../types/config.js';
@@ -28,7 +28,7 @@ export interface MigrationResult {
 const BACKEND_TO_PROVIDER: Record<string, string> = {
   opencode: 'openrouter', // OpenCode uses OpenRouter
   codex: 'openrouter',    // Default mapping
-  gemini: 'google',
+  gemini: 'openrouter',
   claude: 'openrouter',   // Via OpenRouter
 };
 
