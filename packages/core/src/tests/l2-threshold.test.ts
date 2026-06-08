@@ -138,6 +138,39 @@ describe('applyThreshold — WARNING severity', () => {
     expect(unconfirmed).toHaveLength(2);
   });
 
+  it('registers a single high-risk auth/security WARNING for discussion', () => {
+    const doc = makeDoc({
+      severity: 'WARNING',
+      filePath: 'src/auth/session.ts',
+      issueTitle: 'Missing tenant permission check',
+      problem: 'Session lookup accepts a tenant id without verifying the caller can access that tenant.',
+      confidence: 62,
+      reviewerId: 'r1',
+    });
+
+    const { discussions, unconfirmed } = applyThreshold([doc], defaultSettings);
+
+    expect(discussions).toHaveLength(1);
+    expect(discussions[0].severity).toBe('WARNING');
+    expect(unconfirmed).toHaveLength(0);
+  });
+
+  it('keeps low-confidence high-risk WARNING in unconfirmed queue', () => {
+    const doc = makeDoc({
+      severity: 'WARNING',
+      filePath: 'src/auth/session.ts',
+      issueTitle: 'Possible permission issue',
+      problem: 'This might be an auth issue, but the evidence is weak.',
+      confidence: 35,
+      reviewerId: 'r1',
+    });
+
+    const { discussions, unconfirmed } = applyThreshold([doc], defaultSettings);
+
+    expect(discussions).toHaveLength(0);
+    expect(unconfirmed).toHaveLength(1);
+  });
+
   it('assigns sequential Discussion IDs starting from d001', () => {
     const doc1 = makeDoc({ severity: 'CRITICAL', filePath: 'src/a.ts', lineRange: [1, 5] });
     const doc2 = makeDoc({ severity: 'CRITICAL', filePath: 'src/b.ts', lineRange: [1, 5] });

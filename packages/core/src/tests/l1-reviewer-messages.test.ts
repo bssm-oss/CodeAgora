@@ -96,6 +96,28 @@ describe('buildReviewerMessages', () => {
     expect(system).not.toContain(ctx);
   });
 
+  it('includes enriched risk-focus context in user and second-pass instructions in system', () => {
+    const enriched = `
+## Pre-Analysis Context
+
+## Risk-Focus Pass
+Do one short second pass on the flagged buckets before finalizing findings.
+- \`AUTH_ACCESS_CONTROL\` [HIGH] — re-check authn/authz gates
+`;
+    const { system, user } = buildReviewerMessages(
+      SAMPLE_DIFF,
+      SAMPLE_SUMMARY,
+      undefined,
+      undefined,
+      enriched,
+    );
+
+    expect(user).toContain('Risk-Focus Pass');
+    expect(user).toContain('AUTH_ACCESS_CONTROL');
+    expect(system).toContain('Targeted Second Pass');
+    expect(system).toContain('SECURITY_BOUNDARY');
+  });
+
   it('omits surrounding context section when not provided', () => {
     const { user } = buildReviewerMessages(SAMPLE_DIFF, SAMPLE_SUMMARY);
     expect(user).not.toContain('Surrounding Code Context');
@@ -254,6 +276,22 @@ describe('buildReviewerMessages', () => {
         SAMPLE_DIFF, SAMPLE_SUMMARY, undefined, undefined, undefined, undefined, undefined, 'lite',
       );
       expect(user).toContain(SAMPLE_DIFF);
+    });
+
+    it('lite prompt keeps targeted second-pass instruction when enriched risk focus exists', () => {
+      const { system, user } = buildReviewerMessages(
+        SAMPLE_DIFF,
+        SAMPLE_SUMMARY,
+        undefined,
+        undefined,
+        '## Risk-Focus Pass\n- `DATA_INTEGRITY` [HIGH] — re-check transactions',
+        undefined,
+        undefined,
+        'lite',
+      );
+
+      expect(system).toContain('Risk-Focus Pass');
+      expect(user).toContain('DATA_INTEGRITY');
     });
   });
 });

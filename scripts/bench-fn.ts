@@ -12,6 +12,8 @@
 //       Score fixtures against pre-generated review results. Each file
 //       in <dir> must be named `<fixture-id>.json` and contain an array
 //       of ActualFinding objects.
+//       Use --fixtures or --categories when scoring a subset run, otherwise
+//       missing fixture result files are treated as empty findings.
 //
 //   tsx scripts/bench-fn.ts --results <dir> --json
 //       Same as above but emits a single JSON report on stdout.
@@ -42,28 +44,45 @@ interface Args {
   validateOnly: boolean;
   resultsDir: string | null;
   json: boolean;
+  fixtureFilter: Set<string> | null;
+  categoryFilter: Set<string> | null;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { validateOnly: false, resultsDir: null, json: false };
+  const args: Args = {
+    validateOnly: false,
+    resultsDir: null,
+    json: false,
+    fixtureFilter: null,
+    categoryFilter: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--validate-only') args.validateOnly = true;
     else if (a === '--json') args.json = true;
     else if (a === '--results') args.resultsDir = argv[++i] ?? null;
+    else if (a === '--fixtures') {
+      const list = argv[++i] ?? '';
+      args.fixtureFilter = new Set(list.split(',').map((s) => s.trim()).filter(Boolean));
+    }
+    else if (a === '--categories') {
+      const list = argv[++i] ?? '';
+      args.categoryFilter = new Set(list.split(',').map((s) => s.trim()).filter(Boolean));
+    }
     else if (a === '--help' || a === '-h') {
-      console.log('Usage: tsx scripts/bench-fn.ts [--validate-only] [--results <dir>] [--json]');
+      console.log('Usage: tsx scripts/bench-fn.ts [--validate-only] [--results <dir>] [--fixtures id1,id2] [--categories category1,category2] [--json]');
       process.exit(0);
     }
   }
   return args;
 }
 
-async function loadFixtures(): Promise<{ fixture: GoldenBugFixture; dir: string }[]> {
+async function loadFixtures(args: Args): Promise<{ fixture: GoldenBugFixture; dir: string }[]> {
   const entries = await readdir(fixturesDir, { withFileTypes: true });
   const fixtures: { fixture: GoldenBugFixture; dir: string }[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+    if (args.fixtureFilter && !args.fixtureFilter.has(entry.name)) continue;
     const dir = path.join(fixturesDir, entry.name);
     const expectedPath = path.join(dir, 'expected.json');
     const diffPath = path.join(dir, 'diff.patch');
@@ -82,6 +101,7 @@ async function loadFixtures(): Promise<{ fixture: GoldenBugFixture; dir: string 
     if (parsed.data.id !== entry.name) {
       throw new Error(`fixture ${entry.name}: id "${parsed.data.id}" does not match directory name`);
     }
+    if (args.categoryFilter && !args.categoryFilter.has(parsed.data.category)) continue;
     fixtures.push({ fixture: parsed.data, dir });
   }
   fixtures.sort((a, b) => a.fixture.id.localeCompare(b.fixture.id));
@@ -143,7 +163,10 @@ function printHumanReport(report: AggregateReport, opts: { hadAnyResults: boolea
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const fixtures = await loadFixtures();
+  const fixtures = await loadFixtures(args);
+  if (fixtures.length === 0) {
+    throw new Error('no fixtures matched the requested filters');
+  }
 
   if (args.validateOnly) {
     console.log(`OK: ${fixtures.length} fixture(s) validated`);

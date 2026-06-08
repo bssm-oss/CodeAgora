@@ -9,6 +9,7 @@
 // Usage:
 //   pnpm bench:fn:run -- --results <dir>                     # run all fixtures
 //   pnpm bench:fn:run -- --results <dir> --fixtures id1,id2  # subset
+//   pnpm bench:fn:run -- --results <dir> --categories held-out-security,fp-regression
 //   pnpm bench:fn:run -- --results <dir> --config .ca/config.low-cost-diverse.json
 //   pnpm bench:fn:run -- --results <dir> --skip-head         # skip L3 verdict
 //   pnpm bench:fn:run -- --results <dir> --delay-ms 10000    # throttle between fixtures
@@ -40,6 +41,7 @@ const benchmarkCwd = path.join(repoRoot, 'benchmarks');
 interface Args {
   resultsDir: string | null;
   fixtureFilter: Set<string> | null;
+  categoryFilter: Set<string> | null;
   skipHead: boolean;
   dryRun: boolean;
   configPath: string | null;
@@ -97,6 +99,7 @@ function parseArgs(argv: string[]): Args {
   const args: Args = {
     resultsDir: null,
     fixtureFilter: null,
+    categoryFilter: null,
     skipHead: false,
     dryRun: false,
     configPath: null,
@@ -108,6 +111,9 @@ function parseArgs(argv: string[]): Args {
     else if (a === '--fixtures') {
       const list = argv[++i] ?? '';
       args.fixtureFilter = new Set(list.split(',').map((s) => s.trim()).filter(Boolean));
+    } else if (a === '--categories') {
+      const list = argv[++i] ?? '';
+      args.categoryFilter = new Set(list.split(',').map((s) => s.trim()).filter(Boolean));
     } else if (a === '--skip-head') args.skipHead = true;
     else if (a === '--dry-run') args.dryRun = true;
     else if (a === '--config') args.configPath = argv[++i] ?? null;
@@ -120,7 +126,7 @@ function parseArgs(argv: string[]): Args {
     }
     else if (a === '--help' || a === '-h') {
       console.log(
-        'Usage: pnpm bench:fn:run -- --results <dir> [--fixtures id1,id2] [--config <path>] [--skip-head] [--delay-ms ms] [--dry-run]',
+        'Usage: pnpm bench:fn:run -- --results <dir> [--fixtures id1,id2] [--categories category1,category2] [--config <path>] [--skip-head] [--delay-ms ms] [--dry-run]',
       );
       process.exit(0);
     }
@@ -134,12 +140,15 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-async function loadFixtures(filter: Set<string> | null): Promise<GoldenBugFixture[]> {
+async function loadFixtures(
+  fixtureFilter: Set<string> | null,
+  categoryFilter: Set<string> | null,
+): Promise<GoldenBugFixture[]> {
   const entries = await readdir(fixturesDir, { withFileTypes: true });
   const out: GoldenBugFixture[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (filter && !filter.has(entry.name)) continue;
+    if (fixtureFilter && !fixtureFilter.has(entry.name)) continue;
     const dir = path.join(fixturesDir, entry.name);
     await stat(path.join(dir, 'diff.patch'));
     const expectedPath = path.join(dir, 'expected.json');
@@ -156,6 +165,7 @@ async function loadFixtures(filter: Set<string> | null): Promise<GoldenBugFixtur
         `fixture ${entry.name}: id "${parsed.id}" does not match directory name`,
       );
     }
+    if (categoryFilter && !categoryFilter.has(parsed.category)) continue;
     out.push(parsed);
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
@@ -253,7 +263,7 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  const fixtures = await loadFixtures(args.fixtureFilter);
+  const fixtures = await loadFixtures(args.fixtureFilter, args.categoryFilter);
   if (fixtures.length === 0) {
     console.error('bench-fn-run: no fixtures matched');
     process.exit(2);
@@ -270,6 +280,7 @@ async function main(): Promise<void> {
   if (args.dryRun) {
     console.log(`[dry-run] would run ${fixtures.length} fixture(s):`);
     console.log(`  config: ${configPath ?? path.join(benchmarkCwd, '.ca', 'config.json')}`);
+    console.log(`  categories: ${args.categoryFilter ? [...args.categoryFilter].join(',') : 'all'}`);
     console.log(`  delay: ${args.delayMs}ms`);
     console.log(`  metadata: ${metadataDir}`);
     for (const f of fixtures) console.log(`  - ${f.id} → ${path.join(resultsDir, `${f.id}.json`)}`);
