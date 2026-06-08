@@ -45,6 +45,14 @@ Examples:
   ${displayName} doctor --live                     Test actual API connections
 `);
         break;
+      case 'env':
+        cmd.addHelpText('after', `
+Examples:
+  ${displayName} env                               Show API key readiness
+  ${displayName} env set openrouter <api-key>      Save an OpenRouter key
+  printf '%s' "$OPENROUTER_API_KEY" | ${displayName} env set openrouter --stdin
+`);
+        break;
       case 'sessions':
         cmd.addHelpText('after', `
 Examples:
