@@ -106,8 +106,8 @@ describe('M-07: review_pr URL validation', () => {
   it('rejects file:// URLs — not a valid GitHub PR URL', () => {
     const { z } = require('zod') as typeof import('zod');
 
-    // The actual tool uses a plain z.string() for pr_url, so we test the
-    // stricter schema that should be used (documents the security requirement)
+    // The actual tool uses a stricter GitHub-URL schema now, so we keep this
+    // explicit test to document the security requirement.
     const strictSchema = z.object({
       pr_url: z.string().regex(
         /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/,

@@ -537,8 +537,8 @@
   "desktop.setup.notConfigured": "미설정",
   "desktop.setup.providerHint": "이 변수들을 셸 프로필이나 프로젝트 .env 파일에 추가하세요",
   "desktop.setup.providerStatusNotLoaded": "프로바이더 상태가 아직 로드되지 않았습니다.",
-  "desktop.setup.providerStatusHint": "셋업을 새로고침해 설정된 API 키와 로컬 CLI 도구를 감지하세요.",
-  "desktop.setup.mcpServer": "MCP 서버",
+  "desktop.setup.providerStatusHint": "셋업을 새로고침해 API 키와 로컬 도구를 다시 감지하세요.",
+  "desktop.setup.mcpServer": "MCP 연결",
   "desktop.setup.mcpNotLoaded": "MCP 상태가 아직 로드되지 않았습니다.",
   "desktop.setup.mcpEmpty": "노출된 MCP 도구 없음",
   "desktop.setup.workflowsEmpty": "워크플로우 파일 없음",
@@ -587,5 +587,5 @@
   "desktop.live.status.ok": "정상",
   "desktop.live.status.error": "오류",
   "desktop.live.status.timeout": "시간 초과",
-  "desktop.next.privatePreviewNote": "데스크톱 가이드는 프라이빗 프리뷰 전용이며 기존 CodeAgora CLI/세션 의미를 따릅니다."
+  "desktop.next.privatePreviewNote": "데스크톱 가이드는 프라이빗 프리뷰 전용입니다."
 }

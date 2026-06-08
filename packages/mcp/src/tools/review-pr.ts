@@ -10,6 +10,28 @@ import { formatReviewResult, postToGitHub, type OutputFormat } from '../post-act
 import { reviewOptionsSchema, postReviewSchema } from './shared-schema.js';
 import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared-response.js';
 
+const reviewPrInputSchema = z.object({
+  pr_url: z.string()
+    .regex(
+      /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/,
+      'Must be a valid GitHub PR URL: https://github.com/owner/repo/pull/123',
+    )
+    .optional()
+    .describe('GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)'),
+  pr_number: z.number().int().positive().optional()
+    .describe('PR number (auto-detects owner/repo from git remote)'),
+  ...reviewOptionsSchema,
+  ...postReviewSchema,
+}).superRefine((value, ctx) => {
+  if (value.pr_url == null && value.pr_number == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Either pr_url or pr_number is required',
+      path: ['pr_url'],
+    });
+  }
+});
+
 /**
  * Resolve a PR URL from either a URL or a number + git remote.
  */
@@ -44,19 +66,7 @@ export function registerReviewPr(server: McpServer): void {
   server.tool(
     'review_pr',
     'Review a GitHub PR — fetches the diff automatically and runs full multi-LLM review. Supports PR URL (https://github.com/owner/repo/pull/123) or just a PR number (auto-detects owner/repo from git remote). Can post results back as PR comments with --post_review.',
-    {
-      pr_url: z.string()
-        .regex(
-          /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+$/,
-          'Must be a valid GitHub PR URL: https://github.com/owner/repo/pull/123',
-        )
-        .optional()
-        .describe('GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)'),
-      pr_number: z.number().int().positive().optional()
-        .describe('PR number (auto-detects owner/repo from git remote)'),
-      ...reviewOptionsSchema,
-      ...postReviewSchema,
-    },
+    reviewPrInputSchema,
     async (params) => {
       try {
         const repoPath = await resolveRepoPathOrError(params.repo_path);

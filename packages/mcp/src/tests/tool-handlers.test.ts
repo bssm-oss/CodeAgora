@@ -49,10 +49,12 @@ async function resolveToolDir() {
 
 function createServerStub() {
   const handlers = new Map<string, ToolHandler>();
+  const schemas = new Map<string, unknown>();
 
   return {
     server: {
       tool(name: string, _desc: string, _schema: unknown, handler: ToolHandler) {
+        schemas.set(name, _schema);
         handlers.set(name, handler);
       },
     },
@@ -60,6 +62,11 @@ function createServerStub() {
       const h = handlers.get(name);
       if (!h) throw new Error(`Tool "${name}" not registered`);
       return h;
+    },
+    getSchema(name: string): unknown {
+      const schema = schemas.get(name);
+      if (!schema) throw new Error(`Schema "${name}" not registered`);
+      return schema;
     },
   };
 }
@@ -329,6 +336,17 @@ describe('review_pr handler', () => {
     expect(postToGitHub).toHaveBeenCalledTimes(1);
     expect(compactFromPipelineResult).toHaveBeenCalledTimes(1);
     expect(runReviewCompact).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing pr_url and pr_number at the schema layer', async () => {
+    const { registerReviewPr } = await import('../tools/review-pr.js');
+    const { server, getSchema } = createServerStub();
+    registerReviewPr(server as never);
+
+    const schema = getSchema('review_pr') as { safeParse: (value: unknown) => { success: boolean } };
+    expect(schema.safeParse({}).success).toBe(false);
+    expect(schema.safeParse({ pr_number: 7 }).success).toBe(true);
+    expect(schema.safeParse({ pr_url: 'https://github.com/owner/repo/pull/7' }).success).toBe(true);
   });
 
   it('returns structured error when post_review fails', async () => {

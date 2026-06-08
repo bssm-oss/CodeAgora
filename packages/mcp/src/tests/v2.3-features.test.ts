@@ -261,6 +261,8 @@ describe('review_pr extended schema', () => {
     pr_number: z.number().int().positive().optional(),
     ...reviewOptionsSchema,
     ...postReviewSchema,
+  }).refine((value) => value.pr_url != null || value.pr_number != null, {
+    message: 'Either pr_url or pr_number is required',
   });
 
   it('accepts pr_url', () => {
@@ -269,6 +271,10 @@ describe('review_pr extended schema', () => {
 
   it('accepts pr_number', () => {
     expect(schema.safeParse({ pr_number: 42 }).success).toBe(true);
+  });
+
+  it('rejects missing pr_url and pr_number', () => {
+    expect(schema.safeParse({}).success).toBe(false);
   });
 
   it('accepts pr_url with post_review', () => {

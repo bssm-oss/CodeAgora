@@ -60,8 +60,8 @@ Deterministic benchmark CI gates such as `pnpm bench:ci` do not require live pro
 
 - `review_quick`: fast L1-only diff review.
 - `review_full`: full L0-L3 review with debate and head verdict.
-- `review_pr`: PR-oriented review flow.
-- `dry_run`: validate diff/config without a full review.
+- `review_pr`: PR-oriented review flow. Pass `pr_url` or `pr_number`.
+- `dry_run`: estimate diff complexity and review cost from a unified diff.
 - `explain_session`: explain a previous session (`repo_path` optional).
 - `get_leaderboard`: inspect model ranking data.
 - `get_stats`: inspect review statistics (`repo_path` optional).

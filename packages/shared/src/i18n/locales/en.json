@@ -538,8 +538,8 @@
   "desktop.setup.notConfigured": "not configured",
   "desktop.setup.providerHint": "Add these variables to your shell profile or project .env file",
   "desktop.setup.providerStatusNotLoaded": "Provider status has not been loaded yet.",
-  "desktop.setup.providerStatusHint": "Refresh setup to detect configured API keys and local CLI tools.",
-  "desktop.setup.mcpServer": "MCP Server",
+  "desktop.setup.providerStatusHint": "Refresh setup to detect API keys and local tools again.",
+  "desktop.setup.mcpServer": "MCP connection",
   "desktop.setup.mcpNotLoaded": "MCP status has not been loaded yet.",
   "desktop.setup.mcpEmpty": "No MCP tools exposed",
   "desktop.setup.workflowsEmpty": "No workflow files found",
@@ -588,5 +588,5 @@
   "desktop.live.status.ok": "ok",
   "desktop.live.status.error": "error",
   "desktop.live.status.timeout": "timeout",
-  "desktop.next.privatePreviewNote": "Desktop guidance is private-preview only and follows existing CodeAgora CLI/session semantics."
+  "desktop.next.privatePreviewNote": "Desktop guidance is private preview only."
 }
