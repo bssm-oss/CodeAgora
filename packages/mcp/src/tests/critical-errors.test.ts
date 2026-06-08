@@ -310,6 +310,10 @@ describe('M-12: dry_run with large diff input', () => {
       code: 'INVALID_INPUT',
       message: 'diff must not be empty',
     });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('Pass a unified diff'),
+      expect.stringContaining('git add'),
+    ]));
   });
 
   it('dry_run tool returns structured error when complexity estimation fails', async () => {

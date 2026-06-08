@@ -30,7 +30,7 @@ export function registerConfigGet(server: McpServer): void {
     'Read CodeAgora configuration. Returns full config or a specific value by dot-notation key.',
     {
       key: z.string().optional().describe('Dot-notation key (e.g. "discussion.maxRounds"). Omit for full config.'),
-      repo_path: z.string().optional().describe('Repo root path for config lookup; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe('Optional repo root override for config lookup. Omit it when you are already inside the target workspace; otherwise pass the exact workspace root.'),
     },
     async ({ key, repo_path }) => {
       try {

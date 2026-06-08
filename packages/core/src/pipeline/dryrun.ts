@@ -66,6 +66,36 @@ export function estimateTokensFromDiff(diffContent: string): number {
   return Math.ceil(diffContent.length / 4);
 }
 
+export type DryRunReadiness = 'ready' | 'risky' | 'blocked';
+
+export function classifyDryRunReadiness(result: DryRunResult): DryRunReadiness {
+  if (result.health.some((item) => item.status === 'no-api-key')) {
+    return 'blocked';
+  }
+  if (result.health.some((item) => item.status === 'unknown') || result.warnings.length > 0) {
+    return 'risky';
+  }
+  return 'ready';
+}
+
+export function formatDryRunNextSteps(result: DryRunResult): string[] {
+  const readiness = classifyDryRunReadiness(result);
+  if (readiness === 'blocked') {
+    return [
+      'Set the missing provider API keys above, then rerun `agora doctor` and `agora review --dry-run`.',
+    ];
+  }
+  if (readiness === 'risky') {
+    return [
+      'Review the warnings above, then rerun `agora doctor --live`.',
+      'If the workspace still looks good, run `agora review --staged` or repeat the same review command.',
+    ];
+  }
+  return [
+    'Run `agora review --staged` or repeat the same review command with this diff.',
+  ];
+}
+
 // ============================================================================
 // Core dry-run logic
 // ============================================================================
@@ -241,9 +271,12 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
 export function formatDryRunText(result: DryRunResult): string {
   const lines: string[] = [];
   const diffMetadata = result.diffMetadata;
+  const readiness = classifyDryRunReadiness(result);
 
   lines.push('Pipeline Dry Run Report');
   lines.push('========================');
+  lines.push('');
+  lines.push(`Readiness: ${readiness.toUpperCase()}`);
   lines.push('');
   lines.push(
     `Config: ${result.config.reviewerCount} reviewers, ` +
@@ -330,6 +363,12 @@ export function formatDryRunText(result: DryRunResult): string {
     for (const w of result.warnings) {
       lines.push(`  ⚠ ${w}`);
     }
+  }
+
+  lines.push('');
+  lines.push('Next steps:');
+  for (const step of formatDryRunNextSteps(result)) {
+    lines.push(`  - ${step}`);
   }
 
   return lines.join('\n');

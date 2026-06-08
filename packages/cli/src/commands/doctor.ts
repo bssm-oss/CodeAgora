@@ -315,23 +315,67 @@ export function formatLiveCheckReport(liveChecks: LiveCheckResult[]): string {
 
 export function formatDoctorReport(result: DoctorResult): string {
   const lines: string[] = [];
-  for (const check of result.checks) {
-    const icon =
-      check.status === 'pass'
-        ? statusColor.pass('✓')
-        : check.status === 'fail'
-        ? statusColor.fail('✗')
-        : statusColor.warn('!');
-    lines.push(`${icon} ${check.message}`);
-  }
+
+  const blocking = result.checks.filter((check) => check.status === 'fail');
+  const warnings = result.checks.filter((check) => check.status === 'warn');
+  const ready = result.checks.filter((check) => check.status === 'pass');
+
+  lines.push('Doctor Report');
+  lines.push('=============');
   lines.push('');
   lines.push(
     `Summary: ${statusColor.pass(String(result.summary.pass))} passed, ${statusColor.fail(String(result.summary.fail))} failed, ${statusColor.warn(String(result.summary.warn))} warnings`
   );
+  lines.push('');
+
+  const renderSection = (title: string, checks: DoctorCheck[], iconFn: (text: string) => string): void => {
+    if (checks.length === 0) return;
+    lines.push(`${title} (${checks.length})`);
+    for (const check of checks) {
+      lines.push(`  ${iconFn(check.message)}${check.name ? ` — ${dim(check.name)}` : ''}`);
+    }
+    lines.push('');
+  };
+
+  renderSection('Blocking issues', blocking, (message) => statusColor.fail(`✗ ${message}`));
+  renderSection('Warnings', warnings, (message) => statusColor.warn(`! ${message}`));
+  renderSection('Ready checks', ready, (message) => statusColor.pass(`✓ ${message}`));
 
   if (result.liveChecks && result.liveChecks.length > 0) {
+    lines.push('Live API check');
     lines.push('');
     lines.push(formatLiveCheckReport(result.liveChecks));
+  }
+
+  const nextSteps: string[] = [];
+  const hasConfigFailure = blocking.some((check) => check.name === 'Config file' || check.name === 'Config validity');
+  const hasWorkspaceFailure = blocking.some((check) => check.name === '.ca/ directory');
+  const hasApiWarnings = warnings.some((check) => check.name.endsWith('_API_KEY'));
+  const hasProviderWarnings = warnings.some((check) => check.name.startsWith('CLI: '));
+
+  if (hasWorkspaceFailure) {
+    nextSteps.push('Run `agora init` in the workspace to create the missing project files.');
+  }
+  if (hasConfigFailure && !hasWorkspaceFailure) {
+    nextSteps.push('Fix the config errors, then rerun `agora doctor`.');
+  }
+  if (hasApiWarnings) {
+    nextSteps.push('Set the missing provider API keys, then rerun `agora doctor --live`.');
+  }
+  if (hasProviderWarnings) {
+    nextSteps.push('Install or enable the missing CLI backends, then rerun `agora doctor`.');
+  }
+  if (blocking.length === 0 && warnings.length === 0) {
+    nextSteps.push('Run `agora review --dry-run` or `agora review --staged` next.');
+  } else if (blocking.length === 0) {
+    nextSteps.push('Rerun `agora review --dry-run` after the warnings above are resolved.');
+  }
+
+  if (nextSteps.length > 0) {
+    lines.push('Next steps');
+    for (const step of nextSteps) {
+      lines.push(`  - ${step}`);
+    }
   }
 
   return lines.join('\n');

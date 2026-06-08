@@ -205,6 +205,25 @@ describe('formatDoctorReport()', () => {
     expect(report).toContain('1 failed');
     expect(report).toContain('1 warnings');
   });
+
+  it('groups checks and adds next steps', () => {
+    const result = {
+      checks: [
+        { name: '.ca/ directory', status: 'fail' as const, message: '.ca/ directory missing — run \'agora init\' to set up' },
+        { name: 'GROQ_API_KEY', status: 'warn' as const, message: 'GROQ_API_KEY: missing' },
+        { name: 'Node.js version', status: 'pass' as const, message: 'Node.js v22.0.0' },
+      ],
+      summary: { pass: 1, fail: 1, warn: 1 },
+    };
+
+    const report = stripAnsi(formatDoctorReport(result));
+    expect(report).toContain('Blocking issues (1)');
+    expect(report).toContain('Warnings (1)');
+    expect(report).toContain('Ready checks (1)');
+    expect(report).toContain('Next steps');
+    expect(report).toContain('agora init');
+    expect(report).toContain('agora doctor --live');
+  });
 });
 
 // ============================================================================

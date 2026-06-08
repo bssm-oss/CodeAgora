@@ -49,6 +49,14 @@ only for stable claims that depend on live behavior.
 
 ## Current Live Captures
 
+### rc.6 Usability Note
+
+The rc.6 usability hardening is documented separately so the release story has a clean local smoke reference alongside live-only evidence. The note is deterministic and local, not live-provider or live-GitHub evidence.
+
+| Evidence | Location | Result |
+|----------|----------|--------|
+| rc.6 usability evidence | `docs/archived/rc6-usability-evidence.md` | CLI first-run guidance, dry-run readiness, MCP retry guidance, and GitHub Action degraded summaries verified through local smoke and tests |
+
 The 2026-05-04 readiness branch has stable-candidate live evidence captured in
 GitHub Actions:
 

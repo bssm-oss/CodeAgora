@@ -100,7 +100,7 @@ jobs:
           fetch-depth: 0
 
       - name: CodeAgora Review
-        uses: bssm-oss/CodeAgora@v0.1.0-rc.5
+        uses: bssm-oss/CodeAgora@v0.1.0-rc.6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
@@ -170,7 +170,7 @@ Example with Groq:
 
 ```yaml
 - name: CodeAgora Review
-  uses: bssm-oss/CodeAgora@v0.1.0-rc.5
+  uses: bssm-oss/CodeAgora@v0.1.0-rc.6
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     fail-on-reject: 'true'
@@ -255,16 +255,16 @@ The Action exposes these outputs for downstream workflow steps:
 | `review-url` | URL of the posted GitHub review when available |
 | `session-id` | CodeAgora session ID for audit/debugging |
 | `degraded` | `true` when the run was degraded or skipped |
-| `degraded-reason` | Stable reason code such as `diff-too-large`, `missing-provider-secrets`, or `config-load-failed` |
+| `degraded-reason` | Stable reason code such as `diff-too-large`, `missing-provider-secrets`, or `config-load-failed`; the Action logs and job summary show the matching remediation hint |
 | `head-sha` | PR head SHA reviewed by CodeAgora |
 | `base-sha` | PR base SHA used for diff acquisition |
 
 ## Troubleshooting checklist
 
-1. **Config not found**: commit `.ca/config.json` or set `config-path`.
-2. **Missing provider secret**: add the matching secret and pass it through `env:`.
+1. **Config not found**: commit `.ca/config.json`, set `config-path`, and rerun after the file is valid.
+2. **Missing provider secret**: add the matching secret and pass it through `env:` or use the GitHub Models path.
 3. **GitHub Models fails**: make sure `permissions.models: read` is set and keep the diff/config small.
-4. **Fork PR skipped**: expected when secrets are unavailable to forked PRs.
+4. **Fork PR skipped**: expected when secrets are unavailable to forked PRs; the logs call out the fork-safe path.
 5. **Diff too large**: split the PR or raise `max-diff-lines` only if your provider can handle it.
 6. **Action blocks merge**: set `fail-on-reject: 'false'` if you want review results without a required failure gate.
 

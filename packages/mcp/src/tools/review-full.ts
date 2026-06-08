@@ -14,7 +14,7 @@ export function registerReviewFull(server: McpServer): void {
     'review_full',
     'Thorough code review — multiple AI models review your diff, then debate disagreements to reach consensus (~30s). Returns verdict + issues with confidence scores + debate summary. More accurate than review_quick.',
     {
-      diff: z.string().optional().describe('Unified diff content (optional if staged=true)'),
+      diff: z.string().optional().describe('Unified diff content (optional if staged=true). Leave empty only when using staged=true.'),
       ...reviewOptionsSchema,
       ...stagedSchema,
     },

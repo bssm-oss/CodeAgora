@@ -8,6 +8,12 @@ import path from 'path';
 import fs from 'fs/promises';
 import { runInit, runInitInteractive, UserCancelledError } from './init.js';
 
+function printNextSteps(): void {
+  console.log('\nNext steps:');
+  console.log('  agora doctor');
+  console.log('  agora review --staged');
+}
+
 export function registerInitCommand(program: Command): void {
   program
     .command('init')
@@ -40,6 +46,7 @@ export function registerInitCommand(program: Command): void {
             console.log('  Add GROQ_API_KEY to your repository secrets:');
             console.log('  Settings -> Secrets -> Actions -> New repository secret');
           }
+          if (result.created.length > 0) printNextSteps();
           return;
         }
 
@@ -54,14 +61,12 @@ export function registerInitCommand(program: Command): void {
             const configPath = path.join(caDir, format === 'yaml' ? 'config.yaml' : 'config.json');
             await fs.writeFile(configPath, JSON.stringify(config, null, 2));
             console.log(`\u2713 Config created with ${existing.name} (${existing.envVar} detected)`);
-            console.log(`\nRun your first review:`);
-            console.log(`  git diff | agora review`);
+            printNextSteps();
             return;
           }
           await runInlineSetup(process.cwd());
-          console.log(`\nRun your first review:`);
-          console.log(`  git diff | agora review`);
-          console.log(`\nFor full customization: agora init --advanced`);
+          printNextSteps();
+          console.log('\nFor full customization: agora init --advanced');
           return;
         }
 
@@ -88,6 +93,7 @@ export function registerInitCommand(program: Command): void {
           console.log('  Add GROQ_API_KEY to your repository secrets:');
           console.log('  Settings -> Secrets -> Actions -> New repository secret');
         }
+        if (result.created.length > 0) printNextSteps();
       } catch (error) {
         console.error('Init failed:', error instanceof Error ? error.message : error);
         process.exit(1);

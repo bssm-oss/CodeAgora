@@ -408,6 +408,10 @@ describe('config_set handler', () => {
 
     expect(result.isError).toBe(true);
     expect(parsed).toMatchObject({ status: 'error', code: 'INVALID_REPO_PATH' });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('Omit `repo_path`'),
+      expect.stringContaining('exact workspace root'),
+    ]));
     expect(setConfigValue).not.toHaveBeenCalled();
   });
 
@@ -507,6 +511,10 @@ describe('get_stats handler', () => {
       code: 'STATS_FAILED',
       message: 'no sessions dir',
     });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('Omit `repo_path`'),
+      expect.stringContaining('workspace'),
+    ]));
   });
 
   it('accepts repo_path and resolves it before stats lookup', async () => {
@@ -541,6 +549,10 @@ describe('explain_session handler', () => {
 
     expect(result.isError).toBe(true);
     expect(parsed).toMatchObject({ status: 'error', code: 'INVALID_REPO_PATH' });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('Omit `repo_path`'),
+      expect.stringContaining('exact workspace root'),
+    ]));
     expect(explainSession).not.toHaveBeenCalled();
   });
 
@@ -623,6 +635,10 @@ describe('review_quick handler', () => {
       code: 'INVALID_INPUT',
       message: 'Either diff or staged=true is required',
     });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('Pass a unified diff'),
+      expect.stringContaining('staged=true'),
+    ]));
     expect(runReviewCompact).not.toHaveBeenCalled();
   });
 
@@ -819,6 +835,10 @@ describe('review_full handler', () => {
       code: 'INVALID_INPUT',
       message: 'Either diff or staged=true is required',
     });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('Pass a unified diff'),
+      expect.stringContaining('staged=true'),
+    ]));
     expect(runReviewCompact).not.toHaveBeenCalled();
   });
 

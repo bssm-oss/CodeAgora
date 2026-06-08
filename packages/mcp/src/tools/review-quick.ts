@@ -15,7 +15,7 @@ export function registerReviewQuick(server: McpServer): void {
     'review_quick',
     'Quick code review — 3 AI reviewers scan your diff in parallel (~10s). Returns verdict (ACCEPT/REJECT) + issues grouped as must-fix/verify/ignore with severity, confidence %, and file locations. No debate phase. Use for rapid feedback on small changes.',
     {
-      diff: z.string().optional().describe('Unified diff content (optional if staged=true)'),
+      diff: z.string().optional().describe('Unified diff content (optional if staged=true). Leave empty only when using staged=true.'),
       ...reviewOptionsSchema,
       ...stagedSchema,
     },

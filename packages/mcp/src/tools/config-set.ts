@@ -14,7 +14,7 @@ export function registerConfigSet(server: McpServer): void {
     {
       key: z.string().describe('Dot-notation key (e.g. "discussion.maxRounds")'),
       value: z.union([z.string(), z.number(), z.boolean()]).describe('Value to set'),
-      repo_path: z.string().optional().describe('Repo root path for config mutation; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe('Optional repo root override for config mutation. Omit it when the server already runs in the target workspace; otherwise pass the exact workspace root.'),
     },
     async ({ key, value, repo_path }) => {
       try {

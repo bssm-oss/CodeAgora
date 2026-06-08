@@ -82,9 +82,10 @@ The PR diff exceeds the configured limit (default: 5000 lines). Options:
 3. Check that `npx -y @codeagora/mcp@rc` starts without errors
 
 ### "repo_path is outside the allowed repository boundary"
-- `repo_path` is optional, but when provided it must point to a real directory inside the current repository checkout.
+- `repo_path` is optional, but when provided it must point to the exact workspace root or a real directory inside the current repository checkout.
 - Symlinks and paths outside the repo are rejected on purpose so MCP tools do not read or write unrelated files.
 - If you only need the current workspace, omit `repo_path` and let the server use its current working directory.
+- The MCP error body now includes `guidance` with the same retry hint.
 
 ## Exit Codes
 

@@ -12,7 +12,7 @@ export function registerStats(server: McpServer): void {
     'get_stats',
     'Show aggregate review session statistics. No LLM calls.',
     {
-      repo_path: z.string().optional().describe('Repo root path for session stats; must stay within the current repository boundary'),
+      repo_path: z.string().optional().describe('Optional repo root override for session stats. Omit it when the server already runs in the target workspace; otherwise pass the exact workspace root.'),
     },
     async ({ repo_path }) => {
       try {

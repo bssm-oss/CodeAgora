@@ -4,9 +4,10 @@ name: CodeAgora Review
 # CONTRACT NOTES:
 # - The `review:skip` label is always caller-owned. The Action NEVER mutates skip labels.
 # - The action exposes `degraded` and `degraded-reason` outputs for any degraded or skipped run
-#   (examples: missing credentials, diff too large, posting failures, stale PR head). Loading
-#   the repository config uses a default path; failures to load the config are surfaced via
-#   degraded outputs but do not change input precedence (CLI > env > default).
+#   (examples: missing credentials, diff too large, posting failures, stale PR head). Runtime
+#   logs and the job summary include the matching reason plus next-step guidance. Loading the
+#   repository config uses a default path; failures to load the config are surfaced via degraded
+#   outputs but do not change input precedence (CLI > env > default).
 #
 description: Multi-agent debate-driven code review for pull requests
 

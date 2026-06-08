@@ -39,12 +39,16 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   if (result.status === 'error') {
     lines.push(t('review.failed', { error: result.error ?? 'unknown error' }));
     lines.push(dim(`  ${t('review.session', { date: result.date, sessionId: result.sessionId })}`));
+    lines.push('');
+    lines.push('Next: run `agora doctor` and retry the same review command.');
     return lines.join('\n');
   }
 
   if (!result.summary) {
     lines.push(t('review.complete'));
     lines.push(`  ${t('review.session', { date: result.date, sessionId: result.sessionId })}`);
+    lines.push('');
+    lines.push('Next: run `agora sessions` to review the latest history.');
     return lines.join('\n');
   }
 
@@ -208,6 +212,12 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
 
   // ── Session footer ──
   lines.push(dim(`  Session ${result.date}/${result.sessionId}`));
+  lines.push('');
+  if (s.decision === 'ACCEPT') {
+    lines.push('Next: run `agora sessions` to review history or start another review.');
+  } else {
+    lines.push(`Next: run \`agora explain ${result.date}/${result.sessionId}\` for a deeper walkthrough.`);
+  }
 
   return lines.join('\n');
 }

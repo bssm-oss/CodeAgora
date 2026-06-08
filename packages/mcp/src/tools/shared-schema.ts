@@ -17,7 +17,7 @@ export const reviewOptionsSchema = {
   reviewer_count: z.number().min(1).max(10).optional().describe('Number of reviewers (1-10)'),
   reviewer_names: z.array(z.string()).optional().describe('Specific reviewer IDs to use (e.g. ["r1", "r2"])'),
   no_cache: z.boolean().optional().describe('Skip result caching, always run fresh'),
-  repo_path: z.string().optional().describe('Git repo root path for surrounding code context; explicit paths must stay within the server cwd/repository root'),
+  repo_path: z.string().optional().describe('Optional repo root override. Omit it when the server is already running inside the target workspace; otherwise pass the exact workspace root and keep it inside the server boundary.'),
   context_lines: z.number().min(0).optional().describe('Context lines around changes (default 20, 0 = disabled)'),
   output_format: z.enum(['compact', 'text', 'json', 'md', 'github', 'html', 'junit', 'sarif']).optional()
     .describe('Result format (default: compact; json returns the versioned codeagora.review.v1 agent contract)'),

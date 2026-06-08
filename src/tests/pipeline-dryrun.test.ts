@@ -314,10 +314,12 @@ describe('formatDryRunText', () => {
     const text = formatDryRunText(result);
 
     expect(text).toContain('Pipeline Dry Run Report');
+    expect(text).toContain('Readiness: BLOCKED');
     expect(text).toContain('Config:');
     expect(text).toContain('Reviewers:');
     expect(text).toContain('Cost Estimation:');
     expect(text).toContain('Provider Health:');
+    expect(text).toContain('Next steps:');
   });
 
   it('output contains reviewer ids', async () => {
@@ -358,6 +360,8 @@ describe('formatDryRunText', () => {
 
     // Warnings section should be absent when there are none
     expect(text).not.toContain('Warnings:');
+    expect(text).toContain('Readiness: READY');
+    expect(text).toContain('Run `agora review --staged` or repeat the same review command with this diff.');
   });
 
   it('auto reviewer shows "auto" label in output', async () => {

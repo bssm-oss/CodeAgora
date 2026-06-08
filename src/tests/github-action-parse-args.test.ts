@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { ACTION_DEGRADED_REASONS } from '@codeagora/shared/contracts/stable.js';
 import {
   determineActionPolicy,
+  getActionGuidance,
   hasProviderCredentials,
   isForkContext,
   isStaleHead,
@@ -204,5 +205,21 @@ describe('github-action production policy', () => {
         expect(registry.has(reason), `${file} emits unregistered degraded reason: ${reason}`).toBe(true);
       }
     }
+  });
+
+  it('maps degraded reasons to actionable next steps', () => {
+    const missingSecrets = getActionGuidance('missing-provider-secrets');
+    expect(missingSecrets.why).toContain('provider credential');
+    expect(missingSecrets.nextSteps).toEqual(expect.arrayContaining([
+      expect.stringContaining('GitHub Models path'),
+      expect.stringContaining('provider secret'),
+    ]));
+
+    const staleHead = getActionGuidance('stale-head-sha');
+    expect(staleHead.why).toContain('PR head changed');
+    expect(staleHead.nextSteps).toEqual(expect.arrayContaining([
+      expect.stringContaining('Rerun the workflow'),
+      expect.stringContaining('branch head'),
+    ]));
   });
 });

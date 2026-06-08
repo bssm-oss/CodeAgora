@@ -18,7 +18,14 @@ import { createAppOctokit } from './client.js';
 import { fetchPrMetadata } from './pr-diff.js';
 import { buildSarifReport, serializeSarif } from './sarif.js';
 import { loadConfigFile } from '@codeagora/core/config/loader.js';
-import { determineActionPolicy, isStaleHead, parseActionInputs, validateActionDiffPath, validateActionOutputPath } from './action-policy.js';
+import {
+  determineActionPolicy,
+  getActionGuidance,
+  isStaleHead,
+  parseActionInputs,
+  validateActionDiffPath,
+  validateActionOutputPath,
+} from './action-policy.js';
 import type { ActionDegradedReason } from '@codeagora/shared/contracts/stable.js';
 
 // ============================================================================
@@ -41,13 +48,22 @@ async function main(): Promise<void> {
 
   const actionPolicy = determineActionPolicy(inputs);
   if (actionPolicy.degraded) {
-    if (actionPolicy.degradedReason) setActionDegraded(actionPolicy.degradedReason);
+    if (actionPolicy.degradedReason && !actionPolicy.shouldRunReview) {
+      setActionDegraded(actionPolicy.degradedReason);
+      logActionDiagnostic(
+        actionPolicy.shouldRunReview ? 'Running in degraded mode' : 'Review skipped',
+        actionPolicy.degradedReason,
+        undefined,
+      );
+    }
   } else {
     setActionOutput('degraded', 'false');
   }
 
   if (!actionPolicy.shouldRunReview) {
-    console.log(`::warning::CodeAgora review skipped: ${actionPolicy.degradedReason ?? 'degraded'}`);
+    if (actionPolicy.degradedReason) {
+      writeActionSummary('skipped', actionPolicy.degradedReason);
+    }
     setActionOutput('verdict', actionPolicy.verdictOverride ?? 'SKIPPED');
     return;
   }
@@ -57,9 +73,14 @@ async function main(): Promise<void> {
     const diffContent = await fs.readFile(safeDiffPath, 'utf-8');
     const lineCount = diffContent.split('\n').length;
     if (lineCount > inputs.maxDiffLines) {
-      console.log(`::warning::Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}). Skipping review.`);
+      logActionDiagnostic(
+        'Diff too large',
+        'diff-too-large',
+        `Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}).`,
+      );
       setActionDegraded('diff-too-large');
       setActionOutput('verdict', 'SKIPPED');
+      writeActionSummary('skipped', 'diff-too-large', `Diff has ${lineCount} lines (limit: ${inputs.maxDiffLines}).`);
       return;
     }
   }
@@ -71,8 +92,9 @@ async function main(): Promise<void> {
   const configPath = inputs.configPath;
   const config = await loadConfigFile(configPath, { rootDir: process.cwd() }).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(`::warning::Config load degraded: ${message}`);
+    logActionDiagnostic('Config load degraded', 'config-load-failed', message);
     setActionDegraded('config-load-failed');
+    writeActionSummary('degraded', 'config-load-failed', message);
     return null;
   });
 
@@ -143,9 +165,18 @@ async function main(): Promise<void> {
     console.log('::group::Posting review to GitHub');
     const currentPr = await fetchPrMetadata(ghConfig, inputs.pr, appKit ?? undefined);
     if (isStaleHead(inputs.sha, currentPr.headSha)) {
-      console.log(`::warning::PR head changed from ${inputs.sha} to ${currentPr.headSha}; skipping stale posting.`);
+      logActionDiagnostic(
+        'Stale head SHA',
+        'stale-head-sha',
+        `PR head changed from ${inputs.sha} to ${currentPr.headSha}; skipping stale posting.`,
+      );
       setActionDegraded('stale-head-sha');
       setActionOutput('verdict', 'SKIPPED');
+      writeActionSummary(
+        'skipped',
+        'stale-head-sha',
+        `PR head changed from ${inputs.sha} to ${currentPr.headSha}; skipping stale posting.`,
+      );
       console.log('::endgroup::');
       return;
     }
@@ -166,12 +197,18 @@ async function main(): Promise<void> {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.log(`::warning::GitHub posting degraded: ${message}`);
+      logActionDiagnostic('GitHub posting degraded', 'github-post-failed', message);
       setActionDegraded('github-post-failed');
+      writeActionSummary('degraded', 'github-post-failed', message);
     }
     console.log('::endgroup::');
   } else {
-    console.log(`::warning::GitHub posting skipped: ${actionPolicy.degradedReason ?? 'posting-disabled'}`);
+    logActionDiagnostic(
+      'GitHub posting skipped',
+      actionPolicy.degradedReason ?? 'posting-disabled',
+      undefined,
+    );
+    writeActionSummary('degraded', actionPolicy.degradedReason ?? 'posting-disabled');
   }
 
   // Generate SARIF output — validate path to prevent traversal attacks
@@ -183,8 +220,9 @@ async function main(): Promise<void> {
     console.log(`SARIF report written to ${safeSarifPath}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`::warning::SARIF output path rejected: ${message}`);
+    logActionDiagnostic('SARIF output skipped', 'sarif-write-failed', message);
     setActionDegraded('sarif-write-failed');
+    writeActionSummary('degraded', 'sarif-write-failed', message);
   }
 
   // Set outputs
@@ -228,6 +266,48 @@ function setActionOutput(name: string, value: string): void {
 function setActionDegraded(reason: ActionDegradedReason): void {
   setActionOutput('degraded', 'true');
   setActionOutput('degraded-reason', reason);
+}
+
+function logActionDiagnostic(
+  title: string,
+  reason: ActionDegradedReason,
+  detail?: string,
+): void {
+  const guidance = getActionGuidance(reason);
+  console.log(`::group::CodeAgora ${title}`);
+  console.log(`Reason: ${reason}`);
+  console.log(`Why: ${guidance.why}`);
+  if (detail) {
+    console.log(`Detail: ${detail}`);
+  }
+  console.log('Next steps:');
+  for (const step of guidance.nextSteps) {
+    console.log(`- ${step}`);
+  }
+  console.log('::endgroup::');
+}
+
+function writeActionSummary(
+  status: 'degraded' | 'skipped',
+  reason: ActionDegradedReason,
+  detail?: string,
+): void {
+  const summaryFile = process.env['GITHUB_STEP_SUMMARY'];
+  if (!summaryFile) return;
+
+  const guidance = getActionGuidance(reason);
+  const lines = [
+    `### CodeAgora review ${status}`,
+    '',
+    `- Reason: \`${reason}\``,
+    `- Why: ${guidance.why}`,
+    ...(detail ? [`- Detail: ${detail}`] : []),
+    '- Next steps:',
+    ...guidance.nextSteps.map((step) => `  - ${step}`),
+    '',
+  ];
+
+  appendFileSync(summaryFile, `${lines.join('\n')}\n`);
 }
 
 main().catch((err) => {

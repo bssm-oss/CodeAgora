@@ -27,6 +27,11 @@ export interface ActionPolicy {
   verdictOverride?: 'SKIPPED';
 }
 
+export interface ActionGuidance {
+  why: string;
+  nextSteps: string[];
+}
+
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined || value === '') return defaultValue;
   return value.toLowerCase() === 'true';
@@ -133,6 +138,90 @@ export function determineActionPolicy(
     shouldRunReview: true,
     shouldPostResults: true,
     degraded: false,
+  };
+}
+
+export function getActionGuidance(reason: ActionDegradedReason): ActionGuidance {
+  switch (reason) {
+    case 'missing-github-token':
+      return {
+        why: 'The action needs a GitHub token to post the review and set the status check.',
+        nextSteps: [
+          'Provide the `github-token` input or disable posting with `post-results: false`.',
+          'If you only need a dry run, switch to the CLI or MCP dry-run path instead of the Action.',
+        ],
+      };
+    case 'missing-provider-secrets':
+      return {
+        why: 'The review pipeline cannot start because no provider credential is available.',
+        nextSteps: [
+          'Add the provider secret required by your chosen review backend.',
+          'Run the GitHub Models path if you want to avoid external provider secrets.',
+        ],
+      };
+    case 'fork-missing-provider-secrets':
+      return {
+        why: 'Fork PRs cannot read repository secrets, so the review would fail before it starts.',
+        nextSteps: [
+          'Use the GitHub Models path for forked pull requests.',
+          'If you need an external provider, run the review from a trusted branch with access to secrets.',
+        ],
+      };
+    case 'posting-disabled':
+      return {
+        why: 'The review still ran, but GitHub posting was disabled by the caller.',
+        nextSteps: [
+          'Re-enable `post-results` if you want CodeAgora to comment on the PR and set the status.',
+          'Keep posting disabled if you only want a local review run.',
+        ],
+      };
+    case 'diff-too-large':
+      return {
+        why: 'The diff exceeded the configured safety limit and the review was skipped.',
+        nextSteps: [
+          'Raise `max-diff-lines` if the change is intentionally large.',
+          'Otherwise split the PR into smaller chunks and rerun the review.',
+        ],
+      };
+    case 'config-load-failed':
+      return {
+        why: 'The action could not load the repository config file.',
+        nextSteps: [
+          'Check `config-path` and confirm the file exists at the expected location.',
+          'Fix the config file and rerun the workflow after the file is readable and valid.',
+        ],
+      };
+    case 'stale-head-sha':
+      return {
+        why: 'The PR head changed before CodeAgora could post the review, so the result was skipped.',
+        nextSteps: [
+          'Rerun the workflow after the branch head is up to date.',
+          'If the PR keeps moving, post only after the branch is stable.',
+        ],
+      };
+    case 'github-post-failed':
+      return {
+        why: 'The review ran, but GitHub rejected one of the posting operations.',
+        nextSteps: [
+          'Check repository permissions, comment limits, and GitHub API availability.',
+          'Rerun after the posting issue is resolved, or disable posting if you only need local review output.',
+        ],
+      };
+    case 'sarif-write-failed':
+      return {
+        why: 'CodeAgora could not safely write the SARIF artifact path.',
+        nextSteps: [
+          'Check the configured SARIF output path and filesystem permissions.',
+          'Rerun after fixing the path or point SARIF output at a writable location.',
+        ],
+      };
+  }
+
+  return {
+    why: 'CodeAgora encountered a degraded action state.',
+    nextSteps: [
+      'Review the workflow logs and rerun after the underlying issue is resolved.',
+    ],
   };
 }
 

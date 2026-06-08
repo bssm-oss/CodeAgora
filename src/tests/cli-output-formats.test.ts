@@ -174,6 +174,24 @@ describe('formatHtml()', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Text format tests
+// ---------------------------------------------------------------------------
+
+describe('formatOutput(text)', () => {
+  it('adds next-step guidance for completed reviews', () => {
+    const text = formatOutput(makeSuccessResult(), 'text');
+    expect(text).toContain('Session 2025-01-15/001');
+    expect(text).toContain('Next:');
+    expect(text).toContain('agora explain 2025-01-15/001');
+  });
+
+  it('adds next-step guidance for error reviews', () => {
+    const text = formatOutput(makeErrorResult(), 'text');
+    expect(text).toContain('Next: run `agora doctor`');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // JUnit XML format tests
 // ---------------------------------------------------------------------------
 
