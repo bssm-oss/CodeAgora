@@ -1,10 +1,10 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-05 -->
 
 # packages
 
 ## Purpose
-Monorepo workspace containing scoped packages (`@codeagora/*`) that implement the multi-LLM code review pipeline. Each package has a focused responsibility: shared utilities and types, core review logic (L0-L3), CLI entrypoint, GitHub integration, and MCP server support.
+Monorepo workspace containing scoped packages (`@codeagora/*`) that implement the multi-LLM code review pipeline. Each package has a focused responsibility: shared utilities and types, core review logic (L0-L3), CLI entrypoint, GitHub integration, MCP server support, and private-preview desktop UI.
 
 ## Subdirectories
 
@@ -15,6 +15,7 @@ Monorepo workspace containing scoped packages (`@codeagora/*`) that implement th
 | `cli/` | CLI entrypoint (`codeagora` / `agora` commands), command definitions, formatters, user prompts — orchestrates core pipeline |
 | `github/` | GitHub PR integration: diff parsing, SARIF generation, comment posting, deduplication, Actions support |
 | `mcp/` | MCP (Model Context Protocol) server with 9 tools exposing review pipeline to Claude and other MCP clients |
+| `desktop/` | Private-preview Tauri app over existing CLI/core/session/config contracts; not a stable public surface |
 
 ## For AI Agents
 
@@ -39,7 +40,7 @@ Monorepo workspace containing scoped packages (`@codeagora/*`) that implement th
 **Dependencies Flow:**
 - `shared` — no internal deps, foundation layer
 - `core` — depends on `shared`
-- `cli`, `github`, `mcp` — depend on `core` and `shared`
+- `cli`, `github`, `mcp`, `desktop` — depend on `core`/`shared` contracts, directly or through CLI/session artifacts
 - `cli` also depends on `github` (orchestration)
 - `mcp` also depends on `cli` (tools expose CLI functions)
 
@@ -88,6 +89,13 @@ Monorepo workspace containing scoped packages (`@codeagora/*`) that implement th
 - `cli` ← `core`, `github`, `shared`
 - `github` ← `core`, `shared`
 - `mcp` ← `core`, `cli`, `shared`
+- `desktop` ← CLI/core contracts, shared i18n/types, Tauri bridge
+
+### Package Boundaries
+- `shared` must remain the low-level foundation; do not pull `core`, `cli`, `github`, `mcp`, or `desktop` into it.
+- `core` owns review semantics. Surface packages may adapt input/output but should not invent verdict, finding, confidence, session, or config semantics.
+- `github` and `mcp` should keep errors structured and caller-actionable; do not throw raw transport/provider details into user-facing output.
+- `desktop` is private preview. Touching desktop code may require `pnpm rc:desktop-gate`.
 
 ### External (Notable)
 - `ai` (Vercel AI SDK) — multi-provider LLM abstraction

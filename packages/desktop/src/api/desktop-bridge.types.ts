@@ -72,6 +72,33 @@ export interface ProviderStatus {
   binary?: string;
 }
 
+export interface DoctorCheck {
+  name: string;
+  status: string;
+  message: string;
+}
+
+export interface DoctorSummary {
+  pass: number;
+  fail: number;
+  warn: number;
+}
+
+export interface LiveCheckResult {
+  provider: string;
+  model: string;
+  status: string;
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface LiveDoctorStatus {
+  command: string;
+  checks: DoctorCheck[];
+  summary: DoctorSummary;
+  liveChecks: LiveCheckResult[];
+}
+
 export interface McpStatus {
   command: string;
   tools: string[];

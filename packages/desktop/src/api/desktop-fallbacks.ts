@@ -3,6 +3,7 @@ import type {
   SessionDetail,
   RepoInfo,
   ProviderStatus,
+  LiveDoctorStatus,
   McpStatus,
   GitHubActionStatus,
   EvidenceStatus,
@@ -120,6 +121,15 @@ export function fallbackProviderStatus(): ProviderStatus[] {
     { name: 'anthropic', kind: 'api', envVar: 'ANTHROPIC_API_KEY', configured: false },
     { name: 'codex', kind: 'cli', binary: 'codex', configured: false },
   ];
+}
+
+export function fallbackLiveDoctorStatus(): LiveDoctorStatus {
+  return {
+    command: 'agora doctor --live --json',
+    checks: [],
+    summary: { pass: 0, fail: 0, warn: 0 },
+    liveChecks: [],
+  };
 }
 
 export function fallbackMcpStatus(): McpStatus {

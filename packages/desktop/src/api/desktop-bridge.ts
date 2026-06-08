@@ -8,6 +8,7 @@ import type {
   DesktopConfig,
   ConfigValidation,
   ProviderStatus,
+  LiveDoctorStatus,
   McpStatus,
   GitHubActionStatus,
   EvidenceStatus,
@@ -27,6 +28,7 @@ import {
   fallbackConfig,
   fallbackConfigValidation,
   fallbackProviderStatus,
+  fallbackLiveDoctorStatus,
   fallbackMcpStatus,
   fallbackGitHubActionStatus,
   fallbackEvidenceStatus,
@@ -250,6 +252,12 @@ export async function getProviderStatus(): Promise<ProviderStatus[]> {
   const result = await tauriCall<ProviderStatus[]>('get_provider_status');
   if (result) return result;
   return fallbackProviderStatus();
+}
+
+export async function getLiveDoctorStatus(): Promise<LiveDoctorStatus> {
+  const result = await tauriCall<LiveDoctorStatus>('get_live_doctor_status');
+  if (result) return result;
+  return fallbackLiveDoctorStatus();
 }
 
 export async function getMcpStatus(): Promise<McpStatus> {

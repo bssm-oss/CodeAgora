@@ -1,9 +1,9 @@
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-05 -->
 
 # CodeAgora
 
 ## Purpose
-Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Distributed as a CLI tool, GitHub Action, MCP server, and future desktop app.
+Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Supported release surfaces are the CLI, GitHub Action, and MCP server; the Tauri desktop app is private preview.
 
 ## Key Files
 
@@ -16,6 +16,8 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 | `vitest.config.ts` | Test config — tests live in `src/tests/`, aliases resolve to package sources |
 | `eslint.config.js` | Flat ESLint config — TypeScript strict + React hooks |
 | `action.yml` | GitHub Actions composite action for PR review integration |
+| `scripts/` | Release, benchmark, package-smoke, evidence, and bundle automation |
+| `benchmarks/` | Golden-bug fixtures, configs, references, and benchmark evidence inputs |
 | `.env.example` | Environment variable template for API keys |
 | `.reviewignore` | Patterns to exclude from code review diffs |
 | `.npmignore` | npm publish exclusions |
@@ -30,6 +32,8 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 | `examples/` | Example projects for testing (see `examples/AGENTS.md`) |
 | `assets/` | Static assets — logos, images (see `assets/AGENTS.md`) |
 | `.github/` | GitHub Actions workflows, issue templates (see `.github/AGENTS.md`) |
+| `scripts/` | Automation scripts for releases, benchmarks, action bundles, and evidence (see `scripts/AGENTS.md`) |
+| `benchmarks/` | Golden-bug benchmark fixtures and generated benchmark state (see `benchmarks/AGENTS.md`) |
 
 ## For AI Agents
 
@@ -39,6 +43,8 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 - Build workspace packages: `pnpm build` (runs recursive package builds)
 - Type-check package sources: `pnpm typecheck`
 - Run CLI in dev: `pnpm dev <command>`
+- Regenerate the bundled GitHub Action after action-source changes: `pnpm build:action`
+- Package/evidence smoke: `pnpm release:beta-smoke`, `pnpm evidence:manifest -- --require=rc`
 
 ### Architecture Overview
 ```
@@ -65,6 +71,12 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - Functional style preferred (pure functions, immutable data)
 - Shell args sanitized via `validateArg()` + `spawn()` (never `exec`)
 - Error handling: L1 try-catch, L2 Promise.allSettled, security boundaries use Result<T>
+
+### Scope Boundaries
+- Do not reintroduce retired web dashboard, terminal TUI, or notification package surfaces.
+- Do not describe desktop as stable public support; keep it private preview until separate graduation gates close.
+- Do not widen the stable release contract beyond CLI, GitHub Action, and MCP without explicit roadmap/evidence updates.
+- Do not treat deterministic tests as live provider or live GitHub evidence; release claims need the artifacts named in `docs/archived/RELEASE_EVIDENCE.md`.
 
 ## Repository Map
 
