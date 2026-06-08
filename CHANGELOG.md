@@ -440,8 +440,8 @@
 - **Security hardening** — CRITICAL 5 + HIGH 12 fixes (path traversal, SSRF, shell injection, credential storage)
 - **Tests** — 1817 → 2671 (+854 tests across 169 files)
 - **Architecture** — circular dependency resolution, orchestrator decomposition, type safety overhaul
-- **24+ API providers** — Groq, Anthropic, OpenAI, Google, DeepSeek, OpenRouter, + 18 more
-- **12 CLI backends** — Claude, Codex, Gemini, Copilot, Cursor, Aider, Goose, Cline, + 4 more
+- **6 curated API providers** — Anthropic, OpenAI, OpenRouter, OpenCode Go, OpenCode Zen, Groq
+- **8 CLI backends** — Claude Code, Codex CLI, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Cursor CLI, OpenCode, Pi
 - **models.dev integration** — external model catalog (3875 models) with pricing, context windows, capability metadata
 - **Environment auto-detection** — `agora init` detects API keys + CLI tools, generates dynamic presets
 - **Context-aware review** — surrounding source code in prompts (configurable via `--context-lines`)

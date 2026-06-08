@@ -26,8 +26,8 @@ describe('Config Validation', () => {
       },
       {
         id: 'r3',
-        backend: 'gemini',
-        model: 'gemini-flash',
+        backend: 'antigravity',
+        model: 'default',
         enabled: false,
         timeout: 120,
       },
@@ -172,6 +172,30 @@ describe('Config Validation', () => {
     expect(() => validateConfigData(configWithClaude)).not.toThrow();
   });
 
+  it('should accept antigravity and pi backends', () => {
+    const configWithNewCliBackends = {
+      ...validConfig,
+      reviewers: [
+        {
+          id: 'r1',
+          backend: 'antigravity' as const,
+          model: 'default',
+          enabled: true,
+          timeout: 120,
+        },
+        {
+          id: 'r2',
+          backend: 'pi' as const,
+          model: 'default',
+          enabled: true,
+          timeout: 120,
+        },
+      ],
+    };
+
+    expect(() => validateConfigData(configWithNewCliBackends)).not.toThrow();
+  });
+
   it('should accept api backend with provider', () => {
     const configWithApi = {
       ...validConfig,
@@ -215,7 +239,7 @@ describe('Config Validation', () => {
         {
           id: 'r1',
           backend: 'opencode' as const,
-          provider: 'kimi',
+          provider: 'opencode-go',
           model: 'kimi-k2.5',
           enabled: true,
           timeout: 120,

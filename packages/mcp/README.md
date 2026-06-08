@@ -49,9 +49,9 @@ Provider keys are required only for live review tools that call LLM providers. C
 
 - `OPENAI_API_KEY` for OpenAI models.
 - `ANTHROPIC_API_KEY` for Anthropic models.
-- `GOOGLE_GENERATIVE_AI_API_KEY` or `GOOGLE_API_KEY` for Gemini models.
 - `GROQ_API_KEY` for Groq models.
 - `OPENROUTER_API_KEY` for OpenRouter models.
+- `OPENCODE_API_KEY` for OpenCode Go and OpenCode Zen models.
 - `GITHUB_TOKEN` for PR review workflows that fetch or post GitHub data.
 
 Deterministic benchmark CI gates such as `pnpm bench:ci` do not require live provider keys. Manual live benchmark runs with `pnpm bench:fn:run` do.

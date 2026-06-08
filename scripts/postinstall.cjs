@@ -32,7 +32,7 @@ console.log(`    ${bold}$ agora init${reset}         ${dim}Auto-detect providers
 console.log(`    ${bold}$ agora review${reset}       ${dim}Run your first code review${reset}`);
 console.log(`    ${bold}$ agora language${reset}     ${dim}Switch language (en/ko)${reset}`);
 console.log('');
-console.log(`  ${yellow}Free tier:${reset} ${dim}Groq + GitHub Models = unlimited free reviews${reset}`);
+console.log(`  ${yellow}Free tier:${reset} ${dim}Groq can run low-cost/free API-backed reviews${reset}`);
 console.log('');
 console.log(`  ${cyan}Integrations:${reset}`);
 console.log(`    ${dim}npm i -g @codeagora/mcp${reset}   ${dim}→ Claude Code / Cursor${reset}`);

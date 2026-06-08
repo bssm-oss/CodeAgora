@@ -127,16 +127,16 @@ describe('generateMultiProviderTemplate', () => {
     const parsed = JSON.parse(output);
     expect(parsed.supporters.pool).toHaveLength(3);
     const providers = parsed.supporters.pool.map((s: any) => s.provider);
-    expect(providers).toContain('deepinfra');
-    expect(providers).toContain('moonshot');
-    expect(providers).toContain('siliconflow');
+    expect(providers).toContain('openai');
+    expect(providers).toContain('anthropic');
+    expect(providers).toContain('opencode-zen');
   });
 
   it('should have L3 head using flagship provider (anthropic)', () => {
     const output = generateMultiProviderTemplate('json');
     const parsed = JSON.parse(output);
     expect(parsed.head.provider).toBe('anthropic');
-    expect(parsed.head.model).toBe('claude-opus-4-6');
+    expect(parsed.head.model).toBe('claude-sonnet-4-6');
   });
 
   it('should start with the multi-provider YAML header', () => {

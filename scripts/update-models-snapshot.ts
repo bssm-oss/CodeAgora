@@ -19,21 +19,16 @@ const API_URL = 'https://models.dev/api.json';
 
 /** CodeAgora provider IDs from PROVIDER_ENV_VARS */
 const CA_PROVIDERS = [
-  'nvidia-nim', 'groq', 'openrouter', 'google', 'mistral',
-  'cerebras', 'together', 'xai', 'openai', 'anthropic',
-  'deepseek', 'qwen', 'zai', 'github-models', 'github-copilot',
-  'fireworks', 'cohere', 'deepinfra', 'moonshot', 'perplexity',
-  'huggingface', 'baseten', 'siliconflow', 'novita',
+  'anthropic',
+  'openai',
+  'openrouter',
+  'opencode-go',
+  'opencode-zen',
+  'groq',
 ];
 
 /** Maps CodeAgora provider IDs to models.dev IDs (only where they differ) */
 const PROVIDER_ID_MAP: Record<string, string> = {
-  'nvidia-nim': 'nvidia',
-  'together': 'togetherai',
-  'qwen': 'alibaba',
-  'fireworks': 'fireworks-ai',
-  'moonshot': 'moonshotai',
-  'novita': 'novita-ai',
 };
 
 function toModelsDevId(caId: string): string {

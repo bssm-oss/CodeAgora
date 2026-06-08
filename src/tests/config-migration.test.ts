@@ -47,7 +47,7 @@ const baseConfig: Config = {
 const apiOnlyConfig: Config = {
   reviewers: [
     { id: 'r1', backend: 'api', provider: 'groq', model: 'llama-3.3-70b-versatile', enabled: true, timeout: 120 },
-    { id: 'r2', backend: 'api', provider: 'google', model: 'gemini-2.5-flash', enabled: true, timeout: 120 },
+    { id: 'r2', backend: 'api', provider: 'openrouter', model: 'openai/gpt-4o-mini', enabled: true, timeout: 120 },
   ],
   supporters: {
     pool: [
@@ -138,7 +138,7 @@ describe('migrateConfig()', () => {
     expect(result.migrated).toBe(true);
     expect(result.warnings).toHaveLength(0);
 
-    // r1 codex → openrouter, r2 gemini → google, r3 opencode → openrouter (provider kept),
+    // r1 codex → openrouter, r2 gemini → openrouter, r3 opencode → openrouter (provider kept),
     // r4 claude → openrouter, sp1, sp2, devil, moderator
     const ids = result.changes.map((c) => c.reviewerId);
     expect(ids).toContain('r1');
@@ -159,11 +159,11 @@ describe('migrateConfig()', () => {
     expect(change.to.provider).toBe('openrouter');
   });
 
-  it('maps gemini → google', () => {
+  it('maps gemini → openrouter', () => {
     const result = migrateConfig(baseConfig);
     const change = result.changes.find((c) => c.reviewerId === 'r2')!;
     expect(change.from.backend).toBe('gemini');
-    expect(change.to.provider).toBe('google');
+    expect(change.to.provider).toBe('openrouter');
   });
 
   it('maps claude → openrouter', () => {
@@ -254,7 +254,7 @@ describe('applyMigration()', () => {
     const reviewers = migrated.reviewers as Array<{ id: string; backend: string; provider?: string }>;
     const r2 = reviewers.find((r) => r.id === 'r2')!;
     expect(r2.backend).toBe('api');
-    expect(r2.provider).toBe('google');
+    expect(r2.provider).toBe('openrouter');
   });
 });
 
@@ -268,7 +268,7 @@ describe('mixed config (partial CLI backends)', () => {
     reviewers: [
       { id: 'r1', backend: 'api', provider: 'groq', model: 'llama-3.3-70b-versatile', enabled: true, timeout: 120 },
       { id: 'r2', backend: 'gemini', model: 'gemini-flash', enabled: true, timeout: 120 },
-      { id: 'r3', backend: 'api', provider: 'google', model: 'gemini-2.5-pro', enabled: true, timeout: 120 },
+      { id: 'r3', backend: 'api', provider: 'openrouter', model: 'openai/gpt-4o-mini', enabled: true, timeout: 120 },
     ],
   };
 
@@ -293,7 +293,7 @@ describe('mixed config (partial CLI backends)', () => {
 
     const r3 = reviewers.find((r) => r.id === 'r3')!;
     expect(r3.backend).toBe('api');
-    expect(r3.provider).toBe('google');
+    expect(r3.provider).toBe('openrouter');
   });
 
   it('migrates the CLI-backed reviewer to api', () => {
@@ -303,7 +303,7 @@ describe('mixed config (partial CLI backends)', () => {
     const reviewers = migrated.reviewers as Array<{ id: string; backend: string; provider?: string }>;
     const r2 = reviewers.find((r) => r.id === 'r2')!;
     expect(r2.backend).toBe('api');
-    expect(r2.provider).toBe('google');
+    expect(r2.provider).toBe('openrouter');
   });
 });
 
@@ -413,6 +413,6 @@ describe('fallback migration', () => {
     const r1 = reviewers.find((r) => r.id === 'r1')!;
     expect(r1.backend).toBe('api');
     expect(r1.fallback?.backend).toBe('api');
-    expect(r1.fallback?.provider).toBe('google');
+    expect(r1.fallback?.provider).toBe('openrouter');
   });
 });

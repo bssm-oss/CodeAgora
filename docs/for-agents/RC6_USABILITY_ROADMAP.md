@@ -182,9 +182,7 @@ Expected changes:
   - why CodeAgora degraded/skipped,
   - exact next step.
 - Job summary or log blocks clearly show verdict/degraded reason and links to artifacts when available.
-- Docs provide two clear paths:
-  - low-friction GitHub Models path,
-  - external provider secret path.
+- Docs provide one clear GitHub Action path with retained provider secrets.
 - Generated workflow template stays in sync with docs and current release ref.
 
 Acceptance criteria:

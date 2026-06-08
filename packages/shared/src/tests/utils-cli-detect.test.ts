@@ -17,8 +17,17 @@ beforeEach(() => {
 });
 
 describe('CLI_BACKENDS constant', () => {
-  it('contains at least 10 backends', () => {
-    expect(CLI_BACKENDS.length).toBeGreaterThanOrEqual(10);
+  it('contains the curated backend list', () => {
+    expect(CLI_BACKENDS.map((b) => b.backend)).toEqual([
+      'antigravity',
+      'claude',
+      'codex',
+      'copilot',
+      'cursor',
+      'gemini',
+      'opencode',
+      'pi',
+    ]);
   });
 
   it('every entry has non-empty backend and bin fields', () => {
@@ -42,9 +51,12 @@ describe('CLI_BACKENDS constant', () => {
   });
 
   it('kiro backend uses kiro-cli binary', () => {
-    const kiro = CLI_BACKENDS.find((b) => b.backend === 'kiro');
-    expect(kiro).toBeDefined();
-    expect(kiro!.bin).toBe('kiro-cli');
+    expect(CLI_BACKENDS.map((b) => b.backend)).not.toContain('kiro');
+  });
+
+  it('antigravity and pi use their documented binaries', () => {
+    expect(CLI_BACKENDS.find((b) => b.backend === 'antigravity')!.bin).toBe('agy');
+    expect(CLI_BACKENDS.find((b) => b.backend === 'pi')!.bin).toBe('pi');
   });
 });
 

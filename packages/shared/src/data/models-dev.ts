@@ -71,14 +71,7 @@ export type ModelsCatalog = z.infer<typeof ModelsCatalogSchema>;
 // ---------------------------------------------------------------------------
 
 /** Maps CodeAgora provider IDs to models.dev provider IDs (only where they differ). */
-export const PROVIDER_ID_MAP: Record<string, string> = {
-  'nvidia-nim': 'nvidia',
-  together: 'togetherai',
-  qwen: 'alibaba',
-  fireworks: 'fireworks-ai',
-  moonshot: 'moonshotai',
-  novita: 'novita-ai',
-};
+export const PROVIDER_ID_MAP: Record<string, string> = {};
 
 /** Reverse map: models.dev ID → CodeAgora ID */
 const REVERSE_PROVIDER_ID_MAP: Record<string, string> = Object.fromEntries(
@@ -256,7 +249,7 @@ export function sortByCost(models: ModelEntry[]): ModelEntry[] {
 /**
  * Get the top N review-capable models from a provider, sorted by cost.
  * @param catalog - The loaded models catalog
- * @param providerId - CodeAgora provider ID (e.g. "groq", "nvidia-nim")
+ * @param providerId - CodeAgora provider ID (e.g. "groq", "openrouter")
  * @param n - Maximum number of models to return
  */
 export function getTopModels(
@@ -277,7 +270,7 @@ export function getTopModels(
 /**
  * Get statistics about a provider's models.
  * @param catalog - The loaded models catalog
- * @param providerId - CodeAgora provider ID (e.g. "groq", "nvidia-nim")
+ * @param providerId - CodeAgora provider ID (e.g. "groq", "openrouter")
  */
 export function getProviderStats(
   catalog: ModelsCatalog,

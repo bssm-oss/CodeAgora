@@ -61,7 +61,7 @@ Foundation layer providing types, utilities, config schemas, validators, i18n, a
 **Provider Mapping:**
 - `PROVIDER_ENV_VARS` — Single source of truth: provider name → environment variable name
 - Used by CLI to load credentials from environment at startup
-- Supported: 'openai', 'anthropic', 'groq', 'google', 'mistral', 'cerebras', 'together', 'xai', 'deepseek', 'qwen', 'zai', 'github-models', 'nvidia-nim', 'openrouter', etc.
+- Supported API providers: 'anthropic', 'openai', 'openrouter', 'opencode-go', 'opencode-zen', 'groq'.
 
 **Meme Mode:**
 - `getMemeVerdict(verdict)` — Return alternate text pool for verdict message

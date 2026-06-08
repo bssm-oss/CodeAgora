@@ -72,43 +72,43 @@ function makeCatalog(): ModelsCatalog {
         isReasoning: false,
       },
       {
-        source: 'google',
-        model_id: 'google/gemini-2.5-flash',
-        name: 'Gemini 2.5 Flash',
+        source: 'openai',
+        model_id: 'openai/gpt-4o-mini',
+        name: 'GPT-4o Mini',
         context: '1000k',
         aa_intelligence: 40,
         aa_price_input: 0.00015,
         aa_price_output: 0.0006,
         aa_context: '1000k',
-        provider: 'google',
+        provider: 'openai',
         isFree: false,
         contextWindow: 1024000,
         isReasoning: false,
       },
       {
-        source: 'cerebras',
-        model_id: 'cerebras/llama-3.3-70b',
-        name: 'Llama 3.3 70B (Cerebras)',
+        source: 'opencode-go',
+        model_id: 'opencode-go/deepseek-v4-flash',
+        name: 'DeepSeek V4 Flash (OpenCode Go)',
         context: '128k',
         aa_intelligence: 28,
         aa_price_input: 0,
         aa_price_output: 0,
         aa_context: '128k',
-        provider: 'cerebras',
+        provider: 'opencode-go',
         isFree: true,
         contextWindow: 131072,
         isReasoning: false,
       },
       {
-        source: 'mistral',
-        model_id: 'mistral/mistral-large-latest',
-        name: 'Mistral Large',
+        source: 'anthropic',
+        model_id: 'anthropic/claude-sonnet-4-6',
+        name: 'Claude Sonnet',
         context: '128k',
         aa_intelligence: 35,
         aa_price_input: 0.002,
         aa_price_output: 0.006,
         aa_context: '128k',
-        provider: 'mistral',
+        provider: 'anthropic',
         isFree: false,
         contextWindow: 131072,
         isReasoning: false,
@@ -150,10 +150,10 @@ describe('generatePresets()', () => {
   });
 
   it('generates quick preset from first detected provider', () => {
-    const presets = generatePresets(makeEnv(['google']), null);
+    const presets = generatePresets(makeEnv(['openai']), null);
     const quick = presets.find((p) => p.id === 'quick');
     expect(quick).toBeDefined();
-    expect(quick!.providers).toEqual(['google']);
+    expect(quick!.providers).toEqual(['openai']);
     expect(quick!.reviewerCount).toBe(1);
     expect(quick!.discussion).toBe(false);
   });
@@ -165,21 +165,20 @@ describe('generatePresets()', () => {
     expect(free!.providers).toContain('groq');
   });
 
-  it('generates free preset when cerebras is detected', () => {
-    const presets = generatePresets(makeEnv(['cerebras']), null);
+  it('does not generate free preset when only OpenCode Go is detected', () => {
+    const presets = generatePresets(makeEnv(['opencode-go']), null);
     const free = presets.find((p) => p.id === 'free');
-    expect(free).toBeDefined();
-    expect(free!.providers).toContain('cerebras');
+    expect(free).toBeUndefined();
   });
 
   it('does not generate free preset when only paid providers detected', () => {
-    const presets = generatePresets(makeEnv(['google', 'mistral']), null);
+    const presets = generatePresets(makeEnv(['openai', 'anthropic']), null);
     const free = presets.find((p) => p.id === 'free');
     expect(free).toBeUndefined();
   });
 
   it('generates thorough preset with multi-provider when 2+ detected', () => {
-    const presets = generatePresets(makeEnv(['groq', 'google', 'mistral']), null);
+    const presets = generatePresets(makeEnv(['groq', 'openai', 'anthropic']), null);
     const thorough = presets.find((p) => p.id === 'thorough');
     expect(thorough).toBeDefined();
     expect(thorough!.providers.length).toBeGreaterThanOrEqual(2);
@@ -188,10 +187,10 @@ describe('generatePresets()', () => {
   });
 
   it('generates thorough preset with single provider when only 1 detected', () => {
-    const presets = generatePresets(makeEnv(['google']), null);
+    const presets = generatePresets(makeEnv(['openai']), null);
     const thorough = presets.find((p) => p.id === 'thorough');
     expect(thorough).toBeDefined();
-    expect(thorough!.providers).toEqual(['google']);
+    expect(thorough!.providers).toEqual(['openai']);
     expect(thorough!.reviewerCount).toBe(3);
     expect(thorough!.discussion).toBe(true);
   });
@@ -220,7 +219,7 @@ describe('generatePresets()', () => {
 
   it('caps thorough preset providers at 4', () => {
     const presets = generatePresets(
-      makeEnv(['groq', 'google', 'mistral', 'openrouter', 'cerebras', 'together']),
+      makeEnv(['groq', 'openai', 'anthropic', 'openrouter', 'opencode-go', 'together']),
       null,
     );
     const thorough = presets.find((p) => p.id === 'thorough');
@@ -230,7 +229,7 @@ describe('generatePresets()', () => {
 
   it('caps thorough preset reviewerCount at 5', () => {
     const presets = generatePresets(
-      makeEnv(['groq', 'google', 'mistral', 'openrouter']),
+      makeEnv(['groq', 'openai', 'anthropic', 'openrouter']),
       null,
     );
     const thorough = presets.find((p) => p.id === 'thorough');
@@ -248,7 +247,7 @@ describe('buildMultiProviderConfig()', () => {
     const params: MultiProviderConfigParams = {
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b-versatile', backend: 'api' },
-        { provider: 'google', model: 'gemini-2.5-flash', backend: 'api' },
+        { provider: 'openai', model: 'gpt-4o-mini', backend: 'api' },
       ],
       reviewerCount: 4,
       discussion: true,
@@ -257,11 +256,11 @@ describe('buildMultiProviderConfig()', () => {
     const reviewers = config.reviewers;
 
     expect(reviewers).toHaveLength(4);
-    // Even distribution: r1=groq, r2=google, r3=groq, r4=google
+    // Even distribution: r1=groq, r2=openai, r3=groq, r4=openai
     expect(reviewers[0]!.provider).toBe('groq');
-    expect(reviewers[1]!.provider).toBe('google');
+    expect(reviewers[1]!.provider).toBe('openai');
     expect(reviewers[2]!.provider).toBe('groq');
-    expect(reviewers[3]!.provider).toBe('google');
+    expect(reviewers[3]!.provider).toBe('openai');
   });
 
   it('works with single provider', () => {
@@ -286,7 +285,7 @@ describe('buildMultiProviderConfig()', () => {
     const config = buildMultiProviderConfig({
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b-versatile', backend: 'api' },
-        { provider: 'google', model: 'gemini-2.5-flash', backend: 'api' },
+        { provider: 'openai', model: 'gpt-4o-mini', backend: 'api' },
       ],
       reviewerCount: 3,
       discussion: true,
@@ -315,7 +314,7 @@ describe('buildMultiProviderConfig()', () => {
     const config = buildMultiProviderConfig({
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b-versatile', backend: 'api' },
-        { provider: 'google', model: 'gemini-2.5-flash', backend: 'api' },
+        { provider: 'openai', model: 'gpt-4o-mini', backend: 'api' },
       ],
       reviewerCount: 2,
       discussion: true,
@@ -324,7 +323,7 @@ describe('buildMultiProviderConfig()', () => {
     const supporterPool = config.supporters.pool;
     expect(supporterPool).toHaveLength(1);
     // Supporter uses second provider for diversity
-    expect(supporterPool[0]!.provider).toBe('google');
+    expect(supporterPool[0]!.provider).toBe('openai');
   });
 
   it('uses same provider for supporter when single provider', () => {
@@ -343,29 +342,29 @@ describe('buildMultiProviderConfig()', () => {
     const config = buildMultiProviderConfig({
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b-versatile', backend: 'api', contextWindow: 131072 },
-        { provider: 'google', model: 'gemini-2.5-flash', backend: 'api', contextWindow: 1024000 },
+        { provider: 'openai', model: 'gpt-4o-mini', backend: 'api', contextWindow: 1024000 },
       ],
       reviewerCount: 2,
       discussion: true,
     });
 
-    expect(config.moderator.provider).toBe('google');
-    expect(config.moderator.model).toBe('gemini-2.5-flash');
+    expect(config.moderator.provider).toBe('openai');
+    expect(config.moderator.model).toBe('gpt-4o-mini');
   });
 
   it('uses head with same model as moderator', () => {
     const config = buildMultiProviderConfig({
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b-versatile', backend: 'api', contextWindow: 131072 },
-        { provider: 'google', model: 'gemini-2.5-flash', backend: 'api', contextWindow: 1024000 },
+        { provider: 'openai', model: 'gpt-4o-mini', backend: 'api', contextWindow: 1024000 },
       ],
       reviewerCount: 2,
       discussion: true,
     });
 
     const head = config['head'] as Record<string, unknown>;
-    expect(head['provider']).toBe('google');
-    expect(head['model']).toBe('gemini-2.5-flash');
+    expect(head['provider']).toBe('openai');
+    expect(head['model']).toBe('gpt-4o-mini');
   });
 
   it('sets discussion maxRounds > 0 when discussion is true', () => {
@@ -434,8 +433,8 @@ describe('buildMultiProviderConfig()', () => {
     const config = buildMultiProviderConfig({
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b', backend: 'api' },
-        { provider: 'google', model: 'gemini-2.5-flash', backend: 'api' },
-        { provider: 'mistral', model: 'mistral-large', backend: 'api' },
+        { provider: 'openai', model: 'gpt-4o-mini', backend: 'api' },
+        { provider: 'anthropic', model: 'claude-sonnet-4-6', backend: 'api' },
       ],
       reviewerCount: 5,
       discussion: true,
@@ -443,12 +442,12 @@ describe('buildMultiProviderConfig()', () => {
 
     const reviewers = config.reviewers;
     expect(reviewers).toHaveLength(5);
-    // r1=groq, r2=google, r3=mistral, r4=groq, r5=google
+    // r1=groq, r2=openai, r3=anthropic, r4=groq, r5=openai
     expect(reviewers[0]!.provider).toBe('groq');
-    expect(reviewers[1]!.provider).toBe('google');
-    expect(reviewers[2]!.provider).toBe('mistral');
+    expect(reviewers[1]!.provider).toBe('openai');
+    expect(reviewers[2]!.provider).toBe('anthropic');
     expect(reviewers[3]!.provider).toBe('groq');
-    expect(reviewers[4]!.provider).toBe('google');
+    expect(reviewers[4]!.provider).toBe('openai');
   });
 
   it('supports cli backend', () => {
@@ -530,7 +529,7 @@ describe('buildCustomConfig backward compatibility', () => {
 
 describe('catalog unavailable fallback', () => {
   it('generatePresets works with null catalog', () => {
-    const presets = generatePresets(makeEnv(['groq', 'google']), null);
+    const presets = generatePresets(makeEnv(['groq', 'openai']), null);
     expect(presets.length).toBeGreaterThan(0);
     // Models should fall back to PROVIDER_DEFAULT_MODELS
     const quick = presets.find((p) => p.id === 'quick');

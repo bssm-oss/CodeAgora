@@ -300,8 +300,8 @@ describe('generatePresets()', () => {
       { name: 'groq', available: true },
       { name: 'anthropic', available: true },
       { name: 'openai', available: true },
-      { name: 'google', available: true },
-      { name: 'mistral', available: true },
+      { name: 'openai', available: true },
+      { name: 'anthropic', available: true },
     ]);
     const presets = generatePresets(env, null);
     const thorough = presets.find((p) => p.id === 'thorough');

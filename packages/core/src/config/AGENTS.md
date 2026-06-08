@@ -107,8 +107,9 @@ None (configuration utilities)
 credentials = {
   openai_api_key: process.env.OPENAI_API_KEY,
   anthropic_api_key: process.env.ANTHROPIC_API_KEY,
-  google_api_key: process.env.GOOGLE_API_KEY,
-  github_token: process.env.GITHUB_TOKEN,
+  openrouter_api_key: process.env.OPENROUTER_API_KEY,
+  opencode_api_key: process.env.OPENCODE_API_KEY,
+  groq_api_key: process.env.GROQ_API_KEY,
 }
 ```
 

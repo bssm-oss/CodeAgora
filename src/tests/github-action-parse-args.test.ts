@@ -132,8 +132,18 @@ describe('github-action production policy', () => {
     });
   });
 
-  it('runs same-repository PRs with only GITHUB_TOKEN for GitHub Models', () => {
+  it('skips same-repository PRs when no provider secret is configured', () => {
     expect(determineActionPolicy(baseInputs, env({ GITHUB_TOKEN: TOKEN }))).toEqual({
+      shouldRunReview: false,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'missing-provider-secrets',
+      verdictOverride: 'SKIPPED',
+    });
+  });
+
+  it('runs same-repository PRs when a retained provider secret is configured', () => {
+    expect(determineActionPolicy(baseInputs, env({ GITHUB_TOKEN: TOKEN, OPENROUTER_API_KEY: 'test' }))).toEqual({
       shouldRunReview: true,
       shouldPostResults: true,
       degraded: false,
@@ -162,9 +172,8 @@ describe('github-action production policy', () => {
     });
   });
 
-  it('detects provider credentials while allowing callers to exclude GITHUB_TOKEN', () => {
-    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }))).toBe(true);
-    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }), { allowGitHubTokenAsProvider: false })).toBe(false);
+  it('detects only retained provider credentials, not GITHUB_TOKEN', () => {
+    expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN }))).toBe(false);
     expect(hasProviderCredentials(env({ GITHUB_TOKEN: TOKEN, OPENAI_API_KEY: 'sk-test' }))).toBe(true);
   });
 
@@ -211,8 +220,8 @@ describe('github-action production policy', () => {
     const missingSecrets = getActionGuidance('missing-provider-secrets');
     expect(missingSecrets.why).toContain('provider credential');
     expect(missingSecrets.nextSteps).toEqual(expect.arrayContaining([
-      expect.stringContaining('GitHub Models path'),
       expect.stringContaining('provider secret'),
+      expect.stringContaining('CLI or MCP dry-run'),
     ]));
 
     const staleHead = getActionGuidance('stale-head-sha');

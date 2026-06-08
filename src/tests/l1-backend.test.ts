@@ -106,7 +106,7 @@ describe('executeBackend() CLI backends – successful execution', () => {
   });
 
   it('writes prompt to stdin for all CLI backends (prompt not embedded in args)', async () => {
-    const stdinBackends = ['copilot', 'aider', 'goose', 'cline', 'qwen-code', 'vibe', 'kiro', 'cursor'] as const;
+    const stdinBackends = ['copilot', 'cursor', 'antigravity', 'pi'] as const;
     for (const backend of stdinBackends) {
       const child = createMockChild('ok', '', 0);
       const writeSpy = vi.spyOn(child.stdin, 'write');
@@ -185,65 +185,29 @@ describe('executeBackend() dispatches correct CLI command per backend', () => {
     );
   });
 
-  it('spawns aider with stdin (prompt not in args)', async () => {
-    await executeBackend(makeInput({ backend: 'aider', model: 'gpt-4o', provider: undefined }));
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'aider',
-      ['--yes-always', '--no-auto-commits'],
-      expect.any(Object)
-    );
-  });
-
-  it('spawns goose with run --no-session (prompt via stdin)', async () => {
-    await executeBackend(makeInput({ backend: 'goose', model: 'gpt-4o', provider: undefined }));
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'goose',
-      ['run', '--no-session'],
-      expect.any(Object)
-    );
-  });
-
-  it('spawns cline with -y (prompt via stdin)', async () => {
-    await executeBackend(makeInput({ backend: 'cline', model: 'gpt-4o', provider: undefined }));
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'cline',
-      ['-y'],
-      expect.any(Object)
-    );
-  });
-
-  it('spawns qwen binary for qwen-code backend (prompt via stdin)', async () => {
-    await executeBackend(makeInput({ backend: 'qwen-code', model: 'qwen-coder', provider: undefined }));
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'qwen',
-      [],
-      expect.any(Object)
-    );
-  });
-
-  it('spawns vibe with no args (prompt via stdin)', async () => {
-    await executeBackend(makeInput({ backend: 'vibe', model: 'mistral-large', provider: undefined }));
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'vibe',
-      [],
-      expect.any(Object)
-    );
-  });
-
-  it('spawns kiro-cli for kiro backend (prompt via stdin)', async () => {
-    await executeBackend(makeInput({ backend: 'kiro', model: 'default', provider: undefined }));
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'kiro-cli',
-      ['chat', '--no-interactive', '--trust-all-tools'],
-      expect.any(Object)
-    );
-  });
-
   it('spawns agent binary for cursor backend (prompt via stdin)', async () => {
     await executeBackend(makeInput({ backend: 'cursor', model: 'gpt-4o', provider: undefined }));
     expect(mockSpawn).toHaveBeenCalledWith(
       'agent',
       [],
+      expect.any(Object)
+    );
+  });
+
+  it('spawns agy binary in print mode for antigravity backend', async () => {
+    await executeBackend(makeInput({ backend: 'antigravity', model: 'default', provider: undefined }));
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'agy',
+      ['-p', '--model', 'default'],
+      expect.any(Object)
+    );
+  });
+
+  it('spawns pi binary for pi backend (prompt via stdin)', async () => {
+    await executeBackend(makeInput({ backend: 'pi', model: 'default', provider: undefined }));
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'pi',
+      ['-p', '--model', 'default'],
       expect.any(Object)
     );
   });
