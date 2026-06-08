@@ -1,5 +1,50 @@
 # Live Benchmark Report
 
+Captured on 2026-06-08 from GitHub Actions.
+
+- Workflow: `Benchmark — golden-bug FN`
+- Run: https://github.com/bssm-oss/CodeAgora/actions/runs/27122547780
+- Job: https://github.com/bssm-oss/CodeAgora/actions/runs/27122547780/job/80042898650
+- Event: `workflow_dispatch`
+- Branch: `main`
+- Head SHA: `e16d2bcc17548dae688c49bd7fbacb09f6759630`
+- Config: `benchmarks/.ca/config.github-models.json`
+- Fixtures: `async-stale-profile-cache`, `fp-docs-only-runbook`
+- Head stage: enabled, `skip_head=false`
+- Fixture throttle: `delay_ms=30000`
+- Artifact: `bench-out`
+- Started: `2026-06-08T07:29:28Z`
+- Completed: `2026-06-08T07:30:38Z`
+
+## Live Subset Summary
+
+This run was intentionally scoped to a two-fixture representative subset because the full-provider benchmark path hit provider quota limits in this environment. The uploaded artifact still contains the live fixture outputs and the scorer output below.
+
+- Live fixtures executed: 2
+- Live fixture successes: 2
+- Live fixture errors: 0
+- Live tokens: 15,410
+- Live duration: 15.8s
+- Known provider cost: `0`
+- Unknown provider cost: yes
+- `async-stale-profile-cache`: 4 findings, `REJECT`, 12.1s, 10,127 tokens
+- `fp-docs-only-runbook`: 0 findings, `ACCEPT`, 3.7s, 5,283 tokens
+
+## Canonical Benchmark Evaluator Output
+
+The benchmark scorer still emits the canonical suite summary for the benchmark
+fixture set.
+
+```text
+total: 20 | recall: 14 | fp-regression: 6
+mean recall@3:  7.1%  @5:  7.1%  @10:  7.1%
+TP: 1  FP: 0  FN: 15  actual: 4  expected: 16
+precision: 100.0%  recall:  6.3%  F1: 11.8%  FP clean-rate: 100.0%
+FP regressions triggered: 0/6
+```
+
+## Historical Benchmark Report
+
 Captured on 2026-05-04 from GitHub Actions.
 
 - Workflow: `Benchmark -- golden-bug FN`
