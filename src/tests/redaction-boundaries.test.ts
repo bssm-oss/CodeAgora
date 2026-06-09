@@ -15,6 +15,7 @@ const rawSecret = 'OPENAI_API_KEY=sk-test-secret';
 const rawGithubToken = 'GITHUB_TOKEN=ghp_testsecret';
 const rawBearer = 'Authorization: Bearer test-secret';
 const rawBareBearer = 'Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature';
+const rawOpenRouterKeyUrl = 'https://openrouter.ai/workspaces/default/keys/8007d1a14cda52db0c4a6a6c56560c7c8215d8d9b056674e99d63461645182ca';
 const date = '2026-05-02';
 const sessionId = '001';
 
@@ -48,6 +49,13 @@ describe('redaction utilities', () => {
     expect(output).toContain('GITHUB_TOKEN=[REDACTED]');
     expect(output).toContain('Authorization: Bearer [REDACTED]');
     expect(output).toContain('Bearer [REDACTED]');
+  });
+
+  it('redacts provider key-management URLs from live API errors', () => {
+    const output = redactSecrets(`To increase, visit ${rawOpenRouterKeyUrl} and adjust the key's weekly limit`);
+
+    expect(output).not.toContain(rawOpenRouterKeyUrl);
+    expect(output).toContain('[REDACTED_URL]');
   });
 
   it('preserves structured fields while redacting nested values', () => {
