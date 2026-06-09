@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CodeAgora app icon">
+  <rect width="512" height="512" rx="34" fill="#ffffff"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M173 63h-60c-19 0-35 16-35 35v116c0 23-15 42-36 42 21 0 36 19 36 42v116c0 19 16 35 35 35h60"
+      stroke="#17195f" stroke-width="18"/>
+    <path d="M339 63h60c19 0 35 16 35 35v116c0 23 15 42 36 42-21 0-36 19-36 42v116c0 19-16 35-35 35h-60"
+      stroke="#17195f" stroke-width="18"/>
+    <path d="M178 198a91 91 0 0 1 156 0" stroke="#17195f" stroke-width="18"/>
+    <path d="M334 314a91 91 0 0 1-156 0" stroke="#17195f" stroke-width="18"/>
+    <circle cx="256" cy="256" r="58" stroke="#17195f" stroke-width="18"/>
+    <path d="M235 229l-27 27 27 27" stroke="#10b5c4" stroke-width="16"/>
+    <path d="M277 229l27 27-27 27" stroke="#10b5c4" stroke-width="16"/>
+    <path d="M256 225v62" stroke="#10b5c4" stroke-width="14"/>
+  </g>
+  <g fill="#10b5c4">
+    <circle cx="256" cy="145" r="22"/>
+    <circle cx="256" cy="367" r="22"/>
+    <circle cx="145" cy="256" r="22"/>
+    <circle cx="367" cy="256" r="22"/>
+  </g>
+</svg>
