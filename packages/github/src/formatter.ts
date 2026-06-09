@@ -411,7 +411,7 @@ export function buildSummaryBody(params: {
   const vb = VERDICT_BADGE[summary.decision] ?? { emoji: '\u2753', label: summary.decision };
   const triage = triageDocs(evidenceDocs);
   const triageStr = formatTriageCounts(triage.counts);
-  const metaParts = formatRoleMeta(summary, params.reviewRun);
+  const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
 
   lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
   lines.push('');
@@ -420,8 +420,8 @@ export function buildSummaryBody(params: {
   lines.push(`> ${summary.reasoning}`);
   lines.push('');
 
-  pushReviewCoverage(lines, summary, params.reviewRun);
-  pushNonBlockingQueues(lines, params.reviewRun, params.reviewQueues);
+  pushReviewCoverage(lines, summary, safeParams.reviewRun);
+  pushNonBlockingQueues(lines, safeParams.reviewRun, safeParams.reviewQueues);
 
   // Must Fix section
   if (triage.mustFix.length > 0) {
@@ -459,7 +459,7 @@ export function buildSummaryBody(params: {
 
   // Suggestions (collapsible). When review queues are present, they already
   // render suggestions/unconfirmed findings with clearer labels.
-  if (triage.ignore.length > 0 && !params.reviewQueues) {
+  if (triage.ignore.length > 0 && !safeParams.reviewQueues) {
     lines.push('<details>');
     lines.push(`<summary>${triage.ignore.length} suggestion(s)</summary>`);
     lines.push('');

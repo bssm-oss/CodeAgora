@@ -305,6 +305,41 @@ describe('buildSummaryBody', () => {
     expect(body).not.toContain('<summary>2 suggestion(s)</summary>');
   });
 
+  it('redacts reviewRun and reviewQueues before rendering public summary', () => {
+    const rawSecret = 'sk-testreviewsecret123456';
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only non-blocking queues remain.' }),
+      sessionId: '005-redaction',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        l1: {
+          ...makeReviewRun().l1,
+          models: [`openrouter/${rawSecret}`],
+        },
+        queues: {
+          activeFindings: 0,
+          suggestions: 1,
+          unconfirmed: 0,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [makeDoc({ issueTitle: `Leaked ${rawSecret}` })],
+        unconfirmed: [],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).not.toContain(rawSecret);
+    expect(body).toContain('[REDACTED]');
+  });
+
   it('hides hallucination-filter details from public queue output', () => {
     const removed = makeDoc({
       issueTitle: 'Imaginary SQL injection',

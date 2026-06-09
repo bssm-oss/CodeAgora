@@ -37,8 +37,6 @@ import {
   mergeReviewOutputsByReviewer,
   trackDA,
   generatePerformanceText,
-  uniqueForfeitedReviewerCount,
-  uniqueReviewerInputCount,
 } from './pipeline-helpers.js';
 import type { ReviewRunSummary } from './pipeline-helpers.js';
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
@@ -677,8 +675,8 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
         sessionId, date, status: 'success',
         summary: {
           decision: 'NEEDS_HUMAN', reasoning: 'Lightweight mode — no head verdict',
-          totalReviewers: uniqueReviewerInputCount(allReviewerInputs),
-          forfeitedReviewers: uniqueForfeitedReviewerCount(allReviewResults),
+          totalReviewers: allReviewerInputs.length,
+          forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
           severityCounts,
           topIssues: allEvidenceDocs.slice(0, 5).map(d => ({ severity: d.severity, filePath: d.filePath, lineRange: d.lineRange, title: d.issueTitle, confidence: d.confidenceTrace?.final ?? d.confidence })),
           totalDiscussions: moderatorReport.summary.totalDiscussions,
@@ -759,8 +757,8 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
       summary: {
         decision: headVerdict.decision,
         reasoning: headVerdict.reasoning,
-        totalReviewers: uniqueReviewerInputCount(allReviewerInputs),
-        forfeitedReviewers: uniqueForfeitedReviewerCount(allReviewResults),
+        totalReviewers: allReviewerInputs.length,
+        forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
         severityCounts,
         topIssues,
         totalDiscussions: moderatorReport.summary.totalDiscussions,
