@@ -3,6 +3,7 @@ const STANDALONE_SECRET_RE = /\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{8
 const ENCODED_TOKEN_RE = /\b(?:[A-Za-z0-9+/]{12,}={0,2}|[A-Za-z0-9_.~%-]*%[0-9A-Fa-f]{2}[A-Za-z0-9_.~%-]*)\b/g;
 const AUTHORIZATION_BEARER_TOKEN_RE = /\b(Authorization\s*:\s*Bearer\s+)([^\s"']+)/gi;
 const BEARER_TOKEN_RE = /\b(Bearer\s+)([A-Za-z0-9._~+/=-]+)/g;
+const OPENROUTER_KEY_URL_RE = /https:\/\/openrouter\.ai\/workspaces\/[^\s"'<>)]*\/keys\/[^\s"'<>)]*/g;
 
 function decodedVariants(value: string): string[] {
   const variants = [value];
@@ -41,6 +42,7 @@ export function redactSecrets(input: string): string {
     .replace(SECRET_ASSIGNMENT_RE, (_match, key: string) => `${key}=[REDACTED]`)
     .replace(AUTHORIZATION_BEARER_TOKEN_RE, (_match, prefix: string) => `${prefix}[REDACTED]`)
     .replace(BEARER_TOKEN_RE, (_match, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(OPENROUTER_KEY_URL_RE, '[REDACTED_URL]')
     .replace(STANDALONE_SECRET_RE, '[REDACTED]')
     .replace(ENCODED_TOKEN_RE, (match) => containsKnownSecret(match) ? '[REDACTED]' : match);
 }

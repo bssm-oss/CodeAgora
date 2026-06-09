@@ -148,6 +148,8 @@ async function main(): Promise<void> {
     supporterModelMap: result.supporterModelMap
       ? new Map(Object.entries(result.supporterModelMap))
       : undefined,
+    reviewRun: result.reviewRun,
+    reviewQueues: result.reviewQueues,
     options: {
       postSuggestions: ghIntegration?.postSuggestions,
       collapseDiscussions: ghIntegration?.collapseDiscussions,

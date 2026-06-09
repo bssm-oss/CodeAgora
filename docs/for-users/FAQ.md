@@ -29,7 +29,7 @@ The L3 head agent makes the final ACCEPT/REJECT/NEEDS_HUMAN verdict based on all
 
 ### How do I see past reviews?
 - CLI: `agora sessions` to list, `agora sessions show <date>/<id>` for details
-- Desktop app: the former web dashboard is being consolidated into a private preview cross-platform Tauri app
+- Desktop app: use the official cross-platform Tauri app for session browsing, result inspection, local review launch, and export workflows
 - Replay: `agora replay <date>/<id>` to re-render a past review
 
 ## Configuration

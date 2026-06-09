@@ -60,9 +60,9 @@ describe('Provider Registry', () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'test-key');
     vi.stubEnv('GROQ_API_KEY', 'test-key');
 
-    expect((getModel('anthropic', 'claude-sonnet-4-6') as any).modelId).toBe('claude-sonnet-4-6');
+    expect((getModel('anthropic', 'claude-haiku-4-5') as any).modelId).toBe('claude-haiku-4-5');
     expect((getModel('openai', 'gpt-4o-mini') as any).modelId).toBe('gpt-4o-mini');
-    expect((getModel('openrouter', 'anthropic/claude-sonnet-4.6') as any).modelId).toBe('anthropic/claude-sonnet-4.6');
+    expect((getModel('openrouter', 'qwen/qwen3.7-max') as any).modelId).toBe('qwen/qwen3.7-max');
     expect((getModel('groq', 'llama-3.3-70b-versatile') as any).modelId).toBe('llama-3.3-70b-versatile');
 
     expect(createAnthropic).toHaveBeenCalledOnce();

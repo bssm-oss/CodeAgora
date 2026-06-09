@@ -10,7 +10,7 @@ import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared
 export function registerStats(server: McpServer): void {
   server.tool(
     'get_stats',
-    'Show aggregate review session statistics. No LLM calls.',
+    'Use when you need audit/reporting totals for reviews already run in a workspace. Returns formatted session statistics text. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root.',
     {
       repo_path: z.string().optional().describe('Optional repo root override for session stats. Omit it when the server already runs in the target workspace; otherwise pass the exact workspace root.'),
     },

@@ -94,6 +94,14 @@ function getGuidance(code: string, message: string, details?: Record<string, unk
     guidance.push('Otherwise pass the exact workspace root, not a nested subdirectory or symlink.');
   }
 
+  if (code === 'CONFIG_GET_FAILED') {
+    if (details?.reason === 'missing-key') {
+      guidance.push('Run `agora config list` or call `config_get` without a key to see valid config keys.');
+    } else {
+      guidance.push('Run `agora init` in the workspace if CodeAgora has not been configured yet.');
+    }
+  }
+
   if (guidance.length === 0 && details?.repoPath != null) {
     guidance.push('If this is the right repo, retry with `repo_path` omitted or pass the workspace root exactly.');
   }

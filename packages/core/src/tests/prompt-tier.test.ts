@@ -95,7 +95,7 @@ describe('resolvePromptTier', () => {
     // frontier subscriptions).
     const config: AgentConfig = {
       id: 'r1',
-      model: 'claude-sonnet',
+      model: 'claude-opus-4-5',
       backend: 'claude',
       timeout: 120,
       enabled: true,

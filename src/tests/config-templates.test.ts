@@ -16,11 +16,11 @@ describe('generateFullTemplate', () => {
     expect(() => JSON.parse(output)).not.toThrow();
   });
 
-  it('should contain 3 reviewers in JSON output', () => {
+  it('should contain 5 reviewers in JSON output', () => {
     const output = generateFullTemplate('json');
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed.reviewers)).toBe(true);
-    expect(parsed.reviewers).toHaveLength(3);
+    expect(parsed.reviewers).toHaveLength(5);
   });
 
   it('should start with the full config YAML header', () => {
@@ -113,30 +113,31 @@ describe('generateMultiProviderTemplate', () => {
     expect(() => JSON.parse(output)).not.toThrow();
   });
 
-  it('should contain 5 reviewers from diverse providers (L1)', () => {
+  it('should contain 5 OpenRouter reviewers from diverse models (L1)', () => {
     const output = generateMultiProviderTemplate('json');
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed.reviewers)).toBe(true);
     expect(parsed.reviewers).toHaveLength(5);
     const providers = parsed.reviewers.map((r: any) => r.provider);
-    expect(new Set(providers).size).toBe(5); // all different providers
+    const models = parsed.reviewers.map((r: any) => r.model);
+    expect(new Set(providers)).toEqual(new Set(['openrouter']));
+    expect(new Set(models).size).toBe(5);
   });
 
-  it('should have L2 supporters from reasoning-capable providers', () => {
+  it('should have L2 supporters from OpenRouter reasoning-capable models', () => {
     const output = generateMultiProviderTemplate('json');
     const parsed = JSON.parse(output);
-    expect(parsed.supporters.pool).toHaveLength(3);
-    const providers = parsed.supporters.pool.map((s: any) => s.provider);
-    expect(providers).toContain('openai');
-    expect(providers).toContain('anthropic');
-    expect(providers).toContain('opencode-zen');
+    expect(parsed.supporters.pool).toHaveLength(2);
+    const models = parsed.supporters.pool.map((s: any) => s.model);
+    expect(models).toEqual(['z-ai/glm-5.1', 'minimax/minimax-m3']);
+    expect(parsed.supporters.pool.every((s: any) => s.provider === 'openrouter')).toBe(true);
   });
 
-  it('should have L3 head using flagship provider (anthropic)', () => {
+  it('should have L3 head using OpenRouter head model', () => {
     const output = generateMultiProviderTemplate('json');
     const parsed = JSON.parse(output);
-    expect(parsed.head.provider).toBe('anthropic');
-    expect(parsed.head.model).toBe('claude-sonnet-4-6');
+    expect(parsed.head.provider).toBe('openrouter');
+    expect(parsed.head.model).toBe('qwen/qwen3.7-max');
   });
 
   it('should start with the multi-provider YAML header', () => {
@@ -155,12 +156,13 @@ describe('generateMultiProviderTemplate', () => {
     expect(parsed).toHaveProperty('errorHandling');
   });
 
-  it('should use higher timeout for L2 supporters than L1 reviewers', () => {
+  it('should use review-grade timeouts for L2 supporters and L1 reviewers', () => {
     const output = generateMultiProviderTemplate('json');
     const parsed = JSON.parse(output);
     const reviewerTimeout = parsed.reviewers[0].timeout;
     const supporterTimeout = parsed.supporters.pool[0].timeout;
-    expect(supporterTimeout).toBeGreaterThan(reviewerTimeout);
+    expect(reviewerTimeout).toBeGreaterThanOrEqual(120);
+    expect(supporterTimeout).toBeGreaterThanOrEqual(reviewerTimeout);
   });
 });
 

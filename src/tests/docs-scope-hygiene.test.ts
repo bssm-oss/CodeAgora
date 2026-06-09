@@ -6,25 +6,26 @@ function read(path: string): string {
 }
 
 describe('public documentation scope hygiene', () => {
-  it('keeps desktop scoped as private preview in public release docs and install messaging', () => {
+  it('keeps desktop listed as an official supported surface in current release docs', () => {
     const docs = [
       'README.md',
-      'CHANGELOG.md',
+      'AGENTS.md',
+      'ROADMAP.md',
       'docs/for-agents/ARCHITECTURE.md',
-      'docs/archived/BETA_READINESS_P4_P6.md',
-      'docs/for-users/EXTENSIONS.md',
-      'docs/archived/PRODUCT_SURFACE_AND_LIGHTWEIGHT_PLAN.md',
       'docs/for-agents/PRODUCTION_READINESS_ROADMAP.md',
-      'scripts/postinstall.cjs',
+      'docs/for-users/DESKTOP.md',
+      'packages/AGENTS.md',
+      'packages/desktop/AGENTS.md',
+      'packages/desktop/README.md',
     ];
 
     for (const file of docs) {
       const content = read(file).toLowerCase();
-      expect(content, `${file} should mention private preview desktop scope`).toContain('private preview');
+      expect(content, `${file} should mention desktop`).toContain('desktop');
+      expect(content, `${file} should not call current desktop preview-only`).not.toContain(`private ${'preview'}`);
     }
 
-    expect(read('CHANGELOG.md')).not.toContain('supported surfaces focused on CLI, MCP, GitHub Actions, and Desktop App');
-    expect(read('docs/archived/RELEASE_CHECKLIST.md')).not.toContain('desktop metadata, and');
+    expect(read('docs/for-agents/PRODUCTION_READINESS_ROADMAP.md')).toContain('CLI, GitHub Actions, MCP, and Desktop');
   });
 
   it('does not leave TODO/FIXME placeholders in release-facing docs', () => {

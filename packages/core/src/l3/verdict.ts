@@ -61,6 +61,7 @@ async function llmVerdict(
           prompt,
           timeout: config.timeout ?? 120,
           temperature: 0.2,
+          maxOutputTokens: config.maxOutputTokens,
           onUsage: (nextUsage) => { usage = nextUsage; },
         });
         onBackendCall?.({

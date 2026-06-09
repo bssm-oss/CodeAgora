@@ -10,7 +10,7 @@ npm i -g @codeagora/mcp@rc         # MCP server (Claude Code, Cursor, etc.)
 
 The former web dashboard, terminal TUI, and webhook notification surfaces are no longer first-class extension packages.
 
-The replacement direction is a planned cross-platform Tauri desktop app for the human-facing local UI: review history, result exploration, configuration, progress, cost visibility, and local alerts. It remains a private preview surface until packaging and parity gates are ready.
+The replacement surface is the official cross-platform Tauri desktop app for the human-facing local UI: review history, result exploration, configuration, progress, cost visibility, local alerts, and evidence export. See [DESKTOP.md](DESKTOP.md).
 
 ## MCP Server (`@codeagora/mcp`)
 

@@ -607,7 +607,7 @@ fails for stolen tokens. Explicit invalidation is required.
 <sub>
   [CodeAgora v3](https://github.com/your-org/codeagora) ·
   Reviewers: kimi-k2.5, grok-fast, codex-mini, glm-4.7, gemini-flash ·
-  Moderator: claude-sonnet ·
+  Moderator: openai/gpt-5.3-codex ·
   [Session logs](.ca/sessions/2026-03-09/001/)
 </sub>
 ```

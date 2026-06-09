@@ -172,8 +172,8 @@ describe('mapToInlineCommentBody', () => {
         suggestion: 'Add null check',
       },
       {
-        reviewerId: 'claude-sonnet',
-        model: 'claude-sonnet-4-20250514',
+        reviewerId: 'mimo',
+        model: 'xiaomi/mimo-v2.5',
         severity: 'WARNING',
         problem: 'Possible null issue, low risk',
         evidence: ['Line 42 might be null'],
@@ -183,7 +183,7 @@ describe('mapToInlineCommentBody', () => {
     const body = mapToInlineCommentBody(makeDoc(), undefined, undefined, undefined, undefined, opinions);
     expect(body).toContain('Individual Reviews (2 reviewers)');
     expect(body).toContain('gpt-4o');
-    expect(body).toContain('claude-sonnet');
+    expect(body).toContain('mimo');
     expect(body).toContain('Null pointer crash on empty input');
     expect(body).toContain('Possible null issue, low risk');
     expect(body).toContain('<details>');
@@ -242,13 +242,13 @@ describe('mapToInlineCommentBody', () => {
     }];
     const supporterModelMap = new Map([
       ['supporter-1', 'gpt-4o'],
-      ['devil-adv', 'claude-sonnet-4-20250514'],
+      ['devil-adv', 'x-ai/grok-4.3'],
     ]);
     const body = mapToInlineCommentBody(
       makeDoc(), discussion, undefined, undefined, rounds, undefined, 'devil-adv', supporterModelMap,
     );
     // DA gets 😈 icon
-    expect(body).toContain('\u{1F608} claude-sonnet-4-20250514');
+    expect(body).toContain('\u{1F608} x-ai/grok-4.3');
     // Regular supporter shows model name without icon
     expect(body).toContain('gpt-4o');
     expect(body).not.toContain('supporter-1');

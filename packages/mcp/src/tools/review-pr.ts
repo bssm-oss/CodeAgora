@@ -43,7 +43,7 @@ async function resolvePrUrl(prUrl?: string, prNumber?: number, repoPath?: string
 export function registerReviewPr(server: McpServer): void {
   server.tool(
     'review_pr',
-    'Review a GitHub PR — fetches the diff automatically and runs full multi-LLM review. Supports PR URL (https://github.com/owner/repo/pull/123) or just a PR number (auto-detects owner/repo from git remote). Can post results back as PR comments with --post_review.',
+    'Use when you need to review a GitHub pull request by URL or PR number instead of pasting a diff. Returns compact JSON review output or the requested formatted output, and can post review comments when post_review is true. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root for git remote and gh CLI resolution.',
     {
       pr_url: z.string()
         .regex(

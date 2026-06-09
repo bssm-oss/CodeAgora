@@ -168,10 +168,10 @@ describe('executeBackend() dispatches correct CLI command per backend', () => {
   });
 
   it('spawns claude in print mode with model args', async () => {
-    await executeBackend(makeInput({ backend: 'claude', model: 'claude-3-5-sonnet-20241022' }));
+    await executeBackend(makeInput({ backend: 'claude', model: 'claude-3-5-haiku-20241022' }));
     expect(mockSpawn).toHaveBeenCalledWith(
       'claude',
-      ['-p', '--model', 'claude-3-5-sonnet-20241022'],
+      ['-p', '--model', 'claude-3-5-haiku-20241022'],
       expect.any(Object)
     );
   });

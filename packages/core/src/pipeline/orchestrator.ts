@@ -29,7 +29,16 @@ import { estimateDiffComplexity } from './diff-complexity.js';
 import { PipelineTelemetry } from './telemetry.js';
 import { buildReviewCacheContext, computeCacheKey, checkAndLoadCache, persistResultCache, writeSessionResult } from './cache-manager.js';
 import { detectProjectContext } from './session-recovery.js';
-import { buildReviewerMap, buildReviewerOpinions, buildSupporterModelMap, mergeReviewOutputsByReviewer, trackDA, generatePerformanceText } from './pipeline-helpers.js';
+import {
+  buildReviewRunSummary,
+  buildReviewerMap,
+  buildReviewerOpinions,
+  buildSupporterModelMap,
+  mergeReviewOutputsByReviewer,
+  trackDA,
+  generatePerformanceText,
+} from './pipeline-helpers.js';
+import type { ReviewRunSummary } from './pipeline-helpers.js';
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
 import fs from 'fs/promises';
 import type { ModeratorReport } from '../types/core.js';
@@ -88,6 +97,14 @@ export interface PipelineSummary {
   questionsForHuman?: string[];
 }
 
+export interface ReviewQueues {
+  suggestions: EvidenceDocument[];
+  unconfirmed: EvidenceDocument[];
+  suppressed: EvidenceDocument[];
+  hallucinationRemoved: EvidenceDocument[];
+  hallucinationUncertain: EvidenceDocument[];
+}
+
 export interface PipelineResult {
   sessionId: string;
   date: string;
@@ -112,11 +129,17 @@ export interface PipelineResult {
   devilsAdvocateId?: string;
   /** Maps supporterId → model name (for display in discussion tables) */
   supporterModelMap?: Record<string, string>;
+  /** Role-aware run summary for UX/reporting surfaces. */
+  reviewRun?: ReviewRunSummary;
+  /** Non-blocking and filtered queues retained for transparent reporting. */
+  reviewQueues?: ReviewQueues;
   /** True when the result was served from cache (#109) */
   cached?: boolean;
   /** Machine-readable cache metadata. Contains hashes/keys only, never raw provider or source context. */
   cache?: CacheMetadata;
 }
+
+export type { ReviewRunSummary };
 
 // ============================================================================
 // Session Result Artifacts
@@ -526,6 +549,7 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
 
     // === LEARNING: Apply dismissed patterns ===
     const learnedPatterns = await loadLearnedPatterns(input.repoPath ?? process.cwd());
+    let suppressedIssues: EvidenceDocument[] = [];
     if (learnedPatterns && learnedPatterns.dismissedPatterns.length > 0) {
       const { filtered, suppressed } = applyLearnedPatterns(
         allEvidenceDocs,
@@ -534,12 +558,15 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
       if (suppressed.length > 0) {
         console.error(`[Learning] Suppressed ${suppressed.length} previously dismissed issue(s)`);
       }
+      suppressedIssues = suppressed;
       allEvidenceDocs = filtered;
     }
 
     // === HALLUCINATION FILTER: Remove findings referencing non-existent code (#428) ===
     const { filterHallucinations } = await import('./hallucination-filter.js');
     const hallucinationResult = filterHallucinations(allEvidenceDocs, filteredDiffContent);
+    const hallucinationRemoved = hallucinationResult.removed;
+    const hallucinationUncertain = hallucinationResult.uncertain;
     if (hallucinationResult.removed.length > 0) {
       console.error(`[Hallucination Filter] Removed ${hallucinationResult.removed.length} finding(s) referencing non-existent code`);
     }
@@ -665,6 +692,25 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
         reviewerOpinions: buildReviewerOpinions(allReviewResults),
         devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
         supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
+        reviewRun: buildReviewRunSummary({
+          config,
+          reviewerInputs: allReviewerInputs,
+          reviewResults: allReviewResults,
+          moderatorReport,
+          evidenceDocs: allEvidenceDocs,
+          suppressedIssues,
+          hallucinationRemoved,
+          hallucinationUncertain,
+          skipHead: true,
+          l2Skipped: !!input.skipDiscussion || config.discussion?.enabled === false,
+        }),
+        reviewQueues: {
+          suggestions: moderatorReport.suggestions,
+          unconfirmed: moderatorReport.unconfirmedIssues,
+          suppressed: suppressedIssues,
+          hallucinationRemoved,
+          hallucinationUncertain,
+        },
       });
     }
 
@@ -730,6 +776,24 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
       reviewerOpinions: buildReviewerOpinions(allReviewResults),
       devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
       supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
+      reviewRun: buildReviewRunSummary({
+        config,
+        reviewerInputs: allReviewerInputs,
+        reviewResults: allReviewResults,
+        moderatorReport,
+        evidenceDocs: allEvidenceDocs,
+        suppressedIssues,
+        hallucinationRemoved,
+        hallucinationUncertain,
+        l2Skipped: !!input.skipDiscussion || config.discussion?.enabled === false,
+      }),
+      reviewQueues: {
+        suggestions: moderatorReport.suggestions,
+        unconfirmed: moderatorReport.unconfirmedIssues,
+        suppressed: suppressedIssues,
+        hallucinationRemoved,
+        hallucinationUncertain,
+      },
       cache: {
         schemaVersion: cacheContext.schemaVersion,
         key: cacheKey,

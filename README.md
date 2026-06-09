@@ -70,7 +70,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
 Use `.ca/config.json` as the default config path. See [GitHub Actions setup](docs/for-users/GITHUB_ACTIONS_SETUP.md) for fork handling, secrets, permissions, and tuning.
@@ -90,9 +90,9 @@ Use `.ca/config.json` as the default config path. See [GitHub Actions setup](doc
 
 See [`packages/mcp/README.md`](packages/mcp/README.md) for tool details.
 
-### Desktop preview
+### Desktop app
 
-The desktop app is a private preview in `packages/desktop`. It is not the stable support surface yet.
+The desktop app in `packages/desktop` is an official local UI surface for setup, session browsing, review launch, result inspection, and evidence export. It uses the same CLI/core/session/config contracts as the automation surfaces.
 
 ## Docs map
 

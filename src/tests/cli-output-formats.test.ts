@@ -71,7 +71,7 @@ function makeErrorResult(): PipelineResult {
   };
 }
 
-function makeEmptyResult(): PipelineResult {
+function makeEmptyResult(overrides: Partial<PipelineResult> = {}): PipelineResult {
   return {
     sessionId: '003',
     date: '2025-01-15',
@@ -88,6 +88,7 @@ function makeEmptyResult(): PipelineResult {
       escalated: 0,
     },
     evidenceDocs: [],
+    ...overrides,
   };
 }
 
@@ -182,7 +183,91 @@ describe('formatOutput(text)', () => {
     const text = formatOutput(makeSuccessResult(), 'text');
     expect(text).toContain('Session 2025-01-15/001');
     expect(text).toContain('Next:');
+    expect(text).toContain('fix the must-fix findings');
     expect(text).toContain('agora explain 2025-01-15/001');
+  });
+
+  it('adds human-answer guidance for NEEDS_HUMAN reviews', () => {
+    const text = formatOutput(
+      makeSuccessResult({
+        summary: {
+          ...makeSuccessResult().summary!,
+          decision: 'NEEDS_HUMAN',
+          questionsForHuman: ['Should this public API remain backward compatible?'],
+        },
+      }),
+      'text',
+    );
+
+    expect(text).toContain('answer the questions above');
+    expect(text).toContain('agora explain 2025-01-15/001');
+  });
+
+  it('surfaces partial review state and doctor recovery', () => {
+    const text = formatOutput(
+      makeSuccessResult({
+        summary: {
+          ...makeSuccessResult().summary!,
+          totalReviewers: 3,
+          forfeitedReviewers: 1,
+        },
+      }),
+      'text',
+    );
+
+    expect(text).toContain('Partial review: 2/3 reviewers completed; 1 forfeited.');
+    expect(text).toContain('agora doctor --live');
+  });
+
+  it('renders role-aware ACCEPT coverage and non-blocking queues', () => {
+    const text = formatOutput(
+      makeEmptyResult({
+        summary: {
+          ...makeEmptyResult().summary!,
+          totalReviewers: 18,
+        },
+        reviewRun: {
+          l1: {
+            configured: 5,
+            completed: 5,
+            forfeited: 0,
+            errored: 0,
+            reviewers: [],
+            models: ['xiaomi/mimo-v2.5', 'qwen/qwen3-coder-30b-a3b-instruct'],
+            providers: ['openrouter'],
+          },
+          l2: {
+            supporters: 2,
+            supporterModels: ['z-ai/glm-5.1', 'minimax/minimax-m3'],
+            devilsAdvocate: { id: 'da', model: 'x-ai/grok-4.3', backend: 'api', provider: 'openrouter' },
+            moderator: { id: 'moderator', model: 'openai/gpt-5.3-codex', backend: 'api', provider: 'openrouter' },
+            discussions: 0,
+            skipped: false,
+          },
+          l3: {
+            head: { id: 'head', model: 'qwen/qwen3.7-max', backend: 'api', provider: 'openrouter' },
+            skipped: false,
+          },
+          queues: {
+            activeFindings: 0,
+            suggestions: 1,
+            unconfirmed: 2,
+            suppressed: 0,
+            hallucinationRemoved: 0,
+            hallucinationUncertain: 0,
+          },
+          degraded: false,
+          degradedReasons: [],
+        },
+      }),
+      'text',
+    );
+
+    expect(text).toContain('Coverage: L1 5/5');
+    expect(text).toContain('L2 2+DA');
+    expect(text).toContain('Non-blocking queues: suggestions 1');
+    expect(text).toContain('unconfirmed 2');
+    expect(text).not.toContain('18 reviewers');
   });
 
   it('adds next-step guidance for error reviews', () => {

@@ -4,9 +4,9 @@ This guide shows the recommended ways to run CodeAgora on pull requests.
 
 Use this when you want PR inline comments, a summary verdict, and a commit status check from the `bssm-oss/CodeAgora` GitHub Action.
 
-## Quick start: OpenRouter or Groq
+## Quick start: OpenRouter
 
-This is the recommended PR setup. Add either `OPENROUTER_API_KEY` or `GROQ_API_KEY` as a repository secret before enabling the workflow.
+This is the recommended PR setup. Add `OPENROUTER_API_KEY` as a repository secret before enabling the workflow.
 
 ### 1. Add `.ca/config.json`
 
@@ -15,61 +15,53 @@ This is the recommended PR setup. Add either `OPENROUTER_API_KEY` or `GROQ_API_K
   "mode": "pragmatic",
   "language": "en",
   "reviewers": [
-    {
-      "id": "r1",
-      "model": "anthropic/claude-sonnet-4.6",
-      "backend": "api",
-      "provider": "openrouter",
-      "enabled": true,
-      "timeout": 120
-    }
+    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" },
+    { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" },
+    { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:api-contract" },
+    { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:security" },
+    { "id": "r-llama-scout", "model": "meta-llama/llama-4-scout", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" }
   ],
   "supporters": {
     "pool": [
-      {
-        "id": "s1",
-        "model": "anthropic/claude-sonnet-4.6",
-        "backend": "api",
-        "provider": "openrouter",
-        "enabled": true,
-        "timeout": 120
-      }
+      { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+      { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
     ],
-    "pickCount": 1,
+    "pickCount": 2,
     "pickStrategy": "random",
     "devilsAdvocate": {
-      "id": "da",
-      "model": "anthropic/claude-sonnet-4.6",
+      "id": "da-grok",
+      "model": "x-ai/grok-4.3",
       "backend": "api",
       "provider": "openrouter",
       "enabled": true,
-      "timeout": 120
+      "timeout": 180
     },
     "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
     "personaAssignment": "random"
   },
-  "moderator": { "model": "anthropic/claude-sonnet-4.6", "backend": "api", "provider": "openrouter" },
+  "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter", "timeout": 180 },
   "discussion": {
-    "maxRounds": 1,
+    "maxRounds": 2,
     "registrationThreshold": {
       "HARSHLY_CRITICAL": 1,
       "CRITICAL": 1,
       "WARNING": 2,
       "SUGGESTION": null
     },
-    "codeSnippetRange": 5
+    "codeSnippetRange": 10
   },
   "head": {
     "backend": "api",
-    "model": "anthropic/claude-sonnet-4.6",
+    "model": "qwen/qwen3.7-max",
     "provider": "openrouter",
-    "enabled": true
+    "enabled": true,
+    "timeout": 180
   },
   "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
 }
 ```
 
-The compact one-reviewer setup keeps PR latency and cost predictable. For larger PRs, keep `max-diff-lines` conservative or use a stronger OpenRouter/Anthropic model.
+The default PR setup uses five independent reviewers, two supporters, a dedicated devil's advocate, a moderator, and a head model. For larger PRs, keep `max-diff-lines` conservative or split the change.
 
 ### 2. Add `.github/workflows/codeagora-review.yml`
 
@@ -103,10 +95,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '250'
+          max-diff-lines: '5000'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
 ```
 
 ### 3. Open or update a PR
@@ -131,7 +122,6 @@ Common secrets:
 
 | Provider | Secret |
 |---|---|
-| Groq | `GROQ_API_KEY` |
 | OpenRouter | `OPENROUTER_API_KEY` |
 | OpenAI | `OPENAI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` |
@@ -141,29 +131,33 @@ See [Providers](./PROVIDERS.md) for the full provider list.
 
 ### 2. Use matching provider config
 
-Example with Groq:
+Example with the recommended OpenRouter quality lineup:
 
 ```json
 {
   "mode": "pragmatic",
   "language": "en",
   "reviewers": [
-    { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
-    { "id": "r2", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-llama-scout", "model": "meta-llama/llama-4-scout", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
   ],
   "supporters": {
     "pool": [
-      { "id": "s1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }
+      { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+      { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
     ],
-    "pickCount": 1,
+    "pickCount": 2,
     "pickStrategy": "random",
-    "devilsAdvocate": { "id": "da", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
+    "devilsAdvocate": { "id": "da-grok", "model": "x-ai/grok-4.3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
     "personaAssignment": "random"
   },
-  "moderator": { "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq" },
-  "discussion": { "maxRounds": 1, "codeSnippetRange": 5 },
-  "head": { "backend": "api", "model": "llama-3.3-70b-versatile", "provider": "groq", "enabled": true },
+  "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter", "timeout": 180 },
+  "discussion": { "maxRounds": 2, "codeSnippetRange": 10 },
+  "head": { "backend": "api", "model": "qwen/qwen3.7-max", "provider": "openrouter", "enabled": true, "timeout": 180 },
   "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
 }
 ```
@@ -178,7 +172,7 @@ Example with Groq:
     fail-on-reject: 'true'
     max-diff-lines: '2500'
   env:
-    GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
 ## Action inputs

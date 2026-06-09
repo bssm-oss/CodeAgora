@@ -40,22 +40,22 @@ jobs:
             "reviewers": [
               {
                 "id": "r1",
-                "model": "llama-3.3-70b-versatile",
+                "model": "xiaomi/mimo-v2.5",
                 "backend": "api",
-                "provider": "groq",
+                "provider": "openrouter",
                 "enabled": true,
                 "timeout": 120
               }
             ],
-            "moderator": { "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq" },
-            "head": { "backend": "api", "model": "llama-3.3-70b-versatile", "provider": "groq", "enabled": true },
+            "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter" },
+            "head": { "backend": "api", "model": "qwen/qwen3.7-max", "provider": "openrouter", "enabled": true },
             "supporters": {
               "pool": [
                 {
                   "id": "s1",
-                  "model": "llama-3.3-70b-versatile",
+                  "model": "z-ai/glm-5.1",
                   "backend": "api",
-                  "provider": "groq",
+                  "provider": "openrouter",
                   "enabled": true,
                   "timeout": 120
                 }
@@ -64,9 +64,9 @@ jobs:
               "pickStrategy": "random",
               "devilsAdvocate": {
                 "id": "da",
-                "model": "llama-3.3-70b-versatile",
+                "model": "x-ai/grok-4.3",
                 "backend": "api",
-                "provider": "groq",
+                "provider": "openrouter",
                 "enabled": true,
                 "timeout": 120
               },
@@ -98,7 +98,7 @@ jobs:
         continue-on-error: true
         run: node packages/cli/dist/index.js doctor --live
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Create issue on failure
         if: steps.health.outcome == 'failure'

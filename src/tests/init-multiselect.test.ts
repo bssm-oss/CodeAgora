@@ -101,8 +101,8 @@ function makeCatalog(): ModelsCatalog {
       },
       {
         source: 'anthropic',
-        model_id: 'anthropic/claude-sonnet-4-6',
-        name: 'Claude Sonnet',
+        model_id: 'anthropic/claude-haiku-4-5',
+        name: 'Claude Haiku',
         context: '128k',
         aa_intelligence: 35,
         aa_price_input: 0.002,
@@ -137,9 +137,9 @@ describe('generatePresets()', () => {
     expect(presets[0]!.id).toBe('quick');
     expect(presets[1]!.id).toBe('thorough');
     expect(presets[2]!.id).toBe('free');
-    // All fallback presets use groq
+    // Fallback presets use the OpenRouter starter lineup.
     for (const p of presets) {
-      expect(p.providers).toContain('groq');
+      expect(p.providers).toContain('openrouter');
     }
   });
 
@@ -158,11 +158,10 @@ describe('generatePresets()', () => {
     expect(quick!.discussion).toBe(false);
   });
 
-  it('generates free preset when groq is detected', () => {
+  it('does not generate free preset when groq is detected', () => {
     const presets = generatePresets(makeEnv(['groq']), null);
     const free = presets.find((p) => p.id === 'free');
-    expect(free).toBeDefined();
-    expect(free!.providers).toContain('groq');
+    expect(free).toBeUndefined();
   });
 
   it('does not generate free preset when only OpenCode Go is detected', () => {
@@ -434,7 +433,7 @@ describe('buildMultiProviderConfig()', () => {
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b', backend: 'api' },
         { provider: 'openai', model: 'gpt-4o-mini', backend: 'api' },
-        { provider: 'anthropic', model: 'claude-sonnet-4-6', backend: 'api' },
+        { provider: 'anthropic', model: 'claude-haiku-4-5', backend: 'api' },
       ],
       reviewerCount: 5,
       discussion: true,

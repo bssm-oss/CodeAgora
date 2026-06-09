@@ -363,9 +363,9 @@ export function buildMultiProviderConfig(params: MultiProviderConfigParams): Gen
 // ============================================================================
 
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-6',
-  openai: 'gpt-4o-mini',
-  openrouter: 'anthropic/claude-sonnet-4.6',
+  anthropic: 'claude-haiku-4-5',
+  openai: 'gpt-5.3-codex',
+  openrouter: 'xiaomi/mimo-v2.5',
   'opencode-go': 'deepseek-v4-flash',
   'opencode-zen': 'gpt-5.4-mini',
   groq: 'llama-3.3-70b-versatile',
@@ -378,30 +378,30 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
 const FALLBACK_PRESETS: DynamicPreset[] = [
   {
     id: 'quick',
-    label: 'Quick review (Groq only)',
-    labelKo: '\uBE60\uB978 \uB9AC\uBDF0 (Groq\uB9CC \uC0AC\uC6A9)',
-    providers: ['groq'],
-    models: { groq: 'llama-3.3-70b-versatile' },
+    label: 'Quick review (OpenRouter)',
+    labelKo: '\uBE60\uB978 \uB9AC\uBDF0 (OpenRouter)',
+    providers: ['openrouter'],
+    models: { openrouter: 'xiaomi/mimo-v2.5' },
     reviewerCount: 1,
     discussion: false,
     backend: 'api',
   },
   {
     id: 'thorough',
-    label: 'Thorough review (multi-provider)',
-    labelKo: '\uC2EC\uCE35 \uB9AC\uBDF0 (\uBA40\uD2F0 \uD504\uB85C\uBC14\uC774\uB354)',
-    providers: ['groq'],
-    models: { groq: 'llama-3.3-70b-versatile' },
+    label: 'Thorough review (OpenRouter)',
+    labelKo: '\uC2EC\uCE35 \uB9AC\uBDF0 (OpenRouter)',
+    providers: ['openrouter'],
+    models: { openrouter: 'xiaomi/mimo-v2.5' },
     reviewerCount: 3,
     discussion: true,
     backend: 'api',
   },
   {
     id: 'free',
-    label: 'Free review (Groq)',
-    labelKo: '\uBB34\uB8CC \uB9AC\uBDF0 (Groq)',
-    providers: ['groq'],
-    models: { groq: 'llama-3.3-70b-versatile' },
+    label: 'Starter review (OpenRouter)',
+    labelKo: '\uC2A4\uD0C0\uD130 \uB9AC\uBDF0 (OpenRouter)',
+    providers: ['openrouter'],
+    models: { openrouter: 'qwen/qwen3-coder-30b-a3b-instruct' },
     reviewerCount: 2,
     discussion: false,
     backend: 'api',
@@ -415,7 +415,7 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
 /**
  * FREE_PROVIDERS — providers known to offer free models.
  */
-const FREE_PROVIDERS = new Set(['groq']);
+const FREE_PROVIDERS = new Set<string>();
 
 /**
  * Generate presets dynamically based on detected environment and catalog.
@@ -426,7 +426,8 @@ export function generatePresets(
   catalog: ModelsCatalog | null,
   cliBackends?: DetectedCli[],
 ): DynamicPreset[] {
-  const detected = env.apiProviders.filter((p: ApiProviderStatus) => p.available).map((p: ApiProviderStatus) => p.provider);
+  const detectedApiProviders = env.apiProviders.filter((p: ApiProviderStatus) => p.available).map((p: ApiProviderStatus) => p.provider);
+  const detected = detectedApiProviders.includes('openrouter') ? ['openrouter'] : detectedApiProviders;
   const presets: DynamicPreset[] = [];
 
   // If nothing detected at all, return fallback presets
@@ -445,7 +446,7 @@ export function generatePresets(
         return slash > 0 ? id.slice(slash + 1) : id;
       }
     }
-    return PROVIDER_DEFAULT_MODELS[provider] ?? 'llama-3.3-70b-versatile';
+    return PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5';
   }
 
   // 1. "Quick review" — single fastest provider, 1 reviewer, no discussion
@@ -517,7 +518,7 @@ export function generatePresets(
   const availableCli = cliBackends?.filter((c) => c.available) ?? [];
   if (availableCli.length > 0) {
     const cliProvider = availableCli[0]!;
-    const cliModel = cliProvider.backend === 'claude' ? 'sonnet'
+    const cliModel = cliProvider.backend === 'claude' ? 'opus'
       : cliProvider.backend === 'codex' ? 'codex'
       : cliProvider.backend === 'gemini' ? 'gemini'
       : cliProvider.backend;
@@ -715,7 +716,7 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
 
   const selections: ProviderModelSelection[] = selected.providers.map((provider) => ({
     provider,
-    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'llama-3.3-70b-versatile',
+    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5',
     backend: selected.backend,
   }));
 
@@ -863,7 +864,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     // Use preset defaults — build selections from preset
     const selections: ProviderModelSelection[] = selectedPreset.providers.map((prov) => ({
       provider: prov,
-      model: selectedPreset.models[prov] ?? PROVIDER_DEFAULT_MODELS[prov] ?? 'llama-3.3-70b-versatile',
+      model: selectedPreset.models[prov] ?? PROVIDER_DEFAULT_MODELS[prov] ?? 'xiaomi/mimo-v2.5',
       backend: selectedPreset.backend,
     }));
 
@@ -1046,7 +1047,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
       }
 
       // Fallback: text input with default model
-      const defaultModel = PROVIDER_DEFAULT_MODELS[prov] ?? 'llama-3.3-70b-versatile';
+      const defaultModel = PROVIDER_DEFAULT_MODELS[prov] ?? 'xiaomi/mimo-v2.5';
       const modelInput = await p.text({
         message: ko ? `${prov} \uBAA8\uB378 \uC774\uB984?` : `Model for ${prov}?`,
         placeholder: defaultModel,

@@ -5,9 +5,9 @@
 ### "Config file not found"
 Run `agora init` to create a config in `.ca/config.json`.
 
-### "API key not found for provider 'groq'"
-1. Get a free key at [console.groq.com/keys](https://console.groq.com/keys)
-2. Set it: `export GROQ_API_KEY=your_key_here`
+### "API key not found for provider 'openrouter'"
+1. Get a key at [openrouter.ai](https://openrouter.ai/)
+2. Set it: `export OPENROUTER_API_KEY=your_key_here`
 3. Verify: `agora doctor`
 
 Provider environment variable names follow the pattern `PROVIDER_API_KEY` where possible (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`). Run `agora providers` to see all supported providers and their required env vars.
@@ -15,7 +15,7 @@ Provider environment variable names follow the pattern `PROVIDER_API_KEY` where 
 ### "doctor passes but review fails with API error"
 - Run `agora doctor --live` to test actual API connectivity
 - Check if your API key is expired or rate-limited
-- Groq free tier has daily limits; try again later or upgrade
+- Check your OpenRouter key budget and provider/model availability
 
 ### "JSON parse error in .ca/config.json"
 Your config file has a syntax error. Options:

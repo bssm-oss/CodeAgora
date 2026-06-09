@@ -5,6 +5,7 @@
 import fs from 'fs';
 import { describe, it, expect } from 'vitest';
 import { ACTION_DEGRADED_REASONS } from '@codeagora/shared/contracts/stable.js';
+import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
 import {
   determineActionPolicy,
   getActionGuidance,
@@ -219,9 +220,20 @@ describe('github-action production policy', () => {
   it('maps degraded reasons to actionable next steps', () => {
     const missingSecrets = getActionGuidance('missing-provider-secrets');
     expect(missingSecrets.why).toContain('provider credential');
+    const missingSecretText = missingSecrets.nextSteps.join('\n');
+    for (const envVar of new Set(Object.values(PROVIDER_ENV_VARS))) {
+      expect(missingSecretText).toContain(envVar);
+    }
     expect(missingSecrets.nextSteps).toEqual(expect.arrayContaining([
-      expect.stringContaining('provider secret'),
-      expect.stringContaining('CLI or MCP dry-run'),
+      expect.stringContaining('agora env set openrouter <api-key>'),
+      expect.stringContaining('agora review --dry-run'),
+      expect.stringContaining('MCP `dry_run`'),
+    ]));
+
+    const forkSecrets = getActionGuidance('fork-missing-provider-secrets');
+    expect(forkSecrets.nextSteps).toEqual(expect.arrayContaining([
+      expect.stringContaining('trusted branch'),
+      expect.stringContaining('agora doctor --live'),
     ]));
 
     const staleHead = getActionGuidance('stale-head-sha');

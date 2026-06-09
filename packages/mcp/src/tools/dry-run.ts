@@ -10,7 +10,7 @@ import { errorMessage, mcpErrorResponse } from './shared-response.js';
 export function registerDryRun(server: McpServer): void {
   server.tool(
     'dry_run',
-    'Estimate review cost and complexity without making any LLM calls. Instant response.',
+    'Use when you need a fast preflight for unified diff size, risk, and estimated review cost before running LLM reviewers. Returns JSON with complexity, file/line counts, security-sensitive files, and estimated cost. No repo_path: this tool only inspects the diff string passed in the request.',
     {
       diff: z.string().describe('Unified diff content'),
     },

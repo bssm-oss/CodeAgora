@@ -27,7 +27,7 @@ function getNestedKey(obj: Record<string, unknown>, dotKey: string): unknown {
 export function registerConfigGet(server: McpServer): void {
   server.tool(
     'config_get',
-    'Read CodeAgora configuration. Returns full config or a specific value by dot-notation key.',
+    'Use when you need to inspect the active CodeAgora configuration before choosing reviewers or changing settings. Returns the full config as JSON, or one dot-notation key/value pair. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root.',
     {
       key: z.string().optional().describe('Dot-notation key (e.g. "discussion.maxRounds"). Omit for full config.'),
       repo_path: z.string().optional().describe('Optional repo root override for config lookup. Omit it when you are already inside the target workspace; otherwise pass the exact workspace root.'),
@@ -45,7 +45,7 @@ export function registerConfigGet(server: McpServer): void {
         if (key) {
           const value = getNestedKey(config as unknown as Record<string, unknown>, key);
           if (value === undefined) {
-            return mcpErrorResponse('CONFIG_GET_FAILED', `Key "${key}" not found in config`, { key });
+            return mcpErrorResponse('CONFIG_GET_FAILED', `Key "${key}" not found in config`, { key, reason: 'missing-key' });
           }
           return { content: [{ type: 'text' as const, text: JSON.stringify({ key, value }, null, 2) }] };
         }

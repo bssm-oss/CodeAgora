@@ -10,7 +10,7 @@ import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared
 export function registerExplain(server: McpServer): void {
   server.tool(
     'explain_session',
-    'Read session artifacts and produce a narrative summary of a past review. No LLM calls.',
+    'Use when you need a human-readable walkthrough of a completed review session and its follow-up questions. Returns narrative text from saved session artifacts with no LLM calls. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root.',
     {
       session: z.string().describe('Session path (e.g. 2026-03-19/001)'),
       repo_path: z.string().optional().describe('Optional repo root override for session lookup. Omit it when the server already runs in the target workspace; otherwise pass the exact workspace root.'),

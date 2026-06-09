@@ -32,12 +32,8 @@ jobs:
         run: |
           if [ -n "${{ secrets.OPENROUTER_API_KEY }}" ]; then
             echo "provider=openrouter" >> "$GITHUB_OUTPUT"
-            echo "model=anthropic/claude-sonnet-4.6" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ secrets.GROQ_API_KEY }}" ]; then
-            echo "provider=groq" >> "$GITHUB_OUTPUT"
-            echo "model=llama-3.3-70b-versatile" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::No supported provider key configured. Add OPENROUTER_API_KEY or GROQ_API_KEY to enable CodeAgora review."
+            echo "::warning::OPENROUTER_API_KEY is not configured. Add it to enable CodeAgora review."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -50,33 +46,34 @@ jobs:
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
         run: |
           mkdir -p .ca
-          PROVIDER="${{ steps.key-check.outputs.provider }}"
-          MODEL="${{ steps.key-check.outputs.model }}"
           cat > .ca/config.json << 'CONF'
           {
             "mode": "pragmatic",
             "language": "en",
             "reviewers": [
-              { "id": "r1", "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__", "enabled": true, "timeout": 120 }
+              { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" },
+              { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" },
+              { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:api-contract" },
+              { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:security" },
+              { "id": "r-llama-scout", "model": "meta-llama/llama-4-scout", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" }
             ],
             "supporters": {
               "pool": [
-                { "id": "s1", "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__", "enabled": true, "timeout": 120 }
+                { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+                { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
               ],
-              "pickCount": 1,
+              "pickCount": 2,
               "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da", "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__", "enabled": true, "timeout": 120 },
+              "devilsAdvocate": { "id": "da-grok", "model": "x-ai/grok-4.3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
               "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
               "personaAssignment": "random"
             },
-            "moderator": { "model": "__MODEL__", "backend": "api", "provider": "__PROVIDER__" },
-            "discussion": { "maxRounds": 1, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 5 },
-            "head": { "backend": "api", "model": "__MODEL__", "provider": "__PROVIDER__", "enabled": true },
+            "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter", "timeout": 180 },
+            "discussion": { "maxRounds": 2, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
+            "head": { "backend": "api", "model": "qwen/qwen3.7-max", "provider": "openrouter", "enabled": true, "timeout": 180 },
             "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
           }
           CONF
-          sed -i.bak "s|__MODEL__|${MODEL}|g; s|__PROVIDER__|${PROVIDER}|g" .ca/config.json
-          rm .ca/config.json.bak
 
       - name: CodeAgora Review
         if: steps.fork-check.outputs.skip != 'true' && steps.key-check.outputs.skip != 'true'
@@ -84,9 +81,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '250'
+          max-diff-lines: '8000'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           CODEAGORA_APP_ID: ${{ secrets.CODEAGORA_APP_ID }}
           CODEAGORA_APP_PRIVATE_KEY: ${{ secrets.CODEAGORA_APP_PRIVATE_KEY }}

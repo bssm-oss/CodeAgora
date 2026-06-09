@@ -68,7 +68,7 @@ describe('Config Validation', () => {
     },
     moderator: {
       backend: 'codex',
-      model: 'claude-sonnet',
+      model: 'gpt-5.3-codex',
     },
     discussion: {
       maxRounds: 3,

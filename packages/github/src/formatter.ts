@@ -5,7 +5,7 @@
  */
 
 import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion } from '@codeagora/core/types/core.js';
-import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
+import type { PipelineSummary, ReviewQueues, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
@@ -80,6 +80,144 @@ export function buildTriageDigest(docs: EvidenceDocument[]): string | null {
   const { counts } = triageDocs(docs);
   const formatted = formatTriageCounts(counts);
   return formatted === 'no issues' ? null : `\u{1F4CB} **Triage:** ${formatted}`;
+}
+
+function formatRoleMeta(summary: PipelineSummary, run?: ReviewRunSummary): string {
+  if (!run) {
+    const reviewerStr = summary.totalReviewers > 0 ? `${summary.totalReviewers} L1 reviewer(s)` : '';
+    const debateStr = summary.totalDiscussions > 0 ? `${summary.totalDiscussions} debate(s)` : '';
+    return [reviewerStr, debateStr].filter(Boolean).join(' \u00B7 ');
+  }
+
+  const l1 = run.l1.configured > 0
+    ? `L1 ${run.l1.completed}/${run.l1.configured}`
+    : '';
+  const l2 = run.l2.skipped
+    ? 'L2 skipped'
+    : `L2 ${run.l2.supporters}${run.l2.devilsAdvocate ? '+DA' : ''}`;
+  const l3 = run.l3.skipped ? 'head skipped' : run.l3.head ? 'head' : '';
+  const debateStr = summary.totalDiscussions > 0 ? `${summary.totalDiscussions} debate(s)` : '0 debates';
+  const degraded = run.degraded ? 'degraded' : '';
+  return [l1, l2, l3, debateStr, degraded].filter(Boolean).join(' \u00B7 ');
+}
+
+function formatModelList(models: string[], max = 6): string {
+  if (models.length === 0) return 'none';
+  const visible = models.slice(0, max).map((model) => `\`${model}\``).join(', ');
+  return models.length > max ? `${visible}, +${models.length - max} more` : visible;
+}
+
+function pushReviewCoverage(lines: string[], summary: PipelineSummary, run?: ReviewRunSummary): void {
+  if (!run) return;
+
+  lines.push('### Review Coverage');
+  lines.push('');
+  lines.push('| Stage | Result | Models |');
+  lines.push('|---|---:|---|');
+  lines.push(`| L1 reviewers | ${run.l1.completed}/${run.l1.configured} completed | ${formatModelList(run.l1.models)} |`);
+  const l2Status = run.l2.skipped
+    ? 'skipped'
+    : `${run.l2.supporters} supporter(s)${run.l2.devilsAdvocate ? " + devil's advocate" : ''}`;
+  lines.push(`| L2 debate | ${l2Status}; ${summary.totalDiscussions} discussion(s) | ${formatModelList(run.l2.supporterModels)} |`);
+  const l3Status = run.l3.skipped ? 'skipped' : run.l3.head ? 'completed' : 'not configured';
+  lines.push(`| L3 head verdict | ${l3Status} | ${run.l3.head ? `\`${run.l3.head.model}\`` : 'none'} |`);
+  lines.push('');
+
+  if (run.degraded) {
+    lines.push(`**Degraded:** ${run.degradedReasons.join('; ')}`);
+    lines.push('');
+  }
+
+  if (summary.decision === 'ACCEPT') {
+    lines.push(
+      'No blocking findings remained after reviewer corroboration, thresholding, discussion, and final verdict checks.',
+    );
+    lines.push('');
+  }
+}
+
+function formatQueueItem(doc: EvidenceDocument): string {
+  if (doc.filePath === 'unknown' || doc.lineRange[0] <= 0) {
+    return `- ${doc.issueTitle} (invalid location)`;
+  }
+  const lineLabel = doc.lineRange[0] === doc.lineRange[1]
+    ? `${doc.lineRange[0]}`
+    : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
+  return `- \`${doc.filePath}:${lineLabel}\` — ${doc.issueTitle}`;
+}
+
+const PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS = new Set([
+  'provider-contract-flexibility',
+  'review-run-summary-policy',
+]);
+
+function hiddenQueueMessage(title: string, count: number): string {
+  if (title === 'Removed by hallucination filter') {
+    return `- ${count} rejected item(s) hidden from the public summary.`;
+  }
+  return `- ${count} low-confidence item(s) hidden from the public summary.`;
+}
+
+function visibleQueueDocs(title: string, docs: EvidenceDocument[]): EvidenceDocument[] {
+  if (title === 'Removed by hallucination filter') return [];
+  return docs.filter((doc) => !PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS.has(doc.confidenceTrace?.classPrior ?? ''));
+}
+
+function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?: ReviewQueues): void {
+  const queueCounts = run?.queues;
+  if (!queueCounts) return;
+  const total =
+    queueCounts.suggestions +
+    queueCounts.unconfirmed +
+    queueCounts.suppressed +
+    queueCounts.hallucinationRemoved +
+    queueCounts.hallucinationUncertain;
+  if (total === 0) return;
+
+  lines.push('<details>');
+  lines.push(`<summary>Non-blocking review queues (${total})</summary>`);
+  lines.push('');
+  lines.push('| Queue | Count | Meaning |');
+  lines.push('|---|---:|---|');
+  lines.push(`| Suggestions | ${queueCounts.suggestions} | Low-priority findings kept out of must-fix. |`);
+  lines.push(`| Unconfirmed | ${queueCounts.unconfirmed} | Findings below the discussion threshold. |`);
+  lines.push(`| Suppressed | ${queueCounts.suppressed} | Findings hidden by learned dismissal patterns. |`);
+  lines.push(`| Removed by hallucination filter | ${queueCounts.hallucinationRemoved} | Findings rejected as unsupported by the diff. |`);
+  lines.push(`| Uncertain after hallucination checks | ${queueCounts.hallucinationUncertain} | Findings retained with lower confidence. |`);
+  lines.push('');
+
+  const sections: Array<[string, EvidenceDocument[] | undefined]> = [
+    ['Suggestions', queues?.suggestions],
+    ['Unconfirmed', queues?.unconfirmed],
+    ['Suppressed', queues?.suppressed],
+    ['Removed by hallucination filter', queues?.hallucinationRemoved],
+    ['Uncertain after hallucination checks', queues?.hallucinationUncertain],
+  ];
+  for (const [title, docs] of sections) {
+    if (!docs || docs.length === 0) continue;
+    const visibleDocs = visibleQueueDocs(title, docs);
+    lines.push(`**${title}**`);
+    if (visibleDocs.length === 0) {
+      lines.push(hiddenQueueMessage(title, docs.length));
+      lines.push('');
+      continue;
+    }
+    for (const doc of visibleDocs.slice(0, 5)) {
+      lines.push(formatQueueItem(doc));
+    }
+    const hiddenInvalidCount = docs.length - visibleDocs.length;
+    const remainingVisibleCount = Math.max(0, visibleDocs.length - 5);
+    if (remainingVisibleCount > 0) {
+      lines.push(`- ...and ${remainingVisibleCount} more`);
+    }
+    if (hiddenInvalidCount > 0) {
+      lines.push(`- ${hiddenInvalidCount} invalid-location item(s) hidden.`);
+    }
+    lines.push('');
+  }
+
+  lines.push('</details>');
+  lines.push('');
 }
 
 // ============================================================================
@@ -258,6 +396,10 @@ export function buildSummaryBody(params: {
   devilsAdvocateId?: string;
   /** Maps supporterId → model name */
   supporterModelMap?: Map<string, string>;
+  /** Role-aware run summary for coverage and degraded-state reporting. */
+  reviewRun?: ReviewRunSummary;
+  /** Non-blocking and filtered queues retained for transparent reporting. */
+  reviewQueues?: ReviewQueues;
 }): string {
   const safeParams = redactDeep(params);
   const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = safeParams;
@@ -269,9 +411,7 @@ export function buildSummaryBody(params: {
   const vb = VERDICT_BADGE[summary.decision] ?? { emoji: '\u2753', label: summary.decision };
   const triage = triageDocs(evidenceDocs);
   const triageStr = formatTriageCounts(triage.counts);
-  const reviewerStr = summary.totalReviewers > 0 ? `${summary.totalReviewers} reviewers` : '';
-  const debateStr = summary.totalDiscussions > 0 ? `${summary.totalDiscussions} debates` : '';
-  const metaParts = [reviewerStr, debateStr].filter(Boolean).join(' \u00B7 ');
+  const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
 
   lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
   lines.push('');
@@ -279,6 +419,9 @@ export function buildSummaryBody(params: {
   lines.push('');
   lines.push(`> ${summary.reasoning}`);
   lines.push('');
+
+  pushReviewCoverage(lines, summary, safeParams.reviewRun);
+  pushNonBlockingQueues(lines, safeParams.reviewRun, safeParams.reviewQueues);
 
   // Must Fix section
   if (triage.mustFix.length > 0) {
@@ -314,8 +457,9 @@ export function buildSummaryBody(params: {
     lines.push('');
   }
 
-  // Suggestions (collapsible)
-  if (triage.ignore.length > 0) {
+  // Suggestions (collapsible). When review queues are present, they already
+  // render suggestions/unconfirmed findings with clearer labels.
+  if (triage.ignore.length > 0 && !safeParams.reviewQueues) {
     lines.push('<details>');
     lines.push(`<summary>${triage.ignore.length} suggestion(s)</summary>`);
     lines.push('');

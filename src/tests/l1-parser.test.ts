@@ -19,8 +19,9 @@ function makeIssueBlock({
   evidence = ['1. Pointer is returned from an unchecked call', '2. No guard clause before use'],
   severity = 'CRITICAL',
   suggestion = 'Add a null check before dereferencing the pointer.',
+  issueHeading = `## Issue: ${title}`,
 } = {}): string {
-  return `## Issue: ${title}
+  return `${issueHeading}
 
 ### 문제
 ${problem}
@@ -134,6 +135,46 @@ describe('parseEvidenceResponse()', () => {
     it('parses issueTitle correctly', () => {
       const docs = parseEvidenceResponse(makeIssueBlock({ title: 'SQL Injection Vulnerability' }));
       expect(docs[0].issueTitle).toBe('SQL Injection Vulnerability');
+    });
+
+    it('parses a plain Issue heading without markdown hashes', () => {
+      const docs = parseEvidenceResponse(
+        makeIssueBlock({
+          title: 'Ignored by custom heading',
+          issueHeading: 'Issue: SQL Injection Vulnerability',
+        })
+      );
+      expect(docs).toHaveLength(1);
+      expect(docs[0].issueTitle).toBe('SQL Injection Vulnerability');
+      expect(docs[0].severity).toBe('CRITICAL');
+    });
+
+    it('parses label-style sections emitted by less strict models', () => {
+      const response = `Issue: Code Duplication in Review Preset Configuration
+
+Problem: In packages/core/src/config/presets.ts:50-118
+
+The same reviewer preset list is duplicated and can drift.
+
+Evidence:
+- Preset reviewers are repeated across multiple presets.
+- The supported provider list is maintained separately.
+
+Severity: WARNING (65%)
+
+Suggestion: Extract a shared preset factory so the provider/model list stays consistent.
+`;
+      const docs = parseEvidenceResponse(response);
+      expect(docs).toHaveLength(1);
+      expect(docs[0].issueTitle).toBe('Code Duplication in Review Preset Configuration');
+      expect(docs[0].filePath).toBe('packages/core/src/config/presets.ts');
+      expect(docs[0].lineRange).toEqual([50, 118]);
+      expect(docs[0].evidence).toEqual([
+        'Preset reviewers are repeated across multiple presets.',
+        'The supported provider list is maintained separately.',
+      ]);
+      expect(docs[0].severity).toBe('WARNING');
+      expect(docs[0].confidence).toBe(65);
     });
 
     it('parses problem text correctly', () => {

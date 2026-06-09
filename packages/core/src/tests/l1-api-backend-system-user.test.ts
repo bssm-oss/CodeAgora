@@ -24,8 +24,8 @@ import type { BackendInput } from '../l1/backend.js';
 function makeInput(overrides: Partial<BackendInput> = {}): BackendInput {
   return {
     backend: 'api',
-    model: 'claude-sonnet-4-6',
-    provider: 'anthropic',
+    model: 'xiaomi/mimo-v2.5',
+    provider: 'openrouter',
     prompt: 'combined fallback prompt',
     timeout: 30,
     ...overrides,
@@ -94,6 +94,27 @@ describe('executeViaAISDK — system/user split', () => {
 
     const callArgs = mockGenerateText.mock.calls[0][0];
     expect(callArgs.temperature).toBeUndefined();
+  });
+
+  it('defaults maxOutputTokens to 4096 for API calls', async () => {
+    await executeViaAISDK(makeInput({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+    }));
+
+    const callArgs = mockGenerateText.mock.calls[0][0];
+    expect(callArgs.maxOutputTokens).toBe(4096);
+  });
+
+  it('passes explicit maxOutputTokens when provided', async () => {
+    await executeViaAISDK(makeInput({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      maxOutputTokens: 2048,
+    }));
+
+    const callArgs = mockGenerateText.mock.calls[0][0];
+    expect(callArgs.maxOutputTokens).toBe(2048);
   });
 
   it('throws when provider is missing', async () => {

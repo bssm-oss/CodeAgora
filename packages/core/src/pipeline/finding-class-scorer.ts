@@ -44,6 +44,28 @@ export interface FindingClassPrior {
  */
 export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
   {
+    id: 'provider-contract-flexibility',
+    label: 'provider/model contract flexibility claim',
+    multiplier: 0.2,
+    patterns: [
+      /\b(?:remov(?:al|e|ed|ing)|drops?|dropped)\b[\s\S]{0,160}\b(?:groq|github\s+models?|provider|api\s+key|model|fallback|workflow)\b/i,
+      /\b(?:groq|github\s+models?|provider|api\s+key|model|fallback|workflow)\b[\s\S]{0,160}\b(?:remov(?:al|e|ed|ing)|unsupported|breaks?\s+existing|existing\s+user\s+setups?)\b/i,
+      /\b(?:hardcoded|fixed)\b[\s\S]{0,160}\b(?:config|provider|model|github\s+actions?|workflow|template)\b/i,
+      /\b(?:limits?|reduc(?:e|ed|es|ing))\s+(?:user\s+)?flexibility\b/i,
+    ],
+  },
+  {
+    id: 'review-run-summary-policy',
+    label: 'review run summary merge/status policy claim',
+    multiplier: 0.2,
+    patterns: [
+      /\bmergeReviewOutputsByReviewer\b/i,
+      /\buniqueById\b[\s\S]{0,200}\b(?:first|duplicate|status|best)\b/i,
+      /\b(?:first[-\s]?encountered|first\s+encountered|first[-\s]?wins|first\s+wins)\b[\s\S]{0,200}\b(?:review|status|summary|duplicate)\b/i,
+      /\breview\s+summary\b[\s\S]{0,180}\bstatus\s+counting\b/i,
+    ],
+  },
+  {
     id: 'redos',
     label: 'ReDoS / catastrophic backtracking',
     multiplier: 0.6,

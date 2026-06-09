@@ -50,7 +50,7 @@ Review this diff. Focus only on real production bugs, security vulnerabilities, 
 
 | Target | Command shape | Known usable model |
 |---|---|---|
-| Claude raw | `claude -p --model <model>` | `sonnet` |
+| OpenRouter raw | API backend via OpenRouter | `xiaomi/mimo-v2.5`, `qwen/qwen3-coder-30b-a3b-instruct`, `tencent/hy3-preview`, `deepseek/deepseek-v4-flash`, `meta-llama/llama-4-scout` |
 | Codex raw | `codex exec -m <model> -` | `gpt-5.5` |
 
 ### Output Plan
@@ -58,71 +58,49 @@ Review this diff. Focus only on real production bugs, security vulnerabilities, 
 Store raw model outputs first:
 
 ```text
-bench-out-claude-raw-<scope>/<fixture-id>.md
+bench-out-openrouter-raw-<scope>/<fixture-id>.md
 bench-out-codex-raw-<scope>/<fixture-id>.md
 ```
 
 Then manually map raw findings into scorer-compatible JSON:
 
 ```text
-bench-out-claude-raw-json-<scope>/<fixture-id>.json
+bench-out-openrouter-raw-json-<scope>/<fixture-id>.json
 bench-out-codex-raw-json-<scope>/<fixture-id>.json
 ```
 
 Score mapped output with:
 
 ```bash
-pnpm bench:fn -- --results ./bench-out-claude-raw-json-<scope>
+pnpm bench:fn -- --results ./bench-out-openrouter-raw-json-<scope>
 pnpm bench:fn -- --results ./bench-out-codex-raw-json-<scope>
 ```
 
-## Track 2: Codex-Claude Only Agora
+## Track 2: Proposed OpenRouter Agora Lineup
 
-Purpose: measure CodeAgora's multi-agent value using only local Claude/Codex CLI backends.
+Purpose: measure CodeAgora's multi-agent value using the proposed OpenRouter-only live review lineup.
 
 ### Constraints
 
-- All L1 reviewers, supporters, devil's advocate, and head must be Claude or Codex.
-- No OpenRouter/API models.
+- All API review roles use OpenRouter.
+- Do not use Anthropic Claude/Sonnet models for this track.
 - Use CodeAgora's normal L1/L2/L3 pipeline.
 - Use the fixed topology: 5 reviewers, 2 supporters, 1 DA, 1 head.
 
-### Known Local Model Choices
-
-| Backend | Model | Status |
-|---|---|---|
-| `claude` | `sonnet` | Verified working locally. |
-| `codex` | `gpt-5.5` | Verified working locally. |
-| `claude` | `claude` | Not usable locally; model alias rejected. |
-| `codex` | `codex` | Not usable locally with current account. |
-| `codex` | `gpt-5`, `gpt-5.1` | Not usable locally with current account. |
-
-### Recommended Mapping: Balanced CLI Ensemble
+### Recommended Mapping
 
 | Role | Backend | Model | Reason |
 |---|---|---|---|
-| reviewer 1 | `claude` | `sonnet` | Strong reasoning and grounded review. |
-| reviewer 2 | `codex` | `gpt-5.5` | Strong coding-oriented review. |
-| reviewer 3 | `claude` | `sonnet` | Adds second Claude pass for consistency. |
-| reviewer 4 | `codex` | `gpt-5.5` | Adds second Codex pass for coding signal. |
-| reviewer 5 | `codex` | `gpt-5.5` | Slight bias toward code-agent detection breadth. |
-| supporter 1 | `claude` | `sonnet` | Good verifier/summarizer. |
-| supporter 2 | `codex` | `gpt-5.5` | Good implementation-oriented challenge. |
-| devil's advocate | `claude` | `sonnet` | Conservative critique and FP suppression. |
-| head | `claude` | `sonnet` | Prefer stable final synthesis. |
-
-### Alternative Mapping: Codex-Heavy
-
-Use if Claude latency or quota becomes limiting.
-
-| Role | Backend | Model |
-|---|---|---|
-| reviewers 1-4 | `codex` | `gpt-5.5` |
-| reviewer 5 | `claude` | `sonnet` |
-| supporter 1 | `codex` | `gpt-5.5` |
-| supporter 2 | `claude` | `sonnet` |
-| devil's advocate | `claude` | `sonnet` |
-| head | `codex` | `gpt-5.5` |
+| reviewer 1 | `api/openrouter` | `xiaomi/mimo-v2.5` | General reviewer. |
+| reviewer 2 | `api/openrouter` | `qwen/qwen3-coder-30b-a3b-instruct` | Stable code-focused reviewer. |
+| reviewer 3 | `api/openrouter` | `tencent/hy3-preview` | Contract/API reviewer. |
+| reviewer 4 | `api/openrouter` | `deepseek/deepseek-v4-flash` | Security/correctness reviewer. |
+| reviewer 5 | `api/openrouter` | `meta-llama/llama-4-scout` | Extra independent L1 signal. |
+| supporter 1 | `api/openrouter` | `z-ai/glm-5.1` | Debate verifier. |
+| supporter 2 | `api/openrouter` | `minimax/minimax-m3` | Debate verifier. |
+| devil's advocate | `api/openrouter` | `x-ai/grok-4.3` | Conservative challenge pass. |
+| moderator | `api/openrouter` | `openai/gpt-5.3-codex` | Discussion moderation. |
+| head | `api/openrouter` | `qwen/qwen3.7-max` | Final synthesis. |
 
 ### Result Directory Naming
 
@@ -171,7 +149,7 @@ Use existing baseline when available:
 |---|---|
 | reviewer 1 | `qwen/qwen3-coder:free` |
 | reviewer 2 | `minimax/minimax-m2.5:free` |
-| reviewer 3 | `nvidia/nemotron-3-super-120b-a12b:free` |
+| reviewer 3 | `qwen/qwen3-coder-30b-a3b-instruct` |
 | reviewer 4 | another available free coding/reasoning model |
 | reviewer 5 | another available free diverse model |
 | supporter 1 | `qwen/qwen3.6-plus:free` |

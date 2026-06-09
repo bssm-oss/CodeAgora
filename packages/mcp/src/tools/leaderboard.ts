@@ -9,7 +9,7 @@ import { errorMessage, mcpErrorResponse } from './shared-response.js';
 export function registerLeaderboard(server: McpServer): void {
   server.tool(
     'get_leaderboard',
-    'Show model performance leaderboard from Thompson Sampling data. No LLM calls.',
+    'Use when you need to compare reviewer model quality from accumulated Thompson Sampling data before choosing a model mix. Returns formatted leaderboard text with ranked model performance. No repo_path: leaderboard reads global model metrics rather than workspace session files.',
     {},
     async () => {
       try {

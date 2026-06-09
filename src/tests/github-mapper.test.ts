@@ -7,7 +7,7 @@ import {
 } from '@codeagora/github/mapper.js';
 import type { EvidenceDocument, DiscussionVerdict } from '@codeagora/core/types/core.js';
 import type { DiffPositionIndex } from '@codeagora/github/types.js';
-import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
+import type { PipelineSummary, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 
 const makeDoc = (overrides?: Partial<EvidenceDocument>): EvidenceDocument => ({
   issueTitle: 'SQL injection vulnerability',
@@ -42,6 +42,47 @@ const makeSummary = (overrides?: Partial<PipelineSummary>): PipelineSummary => (
   totalDiscussions: 1,
   resolved: 1,
   escalated: 0,
+  ...overrides,
+});
+
+const makeReviewRun = (overrides?: Partial<ReviewRunSummary>): ReviewRunSummary => ({
+  l1: {
+    configured: 5,
+    completed: 5,
+    forfeited: 0,
+    errored: 0,
+    reviewers: [],
+    models: [
+      'xiaomi/mimo-v2.5',
+      'qwen/qwen3-coder-30b-a3b-instruct',
+      'tencent/hy3-preview',
+      'deepseek/deepseek-v4-flash',
+      'meta-llama/llama-4-scout',
+    ],
+    providers: ['openrouter'],
+  },
+  l2: {
+    supporters: 2,
+    supporterModels: ['z-ai/glm-5.1', 'minimax/minimax-m3'],
+    devilsAdvocate: { id: 'da', model: 'x-ai/grok-4.3', backend: 'api', provider: 'openrouter' },
+    moderator: { id: 'moderator', model: 'openai/gpt-5.3-codex', backend: 'api', provider: 'openrouter' },
+    discussions: 0,
+    skipped: false,
+  },
+  l3: {
+    head: { id: 'head', model: 'qwen/qwen3.7-max', backend: 'api', provider: 'openrouter' },
+    skipped: false,
+  },
+  queues: {
+    activeFindings: 0,
+    suggestions: 0,
+    unconfirmed: 0,
+    suppressed: 0,
+    hallucinationRemoved: 0,
+    hallucinationUncertain: 0,
+  },
+  degraded: false,
+  degradedReasons: [],
   ...overrides,
 });
 
@@ -115,6 +156,20 @@ describe('buildReviewComments', () => {
     expect(comments).toHaveLength(0);
   });
 
+  it('skips dismissed issues matched within L2 line tolerance', () => {
+    const discussion = makeDiscussion({
+      finalSeverity: 'DISMISSED',
+      lineRange: [51, 51],
+    });
+    const index: DiffPositionIndex = { 'src/db/queries.ts:56': 14 };
+    const comments = buildReviewComments(
+      [makeDoc({ lineRange: [56, 56] })],
+      [discussion],
+      index,
+    );
+    expect(comments).toHaveLength(0);
+  });
+
   it('handles multiple documents', () => {
     const docs = [
       makeDoc(),
@@ -182,6 +237,184 @@ describe('buildSummaryBody', () => {
     });
     expect(body).toContain('2026-03-16/003');
   });
+
+  it('renders role-aware ACCEPT coverage instead of a misleading reviewer total', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({
+        decision: 'ACCEPT',
+        reasoning: 'No blocking findings remained.',
+        totalReviewers: 18,
+        totalDiscussions: 0,
+      }),
+      sessionId: '004',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun(),
+    });
+
+    expect(body).toContain('L1 5/5');
+    expect(body).toContain('L2 2+DA');
+    expect(body).toContain('head');
+    expect(body).toContain('Review Coverage');
+    expect(body).toContain('No blocking findings remained after reviewer corroboration');
+    expect(body).not.toContain('18 reviewers');
+  });
+
+  it('renders non-blocking queue digest with retained examples', () => {
+    const suggestion = makeDoc({
+      severity: 'SUGGESTION',
+      issueTitle: 'Simplify branch',
+      filePath: 'src/foo.ts',
+      lineRange: [12, 12],
+    });
+    const unconfirmed = makeDoc({
+      severity: 'WARNING',
+      issueTitle: 'Check nullable path',
+      filePath: 'src/bar.ts',
+      lineRange: [20, 22],
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only non-blocking queues remain.' }),
+      sessionId: '005',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 1,
+          unconfirmed: 1,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [suggestion],
+        unconfirmed: [unconfirmed],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).toContain('Non-blocking review queues (2)');
+    expect(body).toContain('Simplify branch');
+    expect(body).toContain('Check nullable path');
+    expect(body).not.toContain('<summary>2 suggestion(s)</summary>');
+  });
+
+  it('redacts reviewRun and reviewQueues before rendering public summary', () => {
+    const rawSecret = 'sk-testreviewsecret123456';
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only non-blocking queues remain.' }),
+      sessionId: '005-redaction',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        l1: {
+          ...makeReviewRun().l1,
+          models: [`openrouter/${rawSecret}`],
+        },
+        queues: {
+          activeFindings: 0,
+          suggestions: 1,
+          unconfirmed: 0,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [makeDoc({ issueTitle: `Leaked ${rawSecret}` })],
+        unconfirmed: [],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).not.toContain(rawSecret);
+    expect(body).toContain('[REDACTED]');
+  });
+
+  it('hides hallucination-filter details from public queue output', () => {
+    const removed = makeDoc({
+      issueTitle: 'Imaginary SQL injection',
+      filePath: 'src/auth.ts',
+      lineRange: [42, 42],
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only filtered findings remain.' }),
+      sessionId: '006',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 0,
+          unconfirmed: 0,
+          suppressed: 0,
+          hallucinationRemoved: 1,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [],
+        unconfirmed: [],
+        suppressed: [],
+        hallucinationRemoved: [removed],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).toContain('Removed by hallucination filter');
+    expect(body).toContain('1 rejected item(s) hidden from the public summary.');
+    expect(body).not.toContain('src/auth.ts:42');
+    expect(body).not.toContain('Imaginary SQL injection');
+  });
+
+  it('hides low-confidence FP-heavy queue details from public output', () => {
+    const unconfirmed = makeDoc({
+      severity: 'WARNING',
+      issueTitle: 'Removal of Groq Provider Support in GitHub Actions Workflows',
+      filePath: '.github/workflows/review.yml',
+      lineRange: [32, 38],
+      confidenceTrace: { classPrior: 'provider-contract-flexibility' },
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only low-confidence findings remain.' }),
+      sessionId: '007',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 0,
+          unconfirmed: 1,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [],
+        unconfirmed: [unconfirmed],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).toContain('Unconfirmed');
+    expect(body).toContain('1 low-confidence item(s) hidden from the public summary.');
+    expect(body).not.toContain('Removal of Groq Provider Support');
+    expect(body).not.toContain('.github/workflows/review.yml:32-38');
+  });
 });
 
 describe('mapToGitHubReview', () => {
@@ -227,5 +460,24 @@ describe('mapToGitHubReview', () => {
       sessionDate: '2026-03-16',
     });
     expect(review.comments).toHaveLength(0);
+  });
+
+  it('filters dismissed documents from the summary within L2 line tolerance', () => {
+    const index: DiffPositionIndex = { 'src/db/queries.ts:56': 14 };
+    const review = mapToGitHubReview({
+      summary: makeSummary({ decision: 'ACCEPT', totalDiscussions: 1 }),
+      evidenceDocs: [makeDoc({ lineRange: [56, 56], confidence: 17 })],
+      discussions: [makeDiscussion({ finalSeverity: 'DISMISSED', lineRange: [51, 51] })],
+      positionIndex: index,
+      headSha: 'abc123',
+      sessionId: '001',
+      sessionDate: '2026-03-16',
+      reviewRun: makeReviewRun(),
+    });
+
+    expect(review.comments).toHaveLength(0);
+    expect(review.body).toContain('**no issues**');
+    expect(review.body).not.toContain('Verify');
+    expect(review.body).not.toContain('SQL injection vulnerability');
   });
 });

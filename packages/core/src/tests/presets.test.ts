@@ -25,8 +25,8 @@ function makePreset(overrides: Partial<PresetConfig> = {}): PresetConfig {
     description: 'Test preset',
     descriptionKo: '테스트 프리셋',
     reviewerCount: 3,
-    providers: ['groq'],
-    models: { groq: 'llama-3.3-70b-versatile' },
+    providers: ['openrouter'],
+    models: { openrouter: 'xiaomi/mimo-v2.5' },
     discussion: false,
     ...overrides,
   };
@@ -139,10 +139,10 @@ describe('buildPresetConfig() — quick preset', () => {
     expect(config.reviewers).toHaveLength(3);
   });
 
-  it('all reviewers use groq provider', () => {
+  it('all reviewers use openrouter provider', () => {
     const config = buildPresetConfig({ preset: quickPreset });
     for (const r of reviewers(config)) {
-      expect(r.provider).toBe('groq');
+      expect(r.provider).toBe('openrouter');
     }
   });
 
@@ -422,7 +422,7 @@ describe('buildPresetConfig() — supporters', () => {
 
   it('supporters pool first entry uses primary provider', () => {
     const config = buildPresetConfig({ preset: makePreset() });
-    expect(config.supporters.pool[0]?.provider).toBe('groq');
+    expect(config.supporters.pool[0]?.provider).toBe('openrouter');
   });
 
   it('pickCount is 1', () => {

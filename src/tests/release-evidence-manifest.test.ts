@@ -58,7 +58,7 @@ describe('release evidence manifest', () => {
     }
   });
 
-  it('does not require private-preview desktop evidence for release tiers', () => {
+  it('requires desktop evidence for rc release tiers', () => {
     const dir = makeTmpDir();
     try {
       const rcFiles = [
@@ -73,6 +73,11 @@ describe('release evidence manifest', () => {
         'package-mcp-dry-run.log',
         'action-smoke.log',
         'mcp-smoke.log',
+        'desktop-app-e2e.log',
+        'desktop-macos-webdriver-e2e.log',
+        'desktop-visual-qa.json',
+        'desktop-gate.log',
+        'desktop-evidence-manifest.json',
         'security-regression.log',
       ];
       for (const file of rcFiles) {
@@ -88,8 +93,8 @@ describe('release evidence manifest', () => {
 
       const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'evidence-manifest.json'), 'utf-8'));
       const desktopGate = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-gate');
-      expect(desktopGate.requiredForRelease).toBe(false);
-      expect(desktopGate.exists).toBe(false);
+      expect(desktopGate.requiredForRelease).not.toBe(false);
+      expect(desktopGate.exists).toBe(true);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

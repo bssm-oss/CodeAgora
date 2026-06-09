@@ -25,6 +25,7 @@ export const FallbackSchema = z.object({
   model: z.string(),
   backend: BackendSchema,
   provider: z.string().optional(),
+  maxOutputTokens: z.number().int().positive().max(32768).optional(),
 });
 export type FallbackConfig = z.infer<typeof FallbackSchema>;
 
@@ -41,6 +42,7 @@ export const AgentConfigSchema = z
     provider: z.string().optional(),
     persona: z.string().optional(),
     temperature: z.number().min(0).max(2).optional(),
+    maxOutputTokens: z.number().int().positive().max(32768).optional(),
     timeout: z.number().default(120),
     enabled: z.boolean().default(true),
     fallback: z.union([FallbackSchema, z.array(FallbackSchema)]).optional(),
@@ -120,6 +122,7 @@ export const ModeratorConfigSchema = z.object({
   backend: BackendSchema,
   model: z.string(),
   provider: z.string().optional(),
+  maxOutputTokens: z.number().int().positive().max(32768).optional(),
   timeout: z.number().default(120),
   /**
    * Forced-decision output format. Default (undefined/'markdown') uses the
@@ -228,6 +231,7 @@ export const HeadConfigSchema = z.object({
   backend: BackendSchema,
   model: z.string(),
   provider: z.string().optional(),
+  maxOutputTokens: z.number().int().positive().max(32768).optional(),
   timeout: z.number().default(120),
   enabled: z.boolean().default(true),
 });

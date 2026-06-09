@@ -10,18 +10,18 @@ The release goal is not new review intelligence or a new product surface. The go
 
 > A new user, CI maintainer, or IDE agent can get from install to first useful review, or recover from a failed setup, without reading source code or guessing the next command.
 
-Optimize for **time-to-first-success** and **failure recovery** across the existing supported surfaces: CLI, GitHub Action, and MCP. Desktop remains private preview and evidence-only.
+Optimize for **time-to-first-success** and **failure recovery** across the existing supported surfaces: CLI, GitHub Action, MCP, and Desktop.
 
 ## Release Thesis
 
-rc.5 stabilized MCP repo targeting and Desktop private-preview packaging. rc.6 should make the existing system feel obvious:
+rc.5 stabilized MCP repo targeting and Desktop packaging. rc.6 should make the existing system feel obvious:
 
 1. Setup tells users what exists, what is missing, and what to run next.
 2. Dry-run/preflight distinguishes ready, blocked, and risky states.
 3. Review output explains the verdict and the next action.
 4. MCP errors are agent-retryable.
 5. GitHub Action degraded states are actionable in logs and summaries.
-6. Desktop continues to be labelled and gated as private preview only.
+6. Desktop setup, launch, review, and evidence flows are held to the same usability bar as the automation surfaces.
 
 ## Non-Negotiable Guardrails
 
@@ -32,7 +32,7 @@ Do not change these in rc.6 unless explicitly approved as a separate release-blo
 - GitHub Action inputs/outputs or public action contract.
 - L0/L1/L2/L3 review semantics, thresholds, verdict logic, confidence computation, or reviewer selection.
 - Provider/model support matrix.
-- Public Desktop support claims.
+- Desktop release/support claims that are not backed by package, launch, E2E, and visual evidence.
 - Hosted service, billing, teams, web dashboard, or TUI surfaces.
 
 Messaging, docs, and human-readable text can improve. Machine contracts must remain stable.
@@ -220,13 +220,13 @@ Expected changes:
 - Document known constraints:
   - provider key requirements,
   - fork PR secret behavior,
-  - Desktop private-preview status,
+  - Desktop platform and packaging requirements,
   - machine-output contract stability.
 - Add or update smoke scripts only when they directly prove first-run usability.
 
 Acceptance criteria:
 
-- Docs have one canonical happy path for CLI, Action, and MCP.
+- Docs have one canonical happy path for CLI, Action, MCP, and Desktop.
 - Evidence includes success and failure recovery examples.
 - Release evidence manifest remains green.
 
@@ -246,32 +246,37 @@ Suggested commit:
 docs: add rc6 usability evidence
 ```
 
-### P2 — Desktop Private Preview Only
+### P2 — Desktop Official UX And Evidence
 
-Primary target: preserve trust and avoid accidental public Desktop support claims.
+Primary target: make the official Desktop app feel like a supported product surface, while keeping its implementation bound to the same CLI/core/session/config contracts.
 
 Expected changes:
 
-- Keep Desktop wording explicitly private preview.
-- Only touch Desktop if CLI/core usability changes require private-preview copy or evidence updates.
-- Run existing gate if Desktop changes.
+- Remove legacy preview-only wording from current docs, in-app copy, and release gates.
+- Desktop setup should surface the same readiness facts as CLI doctor: config, credentials, provider health, CLI backends, MCP, GitHub Action, and evidence status.
+- Desktop review launch should expose blocked/ready states with the same remediation commands as CLI.
+- Desktop result views should make verdict, findings, degraded states, session ID/path, and export actions obvious.
+- Desktop evidence should include packaged app launch, WebDriver E2E, visual QA, live review smoke where available, and bundle smoke.
 
 Acceptance criteria:
 
-- No public Desktop launch wording.
-- `pnpm rc:desktop-gate` remains the gate if any Desktop file changes.
+- Public docs list Desktop as a supported surface alongside CLI, GitHub Action, and MCP.
+- No current source-of-truth doc or in-app copy labels Desktop as preview-only.
+- `pnpm rc:desktop-gate` remains green for Desktop changes.
+- Visual QA evidence is captured before claiming release readiness.
 
 Candidate files:
 
-- `docs/for-users/DESKTOP_PREVIEW.md`
+- `docs/for-users/DESKTOP.md`
 - `packages/desktop/src/main.ts`
 - `packages/desktop/src/api/*`
+- `packages/shared/src/i18n/locales/*.json`
 - `src/tests/desktop-*.test.ts`
 
 Suggested commit:
 
 ```text
-desktop: clarify private-preview usability boundaries
+desktop: align official surface usability gates
 ```
 
 ## Verification Gates
@@ -351,5 +356,5 @@ rc.6 is ready when:
 - Dry-run acts as a useful preflight, not just a technical report.
 - MCP errors are retryable by an IDE agent.
 - GitHub Action degraded states are understandable from logs/summary.
-- Desktop remains private preview and green if touched.
+- Desktop official surface gates are green, including packaged launch, WebDriver E2E, visual QA, and evidence export.
 - All release gates pass and package smoke verifies the published surfaces.

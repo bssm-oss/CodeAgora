@@ -20,6 +20,30 @@ describe('matchFindingClass — positive matches', () => {
   // fp-moderator-regex and quota-manager-dual. Each must trip the
   // corresponding prior class.
 
+  it('catches provider/model contract flexibility claims from Action config changes', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Removal of Groq Provider Support in GitHub Actions Workflows',
+        problem:
+          'The workflow no longer sets GROQ_API_KEY and this breaks existing user setups that relied on Groq provider support.',
+      }),
+    )!;
+    expect(match.id).toBe('provider-contract-flexibility');
+    expect(match.multiplier).toBe(0.2);
+  });
+
+  it('catches review-run summary merge policy claims', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Incorrect logic in mergeReviewOutputsByReviewer prevents correct review summary and status counting',
+        problem:
+          'The uniqueById helper uses first-encountered-wins behavior for duplicate reviewer IDs instead of selecting the best status.',
+      }),
+    )!;
+    expect(match.id).toBe('review-run-summary-policy');
+    expect(match.multiplier).toBe(0.2);
+  });
+
   it('catches ReDoS claim against a bounded regex (run 3 FP)', () => {
     const match = matchFindingClass(
       doc({

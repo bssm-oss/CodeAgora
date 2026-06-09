@@ -6,7 +6,7 @@ This roadmap is the root-level readiness queue for CodeAgora. It collects the co
 
 This document is not a product wishlist. It focuses on correctness blockers, packaging/API contract gaps, public-surface accuracy, evidence quality, and release confidence for the supported surfaces.
 
-After `v0.1.0-beta.1`, the Tauri desktop private-preview production track is closed for release-candidate handoff. RC work can proceed only while desktop, CLI/GitHub/MCP, package, security, benchmark, and live-only evidence stay refreshed against the integrated product shape.
+After `v0.1.0-beta.1`, the Tauri desktop production track is closed for release-candidate handoff. RC work can proceed only while desktop, CLI/GitHub/MCP, package, security, benchmark, and live-only evidence stay refreshed against the integrated product shape.
 
 ## Scope
 
@@ -15,17 +15,16 @@ In scope:
 - CLI review flows, setup, config defaults, output contracts, and session behavior.
 - GitHub Action PR review, posting, status checks, SARIF behavior, and degraded/fork paths.
 - MCP server tool parity, package startup, schema validation, and structured errors.
-- Tauri desktop private-preview evidence before the next RC: CLI bridge, repository/session browsing, progress streaming, config studio, provider setup, MCP setup, GitHub Action setup, local evidence views, and packaging smoke.
+- Tauri desktop evidence before the next RC: CLI bridge, repository/session browsing, progress streaming, config studio, provider setup, MCP setup, GitHub Action setup, local evidence views, visual QA, and packaging smoke.
 - Package contents, entrypoints, generated types, published-package smoke tests, and release evidence.
 - Benchmark credibility, live evidence artifacts, docs accuracy, and stable-readiness claims.
 
 Out of scope before stable:
 
 - Hosted service, billing, teams, or enterprise admin features.
-- Public desktop launch or stable desktop support claims before desktop graduation gates are closed.
 - Reintroducing retired web dashboard, TUI, or notification package surfaces.
 - Accuracy claims not backed by benchmark evidence.
-- Broad product expansion beyond CLI, GitHub Action, MCP, and the pre-RC Tauri private preview.
+- Broad product expansion beyond CLI, GitHub Action, MCP, and the Tauri desktop app.
 
 ## Relationship To Existing Docs
 
@@ -39,15 +38,15 @@ Out of scope before stable:
 
 CodeAgora has cleared the cautious beta line for CLI, GitHub Action, and MCP feedback. Local deterministic gates are strong: typecheck, build, tests, benchmark schema/reference gate, and beta smoke all pass in the latest assessment.
 
-Stable production readiness is not complete yet. The main remaining work is no longer broad CLI/GitHub/MCP feature development or desktop implementation; it is re-running package, release, security, benchmark, and live-evidence checks with the desktop private-preview surface included in the RC story.
+Stable production readiness is not complete yet. The main remaining work is no longer broad CLI/GitHub/MCP feature development or desktop implementation; it is re-running package, release, security, benchmark, desktop, and live-evidence checks against the supported product shape.
 
 ## 0.1.0-rc.3 Execution Plan
 
-`0.1.0-rc.3` is the release-candidate cycle for app completion, real production usage validation, review-quality tuning, and UX polish. It should not widen the stable contract by accident: CLI, GitHub Action, and MCP remain the production gates, while desktop remains private-preview until its promotion criteria are explicitly revisited and passed.
+`0.1.0-rc.3` is the release-candidate cycle for app completion, real production usage validation, review-quality tuning, and UX polish. It should not widen review semantics by accident: CLI, GitHub Action, MCP, and Desktop remain the production gates, while desktop stays bound to existing CLI/core/session/config contracts.
 
 ### rc.3 Goals
 
-1. Finish the app experience enough for serious private-preview use: repository readiness, review launch, progress, sessions, setup panels, evidence, export, and Korean/English copy must feel cohesive.
+1. Finish the app experience enough for serious local use: repository readiness, review launch, progress, sessions, setup panels, evidence, export, and Korean/English copy must feel cohesive.
 2. Make the app capable of the full practical local workflow: a user should be able to open a real repository, understand what is ready or blocked, fix setup/config issues, launch or cancel a review, inspect results, export evidence, and know the next action without falling back to raw files or terminal spelunking for normal cases.
 3. Prove actual production usage readiness across the supported surfaces: local CLI reviews, GitHub PR automation, MCP agent workflows, package installs, and realistic failure modes.
 4. Tune the review system against evidence: benchmark recall/precision, false-positive suppression, latency, cost, model selection, confidence calibration, and degraded behavior.
@@ -56,11 +55,11 @@ Stable production readiness is not complete yet. The main remaining work is no l
 ### App Completion Workstream
 
 - Keep desktop as a host over existing CLI/core/session/config contracts; do not add desktop-only verdict, finding, session, or config semantics.
-- Treat app-complete as a workflow requirement, not a screen checklist: the cockpit must let a private-preview user complete the normal review loop from repo readiness through setup, launch, monitoring, result triage, evidence export, and follow-up.
+- Treat app-complete as a workflow requirement, not a screen checklist: the cockpit must let a local desktop user complete the normal review loop from repo readiness through setup, launch, monitoring, result triage, evidence export, and follow-up.
 - Close gaps in the Review Cockpit flow: current workspace status, config validity, provider readiness, MCP status, GitHub Action setup, release evidence, recent verdicts, blockers, and launch affordances.
 - Make session exploration production-shaped: search/filter, verdict and severity summaries, finding evidence, model/cost metadata, degraded states, and export paths that match canonical artifacts.
 - Make review execution understandable: progress events, cancellation, partial failure states, cache/degraded metadata, and no raw stack traces in user-facing UI.
-- Keep desktop packaging private-preview: signing, notarization, updater, public distribution, and support policy are promotion decisions, not implicit rc.3 promises.
+- Keep desktop packaging explicit: signing, notarization, updater, distribution, and support policy must be captured in release evidence rather than implied by the app build.
 
 ### Production Usage Workstream
 
@@ -89,9 +88,9 @@ Stable production readiness is not complete yet. The main remaining work is no l
 ### rc.3 Exit Criteria
 
 - CLI, GitHub Action, and MCP pass their production-readiness gates through real entrypoints and packed artifacts.
-- Desktop private-preview passes `pnpm rc:desktop-gate`, manual smoke, and evidence-manifest checks without claiming public support.
+- Desktop passes `pnpm rc:desktop-gate`, visual QA, manual smoke, and evidence-manifest checks before release readiness is claimed.
 - Live benchmark and live PR smoke evidence are fresh enough for the claims made in README, changelog, release notes, and release evidence docs.
-- App UX blockers that prevent the normal local review workflow are fixed before rc.3 or explicitly marked as release blockers; lesser gaps are documented as private-preview limitations.
+- App UX blockers that prevent the normal local review workflow are fixed before rc.3 or explicitly marked as release blockers; lesser gaps are documented as Desktop limitations.
 - No new dependency, framework, config format, or desktop-only review behavior is introduced for rc.3.
 - Stable or npm `latest` promotion remains blocked until the release-candidate evidence cycle stays green and the stable approval decision is explicit.
 
@@ -122,10 +121,10 @@ pnpm bench:fn
 | CLI | Primary supported surface; setup, input handling, docs/help parity, package smoke, and config mutation gates closed | Keep packed/global smoke evidence current for release candidates |
 | GitHub Action | Bundled Action, live small-PR smoke, oversized-diff behavior, degraded/output contracts, and SARIF handoff are documented | Fork/stale-head/provider-failure scenarios remain release-candidate regression checks |
 | MCP | 9 advertised tools implemented with parity evidence, structured errors, package smoke, and runtime data coverage | Keep published-package startup smoke current for release candidates |
-| Desktop | Private-preview gates closed on 2026-05-06; `pnpm rc:desktop-gate` covers typecheck, smoke, `tauri:check`, Rust app E2E, macOS WebDriver E2E, evidence manifest, and bundle smoke | Keep private-preview evidence green during RC; no stable public desktop support until signing/notarization/updater/public distribution decisions are revisited |
+| Desktop | Gates closed on 2026-05-06; `pnpm rc:desktop-gate` covers typecheck, smoke, `tauri:check`, Rust app E2E, macOS WebDriver E2E, visual QA, evidence manifest, and bundle smoke | Keep desktop evidence green during RC; signing/notarization/updater/distribution decisions must stay explicit in release evidence |
 | Packaging | Root/MCP package dry-run, entrypoint/type contracts, runtime data paths, and provenance gates are aligned | Re-run package dry-runs before publish approval |
 | Benchmarks | Deterministic 20-fixture gate and 2026-05-04 live stable-candidate report exist | Re-run live benchmark when model pools, severity semantics, or stable wording change |
-| Docs | Release, Action, SARIF, desktop-preview, evidence, and roadmap drift gates are aligned | Keep docs synchronized before each release candidate |
+| Docs | Release, Action, SARIF, Desktop, evidence, and roadmap drift gates are aligned | Keep docs synchronized before each release candidate |
 
 ## How To Use This Roadmap
 
@@ -177,7 +176,7 @@ closed.
 
 ### P3 Scope Hygiene
 
-- [x] Keep desktop explicitly private preview across public docs.
+- [x] Promote desktop docs to the official supported local UI surface.
 - [x] Clean public TODO/draft signals and mark research TODOs as non-release backlog.
 - [x] Prevent roadmap drift by syncing completed gates back to authoritative docs.
 
@@ -187,7 +186,7 @@ closed.
 - 2026-05-04: Live GitHub Action evidence was captured in PR #532 (`review` run 25317789874, review 4219826536, verdict `ACCEPT`) and oversized-diff behavior was captured in PR #531 (`review` run 25317537322).
 - 2026-05-04: Stable-candidate live benchmark evidence was captured in run 25317360402 with 20/20 successful fixtures, 87.5% recall, 82.4% precision, 84.8% F1, and 0/6 FP regressions.
 - 2026-05-04: Release evidence, skipped/live-only classification, security regression, CI/release/provenance, and artifact-upload gates were synced into `docs/archived/RELEASE_CHECKLIST.md`, `docs/archived/RELEASE_EVIDENCE.md`, CI/release workflows, and dedicated readiness tests.
-- 2026-05-04: Desktop scope hygiene was re-checked across README, changelog, release docs, architecture docs, extension docs, and postinstall messaging. Desktop remains a private preview outside stable CLI/GitHub/MCP release gates.
+- 2026-06-09: Desktop scope hygiene was refreshed across README, roadmap, architecture docs, extension docs, package guidance, postinstall messaging, and evidence gates. Desktop is now an official supported local UI surface backed by `pnpm rc:desktop-gate`.
 - 2026-05-06: `v0.1.0-beta.1` is published as a GitHub prerelease and npm `beta` dist-tag release. Stable promotion remains blocked until the RC evidence manifest, live-only register, package smokes, and release wording are current.
 - 2026-05-06: PRs #534-#536 merged the desktop release surface, core correctness fixes, and full evidence output fixes onto `origin/main` at `1075f81`. Post-merge `pnpm rc:desktop-gate`, `pnpm test:security`, and `pnpm evidence:manifest -- --require=rc` passed; the next RC gate is full release evidence regeneration and live-only freshness, not desktop implementation.
 
@@ -232,14 +231,14 @@ Desktop must stay a host for the existing CodeAgora system:
 - Inventory every Tauri command and classify it as read-only, mutation, process execution, or external integration.
 - Version the desktop command payloads that cross the frontend/Tauri boundary.
 - Add a command-permission matrix for repository access, config writes, process spawning, and network/provider checks.
-- Decide the minimum private-preview promise: local repo open, review run, session browse, config edit, provider setup, MCP setup, GitHub Action setup, and packaged app smoke.
+- Define the minimum Desktop promise: local repo open, review run, session browse, config edit, provider setup, MCP setup, GitHub Action setup, evidence export, visual QA, and packaged app smoke.
 
 **Likely files:**
 
 - `packages/desktop/src-tauri/src/main.rs`
 - `packages/desktop/src-tauri/tauri.conf.json`
 - `packages/desktop/src/`
-- `docs/for-users/DESKTOP_PREVIEW.md`
+- `docs/for-users/DESKTOP.md`
 - `docs/for-agents/AGENT_CONTRACT.md`
 
 **Evidence:**
@@ -519,7 +518,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - `packages/desktop/src-tauri/src/main.rs`
 - `packages/desktop/src-tauri/tauri.conf.json`
 - `packages/desktop/src/`
-- `docs/for-users/DESKTOP_PREVIEW.md`
+- `docs/for-users/DESKTOP.md`
 - `docs/SECURITY.md`
 
 **Evidence:**
@@ -558,11 +557,11 @@ Desktop must stay a host for the existing CodeAgora system:
 
 **Required work:**
 
-- Define supported desktop platforms for private preview.
+- Define supported desktop platforms for RC release readiness.
 - Add app icon, bundle metadata, entitlement/capability settings, and updater-channel decision.
-- Decide whether signing/notarization is required for private preview or only for public desktop launch.
+- Decide whether signing/notarization is required for the current release channel.
 - Add packaged app smoke for launch, repo open, config read, session read, and provider-free dry-run where available.
-- Keep desktop package artifacts outside stable/latest release claims until private-preview signoff.
+- Keep desktop package artifacts outside stable/latest release claims until the desktop evidence gates pass.
 
 **Likely files:**
 
@@ -576,11 +575,12 @@ Desktop must stay a host for the existing CodeAgora system:
 **Evidence:**
 
 - `pnpm --filter @codeagora/desktop tauri:check` passes.
-- `pnpm --filter @codeagora/desktop smoke` passes as the package-equivalent private-preview app smoke.
+- `pnpm --filter @codeagora/desktop smoke` passes as the package-equivalent app smoke.
 - `pnpm --filter @codeagora/desktop evidence` writes `.sisyphus/evidence/desktop-evidence-manifest.json`.
-- `pnpm --filter @codeagora/desktop macos:webdriver-e2e` passes on macOS preview hardware.
-- `pnpm --filter @codeagora/desktop bundle:smoke` validates the generated private-preview bundle shape.
-- `docs/for-users/DESKTOP_PREVIEW.md` and the desktop evidence manifest record signing/notarization/updater decisions as deferred until public desktop launch.
+- `pnpm --filter @codeagora/desktop macos:webdriver-e2e` passes on macOS automation hardware.
+- `pnpm --filter @codeagora/desktop visual:qa` captures cockpit/setup screenshots and layout checks.
+- `pnpm --filter @codeagora/desktop bundle:smoke` validates the generated bundle shape.
+- `docs/for-users/DESKTOP.md` and the desktop evidence manifest record signing/notarization/updater decisions for the current release channel.
 
 ### D14: Desktop release gates
 
@@ -591,13 +591,13 @@ Desktop must stay a host for the existing CodeAgora system:
 - Add a desktop evidence manifest with command outputs, screenshots where useful, app version, OS, architecture, and package source.
 - Add automated smoke commands for read-only open, config load/edit validation, session browse, review dry-run, MCP tools/list, export, and cancellation.
 - Add manual smoke checklist for first-run UX, provider setup, large diff handling, degraded state display, and app restart persistence.
-- Sync desktop claims across README, changelog, release notes, `docs/for-users/DESKTOP_PREVIEW.md`, and release checklist.
-- Document known limitations as private-preview limitations, not stable guarantees.
+- Sync desktop claims across README, changelog, release notes, `docs/for-users/DESKTOP.md`, and release checklist.
+- Document known limitations as Desktop limitations, not unqualified guarantees.
 
 **Likely files:**
 
 - `scripts/desktop-smoke.mjs`
-- `docs/for-users/DESKTOP_PREVIEW.md`
+- `docs/for-users/DESKTOP.md`
 - `docs/archived/RELEASE_CHECKLIST.md`
 - `docs/archived/RELEASE_EVIDENCE.md`
 - `README.md`
@@ -608,7 +608,7 @@ Desktop must stay a host for the existing CodeAgora system:
 - Desktop evidence manifest exists for the RC candidate.
 - Automated desktop smoke passes from a packaged or package-equivalent app.
 - `pnpm rc:desktop-gate` passes and captures `desktop-gate.log` plus `.sisyphus/evidence/desktop-evidence-manifest.json`.
-- Manual smoke checklist is documented in `docs/for-users/DESKTOP_PREVIEW.md` and must be signed off before an RC branch/tag.
+- Manual smoke checklist is documented in `docs/for-users/DESKTOP.md` and must be signed off before an RC branch/tag.
 
 ### D15: RC handoff after desktop
 
@@ -735,7 +735,7 @@ Desktop must stay a host for the existing CodeAgora system:
 
 - Define versioned required artifacts such as `metadata.json`, `result.json`, verdict/report markdown, telemetry, and optional raw logs.
 - Require every terminal path to persist compatible artifacts: normal review, quick/skip-head, cache hit, empty diff, auto-approve, degraded/error.
-- Add session contract tests for `sessions list/show`, `explain`, `replay`, `trace`, `costs`, and MCP explain. Desktop session browsing remains private-preview validation and must not block stable CLI/GitHub/MCP release gates until desktop graduates into the supported surface.
+- Add session contract tests for `sessions list/show`, `explain`, `replay`, `trace`, `costs`, and MCP explain. Desktop session browsing must use the same versioned session contract and remain part of the Desktop release gate.
 - Document migration behavior for old sessions or mark old sessions best-effort only.
 
 **Likely files:**
@@ -1335,32 +1335,31 @@ evidence-manifest.json
 
 ## P3: Scope Hygiene And Documentation Cleanup
 
-### Keep desktop explicitly private preview
+### Keep Desktop Official And Evidence-Backed
 
-**Finding:** Desktop code exists and builds, but docs correctly state it is outside the stable support surface. That public-support boundary must stay clear, while the Tauri private-preview track is now a required pre-RC product gate.
+**Finding:** Desktop code exists and builds, and current docs now treat it as an official local UI surface. That support claim must stay evidence-backed and contract-aligned with CLI, GitHub Action, and MCP.
 
 **Surface:** README, `packages/desktop`, docs, postinstall messaging.
 
 **Required work:**
 
-- Keep desktop out of beta/stable support claims until private-preview graduation evidence exists.
-- Ensure postinstall, README, and extension docs do not imply desktop is a released integration.
-- When desktop graduates, require session browsing, config round-trip, and CLI parity evidence first.
-- Keep desktop packaging, signing, updater, and distribution work separate from CLI/GitHub/MCP semantics, but complete the private-preview production gates before RC.
-- Keep progress, cost visibility, local review controls, and notifications aligned with the desktop production gates above, or soften public docs that imply those capabilities are part of the preview.
+- Ensure postinstall, README, and extension docs describe Desktop as a released local UI without implying desktop-only review semantics.
+- Keep session browsing, config round-trip, and CLI parity evidence current.
+- Keep desktop packaging, signing, updater, and distribution work separate from CLI/GitHub/MCP review semantics, and record the release-channel decisions in evidence.
+- Keep progress, cost visibility, local review controls, notifications, visual QA, and export flows aligned with the desktop production gates above, or soften public docs that imply those capabilities are guaranteed.
 
-**Graduation gates:**
+**Support gates:**
 
 - Desktop can browse sessions generated by the CLI without migration.
 - Desktop config edits validate against the same schemas as CLI and MCP.
 - Desktop-triggered review produces the same verdict/issues as CLI for the same diff/config.
-- Desktop progress, cost visibility, local review controls, and notifications match the public preview claims.
-- Desktop packaging and updater are documented with clear private-preview limits before RC.
+- Desktop progress, cost visibility, local review controls, and notifications match the public claims.
+- Desktop packaging, signing/notarization, updater, and distribution limits are documented before RC.
 
 **Evidence:**
 
-- Public docs consistently describe desktop as private preview or planned local UI until graduation.
-- Release checklist makes desktop private-preview production gates a pre-RC requirement without claiming desktop stable support.
+- Public docs consistently describe Desktop as an official local UI surface backed by release evidence.
+- Release checklist makes Desktop production gates a pre-RC requirement without replacing CLI/GitHub Action/MCP evidence.
 
 ### Clean up public TODO/draft signals
 
@@ -1428,11 +1427,11 @@ Add cross-surface parity tests, produce stable-candidate live benchmark evidence
 
 **Exit:** CLI/MCP/Action parity is deterministic, live benchmark evidence is attached with complete metadata, security regressions are named, release artifacts are uploaded, and publish-capable workflows have preflight/approval boundaries.
 
-### Batch E: Desktop private-preview production and scope hygiene
+### Batch E: Desktop production and scope hygiene
 
-Keep the completed desktop private-preview production track green, clean public TODO/draft signals, and keep desktop stable-support claims separate from CLI/GitHub/MCP supported-surface claims.
+Keep the completed desktop production track green, clean public TODO/draft signals, and keep desktop claims backed by package, launch, WebDriver, visual QA, export, and release evidence.
 
-**Exit:** Release-facing docs have no accidental placeholders, desktop private-preview evidence is attached, and desktop remains outside stable support wording until its own graduation gates are met.
+**Exit:** Release-facing docs have no accidental placeholders, Desktop evidence is attached, and Desktop wording matches the current release gates.
 
 ## Verification Strategy
 
@@ -1485,7 +1484,7 @@ Manual or live evidence required before stable claims:
 - Built CLI smoke from packed or globally installed artifact.
 - MCP startup and `tools/list` from package command.
 - GitHub Action run on a representative PR.
-- Tauri desktop private-preview smoke from packaged or package-equivalent app.
+- Tauri desktop smoke from packaged or package-equivalent app.
 - Live benchmark report with provider/model/cost/latency/failure metadata.
 
 ## Execution Order
@@ -1508,23 +1507,23 @@ at step 15.
 11. Align CI/release/security/provenance/artifact gates.
 12. Freeze desktop command contract and repository/session/config boundaries.
 13. Implement desktop repo open, review execution bridge, progress/cancel, session explorer, diff/finding views, config studio, provider setup, MCP manager, GitHub Action manager, evidence view, security/privacy layer, export flows, and package smoke.
-14. Close desktop private-preview release gates and attach desktop evidence.
+14. Close desktop release gates and attach desktop evidence.
 15. Re-run CLI/GitHub/MCP package, live, benchmark, and release evidence after desktop integration.
-16. Clean public TODO/draft signals and keep desktop scoped as private preview until graduation.
+16. Clean public TODO/draft signals and keep Desktop scoped to the official local UI contract.
 17. Only then consider RC wording, stable wording, or npm latest dist-tag promotion.
 ```
 
 ## Stable Promotion Rule
 
-Do not promote a stable release or `latest` npm dist-tag until all P0 items are closed, P1 public-surface accuracy is verified, P2 evidence is attached, the desktop private-preview production track is closed, and this status remains green through a release-candidate cycle.
+Do not promote a stable release or `latest` npm dist-tag until all P0 items are closed, P1 public-surface accuracy is verified, P2 evidence is attached, the desktop production track is closed, and this status remains green through a release-candidate cycle.
 
 A stable candidate must have all of the following attached or linked from release notes:
 
 - Passing deterministic gates: `typecheck`, `build`, `test`, `bench:ci`, `release:beta-smoke`.
-- Desktop evidence: desktop typecheck/build/`tauri:check`, packaged or package-equivalent app smoke, session/config/review/MCP/export smoke, security/redaction evidence, and private-preview limitations.
+- Desktop evidence: desktop typecheck/build/`tauri:check`, packaged or package-equivalent app smoke, WebDriver E2E, visual QA, session/config/review/MCP/export smoke, security/redaction evidence, and Desktop limitations.
 - Package evidence: root package dry-run, MCP package dry-run, tarball-installed CLI smoke, tarball-installed MCP startup/tools-list plus provider-free tool smoke, and lazy runtime data path smoke.
 - GitHub evidence: Action bundle build and at least one representative PR smoke with outputs captured.
 - CI/release evidence: named OS/Node matrix, lint policy, skipped-test register, release artifact uploads, security regression suite, publish preflight, and approval/provenance policy.
 - Quality evidence: fresh live benchmark report with full metadata and known limits.
 - Contract evidence: CLI JSON/NDJSON schema, non-mutating CLI input behavior, cache/session artifact contracts, MCP all-tool output/error contracts, GitHub Action inputs/outputs/defaults, SARIF content behavior, and config defaults/mutations documented and tested.
-- Docs evidence: README, production roadmap, beta readiness, desktop preview docs, release checklist, and this roadmap agree on supported surfaces, desktop private-preview limits, and release status.
+- Docs evidence: README, production roadmap, beta readiness, Desktop docs, release checklist, and this roadmap agree on supported surfaces, Desktop limits, and release status.

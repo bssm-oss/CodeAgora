@@ -36,6 +36,11 @@ type View = 'sessions' | 'run' | 'config' | 'setup';
 type DesktopLocale = 'en' | 'ko';
 type DesktopLocalePreference = DesktopLocale | 'auto';
 type DesktopThemePreference = 'system' | 'light' | 'dark';
+interface RunReadiness {
+  ready: boolean;
+  reasons: string[];
+  nextSteps: string[];
+}
 const sessionPageSize = 50;
 
 const recentReposKey = 'codeagora.desktop.recentRepos';
@@ -422,15 +427,34 @@ function decisionTone(session: Pick<SessionSummary, 'decision' | 'status' | 'sev
   return 'warn';
 }
 
-function runReadiness(): { ready: boolean; reasons: string[] } {
+function runReadiness(): RunReadiness {
   const reasons: string[] = [];
+  const nextSteps = new Set<string>();
   const repo = state.repoInfo;
-  if (!repo) reasons.push(t('desktop.readiness.reason.repoUnknown'));
-  if (repo && !repo.isGitRepo) reasons.push(t('desktop.readiness.reason.notGitRepo'));
-  if (repo && !repo.trusted) reasons.push(repo.trustReason || t('desktop.readiness.reason.notTrusted'));
-  if (repo && !repo.hasConfig) reasons.push(t('desktop.readiness.reason.configMissing'));
-  if (state.configValidation?.valid === false) reasons.push(t('desktop.readiness.reason.configInvalid'));
-  return { ready: reasons.length === 0, reasons };
+  if (!repo) {
+    reasons.push(t('desktop.readiness.reason.repoUnknown'));
+    nextSteps.add(t('desktop.readiness.next.selectRepo'));
+  }
+  if (repo && !repo.isGitRepo) {
+    reasons.push(t('desktop.readiness.reason.notGitRepo'));
+    nextSteps.add(t('desktop.readiness.next.selectRepo'));
+  }
+  if (repo && !repo.trusted) {
+    reasons.push(repo.trustReason || t('desktop.readiness.reason.notTrusted'));
+    nextSteps.add(t('desktop.readiness.next.trustedRepo'));
+  }
+  if (repo && !repo.hasConfig) {
+    reasons.push(t('desktop.readiness.reason.configMissing'));
+    nextSteps.add(t('desktop.readiness.next.initConfig'));
+  }
+  if (state.configValidation?.valid === false) {
+    reasons.push(t('desktop.readiness.reason.configInvalid'));
+    nextSteps.add(t('desktop.readiness.next.fixConfig'));
+  }
+  if (reasons.length > 0) {
+    nextSteps.add(t('desktop.readiness.next.liveDoctor'));
+  }
+  return { ready: reasons.length === 0, reasons, nextSteps: [...nextSteps] };
 }
 
 function sessionHasDegradedSignal(session?: SessionDetail): boolean {
@@ -442,7 +466,7 @@ function runHasDegradedSignal(run?: ReviewRunSnapshot): boolean {
   return run.events.some((event) => /degraded/i.test(event.kind) || /degraded/i.test(event.message));
 }
 
-function cockpitStatus(latest: SessionSummary | undefined, readiness: { ready: boolean; reasons: string[] }): CockpitStatus {
+function cockpitStatus(latest: SessionSummary | undefined, readiness: RunReadiness): CockpitStatus {
   if (state.activeRun && isReviewRunning(state.activeRun)) {
     return {
       tone: 'info',
@@ -1777,6 +1801,14 @@ function renderRunReview(): HTMLElement {
     }
     readinessPanel.append(list);
   }
+  if (readiness.nextSteps.length > 0) {
+    readinessPanel.append(el('strong', 'ca-readiness-next-title', t('desktop.readiness.nextTitle')));
+    const nextList = el('ul', 'ca-readiness-reasons ca-readiness-next');
+    for (const step of readiness.nextSteps) {
+      nextList.append(el('li', '', step));
+    }
+    readinessPanel.append(nextList);
+  }
   panel.append(readinessPanel);
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
@@ -2080,7 +2112,7 @@ function renderNextActionPanel(selected: SessionDetail): HTMLElement {
     list.append(el('li', '', t('desktop.next.monitorNextRun')));
   }
   panel.append(list);
-  panel.append(el('p', 'ca-repo-note', t('desktop.next.privatePreviewNote')));
+  panel.append(el('p', 'ca-repo-note', t('desktop.next.contractNote')));
   return panel;
 }
 
