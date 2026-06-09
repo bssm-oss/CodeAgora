@@ -31,7 +31,7 @@ export interface PresetConfig {
 }
 
 const OPENROUTER_QUALITY_REVIEWERS = [
-  'qwen/qwen3-235b-a22b-2507',
+  'xiaomi/mimo-v2.5',
   'qwen/qwen3-coder-30b-a3b-instruct',
   'tencent/hy3-preview',
   'deepseek/deepseek-v4-flash',
@@ -39,13 +39,13 @@ const OPENROUTER_QUALITY_REVIEWERS = [
 ];
 
 const OPENROUTER_QUALITY_SUPPORTERS = [
-  'openai/gpt-oss-120b',
-  'z-ai/glm-4.7-flash',
+  'z-ai/glm-5.1',
+  'minimax/minimax-m3',
 ];
 
-const OPENROUTER_QUALITY_DA = 'deepseek/deepseek-v4-flash';
-const OPENROUTER_QUALITY_MODERATOR = 'qwen/qwen3-235b-a22b-2507';
-const OPENROUTER_QUALITY_HEAD = 'qwen/qwen3-235b-a22b-2507';
+const OPENROUTER_QUALITY_DA = 'x-ai/grok-4.3';
+const OPENROUTER_QUALITY_MODERATOR = 'openai/gpt-5.3-codex';
+const OPENROUTER_QUALITY_HEAD = 'qwen/qwen3.7-max';
 
 export const STATIC_PRESETS: PresetConfig[] = [
   {
@@ -118,7 +118,7 @@ export function buildPresetConfig(options: BuildPresetOptions): Config {
 
   // Use first provider's model as the "primary" for shared roles
   const primaryProvider = preset.providers[0]!;
-  const primaryModel = preset.models[primaryProvider] ?? 'qwen/qwen3-235b-a22b-2507';
+  const primaryModel = preset.models[primaryProvider] ?? 'xiaomi/mimo-v2.5';
 
   const agent = (id: string, provider: string, model: string) => ({
     id,

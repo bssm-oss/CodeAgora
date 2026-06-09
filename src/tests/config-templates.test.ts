@@ -129,7 +129,7 @@ describe('generateMultiProviderTemplate', () => {
     const parsed = JSON.parse(output);
     expect(parsed.supporters.pool).toHaveLength(2);
     const models = parsed.supporters.pool.map((s: any) => s.model);
-    expect(models).toEqual(['openai/gpt-oss-120b', 'z-ai/glm-4.7-flash']);
+    expect(models).toEqual(['z-ai/glm-5.1', 'minimax/minimax-m3']);
     expect(parsed.supporters.pool.every((s: any) => s.provider === 'openrouter')).toBe(true);
   });
 
@@ -137,7 +137,7 @@ describe('generateMultiProviderTemplate', () => {
     const output = generateMultiProviderTemplate('json');
     const parsed = JSON.parse(output);
     expect(parsed.head.provider).toBe('openrouter');
-    expect(parsed.head.model).toBe('qwen/qwen3-235b-a22b-2507');
+    expect(parsed.head.model).toBe('qwen/qwen3.7-max');
   });
 
   it('should start with the multi-provider YAML header', () => {

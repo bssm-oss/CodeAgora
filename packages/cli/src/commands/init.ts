@@ -365,7 +365,7 @@ export function buildMultiProviderConfig(params: MultiProviderConfigParams): Gen
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-haiku-4-5',
   openai: 'gpt-5.3-codex',
-  openrouter: 'qwen/qwen3-235b-a22b-2507',
+  openrouter: 'xiaomi/mimo-v2.5',
   'opencode-go': 'deepseek-v4-flash',
   'opencode-zen': 'gpt-5.4-mini',
   groq: 'llama-3.3-70b-versatile',
@@ -381,7 +381,7 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
     label: 'Quick review (OpenRouter)',
     labelKo: '\uBE60\uB978 \uB9AC\uBDF0 (OpenRouter)',
     providers: ['openrouter'],
-    models: { openrouter: 'qwen/qwen3-235b-a22b-2507' },
+    models: { openrouter: 'xiaomi/mimo-v2.5' },
     reviewerCount: 1,
     discussion: false,
     backend: 'api',
@@ -391,7 +391,7 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
     label: 'Thorough review (OpenRouter)',
     labelKo: '\uC2EC\uCE35 \uB9AC\uBDF0 (OpenRouter)',
     providers: ['openrouter'],
-    models: { openrouter: 'qwen/qwen3-235b-a22b-2507' },
+    models: { openrouter: 'xiaomi/mimo-v2.5' },
     reviewerCount: 3,
     discussion: true,
     backend: 'api',
@@ -446,7 +446,7 @@ export function generatePresets(
         return slash > 0 ? id.slice(slash + 1) : id;
       }
     }
-    return PROVIDER_DEFAULT_MODELS[provider] ?? 'qwen/qwen3-235b-a22b-2507';
+    return PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5';
   }
 
   // 1. "Quick review" — single fastest provider, 1 reviewer, no discussion
@@ -716,7 +716,7 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
 
   const selections: ProviderModelSelection[] = selected.providers.map((provider) => ({
     provider,
-    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'qwen/qwen3-235b-a22b-2507',
+    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5',
     backend: selected.backend,
   }));
 
@@ -864,7 +864,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     // Use preset defaults — build selections from preset
     const selections: ProviderModelSelection[] = selectedPreset.providers.map((prov) => ({
       provider: prov,
-      model: selectedPreset.models[prov] ?? PROVIDER_DEFAULT_MODELS[prov] ?? 'qwen/qwen3-235b-a22b-2507',
+      model: selectedPreset.models[prov] ?? PROVIDER_DEFAULT_MODELS[prov] ?? 'xiaomi/mimo-v2.5',
       backend: selectedPreset.backend,
     }));
 
@@ -1047,7 +1047,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
       }
 
       // Fallback: text input with default model
-      const defaultModel = PROVIDER_DEFAULT_MODELS[prov] ?? 'qwen/qwen3-235b-a22b-2507';
+      const defaultModel = PROVIDER_DEFAULT_MODELS[prov] ?? 'xiaomi/mimo-v2.5';
       const modelInput = await p.text({
         message: ko ? `${prov} \uBAA8\uB378 \uC774\uB984?` : `Model for ${prov}?`,
         placeholder: defaultModel,

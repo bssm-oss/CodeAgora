@@ -583,7 +583,7 @@ const LIVE_CHECK_TIMEOUT_MS = 30_000;
 const HEALTH_CHECK_DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-haiku-4-5',
   openai: 'gpt-5.3-codex',
-  openrouter: 'qwen/qwen3-235b-a22b-2507',
+  openrouter: 'xiaomi/mimo-v2.5',
   'opencode-go': 'deepseek-v4-flash',
   'opencode-zen': 'gpt-5.4-mini',
   groq: 'llama-3.3-70b-versatile',

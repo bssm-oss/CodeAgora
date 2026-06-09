@@ -25,6 +25,7 @@ export const FallbackSchema = z.object({
   model: z.string(),
   backend: BackendSchema,
   provider: z.string().optional(),
+  maxOutputTokens: z.number().int().positive().max(32768).optional(),
 });
 export type FallbackConfig = z.infer<typeof FallbackSchema>;
 
@@ -121,8 +122,8 @@ export const ModeratorConfigSchema = z.object({
   backend: BackendSchema,
   model: z.string(),
   provider: z.string().optional(),
-  timeout: z.number().default(120),
   maxOutputTokens: z.number().int().positive().max(32768).optional(),
+  timeout: z.number().default(120),
   /**
    * Forced-decision output format. Default (undefined/'markdown') uses the
    * existing regex-based parser (structured "severity:" field → JSON-like
@@ -230,8 +231,8 @@ export const HeadConfigSchema = z.object({
   backend: BackendSchema,
   model: z.string(),
   provider: z.string().optional(),
-  timeout: z.number().default(120),
   maxOutputTokens: z.number().int().positive().max(32768).optional(),
+  timeout: z.number().default(120),
   enabled: z.boolean().default(true),
 });
 export type HeadConfig = z.infer<typeof HeadConfigSchema>;

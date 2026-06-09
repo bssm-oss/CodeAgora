@@ -24,7 +24,6 @@ export interface BackendInput {
   timeout: number;
   signal?: AbortSignal;
   temperature?: number;
-  /** API backend response token cap. Defaults to a conservative budget. */
   maxOutputTokens?: number;
   /** API backends report token usage here when the provider returns it. */
   onUsage?: (usage: TokenUsage) => void;

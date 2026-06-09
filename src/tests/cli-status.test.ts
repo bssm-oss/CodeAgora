@@ -260,7 +260,7 @@ describe('getStatus()', () => {
         arms: {
           'groq/llama-3': { alpha: 9, beta: 1 },
           'openai/gpt-4o': { alpha: 8, beta: 2 },
-          'openrouter/qwen/qwen3-235b-a22b-2507': { alpha: 7, beta: 3 },
+          'openrouter/qwen/qwen3.7-max': { alpha: 7, beta: 3 },
           'google/gemini': { alpha: 1, beta: 9 },
         },
       });
@@ -269,7 +269,7 @@ describe('getStatus()', () => {
       expect(output).toContain('Models (top 3)');
       expect(output).toContain('groq/llama-3');
       expect(output).toContain('openai/gpt-4o');
-      expect(output).toContain('openrouter/qwen/qwen3-235b-a22b-2507');
+      expect(output).toContain('openrouter/qwen/qwen3.7-max');
       // worst model should be excluded
       expect(output).not.toContain('google/gemini');
     });

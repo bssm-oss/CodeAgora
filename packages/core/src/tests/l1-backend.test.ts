@@ -22,7 +22,7 @@ describe('sanitizeShellArg', () => {
   it('accepts forward-slash path separators used in provider/model combos', () => {
     // Note: ../../../etc/passwd passes the regex since dots and slashes are allowed.
     // Security is enforced at the OS level via spawn() (no shell interpretation).
-    expect(() => sanitizeShellArg('openrouter/qwen/qwen3-235b-a22b-2507', 'model')).not.toThrow();
+    expect(() => sanitizeShellArg('openrouter/xiaomi/mimo-v2.5', 'model')).not.toThrow();
   });
 
   it('rejects strings with shell metacharacters', () => {
@@ -49,7 +49,7 @@ describe('sanitizeShellArg', () => {
   });
 
   it('returns the arg unchanged on success', () => {
-    const arg = 'openrouter/qwen/qwen3-235b-a22b-2507';
+    const arg = 'openrouter/qwen/qwen3.7-max';
     expect(sanitizeShellArg(arg, 'provider')).toBe(arg);
   });
 });

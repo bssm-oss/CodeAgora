@@ -15,9 +15,9 @@ const FULL_TEMPLATE_DATA = {
   language: 'en',
   reviewers: [
     {
-      id: 'r-qwen-235b',
-      label: 'Qwen 235B Reviewer',
-      model: 'qwen/qwen3-235b-a22b-2507',
+      id: 'r-mimo',
+      label: 'Mimo Reviewer',
+      model: 'xiaomi/mimo-v2.5',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -63,16 +63,16 @@ const FULL_TEMPLATE_DATA = {
   supporters: {
     pool: [
       {
-        id: 's-gpt-oss',
-        model: 'openai/gpt-oss-120b',
+        id: 's-glm',
+        model: 'z-ai/glm-5.1',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
         timeout: 180,
       },
       {
-        id: 's-glm-flash',
-        model: 'z-ai/glm-4.7-flash',
+        id: 's-minimax',
+        model: 'minimax/minimax-m3',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
@@ -82,8 +82,8 @@ const FULL_TEMPLATE_DATA = {
     pickCount: 2,
     pickStrategy: 'random',
     devilsAdvocate: {
-      id: 'da-deepseek-flash',
-      model: 'deepseek/deepseek-v4-flash',
+      id: 'da-grok',
+      model: 'x-ai/grok-4.3',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -93,7 +93,7 @@ const FULL_TEMPLATE_DATA = {
     personaAssignment: 'random',
   },
   moderator: {
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'openai/gpt-5.3-codex',
     backend: 'api',
     provider: 'openrouter',
   },
@@ -109,7 +109,7 @@ const FULL_TEMPLATE_DATA = {
   },
   head: {
     backend: 'api',
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'qwen/qwen3.7-max',
     provider: 'openrouter',
     enabled: true,
   },
@@ -130,8 +130,8 @@ const MINIMAL_TEMPLATE_DATA = {
   language: 'en',
   reviewers: [
     {
-      id: 'r-qwen-235b',
-      model: 'qwen/qwen3-235b-a22b-2507',
+      id: 'r-mimo',
+      model: 'xiaomi/mimo-v2.5',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -141,8 +141,8 @@ const MINIMAL_TEMPLATE_DATA = {
   supporters: {
     pool: [
       {
-        id: 's-gpt-oss',
-        model: 'openai/gpt-oss-120b',
+        id: 's-glm',
+        model: 'z-ai/glm-5.1',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
@@ -152,8 +152,8 @@ const MINIMAL_TEMPLATE_DATA = {
     pickCount: 1,
     pickStrategy: 'random',
     devilsAdvocate: {
-      id: 'da-deepseek-flash',
-      model: 'deepseek/deepseek-v4-flash',
+      id: 'da-grok',
+      model: 'x-ai/grok-4.3',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -163,7 +163,7 @@ const MINIMAL_TEMPLATE_DATA = {
     personaAssignment: 'random',
   },
   moderator: {
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'openai/gpt-5.3-codex',
     backend: 'api',
     provider: 'openrouter',
   },
@@ -179,7 +179,7 @@ const MINIMAL_TEMPLATE_DATA = {
   },
   head: {
     backend: 'api',
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'qwen/qwen3.7-max',
     provider: 'openrouter',
     enabled: true,
   },
@@ -217,8 +217,8 @@ const DECLARATIVE_TEMPLATE_DATA = {
   supporters: {
     pool: [
       {
-        id: 's-gpt-oss',
-        model: 'openai/gpt-oss-120b',
+        id: 's-glm',
+        model: 'z-ai/glm-5.1',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
@@ -228,8 +228,8 @@ const DECLARATIVE_TEMPLATE_DATA = {
     pickCount: 1,
     pickStrategy: 'random',
     devilsAdvocate: {
-      id: 'da-deepseek-flash',
-      model: 'deepseek/deepseek-v4-flash',
+      id: 'da-grok',
+      model: 'x-ai/grok-4.3',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -239,7 +239,7 @@ const DECLARATIVE_TEMPLATE_DATA = {
     personaAssignment: 'random',
   },
   moderator: {
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'openai/gpt-5.3-codex',
     backend: 'api',
     provider: 'openrouter',
   },
@@ -255,7 +255,7 @@ const DECLARATIVE_TEMPLATE_DATA = {
   },
   head: {
     backend: 'api',
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'qwen/qwen3.7-max',
     provider: 'openrouter',
     enabled: true,
   },
@@ -277,9 +277,9 @@ const MULTI_PROVIDER_TEMPLATE_DATA = {
   // L1: diverse reviewers across the OpenRouter lineup
   reviewers: [
     {
-      id: 'r-qwen-235b',
-      label: 'Qwen 235B Reviewer',
-      model: 'qwen/qwen3-235b-a22b-2507',
+      id: 'r-mimo',
+      label: 'Mimo Reviewer',
+      model: 'xiaomi/mimo-v2.5',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -326,18 +326,18 @@ const MULTI_PROVIDER_TEMPLATE_DATA = {
   supporters: {
     pool: [
       {
-        id: 's-gpt-oss',
-        label: 'GPT OSS Supporter',
-        model: 'openai/gpt-oss-120b',
+        id: 's-glm',
+        label: 'GLM Supporter',
+        model: 'z-ai/glm-5.1',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
         timeout: 180,
       },
       {
-        id: 's-glm-flash',
-        label: 'GLM Flash Supporter',
-        model: 'z-ai/glm-4.7-flash',
+        id: 's-minimax',
+        label: 'MiniMax Supporter',
+        model: 'minimax/minimax-m3',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
@@ -347,9 +347,9 @@ const MULTI_PROVIDER_TEMPLATE_DATA = {
     pickCount: 2,
     pickStrategy: 'random',
     devilsAdvocate: {
-      id: 'da-deepseek-flash',
-      label: 'DeepSeek Flash Devils Advocate',
-      model: 'deepseek/deepseek-v4-flash',
+      id: 'da-grok',
+      label: 'Grok Devils Advocate',
+      model: 'x-ai/grok-4.3',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -360,7 +360,7 @@ const MULTI_PROVIDER_TEMPLATE_DATA = {
   },
   // L2 moderator: code-focused orchestration model
   moderator: {
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'openai/gpt-5.3-codex',
     backend: 'api',
     provider: 'openrouter',
   },
@@ -377,7 +377,7 @@ const MULTI_PROVIDER_TEMPLATE_DATA = {
   // L3: final verdict model
   head: {
     backend: 'api',
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'qwen/qwen3.7-max',
     provider: 'openrouter',
     enabled: true,
   },

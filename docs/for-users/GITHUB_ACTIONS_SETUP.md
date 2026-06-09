@@ -15,7 +15,7 @@ This is the recommended PR setup. Add `OPENROUTER_API_KEY` as a repository secre
   "mode": "pragmatic",
   "language": "en",
   "reviewers": [
-    { "id": "r-qwen-235b", "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" },
+    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" },
     { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" },
     { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:api-contract" },
     { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:security" },
@@ -23,14 +23,14 @@ This is the recommended PR setup. Add `OPENROUTER_API_KEY` as a repository secre
   ],
   "supporters": {
     "pool": [
-      { "id": "s-gpt-oss", "model": "openai/gpt-oss-120b", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
-      { "id": "s-glm-flash", "model": "z-ai/glm-4.7-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
+      { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+      { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
     ],
     "pickCount": 2,
     "pickStrategy": "random",
     "devilsAdvocate": {
-      "id": "da-deepseek-flash",
-      "model": "deepseek/deepseek-v4-flash",
+      "id": "da-grok",
+      "model": "x-ai/grok-4.3",
       "backend": "api",
       "provider": "openrouter",
       "enabled": true,
@@ -39,7 +39,7 @@ This is the recommended PR setup. Add `OPENROUTER_API_KEY` as a repository secre
     "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
     "personaAssignment": "random"
   },
-  "moderator": { "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "timeout": 180 },
+  "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter", "timeout": 180 },
   "discussion": {
     "maxRounds": 2,
     "registrationThreshold": {
@@ -52,7 +52,7 @@ This is the recommended PR setup. Add `OPENROUTER_API_KEY` as a repository secre
   },
   "head": {
     "backend": "api",
-    "model": "qwen/qwen3-235b-a22b-2507",
+    "model": "qwen/qwen3.7-max",
     "provider": "openrouter",
     "enabled": true,
     "timeout": 180
@@ -138,7 +138,7 @@ Example with the recommended OpenRouter quality lineup:
   "mode": "pragmatic",
   "language": "en",
   "reviewers": [
-    { "id": "r-qwen-235b", "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
@@ -146,18 +146,18 @@ Example with the recommended OpenRouter quality lineup:
   ],
   "supporters": {
     "pool": [
-      { "id": "s-gpt-oss", "model": "openai/gpt-oss-120b", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
-      { "id": "s-glm-flash", "model": "z-ai/glm-4.7-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
+      { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+      { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
     ],
     "pickCount": 2,
     "pickStrategy": "random",
-    "devilsAdvocate": { "id": "da-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    "devilsAdvocate": { "id": "da-grok", "model": "x-ai/grok-4.3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
     "personaAssignment": "random"
   },
-  "moderator": { "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "timeout": 180 },
+  "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter", "timeout": 180 },
   "discussion": { "maxRounds": 2, "codeSnippetRange": 10 },
-  "head": { "backend": "api", "model": "qwen/qwen3-235b-a22b-2507", "provider": "openrouter", "enabled": true, "timeout": 180 },
+  "head": { "backend": "api", "model": "qwen/qwen3.7-max", "provider": "openrouter", "enabled": true, "timeout": 180 },
   "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
 }
 ```

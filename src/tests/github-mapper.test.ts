@@ -53,7 +53,7 @@ const makeReviewRun = (overrides?: Partial<ReviewRunSummary>): ReviewRunSummary 
     errored: 0,
     reviewers: [],
     models: [
-      'qwen/qwen3-235b-a22b-2507',
+      'xiaomi/mimo-v2.5',
       'qwen/qwen3-coder-30b-a3b-instruct',
       'tencent/hy3-preview',
       'deepseek/deepseek-v4-flash',
@@ -63,14 +63,14 @@ const makeReviewRun = (overrides?: Partial<ReviewRunSummary>): ReviewRunSummary 
   },
   l2: {
     supporters: 2,
-    supporterModels: ['openai/gpt-oss-120b', 'z-ai/glm-4.7-flash'],
-    devilsAdvocate: { id: 'da', model: 'deepseek/deepseek-v4-flash', backend: 'api', provider: 'openrouter' },
-    moderator: { id: 'moderator', model: 'qwen/qwen3-235b-a22b-2507', backend: 'api', provider: 'openrouter' },
+    supporterModels: ['z-ai/glm-5.1', 'minimax/minimax-m3'],
+    devilsAdvocate: { id: 'da', model: 'x-ai/grok-4.3', backend: 'api', provider: 'openrouter' },
+    moderator: { id: 'moderator', model: 'openai/gpt-5.3-codex', backend: 'api', provider: 'openrouter' },
     discussions: 0,
     skipped: false,
   },
   l3: {
-    head: { id: 'head', model: 'qwen/qwen3-235b-a22b-2507', backend: 'api', provider: 'openrouter' },
+    head: { id: 'head', model: 'qwen/qwen3.7-max', backend: 'api', provider: 'openrouter' },
     skipped: false,
   },
   queues: {

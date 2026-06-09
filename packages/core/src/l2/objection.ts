@@ -60,6 +60,7 @@ async function executeSupporterObjectionCheck(
   const response = await executeBackend({
     backend: config.backend,
     model: config.model,
+    provider: config.provider,
     prompt,
     timeout: config.timeout ?? 60,
     temperature: config.temperature,

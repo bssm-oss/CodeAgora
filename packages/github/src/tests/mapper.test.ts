@@ -173,7 +173,7 @@ describe('mapToInlineCommentBody', () => {
       },
       {
         reviewerId: 'mimo',
-        model: 'qwen/qwen3-235b-a22b-2507',
+        model: 'xiaomi/mimo-v2.5',
         severity: 'WARNING',
         problem: 'Possible null issue, low risk',
         evidence: ['Line 42 might be null'],
@@ -242,13 +242,13 @@ describe('mapToInlineCommentBody', () => {
     }];
     const supporterModelMap = new Map([
       ['supporter-1', 'gpt-4o'],
-      ['devil-adv', 'deepseek/deepseek-v4-flash'],
+      ['devil-adv', 'x-ai/grok-4.3'],
     ]);
     const body = mapToInlineCommentBody(
       makeDoc(), discussion, undefined, undefined, rounds, undefined, 'devil-adv', supporterModelMap,
     );
     // DA gets 😈 icon
-    expect(body).toContain('\u{1F608} deepseek/deepseek-v4-flash');
+    expect(body).toContain('\u{1F608} x-ai/grok-4.3');
     // Regular supporter shows model name without icon
     expect(body).toContain('gpt-4o');
     expect(body).not.toContain('supporter-1');

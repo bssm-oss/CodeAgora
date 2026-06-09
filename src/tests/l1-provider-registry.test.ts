@@ -62,7 +62,7 @@ describe('Provider Registry', () => {
 
     expect((getModel('anthropic', 'claude-haiku-4-5') as any).modelId).toBe('claude-haiku-4-5');
     expect((getModel('openai', 'gpt-4o-mini') as any).modelId).toBe('gpt-4o-mini');
-    expect((getModel('openrouter', 'qwen/qwen3-235b-a22b-2507') as any).modelId).toBe('qwen/qwen3-235b-a22b-2507');
+    expect((getModel('openrouter', 'qwen/qwen3.7-max') as any).modelId).toBe('qwen/qwen3.7-max');
     expect((getModel('groq', 'llama-3.3-70b-versatile') as any).modelId).toBe('llama-3.3-70b-versatile');
 
     expect(createAnthropic).toHaveBeenCalledOnce();

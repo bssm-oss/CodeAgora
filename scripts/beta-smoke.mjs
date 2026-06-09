@@ -48,8 +48,8 @@ const AUTO_REVIEW_CONFIG = {
   },
   supporters: {
     pool: [{
-      id: 's-gpt-oss',
-      model: 'openai/gpt-oss-120b',
+      id: 's1',
+      model: 'z-ai/glm-5.1',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -59,8 +59,8 @@ const AUTO_REVIEW_CONFIG = {
     pickCount: 1,
     pickStrategy: 'random',
     devilsAdvocate: {
-      id: 'da-deepseek-flash',
-      model: 'deepseek/deepseek-v4-flash',
+      id: 'da',
+      model: 'x-ai/grok-4.3',
       backend: 'api',
       provider: 'openrouter',
       enabled: true,
@@ -71,7 +71,7 @@ const AUTO_REVIEW_CONFIG = {
     personaAssignment: 'random',
   },
   moderator: {
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'openai/gpt-5.3-codex',
     backend: 'api',
     provider: 'openrouter',
     maxOutputTokens: 2048,
@@ -88,7 +88,7 @@ const AUTO_REVIEW_CONFIG = {
   },
   head: {
     backend: 'api',
-    model: 'qwen/qwen3-235b-a22b-2507',
+    model: 'qwen/qwen3.7-max',
     provider: 'openrouter',
     enabled: true,
     timeout: 1,

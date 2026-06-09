@@ -21,8 +21,8 @@ const minimalRankings = {
   models: [
     {
       source: 'openrouter',
-      model_id: 'qwen/qwen3-235b-a22b-2507',
-      name: 'Qwen3 235B',
+      model_id: 'qwen/qwen3.7-max',
+      name: 'Qwen3.7 Max',
       tier: 'S',
       context: '200k',
       aa_intelligence: 85,
@@ -53,13 +53,13 @@ describe('initFromData', () => {
 
   it('builds correct key format: source/model_id', () => {
     const map = initFromData(minimalRankings, minimalGroq);
-    expect(map.has('openrouter/qwen/qwen3-235b-a22b-2507')).toBe(true);
+    expect(map.has('openrouter/qwen/qwen3.7-max')).toBe(true);
     expect(map.has('groq/llama-3.3-70b-versatile')).toBe(true);
   });
 
   it('assigns tier only when it is a valid tier value', () => {
     const map = initFromData(minimalRankings, minimalGroq);
-    const head = map.get('openrouter/qwen/qwen3-235b-a22b-2507');
+    const head = map.get('openrouter/qwen/qwen3.7-max');
     expect(head?.tier).toBe('S');
   });
 
@@ -116,9 +116,9 @@ describe('model registry query API', () => {
   });
 
   it('getModel() returns a known model', () => {
-    const m = getModel('openrouter', 'qwen/qwen3-235b-a22b-2507');
+    const m = getModel('openrouter', 'qwen/qwen3.7-max');
     expect(m).toBeDefined();
-    expect(m?.name).toBe('Qwen3 235B');
+    expect(m?.name).toBe('Qwen3.7 Max');
   });
 
   it('getModel() returns undefined for unknown model', () => {

@@ -391,7 +391,7 @@ async function executeReviewerWithGuards(
         prompt: fullPrompt,
         timeout: config.timeout,
         temperature: config.temperature,
-        maxOutputTokens: config.maxOutputTokens,
+        maxOutputTokens: fb.maxOutputTokens ?? config.maxOutputTokens,
         onUsage: captureUsage,
       });
 

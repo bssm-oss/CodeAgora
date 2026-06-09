@@ -81,17 +81,17 @@ function buildGroqConfig() {
     ],
     supporters: {
       pool: [
-        { id: 's1', model: 'openai/gpt-oss-120b', backend: 'api', provider: 'openrouter', enabled: true, timeout: 180 },
-        { id: 's2', model: 'z-ai/glm-4.7-flash', backend: 'api', provider: 'openrouter', enabled: true, timeout: 180 },
+        { id: 's1', model: 'z-ai/glm-5.1', backend: 'api', provider: 'openrouter', enabled: true, timeout: 180 },
+        { id: 's2', model: 'minimax/minimax-m3', backend: 'api', provider: 'openrouter', enabled: true, timeout: 180 },
       ],
       pickCount: 2,
       pickStrategy: 'random',
-      devilsAdvocate: { id: 'da', model: 'deepseek/deepseek-v4-flash', backend: 'api', provider: 'openrouter', enabled: true, timeout: 180 },
+      devilsAdvocate: { id: 'da', model: 'x-ai/grok-4.3', backend: 'api', provider: 'openrouter', enabled: true, timeout: 180 },
       personaPool: ['.ca/personas/strict.md', '.ca/personas/security-focused.md'],
       personaAssignment: 'random',
     },
-    moderator: { model: 'qwen/qwen3-235b-a22b-2507', backend: 'api', provider: 'openrouter' },
-    head: { model: 'qwen/qwen3-235b-a22b-2507', backend: 'api', provider: 'openrouter', enabled: true },
+    moderator: { model: 'openai/gpt-5.3-codex', backend: 'api', provider: 'openrouter' },
+    head: { model: 'qwen/qwen3.7-max', backend: 'api', provider: 'openrouter', enabled: true },
     discussion: {
       maxRounds: 3,
       registrationThreshold: {

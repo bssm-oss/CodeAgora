@@ -23,7 +23,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
       },
       {
         id: 'r2-openrouter',
-        model: 'qwen/qwen3-235b-a22b-2507',
+        model: 'xiaomi/mimo-v2.5',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
@@ -50,7 +50,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
         },
         {
           id: 's2',
-          model: 'openai/gpt-oss-120b',
+          model: 'z-ai/glm-5.1',
           backend: 'api',
           provider: 'openrouter',
           enabled: true,

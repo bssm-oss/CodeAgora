@@ -56,7 +56,7 @@ describe('buildMultiProviderConfig()', () => {
     const params: MultiProviderConfigParams = {
       selections: [
         makeSelection('groq', 'llama-3.3-70b', 'api'),
-        makeSelection('openrouter', 'qwen/qwen3-235b-a22b-2507', 'api'),
+        makeSelection('openrouter', 'xiaomi/mimo-v2.5', 'api'),
       ],
       reviewerCount: 4,
       discussion: false,
@@ -76,7 +76,7 @@ describe('buildMultiProviderConfig()', () => {
     const params: MultiProviderConfigParams = {
       selections: [
         makeSelection('groq', 'llama-3.3-70b', 'api', 8000),
-        makeSelection('openrouter', 'qwen/qwen3-235b-a22b-2507', 'api', 1000000),
+        makeSelection('openrouter', 'qwen/qwen3.7-max', 'api', 1000000),
       ],
       reviewerCount: 2,
       discussion: false,

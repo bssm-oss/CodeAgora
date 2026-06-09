@@ -30,7 +30,7 @@ vi.mock('@codeagora/shared/data/models-dev.js', () => ({
   loadModelsCatalog: vi.fn(() => Promise.resolve({})),
   getTopModels: vi.fn((_catalog, provider: string) => {
     if (provider === 'groq') return [{ id: 'llama-3.3-70b-versatile' }];
-    if (provider === 'openrouter') return [{ id: 'openai/gpt-oss-120b' }, { id: 'qwen/qwen3-235b-a22b-2507' }];
+    if (provider === 'openrouter') return [{ id: 'z-ai/glm-5.1' }, { id: 'qwen/qwen3.7-max' }];
     return [];
   }),
 }));
@@ -89,7 +89,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
       pool: [
         {
           id: 's1',
-          model: 'openai/gpt-oss-120b',
+          model: 'z-ai/glm-5.1',
           backend: 'api',
           provider: 'openrouter',
           timeout: 120,
@@ -261,13 +261,13 @@ describe('runLiveHealthCheck()', () => {
         personaAssignment: 'random',
       },
       moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
-      head: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3-235b-a22b-2507', timeout: 120, enabled: true },
+      head: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3.7-max', timeout: 120, enabled: true },
     });
 
     const results = await runLiveHealthCheck(config);
     expect(results).toHaveLength(1);
     expect(results[0].provider).toBe('openrouter');
-    expect(results[0].model).toBe('qwen/qwen3-235b-a22b-2507');
+    expect(results[0].model).toBe('qwen/qwen3.7-max');
   });
 
   it('skips disabled head agent', async () => {
@@ -286,7 +286,7 @@ describe('runLiveHealthCheck()', () => {
         personaAssignment: 'random',
       },
       moderator: { backend: 'opencode', model: 'claude-3', provider: 'anthropic' },
-      head: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3-235b-a22b-2507', timeout: 120, enabled: false },
+      head: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3.7-max', timeout: 120, enabled: false },
     });
 
     const results = await runLiveHealthCheck(config);
@@ -398,7 +398,7 @@ describe('runLiveHealthCheck()', () => {
     const results = await runLiveHealthCheck(config);
     expect(results).toHaveLength(1);
     expect(results[0].configuredModel).toBe('auto');
-    expect(results[0].model).toBe('qwen/qwen3-235b-a22b-2507');
+    expect(results[0].model).toBe('xiaomi/mimo-v2.5');
   });
 
   it('keeps static smoke defaults when the model catalog cannot load', async () => {
@@ -423,7 +423,7 @@ describe('runLiveHealthCheck()', () => {
     const results = await runLiveHealthCheck(config);
     expect(results).toHaveLength(1);
     expect(results[0].configuredModel).toBe('auto');
-    expect(results[0].model).toBe('qwen/qwen3-235b-a22b-2507');
+    expect(results[0].model).toBe('xiaomi/mimo-v2.5');
   });
 
   it('returns empty array when no enabled api-backend agents exist', async () => {
@@ -540,7 +540,7 @@ describe('formatLiveCheckReport()', () => {
       liveCheck(),
       liveCheck({
         provider: 'openrouter',
-        model: 'qwen/qwen3-235b-a22b-2507',
+        model: 'qwen/qwen3.7-max',
         envVar: 'OPENROUTER_API_KEY',
         agents: ['head'],
         latencyMs: 380,
@@ -548,7 +548,7 @@ describe('formatLiveCheckReport()', () => {
     ];
     const output = formatLiveCheckReport(checks);
     expect(output).toContain('groq/llama-3.3-70b-versatile');
-    expect(output).toContain('openrouter/qwen/qwen3-235b-a22b-2507');
+    expect(output).toContain('openrouter/qwen/qwen3.7-max');
   });
 
   it('contains latency for ok checks', () => {
