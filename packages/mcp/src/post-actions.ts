@@ -95,6 +95,8 @@ export async function postToGitHub(
     reviewerOpinions,
     devilsAdvocateId: result.devilsAdvocateId,
     supporterModelMap,
+    reviewRun: result.reviewRun,
+    reviewQueues: result.reviewQueues,
   });
 
   const postResult = await postReview(ghConfig, prNumber, review);

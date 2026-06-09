@@ -578,12 +578,12 @@ export { getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 // Live Health Check
 // ============================================================================
 
-const LIVE_CHECK_TIMEOUT_MS = 10_000;
+const LIVE_CHECK_TIMEOUT_MS = 30_000;
 
 const HEALTH_CHECK_DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-sonnet-4-6',
   openai: 'gpt-4o-mini',
-  openrouter: 'anthropic/claude-sonnet-4.6',
+  openrouter: 'xiaomi/mimo-v2.5',
   'opencode-go': 'deepseek-v4-flash',
   'opencode-zen': 'gpt-5.4-mini',
   groq: 'llama-3.3-70b-versatile',
@@ -756,7 +756,7 @@ export function formatLiveCheckReport(liveChecks: LiveCheckResult[]): string {
       const latency = check.latencyMs !== undefined ? dim(`${check.latencyMs}ms`) : '';
       lines.push(`${statusColor.pass('✓')} ${label}  ${latency}  ${envVar}  ${configured}  ${agents}`);
     } else if (check.status === 'timeout') {
-      lines.push(`${statusColor.fail('✗')} ${label}  ${statusColor.fail('timeout (10s)')}  ${envVar}  ${configured}  ${agents}`);
+      lines.push(`${statusColor.fail('✗')} ${label}  ${statusColor.fail(`timeout (${LIVE_CHECK_TIMEOUT_MS / 1000}s)`)}  ${envVar}  ${configured}  ${agents}`);
     } else {
       const errMsg = check.error ? statusColor.fail(check.error) : statusColor.fail('error');
       lines.push(`${statusColor.fail('✗')} ${label}  ${errMsg}  ${envVar}  ${configured}  ${agents}`);

@@ -30,6 +30,39 @@ export interface FormatOptions {
   evidenceDocs?: EvidenceDocument[];
 }
 
+function formatRoleMeta(result: PipelineResult): string {
+  const run = result.reviewRun;
+  const s = result.summary;
+  if (!s) return '';
+  if (!run) {
+    const completedReviewers = Math.max(0, s.totalReviewers - s.forfeitedReviewers);
+    const reviewerStr = s.totalReviewers > 0 ? `${completedReviewers} L1 reviewer(s)` : '';
+    const debateStr = s.totalDiscussions > 0 ? `${s.totalDiscussions} debate(s)` : '';
+    return [reviewerStr, debateStr].filter(Boolean).join(' · ');
+  }
+
+  const l1 = run.l1.configured > 0 ? `L1 ${run.l1.completed}/${run.l1.configured}` : '';
+  const l2 = run.l2.skipped ? 'L2 skipped' : `L2 ${run.l2.supporters}${run.l2.devilsAdvocate ? '+DA' : ''}`;
+  const l3 = run.l3.skipped ? 'head skipped' : run.l3.head ? 'head' : '';
+  const debates = `${run.l2.discussions} debate(s)`;
+  const degraded = run.degraded ? 'degraded' : '';
+  return [l1, l2, l3, debates, degraded].filter(Boolean).join(' · ');
+}
+
+function formatQueueDigest(result: PipelineResult): string | null {
+  const queues = result.reviewRun?.queues;
+  if (!queues) return null;
+  const parts = [
+    ['suggestions', queues.suggestions] as const,
+    ['unconfirmed', queues.unconfirmed] as const,
+    ['suppressed', queues.suppressed] as const,
+    ['removed', queues.hallucinationRemoved] as const,
+    ['uncertain', queues.hallucinationUncertain] as const,
+  ].filter(([, count]) => count > 0);
+  if (parts.length === 0) return null;
+  return parts.map(([label, count]) => `${label} ${count}`).join(' · ');
+}
+
 /**
  * Format a PipelineResult as plain text output.
  */
@@ -73,12 +106,8 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   const decEmoji = s.decision === 'ACCEPT' ? '\u2705' : s.decision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
   const colorFn = decisionColor[s.decision] ?? bold;
   const triageStr = formatTriageCounts(triage.counts);
-  const completedReviewers = Math.max(0, s.totalReviewers - s.forfeitedReviewers);
-  const reviewerStr = s.totalReviewers > 0
-    ? `${completedReviewers} reviewers`
-    : '';
-  const debateStr = s.totalDiscussions > 0 ? `${s.totalDiscussions} debates` : '';
-  const metaParts = [reviewerStr, debateStr].filter(Boolean).join(' \u00B7 ');
+  const completedReviewers = result.reviewRun?.l1.completed ?? Math.max(0, s.totalReviewers - s.forfeitedReviewers);
+  const metaParts = formatRoleMeta(result);
 
   lines.push('');
   lines.push(`  \u250C${ '\u2500'.repeat(47) }\u2510`);
@@ -91,6 +120,21 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   if (s.forfeitedReviewers > 0 && s.totalReviewers > 0) {
     lines.push(`  ${severityColor.WARNING(`Partial review: ${completedReviewers}/${s.totalReviewers} reviewers completed; ${s.forfeitedReviewers} forfeited.`)}`);
     lines.push(`  ${dim('Run `agora doctor --live` if provider/auth failures appear in the session evidence.')}`);
+    lines.push('');
+  }
+
+  const queueDigest = formatQueueDigest(result);
+  if (result.reviewRun) {
+    lines.push(`  ${dim(`Coverage: ${metaParts || 'no model stages executed'}`)}`);
+    if (result.reviewRun.l1.models.length > 0) {
+      lines.push(`  ${dim(`L1 models: ${result.reviewRun.l1.models.join(', ')}`)}`);
+    }
+    if (result.reviewRun.degraded) {
+      lines.push(`  ${severityColor.WARNING(`Degraded: ${result.reviewRun.degradedReasons.join('; ')}`)}`);
+    }
+    if (queueDigest) {
+      lines.push(`  ${dim(`Non-blocking queues: ${queueDigest}`)}`);
+    }
     lines.push('');
   }
 
@@ -174,7 +218,7 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
 
   // ── Zero issues celebration ──
   if (docs.length === 0 && s.decision === 'ACCEPT') {
-    lines.push(`  ${bold('No issues found across all reviewers. Ship it!')} \uD83D\uDE80`);
+    lines.push(`  ${bold('No blocking findings remained after the full review pipeline.')}`);
     lines.push('');
   }
 
@@ -271,6 +315,22 @@ export function formatMarkdown(result: PipelineResult, options?: FormatOptions):
     lines.push('');
     lines.push(`> ${s.reasoning}`);
     lines.push('');
+
+    if (result.reviewRun) {
+      lines.push('### Review Coverage');
+      lines.push('');
+      lines.push('| Stage | Result |');
+      lines.push('|---|---:|');
+      lines.push(`| L1 reviewers | ${result.reviewRun.l1.completed}/${result.reviewRun.l1.configured} completed |`);
+      lines.push(`| L2 debate | ${result.reviewRun.l2.skipped ? 'skipped' : `${result.reviewRun.l2.supporters} supporter(s); ${result.reviewRun.l2.discussions} discussion(s)`} |`);
+      lines.push(`| L3 head verdict | ${result.reviewRun.l3.skipped ? 'skipped' : result.reviewRun.l3.head ? 'completed' : 'not configured'} |`);
+      lines.push('');
+      const mdQueueDigest = formatQueueDigest(result);
+      if (mdQueueDigest) {
+        lines.push(`**Non-blocking queues:** ${mdQueueDigest}`);
+        lines.push('');
+      }
+    }
 
     // Severity table
     const tableRows = SEVERITY_ORDER

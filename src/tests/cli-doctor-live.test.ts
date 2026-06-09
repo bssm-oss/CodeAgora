@@ -398,7 +398,7 @@ describe('runLiveHealthCheck()', () => {
     const results = await runLiveHealthCheck(config);
     expect(results).toHaveLength(1);
     expect(results[0].configuredModel).toBe('auto');
-    expect(results[0].model).toBe('anthropic/claude-sonnet-4.6');
+    expect(results[0].model).toBe('xiaomi/mimo-v2.5');
   });
 
   it('keeps static smoke defaults when the model catalog cannot load', async () => {
@@ -423,7 +423,7 @@ describe('runLiveHealthCheck()', () => {
     const results = await runLiveHealthCheck(config);
     expect(results).toHaveLength(1);
     expect(results[0].configuredModel).toBe('auto');
-    expect(results[0].model).toBe('anthropic/claude-sonnet-4.6');
+    expect(results[0].model).toBe('xiaomi/mimo-v2.5');
   });
 
   it('returns empty array when no enabled api-backend agents exist', async () => {
@@ -582,7 +582,7 @@ describe('formatLiveCheckReport()', () => {
         envVar: 'MISTRAL_API_KEY',
         status: 'timeout',
         latencyMs: 10000,
-        error: 'timeout (10s)',
+        error: 'timeout (30s)',
       }),
     ];
     const output = formatLiveCheckReport(checks);
@@ -607,7 +607,7 @@ describe('formatLiveCheckReport()', () => {
         envVar: 'MISTRAL_API_KEY',
         agents: ['head'],
         status: 'timeout',
-        error: 'timeout (10s)',
+        error: 'timeout (30s)',
       }),
     ];
     const output = stripAnsi(formatLiveCheckReport(checks));

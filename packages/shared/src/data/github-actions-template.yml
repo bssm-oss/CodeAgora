@@ -23,4 +23,4 @@ jobs:
           fail-on-reject: 'true'
           max-diff-lines: '5000'
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

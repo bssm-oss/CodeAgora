@@ -70,7 +70,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
 Use `.ca/config.json` as the default config path. See [GitHub Actions setup](docs/for-users/GITHUB_ACTIONS_SETUP.md) for fork handling, secrets, permissions, and tuning.

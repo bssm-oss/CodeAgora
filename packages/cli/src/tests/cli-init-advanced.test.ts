@@ -260,12 +260,11 @@ describe('generatePresets()', () => {
     expect(quick!.discussion).toBe(false);
   });
 
-  it('generates a "free" preset when a free provider is detected', () => {
+  it('does not generate a "free" preset when groq is detected', () => {
     const env = makeEnv([{ name: 'groq', available: true }]);
     const presets = generatePresets(env, null);
     const free = presets.find((p) => p.id === 'free');
-    expect(free).toBeDefined();
-    expect(free!.providers).toContain('groq');
+    expect(free).toBeUndefined();
   });
 
   it('does NOT generate "free" preset when only paid provider is detected', () => {

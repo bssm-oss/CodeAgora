@@ -35,7 +35,7 @@ const AUTO_REVIEW_CONFIG = {
   reviewers: { count: 1 },
   modelRouter: {
     enabled: true,
-    providers: { groq: { enabled: true } },
+    providers: { openrouter: { enabled: true } },
     constraints: {
       familyDiversity: false,
       includeReasoning: true,
@@ -49,9 +49,9 @@ const AUTO_REVIEW_CONFIG = {
   supporters: {
     pool: [{
       id: 's1',
-      model: 'llama-3.3-70b-versatile',
+      model: 'z-ai/glm-5.1',
       backend: 'api',
-      provider: 'groq',
+      provider: 'openrouter',
       enabled: true,
       timeout: 1,
     }],
@@ -59,9 +59,9 @@ const AUTO_REVIEW_CONFIG = {
     pickStrategy: 'random',
     devilsAdvocate: {
       id: 'da',
-      model: 'llama-3.3-70b-versatile',
+      model: 'x-ai/grok-4.3',
       backend: 'api',
-      provider: 'groq',
+      provider: 'openrouter',
       enabled: true,
       timeout: 1,
     },
@@ -69,9 +69,9 @@ const AUTO_REVIEW_CONFIG = {
     personaAssignment: 'random',
   },
   moderator: {
-    model: 'llama-3.3-70b-versatile',
+    model: 'openai/gpt-5.3-codex',
     backend: 'api',
-    provider: 'groq',
+    provider: 'openrouter',
   },
   discussion: {
     maxRounds: 1,
@@ -85,8 +85,8 @@ const AUTO_REVIEW_CONFIG = {
   },
   head: {
     backend: 'api',
-    model: 'llama-3.3-70b-versatile',
-    provider: 'groq',
+    model: 'qwen/qwen3.7-max',
+    provider: 'openrouter',
     enabled: true,
     timeout: 1,
   },

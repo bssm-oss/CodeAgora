@@ -9,7 +9,7 @@
 import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion } from '@codeagora/core/types/core.js';
 import type { GitHubReview, GitHubReviewComment, DiffPositionIndex } from './types.js';
 import { resolveLineRange } from './diff-parser.js';
-import type { PipelineSummary } from '@codeagora/core/pipeline/orchestrator.js';
+import type { PipelineSummary, ReviewQueues, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import {
   mapToInlineCommentBody,
   buildSummaryBody,
@@ -144,8 +144,12 @@ export function mapToGitHubReview(params: {
   devilsAdvocateId?: string;
   /** Maps supporterId → model name */
   supporterModelMap?: Map<string, string>;
+  /** Role-aware run summary for coverage and degraded-state reporting. */
+  reviewRun?: ReviewRunSummary;
+  /** Non-blocking and filtered queues retained for transparent reporting. */
+  reviewQueues?: ReviewQueues;
 }): GitHubReview {
-  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap } =
+  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues } =
     params;
 
   // Filter out dismissed docs — exact match by file + line
@@ -159,7 +163,7 @@ export function mapToGitHubReview(params: {
   );
 
   const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap);
-  let body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap });
+  let body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues });
 
   // Enforce GitHub char limits (#268)
   if (body.length > MAX_REVIEW_BODY_CHARS) {

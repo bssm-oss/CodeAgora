@@ -22,38 +22,31 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
 ```json
 {
   "reviewers": [
-    {
-      "id": "r1",
-      "model": "llama-3.3-70b-versatile",
-      "backend": "api",
-      "provider": "groq",
-      "enabled": true,
-      "timeout": 120
-    },
-    {
-      "id": "r2",
-      "model": "llama-3.3-70b-versatile",
-      "backend": "api",
-      "provider": "groq",
-      "enabled": true,
-      "timeout": 120
-    }
+    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-gemini-flash-lite", "model": "google/gemini-3.1-flash-lite", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-llama-scout", "model": "meta-llama/llama-4-scout", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
   ],
   "supporters": {
-    "pool": [{ "id": "s1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 }],
-    "pickCount": 1,
+    "pool": [
+      { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+      { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
+    ],
+    "pickCount": 2,
     "pickStrategy": "random",
-    "devilsAdvocate": { "id": "da", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "enabled": true, "timeout": 120 },
+    "devilsAdvocate": { "id": "da-grok", "model": "x-ai/grok-4.3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     "personaPool": [".ca/personas/strict.md"],
     "personaAssignment": "random"
   },
   "moderator": {
-    "model": "llama-3.3-70b-versatile",
+    "model": "openai/gpt-5.3-codex",
     "backend": "api",
-    "provider": "groq"
+    "provider": "openrouter",
+    "timeout": 180
   },
   "discussion": {
-    "maxRounds": 4,
+    "maxRounds": 2,
     "registrationThreshold": {
       "HARSHLY_CRITICAL": 1,
       "CRITICAL": 1,
@@ -61,6 +54,13 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
       "SUGGESTION": null
     },
     "codeSnippetRange": 10
+  },
+  "head": {
+    "backend": "api",
+    "model": "qwen/qwen3.7-max",
+    "provider": "openrouter",
+    "enabled": true,
+    "timeout": 180
   },
   "errorHandling": {
     "maxRetries": 2,
@@ -71,7 +71,7 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
 
 ## Key Fields
 
-**`reviewers`** — L1 reviewer agents. Use different providers and models for heterogeneous coverage.
+**`reviewers`** — L1 reviewer agents. Use different OpenRouter models for heterogeneous coverage.
 
 **`supporters.pool`** — L2 agents that validate issues during discussion.
 
@@ -123,10 +123,10 @@ Assign built-in specialist personas to reviewers:
 ```json
 {
   "reviewers": [
-    { "id": "r1", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "persona": "builtin:security" },
-    { "id": "r2", "model": "gpt-4o-mini", "backend": "api", "provider": "openai", "persona": "builtin:logic" },
-    { "id": "r3", "model": "anthropic/claude-sonnet-4.6", "backend": "api", "provider": "openrouter", "persona": "builtin:api-contract" },
-    { "id": "r4", "model": "llama-3.3-70b-versatile", "backend": "api", "provider": "groq", "persona": "builtin:general" }
+    { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "persona": "builtin:security" },
+    { "id": "r-gemini-flash-lite", "model": "google/gemini-3.1-flash-lite", "backend": "api", "provider": "openrouter", "persona": "builtin:logic" },
+    { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "persona": "builtin:api-contract" },
+    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "persona": "builtin:general" }
   ]
 }
 ```

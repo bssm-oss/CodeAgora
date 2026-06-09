@@ -3,12 +3,55 @@
  * Functions that build result maps and format pipeline output data.
  */
 
-import type { ReviewOutput } from '../types/core.js';
-import type { Config } from '../types/config.js';
+import type { EvidenceDocument, ReviewOutput } from '../types/core.js';
+import type { AgentConfig, Config, HeadConfig, ModeratorConfig } from '../types/config.js';
 import type { ModeratorReport } from '../types/core.js';
+import type { ReviewerInput } from '../l1/reviewer.js';
 import { trackDevilsAdvocate } from '../l2/devils-advocate-tracker.js';
 import { generateReport, formatReportText } from './report.js';
 import type { PipelineTelemetry } from './telemetry.js';
+
+export interface ReviewAgentRun {
+  id: string;
+  model: string;
+  backend?: string;
+  provider?: string;
+  status?: 'success' | 'forfeit' | 'error' | 'skipped';
+}
+
+export interface ReviewRunSummary {
+  l1: {
+    configured: number;
+    completed: number;
+    forfeited: number;
+    errored: number;
+    reviewers: ReviewAgentRun[];
+    models: string[];
+    providers: string[];
+  };
+  l2: {
+    supporters: number;
+    supporterModels: string[];
+    devilsAdvocate?: ReviewAgentRun;
+    moderator?: ReviewAgentRun;
+    discussions: number;
+    skipped: boolean;
+  };
+  l3: {
+    head?: ReviewAgentRun;
+    skipped: boolean;
+  };
+  queues: {
+    activeFindings: number;
+    suggestions: number;
+    unconfirmed: number;
+    suppressed: number;
+    hallucinationRemoved: number;
+    hallucinationUncertain: number;
+  };
+  degraded: boolean;
+  degradedReasons: string[];
+}
 
 /**
  * Build a map of "filePath:startLine" → reviewer IDs that flagged the issue.
@@ -84,6 +127,132 @@ export function mergeReviewOutputsByReviewer(results: ReviewOutput[]): ReviewOut
   }
 
   return [...map.values()];
+}
+
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    unique.push(item);
+  }
+  return unique;
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+function reviewerRunFromInput(input: ReviewerInput, result?: ReviewOutput): ReviewAgentRun {
+  return {
+    id: input.config.id,
+    model: result?.model ?? input.config.model,
+    backend: input.config.backend,
+    provider: result?.provider ?? input.config.provider,
+    status: result?.status ?? 'skipped',
+  };
+}
+
+function agentRunFromConfig(
+  id: string,
+  config: Pick<AgentConfig | ModeratorConfig | HeadConfig, 'model' | 'backend' | 'provider'>,
+  status: ReviewAgentRun['status'] = 'success',
+): ReviewAgentRun {
+  return {
+    id,
+    model: config.model,
+    backend: config.backend,
+    provider: config.provider,
+    status,
+  };
+}
+
+export function uniqueReviewerInputCount(inputs: ReviewerInput[]): number {
+  return new Set(inputs.map((input) => input.config.id)).size;
+}
+
+export function uniqueForfeitedReviewerCount(results: ReviewOutput[]): number {
+  const merged = mergeReviewOutputsByReviewer(results);
+  return merged.filter((result) => result.status === 'forfeit').length;
+}
+
+export function buildReviewRunSummary(params: {
+  config: Config;
+  reviewerInputs: ReviewerInput[];
+  reviewResults: ReviewOutput[];
+  moderatorReport: ModeratorReport;
+  evidenceDocs: EvidenceDocument[];
+  suppressedIssues?: EvidenceDocument[];
+  hallucinationRemoved?: EvidenceDocument[];
+  hallucinationUncertain?: EvidenceDocument[];
+  skipHead?: boolean;
+  l2Skipped?: boolean;
+}): ReviewRunSummary {
+  const mergedResults = mergeReviewOutputsByReviewer(params.reviewResults);
+  const resultByReviewer = new Map(mergedResults.map((result) => [result.reviewerId, result]));
+  const reviewers = uniqueById(
+    params.reviewerInputs.map((input) => reviewerRunFromInput(input, resultByReviewer.get(input.config.id))),
+  );
+  const completed = reviewers.filter((reviewer) => reviewer.status === 'success').length;
+  const forfeited = reviewers.filter((reviewer) => reviewer.status === 'forfeit').length;
+  const errored = reviewers.filter((reviewer) => reviewer.status === 'error').length;
+  const supporterModels = uniqueStrings(params.config.supporters?.pool.filter((s) => s.enabled).map((s) => s.model) ?? []);
+  const devilsAdvocate = params.config.supporters?.devilsAdvocate?.enabled
+    ? agentRunFromConfig(params.config.supporters.devilsAdvocate.id, params.config.supporters.devilsAdvocate)
+    : undefined;
+  const headEnabled = params.config.head?.enabled !== false && !params.skipHead;
+  const head = params.config.head
+    ? agentRunFromConfig('head', params.config.head, headEnabled ? 'success' : 'skipped')
+    : undefined;
+  const degradedReasons: string[] = [];
+
+  if (forfeited > 0) {
+    degradedReasons.push(`${forfeited} L1 reviewer(s) forfeited`);
+  }
+  if (errored > 0) {
+    degradedReasons.push(`${errored} L1 reviewer(s) errored`);
+  }
+  if (params.l2Skipped) {
+    degradedReasons.push('L2 discussion skipped');
+  }
+  if (params.skipHead) {
+    degradedReasons.push('L3 head verdict skipped');
+  }
+
+  return {
+    l1: {
+      configured: reviewers.length,
+      completed,
+      forfeited,
+      errored,
+      reviewers,
+      models: uniqueStrings(reviewers.map((reviewer) => reviewer.model)),
+      providers: uniqueStrings(reviewers.map((reviewer) => reviewer.provider ?? reviewer.backend)),
+    },
+    l2: {
+      supporters: params.config.supporters?.pool.filter((supporter) => supporter.enabled).length ?? 0,
+      supporterModels,
+      devilsAdvocate,
+      moderator: agentRunFromConfig('moderator', params.config.moderator),
+      discussions: params.moderatorReport.summary.totalDiscussions,
+      skipped: !!params.l2Skipped,
+    },
+    l3: {
+      head,
+      skipped: !!params.skipHead,
+    },
+    queues: {
+      activeFindings: params.evidenceDocs.length,
+      suggestions: params.moderatorReport.suggestions.length,
+      unconfirmed: params.moderatorReport.unconfirmedIssues.length,
+      suppressed: params.suppressedIssues?.length ?? 0,
+      hallucinationRemoved: params.hallucinationRemoved?.length ?? 0,
+      hallucinationUncertain: params.hallucinationUncertain?.length ?? 0,
+    },
+    degraded: degradedReasons.length > 0,
+    degradedReasons,
+  };
 }
 
 /**

@@ -501,6 +501,8 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
         supporterModelMap: result.supporterModelMap
           ? new Map(Object.entries(result.supporterModelMap))
           : undefined,
+        reviewRun: result.reviewRun,
+        reviewQueues: result.reviewQueues,
       });
       if (prOctokit && !options.quiet) console.error(t('cli.info.usingAppAuth'));
       const postResult = await postReview(ghConfig, prContext.prNumber, review, prOctokit);
