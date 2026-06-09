@@ -118,6 +118,23 @@ Do one short second pass on the flagged buckets before finalizing findings.
     expect(system).toContain('SECURITY_BOUNDARY');
   });
 
+  it('teaches reviewers to respect documented intent and release-contract context', () => {
+    const { system, user } = buildReviewerMessages(
+      SAMPLE_DIFF,
+      'Remove GitHub Models from the stable Action smoke path; retained providers are OpenRouter only.',
+      undefined,
+      '## Project Context\nSupported release surfaces: CLI, GitHub Action, MCP, Desktop.',
+    );
+
+    expect(system).toContain('Intent and Release-Contract Context');
+    expect(system).toContain('intentionally removes a provider');
+    expect(system).toContain('fixed provider/model/runtime/version values can be intentional release choices');
+    expect(system).toContain('stale references');
+    expect(system).toContain('callers can still select a removed provider/surface');
+    expect(user).toContain('Remove GitHub Models');
+    expect(user).toContain('Supported release surfaces');
+  });
+
   it('omits surrounding context section when not provided', () => {
     const { user } = buildReviewerMessages(SAMPLE_DIFF, SAMPLE_SUMMARY);
     expect(user).not.toContain('Surrounding Code Context');
@@ -292,6 +309,24 @@ Do one short second pass on the flagged buckets before finalizing findings.
 
       expect(system).toContain('Risk-Focus Pass');
       expect(user).toContain('DATA_INTEGRITY');
+    });
+
+    it('lite prompt keeps concise intent and declarative-config guidance', () => {
+      const { system } = buildReviewerMessages(
+        SAMPLE_DIFF,
+        SAMPLE_SUMMARY,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'lite',
+      );
+
+      expect(system).toContain('intent/contract context');
+      expect(system).toContain('intentional provider/model/surface removals');
+      expect(system).toContain('fixed GitHub Action settings');
+      expect(system).toContain('Declarative config choices');
     });
   });
 });

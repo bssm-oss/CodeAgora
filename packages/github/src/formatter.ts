@@ -137,10 +137,18 @@ function pushReviewCoverage(lines: string[], summary: PipelineSummary, run?: Rev
 }
 
 function formatQueueItem(doc: EvidenceDocument): string {
+  if (doc.filePath === 'unknown' || doc.lineRange[0] <= 0) {
+    return `- ${doc.issueTitle} (invalid location)`;
+  }
   const lineLabel = doc.lineRange[0] === doc.lineRange[1]
     ? `${doc.lineRange[0]}`
     : `${doc.lineRange[0]}-${doc.lineRange[1]}`;
   return `- \`${doc.filePath}:${lineLabel}\` — ${doc.issueTitle}`;
+}
+
+function visibleQueueDocs(title: string, docs: EvidenceDocument[]): EvidenceDocument[] {
+  if (title === 'Removed by hallucination filter') return [];
+  return docs;
 }
 
 function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?: ReviewQueues): void {
@@ -175,12 +183,23 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
   ];
   for (const [title, docs] of sections) {
     if (!docs || docs.length === 0) continue;
+    const visibleDocs = visibleQueueDocs(title, docs);
     lines.push(`**${title}**`);
-    for (const doc of docs.slice(0, 5)) {
+    if (visibleDocs.length === 0) {
+      lines.push(`- ${docs.length} rejected item(s) hidden from the public summary.`);
+      lines.push('');
+      continue;
+    }
+    for (const doc of visibleDocs.slice(0, 5)) {
       lines.push(formatQueueItem(doc));
     }
-    if (docs.length > 5) {
-      lines.push(`- ...and ${docs.length - 5} more`);
+    const hiddenInvalidCount = docs.length - visibleDocs.length;
+    const remainingVisibleCount = Math.max(0, visibleDocs.length - 5);
+    if (remainingVisibleCount > 0) {
+      lines.push(`- ...and ${remainingVisibleCount} more`);
+    }
+    if (hiddenInvalidCount > 0) {
+      lines.push(`- ${hiddenInvalidCount} invalid-location item(s) hidden.`);
     }
     lines.push('');
   }
@@ -426,8 +445,9 @@ export function buildSummaryBody(params: {
     lines.push('');
   }
 
-  // Suggestions (collapsible)
-  if (triage.ignore.length > 0) {
+  // Suggestions (collapsible). When review queues are present, they already
+  // render suggestions/unconfirmed findings with clearer labels.
+  if (triage.ignore.length > 0 && !params.reviewQueues) {
     lines.push('<details>');
     lines.push(`<summary>${triage.ignore.length} suggestion(s)</summary>`);
     lines.push('');

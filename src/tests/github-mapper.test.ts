@@ -302,6 +302,44 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('Non-blocking review queues (2)');
     expect(body).toContain('Simplify branch');
     expect(body).toContain('Check nullable path');
+    expect(body).not.toContain('<summary>2 suggestion(s)</summary>');
+  });
+
+  it('hides hallucination-filter details from public queue output', () => {
+    const removed = makeDoc({
+      issueTitle: 'Imaginary SQL injection',
+      filePath: 'src/auth.ts',
+      lineRange: [42, 42],
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only filtered findings remain.' }),
+      sessionId: '006',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 0,
+          unconfirmed: 0,
+          suppressed: 0,
+          hallucinationRemoved: 1,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [],
+        unconfirmed: [],
+        suppressed: [],
+        hallucinationRemoved: [removed],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).toContain('Removed by hallucination filter');
+    expect(body).toContain('1 rejected item(s) hidden from the public summary.');
+    expect(body).not.toContain('src/auth.ts:42');
+    expect(body).not.toContain('Imaginary SQL injection');
   });
 });
 

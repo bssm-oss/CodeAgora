@@ -12,7 +12,15 @@ import { fuzzyMatchFilePath } from '@codeagora/shared/utils/diff.js';
 // Evidence Document Parser
 // ============================================================================
 
-const EVIDENCE_BLOCK_REGEX = /## Issue:\s*(.+?)\n[\s\S]*?### (?:Problem|문제)\n([\s\S]*?)### (?:Evidence|근거)\n([\s\S]*?)### (?:Severity|심각도)\n([\s\S]*?)### (?:Suggestion|제안)\n([\s\S]*?)(?=\n## Issue:|$)/gi;
+const ISSUE_HEADING_REGEX = /^(?:#{1,6}\s*)?Issue:\s*(.+?)\s*$/gim;
+const SECTION_LABELS = {
+  problem: ['Problem', '문제'],
+  evidence: ['Evidence', '근거'],
+  severity: ['Severity', '심각도'],
+  suggestion: ['Suggestion', '제안'],
+} as const;
+
+type EvidenceSectionKey = keyof typeof SECTION_LABELS;
 
 /**
  * Patterns that explicitly signal "no issues" — used both to short-circuit
@@ -173,30 +181,36 @@ export function parseEvidenceResponse(
   const jsonDocs = parseJsonEvidenceResponse(response);
   if (jsonDocs !== null) return jsonDocs;
 
-  // Phase 2: markdown protocol (default).
+  // Phase 2: markdown protocol (default). Accept both strict markdown
+  // headings (`### Problem`) and common label-style sections (`Problem:`).
   const documents: EvidenceDocument[] = [];
-  const matches = Array.from(response.matchAll(EVIDENCE_BLOCK_REGEX));
+  const matches = Array.from(response.matchAll(ISSUE_HEADING_REGEX));
 
-  for (const match of matches) {
+  for (let i = 0; i < matches.length; i++) {
     try {
-      const [_, title, problem, evidenceText, severityText, suggestion] = match;
+      const match = matches[i];
+      const nextMatch = matches[i + 1];
+      const title = match[1];
+      if (!title) continue;
 
-      const evidence = evidenceText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.match(/^\d+\./))
-        .map((line) => line.replace(/^\d+\.\s*/, ''));
+      const blockStart = match.index + match[0].length;
+      const blockEnd = nextMatch?.index ?? response.length;
+      const sections = extractIssueSections(response.slice(blockStart, blockEnd));
+      if (!sections.problem || !sections.evidence || !sections.severity || !sections.suggestion) {
+        continue;
+      }
 
-      const { severity: parsedSeverity, confidence: reviewerConfidence } = parseSeverity(severityText.trim());
+      const evidence = parseEvidenceItems(sections.evidence);
+      const { severity: parsedSeverity, confidence: reviewerConfidence } = parseSeverity(sections.severity.trim());
       const severity = parsedSeverity;
-      const fileInfo = extractFileInfo(problem, diffFilePaths);
+      const fileInfo = extractFileInfo(sections.problem, diffFilePaths);
 
       documents.push({
         issueTitle: title.trim(),
-        problem: problem.trim(),
+        problem: sections.problem.trim(),
         evidence,
         severity,
-        suggestion: suggestion.trim(),
+        suggestion: sections.suggestion.trim(),
         filePath: fileInfo.filePath,
         lineRange: fileInfo.lineRange,
         ...(reviewerConfidence !== undefined && { confidence: reviewerConfidence }),
@@ -224,6 +238,50 @@ export function parseEvidenceResponse(
 interface SeverityResult {
   severity: Severity;
   confidence?: number;
+}
+
+function sectionFromLine(line: string): { key: EvidenceSectionKey; inlineText: string } | null {
+  for (const [key, labels] of Object.entries(SECTION_LABELS) as Array<[EvidenceSectionKey, readonly string[]]>) {
+    const labelPattern = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const markdownMatch = line.match(new RegExp(`^\\s*#{1,6}\\s*(?:${labelPattern})\\s*:?\\s*(.*)$`, 'i'));
+    if (markdownMatch) return { key, inlineText: markdownMatch[1]?.trim() ?? '' };
+    const labelMatch = line.match(new RegExp(`^\\s*(?:${labelPattern})\\s*:\\s*(.*)$`, 'i'));
+    if (labelMatch) return { key, inlineText: labelMatch[1]?.trim() ?? '' };
+  }
+  return null;
+}
+
+function extractIssueSections(block: string): Partial<Record<EvidenceSectionKey, string>> {
+  const sections: Partial<Record<EvidenceSectionKey, string[]>> = {};
+  let current: EvidenceSectionKey | null = null;
+
+  for (const line of block.split('\n')) {
+    const nextSection = sectionFromLine(line);
+    if (nextSection) {
+      current = nextSection.key;
+      sections[current] = [];
+      if (nextSection.inlineText) sections[current]!.push(nextSection.inlineText);
+      continue;
+    }
+    if (current) {
+      sections[current]!.push(line);
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(sections).map(([key, lines]) => [key, lines.join('\n').trim()])
+  ) as Partial<Record<EvidenceSectionKey, string>>;
+}
+
+function parseEvidenceItems(evidenceText: string): string[] {
+  const lines = evidenceText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const structured = lines
+    .filter((line) => /^(?:\d+\.|[-*])\s+/.test(line))
+    .map((line) => line.replace(/^(?:\d+\.|[-*])\s+/, ''));
+  return structured.length > 0 ? structured : lines.slice(0, 3);
 }
 
 function parseSeverity(severityText: string): SeverityResult {
