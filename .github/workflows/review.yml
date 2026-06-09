@@ -81,7 +81,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '5000'
+          max-diff-lines: '8000'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CODEAGORA_APP_ID: ${{ secrets.CODEAGORA_APP_ID }}
