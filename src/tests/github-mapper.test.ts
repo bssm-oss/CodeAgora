@@ -54,7 +54,7 @@ const makeReviewRun = (overrides?: Partial<ReviewRunSummary>): ReviewRunSummary 
     reviewers: [],
     models: [
       'xiaomi/mimo-v2.5',
-      'nvidia/nemotron-3-super-120b-a12b',
+      'qwen/qwen3-coder-30b-a3b-instruct',
       'tencent/hy3-preview',
       'deepseek/deepseek-v4-flash',
       'meta-llama/llama-4-scout',

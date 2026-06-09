@@ -401,7 +401,7 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
     label: 'Starter review (OpenRouter)',
     labelKo: '\uC2A4\uD0C0\uD130 \uB9AC\uBDF0 (OpenRouter)',
     providers: ['openrouter'],
-    models: { openrouter: 'nvidia/nemotron-3-super-120b-a12b' },
+    models: { openrouter: 'qwen/qwen3-coder-30b-a3b-instruct' },
     reviewerCount: 2,
     discussion: false,
     backend: 'api',

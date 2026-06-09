@@ -23,7 +23,7 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
 {
   "reviewers": [
     { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
-    { "id": "r-nemotron-super", "model": "nvidia/nemotron-3-super-120b-a12b", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-llama-scout", "model": "meta-llama/llama-4-scout", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
@@ -124,7 +124,7 @@ Assign built-in specialist personas to reviewers:
 {
   "reviewers": [
     { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "persona": "builtin:security" },
-    { "id": "r-nemotron-super", "model": "nvidia/nemotron-3-super-120b-a12b", "backend": "api", "provider": "openrouter", "persona": "builtin:logic" },
+    { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "persona": "builtin:logic" },
     { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "persona": "builtin:api-contract" },
     { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "persona": "builtin:general" }
   ]

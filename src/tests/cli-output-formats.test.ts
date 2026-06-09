@@ -233,7 +233,7 @@ describe('formatOutput(text)', () => {
             forfeited: 0,
             errored: 0,
             reviewers: [],
-            models: ['xiaomi/mimo-v2.5', 'nvidia/nemotron-3-super-120b-a12b'],
+            models: ['xiaomi/mimo-v2.5', 'qwen/qwen3-coder-30b-a3b-instruct'],
             providers: ['openrouter'],
           },
           l2: {
