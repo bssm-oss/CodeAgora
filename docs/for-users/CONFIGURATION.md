@@ -22,7 +22,7 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
 ```json
 {
   "reviewers": [
-    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    { "id": "r-qwen-235b", "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
@@ -30,17 +30,17 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
   ],
   "supporters": {
     "pool": [
-      { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
-      { "id": "s-minimax", "model": "minimax/minimax-m3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
+      { "id": "s-gpt-oss", "model": "openai/gpt-oss-120b", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+      { "id": "s-glm-flash", "model": "z-ai/glm-4.7-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
     ],
     "pickCount": 2,
     "pickStrategy": "random",
-    "devilsAdvocate": { "id": "da-grok", "model": "x-ai/grok-4.3", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
+    "devilsAdvocate": { "id": "da-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
     "personaPool": [".ca/personas/strict.md"],
     "personaAssignment": "random"
   },
   "moderator": {
-    "model": "openai/gpt-5.3-codex",
+    "model": "qwen/qwen3-235b-a22b-2507",
     "backend": "api",
     "provider": "openrouter",
     "timeout": 180
@@ -57,7 +57,7 @@ If multiple config files exist, load precedence is `config.json` > `config.yaml`
   },
   "head": {
     "backend": "api",
-    "model": "qwen/qwen3.7-max",
+    "model": "qwen/qwen3-235b-a22b-2507",
     "provider": "openrouter",
     "enabled": true,
     "timeout": 180
@@ -126,7 +126,7 @@ Assign built-in specialist personas to reviewers:
     { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "persona": "builtin:security" },
     { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "persona": "builtin:logic" },
     { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "persona": "builtin:api-contract" },
-    { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "persona": "builtin:general" }
+    { "id": "r-qwen-235b", "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "persona": "builtin:general" }
   ]
 }
 ```

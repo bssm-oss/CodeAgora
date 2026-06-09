@@ -26,7 +26,7 @@ function makePreset(overrides: Partial<PresetConfig> = {}): PresetConfig {
     descriptionKo: '테스트 프리셋',
     reviewerCount: 3,
     providers: ['openrouter'],
-    models: { openrouter: 'xiaomi/mimo-v2.5' },
+    models: { openrouter: 'qwen/qwen3-235b-a22b-2507' },
     discussion: false,
     ...overrides,
   };

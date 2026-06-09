@@ -66,7 +66,7 @@ const apiOnlyConfig: Config = {
     personaPool: ['.ca/personas/strict.md'],
     personaAssignment: 'random',
   },
-  moderator: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3.7-max' },
+  moderator: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3-235b-a22b-2507' },
   discussion: {
     maxRounds: 3,
     registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },

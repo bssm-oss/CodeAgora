@@ -289,6 +289,7 @@ async function executeReviewerWithGuards(
         timeout: config.timeout,
         signal: controller.signal,
         temperature: config.temperature,
+        maxOutputTokens: config.maxOutputTokens,
         onUsage: captureUsage,
       });
 
@@ -390,6 +391,7 @@ async function executeReviewerWithGuards(
         prompt: fullPrompt,
         timeout: config.timeout,
         temperature: config.temperature,
+        maxOutputTokens: config.maxOutputTokens,
         onUsage: captureUsage,
       });
 

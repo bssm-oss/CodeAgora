@@ -63,7 +63,7 @@ describe('GitHub Actions runtime readiness', () => {
     expect(review).toContain('OPENROUTER_API_KEY');
     expect(review).toContain('provider=openrouter');
     expect(review).not.toContain('provider=groq');
-    expect(review).toContain('qwen/qwen3.7-max');
+    expect(review).toContain('qwen/qwen3-235b-a22b-2507');
     expect(bench).not.toContain('models: read');
     expect(bench).toContain('config.openrouter-low-cost-5x2.json');
     expect(bench).toContain('OPENROUTER_API_KEY');

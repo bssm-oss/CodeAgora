@@ -50,7 +50,7 @@ Review this diff. Focus only on real production bugs, security vulnerabilities, 
 
 | Target | Command shape | Known usable model |
 |---|---|---|
-| OpenRouter raw | API backend via OpenRouter | `xiaomi/mimo-v2.5`, `qwen/qwen3-coder-30b-a3b-instruct`, `tencent/hy3-preview`, `deepseek/deepseek-v4-flash`, `meta-llama/llama-4-scout` |
+| OpenRouter raw | API backend via OpenRouter | `qwen/qwen3-235b-a22b-2507`, `qwen/qwen3-coder-30b-a3b-instruct`, `tencent/hy3-preview`, `deepseek/deepseek-v4-flash`, `meta-llama/llama-4-scout` |
 | Codex raw | `codex exec -m <model> -` | `gpt-5.5` |
 
 ### Output Plan
@@ -91,16 +91,16 @@ Purpose: measure CodeAgora's multi-agent value using the proposed OpenRouter-onl
 
 | Role | Backend | Model | Reason |
 |---|---|---|---|
-| reviewer 1 | `api/openrouter` | `xiaomi/mimo-v2.5` | General reviewer. |
+| reviewer 1 | `api/openrouter` | `qwen/qwen3-235b-a22b-2507` | General reviewer. |
 | reviewer 2 | `api/openrouter` | `qwen/qwen3-coder-30b-a3b-instruct` | Stable code-focused reviewer. |
 | reviewer 3 | `api/openrouter` | `tencent/hy3-preview` | Contract/API reviewer. |
 | reviewer 4 | `api/openrouter` | `deepseek/deepseek-v4-flash` | Security/correctness reviewer. |
 | reviewer 5 | `api/openrouter` | `meta-llama/llama-4-scout` | Extra independent L1 signal. |
-| supporter 1 | `api/openrouter` | `z-ai/glm-5.1` | Debate verifier. |
-| supporter 2 | `api/openrouter` | `minimax/minimax-m3` | Debate verifier. |
-| devil's advocate | `api/openrouter` | `x-ai/grok-4.3` | Conservative challenge pass. |
-| moderator | `api/openrouter` | `openai/gpt-5.3-codex` | Discussion moderation. |
-| head | `api/openrouter` | `qwen/qwen3.7-max` | Final synthesis. |
+| supporter 1 | `api/openrouter` | `openai/gpt-oss-120b` | Debate verifier. |
+| supporter 2 | `api/openrouter` | `z-ai/glm-4.7-flash` | Debate verifier. |
+| devil's advocate | `api/openrouter` | `deepseek/deepseek-v4-flash` | Conservative challenge pass. |
+| moderator | `api/openrouter` | `qwen/qwen3-235b-a22b-2507` | Discussion moderation. |
+| head | `api/openrouter` | `qwen/qwen3-235b-a22b-2507` | Final synthesis. |
 
 ### Result Directory Naming
 

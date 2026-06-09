@@ -146,7 +146,7 @@ describe('formatCompact', () => {
       reviewerOpinions: {
         'src/test.ts:42': [
           { reviewerId: 'gpt-4o', model: 'gpt-4o', severity: 'CRITICAL', problem: 'Null crash', evidence: ['line 42'], suggestion: 'Add check' },
-          { reviewerId: 'mimo', model: 'xiaomi/mimo-v2.5', severity: 'WARNING', problem: 'Maybe null', evidence: [], suggestion: 'Consider guard' },
+          { reviewerId: 'mimo', model: 'qwen/qwen3-235b-a22b-2507', severity: 'WARNING', problem: 'Maybe null', evidence: [], suggestion: 'Consider guard' },
         ],
       },
     });

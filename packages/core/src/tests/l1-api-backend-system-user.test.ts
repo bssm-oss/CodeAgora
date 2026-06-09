@@ -24,7 +24,7 @@ import type { BackendInput } from '../l1/backend.js';
 function makeInput(overrides: Partial<BackendInput> = {}): BackendInput {
   return {
     backend: 'api',
-    model: 'xiaomi/mimo-v2.5',
+    model: 'qwen/qwen3-235b-a22b-2507',
     provider: 'openrouter',
     prompt: 'combined fallback prompt',
     timeout: 30,
@@ -94,6 +94,20 @@ describe('executeViaAISDK — system/user split', () => {
 
     const callArgs = mockGenerateText.mock.calls[0][0];
     expect(callArgs.temperature).toBeUndefined();
+  });
+
+  it('uses a conservative default maxOutputTokens cap', async () => {
+    await executeViaAISDK(makeInput());
+
+    const callArgs = mockGenerateText.mock.calls[0][0];
+    expect(callArgs.maxOutputTokens).toBe(4096);
+  });
+
+  it('passes explicit maxOutputTokens', async () => {
+    await executeViaAISDK(makeInput({ maxOutputTokens: 2048 }));
+
+    const callArgs = mockGenerateText.mock.calls[0][0];
+    expect(callArgs.maxOutputTokens).toBe(2048);
   });
 
   it('throws when provider is missing', async () => {

@@ -24,7 +24,7 @@ type UsageLike = {
  * Execute a review via direct API call using Vercel AI SDK.
  */
 export async function executeViaAISDK(input: BackendInput): Promise<string> {
-  const { model, provider, prompt, systemPrompt, userPrompt, timeout, signal, temperature } = input;
+  const { model, provider, prompt, systemPrompt, userPrompt, timeout, signal, temperature, maxOutputTokens } = input;
 
   if (!provider) {
     throw new Error('API backend requires provider parameter');
@@ -46,6 +46,7 @@ export async function executeViaAISDK(input: BackendInput): Promise<string> {
       : { prompt }),
     abortSignal,
     ...(temperature !== undefined && { temperature }),
+    maxOutputTokens: maxOutputTokens ?? 4096,
     maxRetries: 0, // Disable AI SDK internal retries — app-level retry in reviewer.ts
   });
 

@@ -124,8 +124,8 @@ describe('Cost Estimator', () => {
     expect(pricing).toHaveProperty('groq/llama-3.3-70b-versatile');
     expect(pricing).toHaveProperty('groq/llama-3.1-8b-instant');
     expect(pricing).toHaveProperty('groq/deepseek-r1-distill-llama-70b');
-    expect(pricing).toHaveProperty('openrouter/xiaomi/mimo-v2.5');
-    expect(pricing).toHaveProperty('openrouter/qwen/qwen3.7-max');
+    expect(pricing).toHaveProperty('openrouter/qwen/qwen3-235b-a22b-2507');
+    expect(pricing).toHaveProperty('openrouter/qwen/qwen3-235b-a22b-2507');
     expect(pricing).toHaveProperty('openrouter/google/gemini-2.5-flash');
     expect(pricing).toHaveProperty('openrouter/deepseek/deepseek-v3.2');
     expect(pricing).toHaveProperty('openrouter/qwen/qwen3-coder-30b-a3b-instruct');

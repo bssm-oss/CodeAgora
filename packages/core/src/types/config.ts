@@ -41,6 +41,7 @@ export const AgentConfigSchema = z
     provider: z.string().optional(),
     persona: z.string().optional(),
     temperature: z.number().min(0).max(2).optional(),
+    maxOutputTokens: z.number().int().positive().max(32768).optional(),
     timeout: z.number().default(120),
     enabled: z.boolean().default(true),
     fallback: z.union([FallbackSchema, z.array(FallbackSchema)]).optional(),
@@ -121,6 +122,7 @@ export const ModeratorConfigSchema = z.object({
   model: z.string(),
   provider: z.string().optional(),
   timeout: z.number().default(120),
+  maxOutputTokens: z.number().int().positive().max(32768).optional(),
   /**
    * Forced-decision output format. Default (undefined/'markdown') uses the
    * existing regex-based parser (structured "severity:" field → JSON-like
@@ -229,6 +231,7 @@ export const HeadConfigSchema = z.object({
   model: z.string(),
   provider: z.string().optional(),
   timeout: z.number().default(120),
+  maxOutputTokens: z.number().int().positive().max(32768).optional(),
   enabled: z.boolean().default(true),
 });
 export type HeadConfig = z.infer<typeof HeadConfigSchema>;

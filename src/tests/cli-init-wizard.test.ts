@@ -57,13 +57,13 @@ describe('buildCustomConfig()', () => {
   it('assigns the chosen model to all reviewers', () => {
     const config = buildCustomConfig({
       provider: 'openrouter',
-      model: 'xiaomi/mimo-v2.5',
+      model: 'qwen/qwen3-235b-a22b-2507',
       reviewerCount: 1,
       discussion: false,
     }) as Record<string, unknown>;
 
     const reviewers = config['reviewers'] as Array<Record<string, unknown>>;
-    expect(reviewers[0]!['model']).toBe('xiaomi/mimo-v2.5');
+    expect(reviewers[0]!['model']).toBe('qwen/qwen3-235b-a22b-2507');
     expect(reviewers[0]!['provider']).toBe('openrouter');
   });
 
