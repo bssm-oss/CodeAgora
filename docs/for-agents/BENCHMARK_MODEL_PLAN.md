@@ -50,7 +50,7 @@ Review this diff. Focus only on real production bugs, security vulnerabilities, 
 
 | Target | Command shape | Known usable model |
 |---|---|---|
-| OpenRouter raw | API backend via OpenRouter | `xiaomi/mimo-v2.5`, `google/gemini-3.1-flash-lite`, `tencent/hy3-preview`, `deepseek/deepseek-v4-flash`, `meta-llama/llama-4-scout` |
+| OpenRouter raw | API backend via OpenRouter | `xiaomi/mimo-v2.5`, `nvidia/nemotron-3-super-120b-a12b`, `tencent/hy3-preview`, `deepseek/deepseek-v4-flash`, `meta-llama/llama-4-scout` |
 | Codex raw | `codex exec -m <model> -` | `gpt-5.5` |
 
 ### Output Plan
@@ -92,7 +92,7 @@ Purpose: measure CodeAgora's multi-agent value using the proposed OpenRouter-onl
 | Role | Backend | Model | Reason |
 |---|---|---|---|
 | reviewer 1 | `api/openrouter` | `xiaomi/mimo-v2.5` | General reviewer. |
-| reviewer 2 | `api/openrouter` | `google/gemini-3.1-flash-lite` | Cheap breadth reviewer. |
+| reviewer 2 | `api/openrouter` | `nvidia/nemotron-3-super-120b-a12b` | Long-context code reviewer. |
 | reviewer 3 | `api/openrouter` | `tencent/hy3-preview` | Contract/API reviewer. |
 | reviewer 4 | `api/openrouter` | `deepseek/deepseek-v4-flash` | Security/correctness reviewer. |
 | reviewer 5 | `api/openrouter` | `meta-llama/llama-4-scout` | Extra independent L1 signal. |

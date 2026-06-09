@@ -8,7 +8,7 @@
   "groq/qwen/qwen3-32b": { "input": 0.00029, "output": 0.00059 },
   "groq/moonshotai/kimi-k2-instruct-0905": { "input": 0.001, "output": 0.003 },
   "openrouter/xiaomi/mimo-v2.5": { "input": 0.00014, "output": 0.00028 },
-  "openrouter/google/gemini-3.1-flash-lite": { "input": 0.00025, "output": 0.0015 },
+  "openrouter/nvidia/nemotron-3-super-120b-a12b": { "input": 0.00009, "output": 0.00045 },
   "openrouter/tencent/hy3-preview": { "input": 0.000063, "output": 0.00021 },
   "openrouter/deepseek/deepseek-v4-flash": { "input": 0.0000983, "output": 0.0001966 },
   "openrouter/meta-llama/llama-4-scout": { "input": 0.0001, "output": 0.0003 },

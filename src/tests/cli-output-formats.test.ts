@@ -233,7 +233,7 @@ describe('formatOutput(text)', () => {
             forfeited: 0,
             errored: 0,
             reviewers: [],
-            models: ['xiaomi/mimo-v2.5', 'google/gemini-3.1-flash-lite'],
+            models: ['xiaomi/mimo-v2.5', 'nvidia/nemotron-3-super-120b-a12b'],
             providers: ['openrouter'],
           },
           l2: {

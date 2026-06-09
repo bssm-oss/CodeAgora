@@ -401,7 +401,7 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
     label: 'Starter review (OpenRouter)',
     labelKo: '\uC2A4\uD0C0\uD130 \uB9AC\uBDF0 (OpenRouter)',
     providers: ['openrouter'],
-    models: { openrouter: 'google/gemini-3.1-flash-lite' },
+    models: { openrouter: 'nvidia/nemotron-3-super-120b-a12b' },
     reviewerCount: 2,
     discussion: false,
     backend: 'api',
