@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     environment: npm-publish
     steps:
       - uses: actions/checkout@v6
@@ -80,6 +80,40 @@ jobs:
         run: |
           set -o pipefail
           pnpm --filter @codeagora/mcp pack --dry-run 2>&1 | tee .sisyphus/evidence/package-mcp-dry-run.log
+
+      - name: Install desktop automation tools
+        if: contains(github.ref_name, '-rc.')
+        run: |
+          set -euo pipefail
+          npm install -g @hypothesi/tauri-mcp-cli@0.10.0
+          if ! command -v tauri-wd >/dev/null 2>&1; then
+            cargo install tauri-webdriver-automation --version 0.1.3
+          fi
+
+      - name: Desktop RC evidence
+        if: contains(github.ref_name, '-rc.')
+        run: |
+          set -euo pipefail
+          desktop_gate_log=.sisyphus/evidence/desktop-gate.log
+          : > "$desktop_gate_log"
+
+          run_desktop_gate() {
+            local log_file="$1"
+            shift
+            {
+              echo "$ $*"
+              "$@"
+            } 2>&1 | tee "$log_file" | tee -a "$desktop_gate_log"
+          }
+
+          run_desktop_gate .sisyphus/evidence/desktop-typecheck.log pnpm --filter @codeagora/desktop typecheck
+          run_desktop_gate .sisyphus/evidence/desktop-smoke.log pnpm --filter @codeagora/desktop smoke
+          run_desktop_gate .sisyphus/evidence/desktop-tauri-check.log pnpm --filter @codeagora/desktop tauri:check
+          run_desktop_gate .sisyphus/evidence/desktop-app-e2e.log pnpm --filter @codeagora/desktop app:e2e
+          run_desktop_gate .sisyphus/evidence/desktop-macos-webdriver-e2e.log pnpm --filter @codeagora/desktop macos:webdriver-e2e
+          run_desktop_gate .sisyphus/evidence/desktop-visual-qa.log pnpm --filter @codeagora/desktop visual:qa
+          run_desktop_gate .sisyphus/evidence/desktop-evidence.log pnpm --filter @codeagora/desktop evidence
+          run_desktop_gate .sisyphus/evidence/desktop-bundle-smoke.log pnpm --filter @codeagora/desktop bundle:smoke
 
       - name: Generate evidence manifest
         run: |
