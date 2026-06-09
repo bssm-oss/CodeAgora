@@ -35,7 +35,7 @@ const baseConfig: Config = {
     personaPool: ['.ca/personas/strict.md', '.ca/personas/pragmatic.md'],
     personaAssignment: 'random',
   },
-  moderator: { backend: 'codex', model: 'claude-sonnet' },
+  moderator: { backend: 'codex', model: 'gpt-5.3-codex' },
   discussion: {
     maxRounds: 3,
     registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },
@@ -66,7 +66,7 @@ const apiOnlyConfig: Config = {
     personaPool: ['.ca/personas/strict.md'],
     personaAssignment: 'random',
   },
-  moderator: { backend: 'api', provider: 'openrouter', model: 'claude-sonnet' },
+  moderator: { backend: 'api', provider: 'openrouter', model: 'qwen/qwen3.7-max' },
   discussion: {
     maxRounds: 3,
     registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },

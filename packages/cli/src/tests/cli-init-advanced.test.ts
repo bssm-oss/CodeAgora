@@ -56,7 +56,7 @@ describe('buildMultiProviderConfig()', () => {
     const params: MultiProviderConfigParams = {
       selections: [
         makeSelection('groq', 'llama-3.3-70b', 'api'),
-        makeSelection('anthropic', 'claude-3-5-sonnet', 'api'),
+        makeSelection('openrouter', 'xiaomi/mimo-v2.5', 'api'),
       ],
       reviewerCount: 4,
       discussion: false,
@@ -65,26 +65,26 @@ describe('buildMultiProviderConfig()', () => {
 
     expect(config.reviewers).toHaveLength(4);
     const providers = config.reviewers.map((r) => r.provider);
-    // Round-robin: groq, anthropic, groq, anthropic
+    // Round-robin: groq, openrouter, groq, openrouter
     expect(providers[0]).toBe('groq');
-    expect(providers[1]).toBe('anthropic');
+    expect(providers[1]).toBe('openrouter');
     expect(providers[2]).toBe('groq');
-    expect(providers[3]).toBe('anthropic');
+    expect(providers[3]).toBe('openrouter');
   });
 
   it('uses the provider with the highest context window as moderator/head', () => {
     const params: MultiProviderConfigParams = {
       selections: [
         makeSelection('groq', 'llama-3.3-70b', 'api', 8000),
-        makeSelection('anthropic', 'claude-3-5-sonnet', 'api', 200000),
+        makeSelection('openrouter', 'qwen/qwen3.7-max', 'api', 1000000),
       ],
       reviewerCount: 2,
       discussion: false,
     };
     const config = buildMultiProviderConfig(params);
 
-    expect(config.moderator.provider).toBe('anthropic');
-    expect((config.head as Record<string, unknown>)['provider']).toBe('anthropic');
+    expect(config.moderator.provider).toBe('openrouter');
+    expect((config.head as Record<string, unknown>)['provider']).toBe('openrouter');
   });
 
   it('falls back to first selection as moderator when context windows are equal', () => {

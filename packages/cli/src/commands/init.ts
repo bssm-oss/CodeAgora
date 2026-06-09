@@ -363,8 +363,8 @@ export function buildMultiProviderConfig(params: MultiProviderConfigParams): Gen
 // ============================================================================
 
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-6',
-  openai: 'gpt-4o-mini',
+  anthropic: 'claude-haiku-4-5',
+  openai: 'gpt-5.3-codex',
   openrouter: 'xiaomi/mimo-v2.5',
   'opencode-go': 'deepseek-v4-flash',
   'opencode-zen': 'gpt-5.4-mini',
@@ -426,7 +426,8 @@ export function generatePresets(
   catalog: ModelsCatalog | null,
   cliBackends?: DetectedCli[],
 ): DynamicPreset[] {
-  const detected = env.apiProviders.filter((p: ApiProviderStatus) => p.available).map((p: ApiProviderStatus) => p.provider);
+  const detectedApiProviders = env.apiProviders.filter((p: ApiProviderStatus) => p.available).map((p: ApiProviderStatus) => p.provider);
+  const detected = detectedApiProviders.includes('openrouter') ? ['openrouter'] : detectedApiProviders;
   const presets: DynamicPreset[] = [];
 
   // If nothing detected at all, return fallback presets
@@ -517,7 +518,7 @@ export function generatePresets(
   const availableCli = cliBackends?.filter((c) => c.available) ?? [];
   if (availableCli.length > 0) {
     const cliProvider = availableCli[0]!;
-    const cliModel = cliProvider.backend === 'claude' ? 'sonnet'
+    const cliModel = cliProvider.backend === 'claude' ? 'opus'
       : cliProvider.backend === 'codex' ? 'codex'
       : cliProvider.backend === 'gemini' ? 'gemini'
       : cliProvider.backend;

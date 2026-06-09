@@ -246,18 +246,18 @@ describe('runDoctor()', () => {
     const cliConfig: Config = {
       ...buildDefaultConfig('groq'),
       reviewers: [
-        { id: 'r1', model: 'sonnet', backend: 'claude', timeout: 120, enabled: true },
+        { id: 'r1', model: 'opus', backend: 'claude', timeout: 120, enabled: true },
       ],
       supporters: {
-        pool: [{ id: 's1', model: 'sonnet', backend: 'claude', timeout: 120, enabled: true }],
+        pool: [{ id: 's1', model: 'opus', backend: 'claude', timeout: 120, enabled: true }],
         pickCount: 1,
         pickStrategy: 'random',
-        devilsAdvocate: { id: 'da', model: 'sonnet', backend: 'claude', timeout: 120, enabled: true },
+        devilsAdvocate: { id: 'da', model: 'opus', backend: 'claude', timeout: 120, enabled: true },
         personaPool: ['critic'],
         personaAssignment: 'random',
       },
-      moderator: { backend: 'claude', model: 'sonnet', timeout: 120 },
-      head: { backend: 'claude', model: 'sonnet', timeout: 120, enabled: true },
+      moderator: { backend: 'claude', model: 'opus', timeout: 120 },
+      head: { backend: 'claude', model: 'opus', timeout: 120, enabled: true },
     };
     await writeConfig(tmpDir, cliConfig);
 
@@ -281,18 +281,18 @@ describe('runDoctor()', () => {
     const cliConfig: Config = {
       ...buildDefaultConfig('groq'),
       reviewers: [
-        { id: 'r1', model: 'sonnet', backend: 'claude', timeout: 120, enabled: true },
+        { id: 'r1', model: 'opus', backend: 'claude', timeout: 120, enabled: true },
       ],
       supporters: {
-        pool: [{ id: 's1', model: 'sonnet', backend: 'claude', timeout: 120, enabled: true }],
+        pool: [{ id: 's1', model: 'opus', backend: 'claude', timeout: 120, enabled: true }],
         pickCount: 1,
         pickStrategy: 'random',
-        devilsAdvocate: { id: 'da', model: 'sonnet', backend: 'claude', timeout: 120, enabled: true },
+        devilsAdvocate: { id: 'da', model: 'opus', backend: 'claude', timeout: 120, enabled: true },
         personaPool: ['critic'],
         personaAssignment: 'random',
       },
-      moderator: { backend: 'claude', model: 'sonnet', timeout: 120 },
-      head: { backend: 'claude', model: 'sonnet', timeout: 120, enabled: true },
+      moderator: { backend: 'claude', model: 'opus', timeout: 120 },
+      head: { backend: 'claude', model: 'opus', timeout: 120, enabled: true },
     };
     await writeConfig(tmpDir, cliConfig);
 

@@ -49,7 +49,7 @@ function makeSuccessReview(overrides: Partial<ReviewOutput> = {}): ReviewOutput 
 function makeForfeitReview(overrides: Partial<ReviewOutput> = {}): ReviewOutput {
   return {
     reviewerId: 'reviewer-2',
-    model: 'claude-3-5-sonnet',
+    model: 'claude-3-5-haiku',
     group: 'group-b',
     evidenceDocs: [],
     rawResponse: '',
@@ -89,11 +89,11 @@ describe('writeReviewOutput() file path construction', () => {
   });
 
   it('includes sanitised model name in the filename', async () => {
-    const filePath = await writeReviewOutput('2026-03-10', '001', makeSuccessReview({ model: 'claude-3.5-sonnet' }));
+    const filePath = await writeReviewOutput('2026-03-10', '001', makeSuccessReview({ model: 'claude-3.5-haiku' }));
 
     // Non-alphanumeric chars replaced with '-'
-    expect(filePath).toContain('claude-3-5-sonnet');
-    expect(filePath).not.toContain('claude-3.5-sonnet');
+    expect(filePath).toContain('claude-3-5-haiku');
+    expect(filePath).not.toContain('claude-3.5-haiku');
   });
 
   it('writes to the correct path passed to writeMarkdown', async () => {
@@ -287,7 +287,7 @@ describe('writeAllReviews()', () => {
   it('returns an array of file paths, one per review', async () => {
     const reviews = [
       makeSuccessReview({ reviewerId: 'r1', model: 'gpt-4o' }),
-      makeSuccessReview({ reviewerId: 'r2', model: 'claude-3-5-sonnet' }),
+      makeSuccessReview({ reviewerId: 'r2', model: 'claude-3-5-haiku' }),
     ];
 
     const paths = await writeAllReviews('2026-03-10', '001', reviews);

@@ -22,7 +22,7 @@ describe('sanitizeShellArg', () => {
   it('accepts forward-slash path separators used in provider/model combos', () => {
     // Note: ../../../etc/passwd passes the regex since dots and slashes are allowed.
     // Security is enforced at the OS level via spawn() (no shell interpretation).
-    expect(() => sanitizeShellArg('anthropic/claude-3.5-sonnet', 'model')).not.toThrow();
+    expect(() => sanitizeShellArg('openrouter/xiaomi/mimo-v2.5', 'model')).not.toThrow();
   });
 
   it('rejects strings with shell metacharacters', () => {
@@ -36,7 +36,7 @@ describe('sanitizeShellArg', () => {
   });
 
   it('accepts a simple model id', () => {
-    expect(sanitizeShellArg('claude-sonnet-4-6', 'model')).toBe('claude-sonnet-4-6');
+    expect(sanitizeShellArg('gpt-5.3-codex', 'model')).toBe('gpt-5.3-codex');
   });
 
   it('accepts a provider/model composite', () => {
@@ -49,7 +49,7 @@ describe('sanitizeShellArg', () => {
   });
 
   it('returns the arg unchanged on success', () => {
-    const arg = 'openrouter/anthropic/claude-3.5-sonnet';
+    const arg = 'openrouter/qwen/qwen3.7-max';
     expect(sanitizeShellArg(arg, 'provider')).toBe(arg);
   });
 });

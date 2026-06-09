@@ -72,10 +72,10 @@ describe('formatCompact', () => {
       decision: 'REJECT',
       reasoning: 'Issues found',
       evidenceDocs: [makeDoc()],
-      reviewerMap: { 'src/test.ts:42': ['claude-sonnet', 'gpt-4o'] },
+      reviewerMap: { 'src/test.ts:42': ['mimo-v2.5', 'gpt-4o'] },
     });
 
-    expect(result.issues[0].flaggedBy).toEqual(['claude-sonnet', 'gpt-4o']);
+    expect(result.issues[0].flaggedBy).toEqual(['mimo-v2.5', 'gpt-4o']);
   });
 
   it('generates severity summary string', () => {
@@ -146,14 +146,14 @@ describe('formatCompact', () => {
       reviewerOpinions: {
         'src/test.ts:42': [
           { reviewerId: 'gpt-4o', model: 'gpt-4o', severity: 'CRITICAL', problem: 'Null crash', evidence: ['line 42'], suggestion: 'Add check' },
-          { reviewerId: 'claude', model: 'claude-sonnet', severity: 'WARNING', problem: 'Maybe null', evidence: [], suggestion: 'Consider guard' },
+          { reviewerId: 'mimo', model: 'xiaomi/mimo-v2.5', severity: 'WARNING', problem: 'Maybe null', evidence: [], suggestion: 'Consider guard' },
         ],
       },
     });
 
     expect(result.issues[0].opinions).toHaveLength(2);
     expect(result.issues[0].opinions![0].reviewerId).toBe('gpt-4o');
-    expect(result.issues[0].opinions![1].reviewerId).toBe('claude');
+    expect(result.issues[0].opinions![1].reviewerId).toBe('mimo');
   });
 
   it('omits opinions field when reviewerOpinions not provided', () => {

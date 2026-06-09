@@ -21,7 +21,7 @@ const basePool: SupporterPoolConfig['pool'] = [
 const baseDevil: SupporterPoolConfig['devilsAdvocate'] = {
   id: 's-devil',
   backend: 'claude',
-  model: 'claude-3-5-sonnet',
+  model: 'claude-3-5-haiku',
   persona: '.ca/personas/devil.md',
   enabled: false, // disabled to keep selection predictable
   timeout: 120,

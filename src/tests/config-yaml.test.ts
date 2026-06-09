@@ -42,7 +42,7 @@ supporters:
   personaAssignment: random
 moderator:
   backend: codex
-  model: claude-sonnet
+  model: gpt-5.3-codex
 discussion:
   maxRounds: 3
   registrationThreshold:
@@ -69,7 +69,7 @@ const validConfigJson = {
     personaPool: ['persona.md'],
     personaAssignment: 'random',
   },
-  moderator: { backend: 'codex', model: 'claude-sonnet' },
+  moderator: { backend: 'codex', model: 'gpt-5.3-codex' },
   discussion: {
     maxRounds: 3,
     registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },

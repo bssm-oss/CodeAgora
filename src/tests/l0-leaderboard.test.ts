@@ -18,7 +18,7 @@ vi.mock('../../packages/core/src/l0/bandit-store.js', () => {
       getAllArms: vi.fn().mockReturnValue(
         new Map([
           ['openai/gpt-4o', { alpha: 8, beta: 2, reviewCount: 10 }],
-          ['anthropic/claude-3-5-sonnet', { alpha: 6, beta: 4, reviewCount: 10 }],
+          ['openrouter/qwen/qwen3.7-max', { alpha: 6, beta: 4, reviewCount: 10 }],
           ['groq/llama-3.3-70b', { alpha: 3, beta: 7, reviewCount: 10 }],
         ])
       ),
@@ -67,7 +67,7 @@ describe('getModelLeaderboard', () => {
     expect(entries).toHaveLength(3);
     const models = entries.map((e) => e.model);
     expect(models).toContain('openai/gpt-4o');
-    expect(models).toContain('anthropic/claude-3-5-sonnet');
+    expect(models).toContain('openrouter/qwen/qwen3.7-max');
     expect(models).toContain('groq/llama-3.3-70b');
   });
 

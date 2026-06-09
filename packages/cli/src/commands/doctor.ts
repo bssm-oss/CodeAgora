@@ -581,8 +581,8 @@ export { getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 const LIVE_CHECK_TIMEOUT_MS = 30_000;
 
 const HEALTH_CHECK_DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'claude-sonnet-4-6',
-  openai: 'gpt-4o-mini',
+  anthropic: 'claude-haiku-4-5',
+  openai: 'gpt-5.3-codex',
   openrouter: 'xiaomi/mimo-v2.5',
   'opencode-go': 'deepseek-v4-flash',
   'opencode-zen': 'gpt-5.4-mini',

@@ -199,7 +199,7 @@ describe('executeReviewers — fallback mechanism', () => {
 
     const input = makeInput({
       fallback: {
-        model: 'claude-3-5-sonnet',
+        model: 'claude-3-5-haiku',
         backend: 'claude',
         provider: undefined,
       },
@@ -210,7 +210,7 @@ describe('executeReviewers — fallback mechanism', () => {
     expect(mockExecuteBackend).toHaveBeenCalledTimes(2);
     const fallbackCall = mockExecuteBackend.mock.calls[1][0] as BackendInput;
     expect(fallbackCall.backend).toBe('claude');
-    expect(fallbackCall.model).toBe('claude-3-5-sonnet');
+    expect(fallbackCall.model).toBe('claude-3-5-haiku');
     expect(fallbackCall.provider).toBeUndefined();
     expect(fallbackCall.timeout).toBe(30); // inherited from primary config
   });

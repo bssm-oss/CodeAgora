@@ -23,7 +23,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
       },
       {
         id: 'r2-openrouter',
-        model: 'anthropic/claude-sonnet-4.6',
+        model: 'xiaomi/mimo-v2.5',
         backend: 'api',
         provider: 'openrouter',
         enabled: true,
@@ -50,7 +50,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
         },
         {
           id: 's2',
-          model: 'anthropic/claude-sonnet-4.6',
+          model: 'z-ai/glm-5.1',
           backend: 'api',
           provider: 'openrouter',
           enabled: true,

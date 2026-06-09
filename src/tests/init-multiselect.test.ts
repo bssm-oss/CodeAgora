@@ -101,8 +101,8 @@ function makeCatalog(): ModelsCatalog {
       },
       {
         source: 'anthropic',
-        model_id: 'anthropic/claude-sonnet-4-6',
-        name: 'Claude Sonnet',
+        model_id: 'anthropic/claude-haiku-4-5',
+        name: 'Claude Haiku',
         context: '128k',
         aa_intelligence: 35,
         aa_price_input: 0.002,
@@ -433,7 +433,7 @@ describe('buildMultiProviderConfig()', () => {
       selections: [
         { provider: 'groq', model: 'llama-3.3-70b', backend: 'api' },
         { provider: 'openai', model: 'gpt-4o-mini', backend: 'api' },
-        { provider: 'anthropic', model: 'claude-sonnet-4-6', backend: 'api' },
+        { provider: 'anthropic', model: 'claude-haiku-4-5', backend: 'api' },
       ],
       reviewerCount: 5,
       discussion: true,

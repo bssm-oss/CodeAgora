@@ -57,7 +57,7 @@ const SETUP_PROVIDERS: ProviderInfo[] = [
     id: 'anthropic',
     name: 'Anthropic',
     envVar: 'ANTHROPIC_API_KEY',
-    speed: 'claude-sonnet',
+    speed: 'claude-haiku',
     signupUrl: 'console.anthropic.com/keys',
     category: 'paid',
     note: 'Claude models',

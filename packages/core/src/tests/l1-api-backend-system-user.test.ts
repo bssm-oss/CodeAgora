@@ -24,8 +24,8 @@ import type { BackendInput } from '../l1/backend.js';
 function makeInput(overrides: Partial<BackendInput> = {}): BackendInput {
   return {
     backend: 'api',
-    model: 'claude-sonnet-4-6',
-    provider: 'anthropic',
+    model: 'xiaomi/mimo-v2.5',
+    provider: 'openrouter',
     prompt: 'combined fallback prompt',
     timeout: 30,
     ...overrides,
