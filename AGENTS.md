@@ -3,7 +3,7 @@
 # CodeAgora
 
 ## Purpose
-Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Supported release surfaces are the CLI, GitHub Action, and MCP server; the Tauri desktop app is private preview.
+Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Supported release surfaces are the CLI, GitHub Action, MCP server, and Tauri desktop app.
 
 ## Key Files
 
@@ -74,8 +74,8 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 
 ### Scope Boundaries
 - Do not reintroduce retired web dashboard, terminal TUI, or notification package surfaces.
-- Do not describe desktop as stable public support; keep it private preview until separate graduation gates close.
-- Do not widen the stable release contract beyond CLI, GitHub Action, and MCP without explicit roadmap/evidence updates.
+- Keep desktop claims backed by package, launch, WebDriver, visual QA, export, signing/notarization/updater, and release-evidence gates.
+- Do not widen the stable release contract beyond CLI, GitHub Action, MCP, and Desktop without explicit roadmap/evidence updates.
 - Do not treat deterministic tests as live provider or live GitHub evidence; release claims need the artifacts named in `docs/archived/RELEASE_EVIDENCE.md`.
 
 ## Repository Map

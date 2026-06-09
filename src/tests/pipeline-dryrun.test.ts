@@ -320,6 +320,8 @@ describe('formatDryRunText', () => {
     expect(text).toContain('Cost Estimation:');
     expect(text).toContain('Provider Health:');
     expect(text).toContain('Next steps:');
+    expect(text).toContain('agora env set groq <api-key>');
+    expect(text).toContain('agora env set openrouter <api-key>');
   });
 
   it('output contains reviewer ids', async () => {
@@ -407,7 +409,7 @@ describe('formatDryRunText', () => {
     expect(text).toContain('Readiness: RISKY');
     expect(text).toContain('unknown provider');
     expect(text).toContain('Check the provider mapping above, then rerun `agora doctor --live`.');
-    expect(text).not.toContain('Review the warnings above, then rerun `agora doctor --live`.');
+    expect(text).not.toContain('Review the warnings above, then rerun `agora doctor --live` and this dry-run.');
   });
 
   it('auto reviewer shows "auto" label in output', async () => {

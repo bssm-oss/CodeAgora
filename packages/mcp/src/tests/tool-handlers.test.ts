@@ -50,10 +50,12 @@ async function resolveToolDir() {
 function createServerStub() {
   const handlers = new Map<string, ToolHandler>();
   const schemas = new Map<string, unknown>();
+  const descriptions = new Map<string, string>();
 
   return {
     server: {
-      tool(name: string, _desc: string, _schema: unknown, handler: ToolHandler) {
+      tool(name: string, desc: string, _schema: unknown, handler: ToolHandler) {
+        descriptions.set(name, desc);
         schemas.set(name, _schema);
         handlers.set(name, handler);
       },
@@ -67,6 +69,14 @@ function createServerStub() {
       const schema = schemas.get(name);
       if (!schema) throw new Error(`Schema "${name}" not registered`);
       return schema;
+    },
+    getDescription(name: string): string {
+      const description = descriptions.get(name);
+      if (!description) throw new Error(`Description "${name}" not registered`);
+      return description;
+    },
+    getToolNames(): string[] {
+      return [...handlers.keys()].sort();
     },
   };
 }
@@ -165,8 +175,12 @@ describe('config_get handler', () => {
       status: 'error',
       code: 'CONFIG_GET_FAILED',
       message: 'Key "missing.key" not found in config',
-      details: { key: 'missing.key' },
+      details: { key: 'missing.key', reason: 'missing-key' },
     });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('config_get'),
+      expect.stringContaining('valid config keys'),
+    ]));
   });
 
   it('returns error when loadConfig throws', async () => {
@@ -185,6 +199,9 @@ describe('config_get handler', () => {
       code: 'CONFIG_GET_FAILED',
       message: 'no config',
     });
+    expect(parsed.guidance).toEqual(expect.arrayContaining([
+      expect.stringContaining('agora init'),
+    ]));
   });
 
   it('resolves repo_path before loading config', async () => {
@@ -597,6 +614,48 @@ describe('explain_session handler', () => {
 // ---------------------------------------------------------------------------
 
 describe('stable MCP error contract', () => {
+  it('describes every public tool with use case, output, and repo_path behavior', async () => {
+    const { registerReviewQuick } = await import('../tools/review-quick.js');
+    const { registerReviewFull } = await import('../tools/review-full.js');
+    const { registerReviewPr } = await import('../tools/review-pr.js');
+    const { registerDryRun } = await import('../tools/dry-run.js');
+    const { registerConfigGet } = await import('../tools/config-get.js');
+    const { registerConfigSet } = await import('../tools/config-set.js');
+    const { registerStats } = await import('../tools/stats.js');
+    const { registerLeaderboard } = await import('../tools/leaderboard.js');
+    const { registerExplain } = await import('../tools/explain.js');
+
+    const { server, getDescription, getToolNames } = createServerStub();
+    registerReviewQuick(server as never);
+    registerReviewFull(server as never);
+    registerReviewPr(server as never);
+    registerDryRun(server as never);
+    registerConfigGet(server as never);
+    registerConfigSet(server as never);
+    registerStats(server as never);
+    registerLeaderboard(server as never);
+    registerExplain(server as never);
+
+    expect(getToolNames()).toEqual([
+      'config_get',
+      'config_set',
+      'dry_run',
+      'explain_session',
+      'get_leaderboard',
+      'get_stats',
+      'review_full',
+      'review_pr',
+      'review_quick',
+    ]);
+
+    for (const toolName of getToolNames()) {
+      const description = getDescription(toolName);
+      expect(description, `${toolName} should explain when to use it`).toContain('Use when');
+      expect(description, `${toolName} should explain its output`).toContain('Returns');
+      expect(description, `${toolName} should explain repo_path behavior`).toMatch(/repo_path|No repo_path/);
+    }
+  });
+
   it('registers every structured MCP error code used by stable tools', () => {
     expect(MCP_ERROR_CODES).toEqual(expect.arrayContaining([
       'INVALID_INPUT',

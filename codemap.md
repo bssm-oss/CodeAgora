@@ -84,7 +84,7 @@ Text/JSON/NDJSON/SARIF/GitHub/MCP/Desktop surfaces
 | `packages/mcp/` | MCP server package exposing review/config/session capabilities to AI IDEs and agents. | [packages/mcp/codemap.md](packages/mcp/codemap.md) |
 | `packages/mcp/src/` | MCP bootstrap, helper layer, compact result conversion, and tool dispatch. | [packages/mcp/src/codemap.md](packages/mcp/src/codemap.md) |
 | `packages/mcp/src/tools/` | MCP tool handlers for quick/full/PR review, dry-run, session explanation, stats, and config. | [packages/mcp/src/tools/codemap.md](packages/mcp/src/tools/codemap.md) |
-| `packages/desktop/` | Private-preview Tauri desktop shell for local review history, configuration, and result exploration. | [packages/desktop/codemap.md](packages/desktop/codemap.md) |
+| `packages/desktop/` | Official Tauri desktop app for local review history, configuration, launch controls, result inspection, and evidence export. | [packages/desktop/codemap.md](packages/desktop/codemap.md) |
 | `packages/desktop/src/` | Desktop frontend app state, views, and bridge calls. | [packages/desktop/src/codemap.md](packages/desktop/src/codemap.md) |
 | `packages/desktop/src/api/` | Desktop bridge and fallback API layer. | [packages/desktop/src/api/codemap.md](packages/desktop/src/api/codemap.md) |
 | `packages/desktop/src-tauri/` | Native Tauri backend and desktop capability configuration. | [packages/desktop/src-tauri/codemap.md](packages/desktop/src-tauri/codemap.md) |

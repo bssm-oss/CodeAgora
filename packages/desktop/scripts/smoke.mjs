@@ -27,9 +27,11 @@ assert(fs.existsSync(path.join(root, 'dist/index.html')), 'dist/index.html is mi
 assert(fs.existsSync(path.join(root, 'dist/main.js')), 'dist/main.js is missing');
 assert(fs.existsSync(path.join(root, 'dist/styles.css')), 'dist/styles.css is missing');
 assert(fs.existsSync(path.join(root, 'scripts/visual-qa.mjs')), 'desktop visual QA script is missing');
+assert(packageJson.scripts?.['browser:fallback']?.includes('browser fallback'), 'desktop browser fallback script is missing');
+assert(!('preview' in (packageJson.scripts ?? {})), 'desktop package must not expose a preview script now that Desktop is official');
 assert(
-  packageJson.scripts?.['macos:webdriver-e2e']?.includes('tauri build --debug --features webdriver-automation'),
-  'macOS WebDriver E2E must build a debug .app bundle with webdriver automation enabled',
+  packageJson.scripts?.['macos:webdriver-e2e']?.includes('tauri build --debug --features webdriver-automation --bundles app'),
+  'macOS WebDriver E2E must build a debug .app bundle with webdriver automation enabled and skip DMG bundling',
 );
 
 const builtJs = readText('dist/main.js');

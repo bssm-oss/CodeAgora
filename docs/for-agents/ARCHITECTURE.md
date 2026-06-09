@@ -82,7 +82,7 @@ Note: Evidence deduplication is in L2 (`deduplication.ts`). Confidence-based CRI
 
 ## Project Structure
 
-pnpm monorepo with three current supported product surfaces: CLI, MCP, and GitHub Actions. The upcoming desktop app is a private preview surface.
+pnpm monorepo with four current supported product surfaces: CLI, MCP, GitHub Actions, and the Tauri Desktop app.
 
 ```
 packages/
@@ -93,7 +93,7 @@ packages/
 └── mcp/            # @codeagora/mcp — MCP server (9 tools)
 ```
 
-The former web, TUI, and notifications packages are retired as first-class surfaces. Their human-facing responsibilities are planned to move into the upcoming Tauri desktop app once it graduates from preview.
+The former web, TUI, and notifications packages are retired as first-class surfaces. Their human-facing responsibilities now live in the Tauri desktop app.
 
 ## Session Storage
 
@@ -121,7 +121,7 @@ Every review run is saved under `.ca/sessions/`:
 | CLI | commander |
 | LLM SDK | Vercel AI SDK (multi-provider) |
 | MCP | @modelcontextprotocol/sdk |
-| Desktop App | Tauri (private scaffold) |
+| Desktop App | Tauri |
 | Validation | zod |
 | Testing | vitest |
 | Build | tsup |

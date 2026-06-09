@@ -10,7 +10,7 @@ import { resolveRepoPathOrError } from './shared-response.js';
 export function registerConfigSet(server: McpServer): void {
   server.tool(
     'config_set',
-    'Set a CodeAgora configuration value using dot-notation key. Validates against config schema.',
+    'Use when you need to update a CodeAgora setting from an MCP client without opening the config file manually. Returns JSON confirming the updated key and value after schema validation. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root.',
     {
       key: z.string().describe('Dot-notation key (e.g. "discussion.maxRounds")'),
       value: z.union([z.string(), z.number(), z.boolean()]).describe('Value to set'),

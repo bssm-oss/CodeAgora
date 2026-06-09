@@ -32,6 +32,8 @@ export interface ActionGuidance {
   nextSteps: string[];
 }
 
+const providerSecretList = [...new Set(Object.values(PROVIDER_ENV_VARS))].join(', ');
+
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined || value === '') return defaultValue;
   return value.toLowerCase() === 'true';
@@ -152,16 +154,18 @@ export function getActionGuidance(reason: ActionDegradedReason): ActionGuidance 
       return {
         why: 'The review pipeline cannot start because no provider credential is available.',
         nextSteps: [
-          'Add the provider secret required by your chosen review backend, such as OPENROUTER_API_KEY or GROQ_API_KEY.',
-          'Use a CLI or MCP dry-run locally if you need to inspect the config without provider secrets.',
+          `Add one retained provider secret to the workflow environment: ${providerSecretList}.`,
+          'For local setup, run `agora env set openrouter <api-key>` or `agora env set groq <api-key>`, then `agora doctor --live`.',
+          'Use `agora review --dry-run` locally or the MCP `dry_run` tool when you need config/diff inspection without a live review.',
         ],
       };
     case 'fork-missing-provider-secrets':
       return {
         why: 'Fork PRs cannot read repository secrets, so the review would fail before it starts.',
         nextSteps: [
-          'Skip automatic review on untrusted fork PRs.',
-          'Run the review from a trusted branch with access to provider secrets when a maintainer is ready.',
+          'Skip automatic review on untrusted fork PRs, or rerun from a trusted branch after maintainer review.',
+          `Confirm the trusted workflow has one retained provider secret available: ${providerSecretList}.`,
+          'For local reproduction, run `agora env set openrouter <api-key>` or `agora env set groq <api-key>`, then `agora doctor --live`.',
         ],
       };
     case 'posting-disabled':

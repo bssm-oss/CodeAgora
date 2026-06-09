@@ -1,18 +1,18 @@
-# Desktop Private Preview
+# Desktop App
 
-The Tauri desktop app is a private-preview surface for the next RC cycle. It is
-not a stable public support claim and must stay aligned with CLI/core/MCP
-contracts.
+The Tauri desktop app is CodeAgora's official human-facing local UI. It stays
+aligned with the same CLI/core/MCP session, config, provider, and review
+contracts used by the automation surfaces.
 
 ## Release Decision
 
-| Area | Private-preview decision |
+| Area | Release decision |
 |------|--------------------------|
-| Channel | Private preview only |
-| Public desktop launch | Deferred |
-| Signing | Deferred until public desktop launch |
-| Notarization | Deferred until public desktop launch |
-| Updater | Disabled for private preview |
+| Channel | Official desktop app |
+| Public desktop launch | Included in release readiness |
+| Signing | Release evidence must state current signing status |
+| Notarization | Release evidence must state current notarization status |
+| Updater | Disabled unless explicitly enabled in release evidence |
 | Canonical review engine | Existing CLI/core path |
 | Canonical sessions | Existing `.ca/sessions` artifacts |
 | Canonical config | Existing `.ca/config.*` schema and files |
@@ -32,6 +32,7 @@ This runs:
 - `pnpm --filter @codeagora/desktop tauri:check`
 - `pnpm --filter @codeagora/desktop app:e2e`
 - `pnpm --filter @codeagora/desktop macos:webdriver-e2e`
+- `pnpm --filter @codeagora/desktop visual:qa`
 - `pnpm --filter @codeagora/desktop evidence`
 - `pnpm --filter @codeagora/desktop bundle:smoke`
 
@@ -41,7 +42,10 @@ The desktop evidence manifest is written to:
 .sisyphus/evidence/desktop-evidence-manifest.json
 ```
 
-The post-merge RC gate passed on 2026-05-06 at `origin/main` `1075f81`.
+Visual QA writes `desktop-visual-qa.json` plus cockpit and setup screenshots in
+the same evidence directory.
+
+Release readiness requires fresh desktop evidence for the candidate commit.
 
 ## Automated Smoke Coverage
 
@@ -60,7 +64,7 @@ The desktop smoke checks:
 
 Before RC handoff, manually verify:
 
-- the Tauri shell launches on the preview platform
+- the Tauri shell launches on the target platform
 - a trusted git repository opens and shows branch/head/dirty/config/session state
 - review progress and cancel controls work on a provider-safe path
 - session detail renders findings and exports Markdown, JSON, and SARIF
@@ -76,7 +80,7 @@ Desktop must not:
 
 - reimplement review orchestration
 - create desktop-only verdict, finding, session, or config semantics
-- claim stable/public desktop support before signing/notarization/updater and
-  public distribution decisions are revisited
+- claim signing, notarization, updater, or platform distribution behavior that
+  has not been captured in release evidence
 - expose provider keys, tokens, Authorization headers, or secret values in UI
   logs, exports, or evidence

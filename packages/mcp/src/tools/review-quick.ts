@@ -13,7 +13,7 @@ import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared
 export function registerReviewQuick(server: McpServer): void {
   server.tool(
     'review_quick',
-    'Quick code review — 3 AI reviewers scan your diff in parallel (~10s). Returns verdict (ACCEPT/REJECT) + issues grouped as must-fix/verify/ignore with severity, confidence %, and file locations. No debate phase. Use for rapid feedback on small changes.',
+    'Use when you need rapid feedback on a small diff from parallel reviewers without debate. Returns compact JSON with verdict, reasoning, grouped issues, severity, confidence, file locations, and session id. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root.',
     {
       diff: z.string().optional().describe('Unified diff content (optional if staged=true). Leave empty only when using staged=true.'),
       ...reviewOptionsSchema,

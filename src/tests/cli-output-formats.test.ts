@@ -182,7 +182,40 @@ describe('formatOutput(text)', () => {
     const text = formatOutput(makeSuccessResult(), 'text');
     expect(text).toContain('Session 2025-01-15/001');
     expect(text).toContain('Next:');
+    expect(text).toContain('fix the must-fix findings');
     expect(text).toContain('agora explain 2025-01-15/001');
+  });
+
+  it('adds human-answer guidance for NEEDS_HUMAN reviews', () => {
+    const text = formatOutput(
+      makeSuccessResult({
+        summary: {
+          ...makeSuccessResult().summary!,
+          decision: 'NEEDS_HUMAN',
+          questionsForHuman: ['Should this public API remain backward compatible?'],
+        },
+      }),
+      'text',
+    );
+
+    expect(text).toContain('answer the questions above');
+    expect(text).toContain('agora explain 2025-01-15/001');
+  });
+
+  it('surfaces partial review state and doctor recovery', () => {
+    const text = formatOutput(
+      makeSuccessResult({
+        summary: {
+          ...makeSuccessResult().summary!,
+          totalReviewers: 3,
+          forfeitedReviewers: 1,
+        },
+      }),
+      'text',
+    );
+
+    expect(text).toContain('Partial review: 2/3 reviewers completed; 1 forfeited.');
+    expect(text).toContain('agora doctor --live');
   });
 
   it('adds next-step guidance for error reviews', () => {

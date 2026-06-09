@@ -24,4 +24,4 @@ Rust/Tauri backend for native filesystem, process, session/config, and desktop p
 ## Verification
 - Rust, command, capability, or package changes require `pnpm rc:desktop-gate`.
 - At minimum run the desktop package smoke/checks named in `packages/desktop/package.json` before release claims.
-- Manual/private-preview smoke should launch the app, open a trusted repo, inspect setup/session evidence, and confirm redaction.
+- Manual desktop smoke should launch the app, open a trusted repo, inspect setup/session evidence, and confirm redaction.

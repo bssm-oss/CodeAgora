@@ -1,8 +1,8 @@
 # CodeAgora Desktop
 
-Initial Tauri desktop scaffold for the planned human-facing CodeAgora surface.
+Official Tauri desktop app for the human-facing CodeAgora local UI.
 
-This package is intentionally private and not part of the stable support surface while the app shape stabilizes. It provides:
+This package stays private in the monorepo, but the app is a supported release surface. It provides:
 
 - recent session list
 - session detail view
@@ -10,7 +10,7 @@ This package is intentionally private and not part of the stable support surface
 - local review run control through a CLI bridge
 - basic config view/edit surface
 - desktop notification when a review completes or fails
-- browser fallback data for scaffold development
+- browser fallback data for layout and bridge development
 
 The desktop app must stay an adapter. Review orchestration remains in `@codeagora/core` and the CLI.
 
@@ -39,13 +39,13 @@ The current Tauri bridge exposes an explicit command contract through `get_comma
 
 Repository state is resolved from the active workspace selected through `open_repository`. Before a user selects a workspace, the app falls back to `CODEAGORA_DESKTOP_REPO` when set, otherwise the current process directory, walking up to the nearest git root. Review execution is blocked in the UI when no trusted git workspace is detected.
 
-## Local Preview
+## Browser Fallback
 
 ```bash
-pnpm --filter @codeagora/desktop preview
+pnpm --filter @codeagora/desktop browser:fallback
 ```
 
-The browser fallback preview works without Tauri and uses sample data. It is useful for quick layout checks, but it does not exercise native commands, filesystem access, review launch, notifications, or bridge behavior.
+The browser fallback works without Tauri and uses sample data. It is useful for quick layout checks, but it does not exercise native commands, filesystem access, review launch, notifications, or bridge behavior.
 
 ## Tauri Shell
 

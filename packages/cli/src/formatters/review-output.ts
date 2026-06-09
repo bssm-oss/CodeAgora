@@ -73,8 +73,9 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   const decEmoji = s.decision === 'ACCEPT' ? '\u2705' : s.decision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
   const colorFn = decisionColor[s.decision] ?? bold;
   const triageStr = formatTriageCounts(triage.counts);
+  const completedReviewers = Math.max(0, s.totalReviewers - s.forfeitedReviewers);
   const reviewerStr = s.totalReviewers > 0
-    ? `${s.totalReviewers - s.forfeitedReviewers} reviewers`
+    ? `${completedReviewers} reviewers`
     : '';
   const debateStr = s.totalDiscussions > 0 ? `${s.totalDiscussions} debates` : '';
   const metaParts = [reviewerStr, debateStr].filter(Boolean).join(' \u00B7 ');
@@ -87,6 +88,11 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
   lines.push(`  \u2514${ '\u2500'.repeat(47) }\u2518`);
   lines.push('');
+  if (s.forfeitedReviewers > 0 && s.totalReviewers > 0) {
+    lines.push(`  ${severityColor.WARNING(`Partial review: ${completedReviewers}/${s.totalReviewers} reviewers completed; ${s.forfeitedReviewers} forfeited.`)}`);
+    lines.push(`  ${dim('Run `agora doctor --live` if provider/auth failures appear in the session evidence.')}`);
+    lines.push('');
+  }
 
   // ── Issue rendering helper ──
   const totalReviewers = s.totalReviewers - s.forfeitedReviewers;
@@ -213,10 +219,13 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   // ── Session footer ──
   lines.push(dim(`  Session ${result.date}/${result.sessionId}`));
   lines.push('');
+  const explainCommand = `agora explain ${result.date}/${result.sessionId}`;
   if (s.decision === 'ACCEPT') {
     lines.push('Next: run `agora sessions` to review history or start another review.');
+  } else if (s.decision === 'NEEDS_HUMAN') {
+    lines.push(`Next: run \`${explainCommand}\`, answer the questions above, then rerun the review.`);
   } else {
-    lines.push(`Next: run \`agora explain ${result.date}/${result.sessionId}\` for a deeper walkthrough.`);
+    lines.push(`Next: fix the must-fix findings, then run \`${explainCommand}\` or rerun the review.`);
   }
 
   return lines.join('\n');

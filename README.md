@@ -90,9 +90,9 @@ Use `.ca/config.json` as the default config path. See [GitHub Actions setup](doc
 
 See [`packages/mcp/README.md`](packages/mcp/README.md) for tool details.
 
-### Desktop preview
+### Desktop app
 
-The desktop app is a private preview in `packages/desktop`. It is not the stable support surface yet.
+The desktop app in `packages/desktop` is an official local UI surface for setup, session browsing, review launch, result inspection, and evidence export. It uses the same CLI/core/session/config contracts as the automation surfaces.
 
 ## Docs map
 

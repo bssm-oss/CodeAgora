@@ -81,8 +81,16 @@ export function classifyDryRunReadiness(result: DryRunResult): DryRunReadiness {
 export function formatDryRunNextSteps(result: DryRunResult): string[] {
   const readiness = classifyDryRunReadiness(result);
   if (readiness === 'blocked') {
+    const missingProviders = result.health
+      .filter((item) => item.status === 'no-api-key')
+      .map((item) => item.provider);
+    const setupSteps = missingProviders.map((provider) => {
+      const envVar = PROVIDER_ENV_VARS[provider] ?? `${provider.toUpperCase().replace(/-/g, '_')}_API_KEY`;
+      return `Run \`agora env set ${provider} <api-key>\` to save ${envVar}.`;
+    });
     return [
-      'Set the missing provider API keys above, then rerun `agora doctor --live` and `agora review --dry-run`.',
+      ...setupSteps,
+      'Then rerun `agora doctor --live` and `agora review --dry-run`.',
     ];
   }
   if (readiness === 'risky') {
@@ -91,7 +99,7 @@ export function formatDryRunNextSteps(result: DryRunResult): string[] {
       nextSteps.push('Check the provider mapping above, then rerun `agora doctor --live`.');
     }
     if (result.warnings.length > 0) {
-      nextSteps.push('Review the warnings above, then rerun `agora doctor --live`.');
+      nextSteps.push('Review the warnings above, then rerun `agora doctor --live` and this dry-run.');
     }
     nextSteps.push('If the workspace still looks good, run `agora review --staged` or repeat the same review command.');
     return nextSteps;

@@ -37,7 +37,7 @@ console.log('');
 console.log(`  ${cyan}Integrations:${reset}`);
 console.log(`    ${dim}npm i -g @codeagora/mcp${reset}   ${dim}→ Claude Code / Cursor${reset}`);
 console.log(`    ${dim}GitHub Action${reset}              ${dim}→ automated PR reviews${reset}`);
-console.log(`    ${dim}Desktop app${reset}                ${dim}→ private preview local UI scaffold${reset}`);
+console.log(`    ${dim}Desktop app${reset}                ${dim}→ official local UI${reset}`);
 console.log('');
 console.log(`  ${dim}Docs: https://github.com/bssm-oss/CodeAgora${reset}`);
 console.log('');

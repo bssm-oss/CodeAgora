@@ -12,7 +12,7 @@ import { errorMessage, mcpErrorResponse, resolveRepoPathOrError } from './shared
 export function registerReviewFull(server: McpServer): void {
   server.tool(
     'review_full',
-    'Thorough code review — multiple AI models review your diff, then debate disagreements to reach consensus (~30s). Returns verdict + issues with confidence scores + debate summary. More accurate than review_quick.',
+    'Use when you need the full CodeAgora review pipeline with reviewer debate and head verdict for higher-confidence decisions. Returns compact JSON with verdict, issues, confidence scores, debate-informed reasoning, and session id. repo_path: omit when the MCP server already runs in the target workspace; otherwise pass the exact workspace root.',
     {
       diff: z.string().optional().describe('Unified diff content (optional if staged=true). Leave empty only when using staged=true.'),
       ...reviewOptionsSchema,
