@@ -35,6 +35,22 @@ export {
 } from './formatter.js';
 export type { MapperOptions } from './formatter.js';
 
+const DISCUSSION_LOCATION_TOLERANCE_LINES = 5;
+
+function findDiscussionForDoc(
+  doc: EvidenceDocument,
+  discussions: DiscussionVerdict[],
+): DiscussionVerdict | undefined {
+  return discussions.find((discussion) =>
+    discussion.filePath === doc.filePath &&
+    Math.abs(discussion.lineRange[0] - doc.lineRange[0]) <= DISCUSSION_LOCATION_TOLERANCE_LINES
+  );
+}
+
+function isDismissedByDiscussion(doc: EvidenceDocument, discussions: DiscussionVerdict[]): boolean {
+  return findDiscussionForDoc(doc, discussions)?.finalSeverity === 'DISMISSED';
+}
+
 // ============================================================================
 // Review Comment Builder
 // ============================================================================
@@ -62,19 +78,12 @@ export function buildReviewComments(
   /** Maps supporterId → model name */
   supporterModelMap?: Map<string, string>,
 ): GitHubReviewComment[] {
-  // Build discussion lookup by filePath:startLine for exact matching
-  const discussionByLocation = new Map<string, DiscussionVerdict>();
-  for (const d of discussions) {
-    const key = `${d.filePath}:${d.lineRange[0]}`;
-    discussionByLocation.set(key, d);
-  }
-
   const comments: GitHubReviewComment[] = [];
 
   for (const doc of evidenceDocs) {
-    // Skip dismissed issues — exact match by file + line
+    // Skip dismissed issues using the same line tolerance as L2 confidence matching.
     const locationKey = `${doc.filePath}:${doc.lineRange[0]}`;
-    const matchingDiscussion = discussionByLocation.get(locationKey);
+    const matchingDiscussion = findDiscussionForDoc(doc, discussions);
 
     if (matchingDiscussion?.finalSeverity === 'DISMISSED') continue;
 
@@ -152,15 +161,7 @@ export function mapToGitHubReview(params: {
   const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues } =
     params;
 
-  // Filter out dismissed docs — exact match by file + line
-  const dismissedLocations = new Set(
-    discussions
-      .filter((d) => d.finalSeverity === 'DISMISSED')
-      .map((d) => `${d.filePath}:${d.lineRange[0]}`),
-  );
-  const activeDocs = evidenceDocs.filter(
-    (doc) => !dismissedLocations.has(`${doc.filePath}:${doc.lineRange[0]}`),
-  );
+  const activeDocs = evidenceDocs.filter((doc) => !isDismissedByDiscussion(doc, discussions));
 
   const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap);
   let body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues });

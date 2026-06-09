@@ -156,6 +156,20 @@ describe('buildReviewComments', () => {
     expect(comments).toHaveLength(0);
   });
 
+  it('skips dismissed issues matched within L2 line tolerance', () => {
+    const discussion = makeDiscussion({
+      finalSeverity: 'DISMISSED',
+      lineRange: [51, 51],
+    });
+    const index: DiffPositionIndex = { 'src/db/queries.ts:56': 14 };
+    const comments = buildReviewComments(
+      [makeDoc({ lineRange: [56, 56] })],
+      [discussion],
+      index,
+    );
+    expect(comments).toHaveLength(0);
+  });
+
   it('handles multiple documents', () => {
     const docs = [
       makeDoc(),
@@ -334,5 +348,24 @@ describe('mapToGitHubReview', () => {
       sessionDate: '2026-03-16',
     });
     expect(review.comments).toHaveLength(0);
+  });
+
+  it('filters dismissed documents from the summary within L2 line tolerance', () => {
+    const index: DiffPositionIndex = { 'src/db/queries.ts:56': 14 };
+    const review = mapToGitHubReview({
+      summary: makeSummary({ decision: 'ACCEPT', totalDiscussions: 1 }),
+      evidenceDocs: [makeDoc({ lineRange: [56, 56], confidence: 17 })],
+      discussions: [makeDiscussion({ finalSeverity: 'DISMISSED', lineRange: [51, 51] })],
+      positionIndex: index,
+      headSha: 'abc123',
+      sessionId: '001',
+      sessionDate: '2026-03-16',
+      reviewRun: makeReviewRun(),
+    });
+
+    expect(review.comments).toHaveLength(0);
+    expect(review.body).toContain('**no issues**');
+    expect(review.body).not.toContain('Verify');
+    expect(review.body).not.toContain('SQL injection vulnerability');
   });
 });
