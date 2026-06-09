@@ -341,6 +341,45 @@ describe('buildSummaryBody', () => {
     expect(body).not.toContain('src/auth.ts:42');
     expect(body).not.toContain('Imaginary SQL injection');
   });
+
+  it('hides low-confidence FP-heavy queue details from public output', () => {
+    const unconfirmed = makeDoc({
+      severity: 'WARNING',
+      issueTitle: 'Removal of Groq Provider Support in GitHub Actions Workflows',
+      filePath: '.github/workflows/review.yml',
+      lineRange: [32, 38],
+      confidenceTrace: { classPrior: 'provider-contract-flexibility' },
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only low-confidence findings remain.' }),
+      sessionId: '007',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 0,
+          unconfirmed: 1,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [],
+        unconfirmed: [unconfirmed],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).toContain('Unconfirmed');
+    expect(body).toContain('1 low-confidence item(s) hidden from the public summary.');
+    expect(body).not.toContain('Removal of Groq Provider Support');
+    expect(body).not.toContain('.github/workflows/review.yml:32-38');
+  });
 });
 
 describe('mapToGitHubReview', () => {

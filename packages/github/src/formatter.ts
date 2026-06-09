@@ -146,9 +146,21 @@ function formatQueueItem(doc: EvidenceDocument): string {
   return `- \`${doc.filePath}:${lineLabel}\` — ${doc.issueTitle}`;
 }
 
+const PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS = new Set([
+  'provider-contract-flexibility',
+  'review-run-summary-policy',
+]);
+
+function hiddenQueueMessage(title: string, count: number): string {
+  if (title === 'Removed by hallucination filter') {
+    return `- ${count} rejected item(s) hidden from the public summary.`;
+  }
+  return `- ${count} low-confidence item(s) hidden from the public summary.`;
+}
+
 function visibleQueueDocs(title: string, docs: EvidenceDocument[]): EvidenceDocument[] {
   if (title === 'Removed by hallucination filter') return [];
-  return docs;
+  return docs.filter((doc) => !PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS.has(doc.confidenceTrace?.classPrior ?? ''));
 }
 
 function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?: ReviewQueues): void {
@@ -186,7 +198,7 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
     const visibleDocs = visibleQueueDocs(title, docs);
     lines.push(`**${title}**`);
     if (visibleDocs.length === 0) {
-      lines.push(`- ${docs.length} rejected item(s) hidden from the public summary.`);
+      lines.push(hiddenQueueMessage(title, docs.length));
       lines.push('');
       continue;
     }
