@@ -1,0 +1,58 @@
+const logoSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="250" viewBox="0 0 250 250" role="img" aria-labelledby="title desc">
+  <title id="title">CodeAgora Logo</title>
+  <desc id="desc">Curly code braces surround an abstract agora of reviewer nodes converging on a central code verdict.</desc>
+  <defs>
+    <style>
+      .navy {
+        fill: none;
+        stroke: #191A51;
+        stroke-linecap: butt;
+        stroke-linejoin: round;
+      }
+
+      .cyan {
+        fill: #05A6B9;
+      }
+    </style>
+  </defs>
+
+  <path
+    class="navy"
+    stroke-width="11"
+    d="M86 51H73C59 51 51 60 51 75V94C51 110 43 119 31 124C43 129 51 138 51 154V175C51 190 59 199 73 199H86"
+  />
+  <path
+    class="navy"
+    stroke-width="11"
+    d="M164 51H177C191 51 199 60 199 75V94C199 110 207 119 219 124C207 129 199 138 199 154V175C199 190 191 199 177 199H164"
+  />
+
+  <path class="navy" stroke-width="10" d="M83 109A52 52 0 0 1 113 72" />
+  <path class="navy" stroke-width="10" d="M137 72A52 52 0 0 1 167 109" />
+  <path class="navy" stroke-width="10" d="M167 141A52 52 0 0 1 137 178" />
+  <path class="navy" stroke-width="10" d="M113 178A52 52 0 0 1 83 141" />
+
+  <circle cx="125" cy="125" r="34" class="navy" stroke-width="8" />
+  <circle cx="125" cy="71" r="11" class="cyan" />
+  <circle cx="179" cy="125" r="11" class="cyan" />
+  <circle cx="125" cy="179" r="11" class="cyan" />
+  <circle cx="71" cy="125" r="11" class="cyan" />
+
+  <path
+    d="M115 113L105 124.5L115 136M135 113L145 124.5L135 136"
+    fill="none"
+    stroke="#05A6B9"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M125 110V140"
+    fill="none"
+    stroke="#05A6B9"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+</svg>`;
+
+export const logoDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(logoSvg)}`;

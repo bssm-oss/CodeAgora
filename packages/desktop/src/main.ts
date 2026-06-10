@@ -1,4 +1,7 @@
 import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
+import { activeReviewerCount, evaluateConfigPolicy, isEnabledConfigEntry } from './readiness.js';
+import { isCompactMobileViewport, resolveRunMobileStep, type RunMobileStep, type SessionMobileTab } from './layout.js';
+import { logoDataUri } from './logo.js';
 import {
   getRepoInfo,
   cancelReviewRun,
@@ -13,6 +16,7 @@ import {
   listSessions,
   openRepository,
   readConfig,
+  selectRepositoryDirectory,
   setNotificationPreferences,
   startReviewRun,
   validateConfig,
@@ -54,6 +58,69 @@ const defaultNotificationPreferences: NotificationPreferences = {
   sound: false,
   badge: true,
 };
+const defaultWorkspaceConfig = {
+  mode: 'pragmatic',
+  language: 'en',
+  reviewers: [
+    {
+      id: 'r-mimo',
+      model: 'xiaomi/mimo-v2.5',
+      backend: 'api',
+      provider: 'openrouter',
+      enabled: true,
+      timeout: 180,
+    },
+  ],
+  supporters: {
+    pool: [
+      {
+        id: 's-glm',
+        model: 'z-ai/glm-5.1',
+        backend: 'api',
+        provider: 'openrouter',
+        enabled: true,
+        timeout: 180,
+      },
+    ],
+    pickCount: 1,
+    pickStrategy: 'random',
+    devilsAdvocate: {
+      id: 'da-grok',
+      model: 'x-ai/grok-4.3',
+      backend: 'api',
+      provider: 'openrouter',
+      enabled: true,
+      timeout: 180,
+    },
+    personaPool: ['.ca/personas/strict.md'],
+    personaAssignment: 'random',
+  },
+  moderator: {
+    model: 'openai/gpt-5.3-codex',
+    backend: 'api',
+    provider: 'openrouter',
+  },
+  discussion: {
+    maxRounds: 1,
+    registrationThreshold: {
+      HARSHLY_CRITICAL: 1,
+      CRITICAL: 1,
+      WARNING: 2,
+      SUGGESTION: null,
+    },
+    codeSnippetRange: 10,
+  },
+  head: {
+    backend: 'api',
+    model: 'qwen/qwen3.7-max',
+    provider: 'openrouter',
+    enabled: true,
+  },
+  errorHandling: {
+    maxRetries: 2,
+    forfeitThreshold: 0.7,
+  },
+};
 
 interface Toast {
   id: string;
@@ -66,6 +133,8 @@ interface AppState {
   view: View;
   sessions: SessionSummary[];
   selected?: SessionDetail;
+  activeMobileTab: SessionMobileTab;
+  runMobileStep: RunMobileStep;
   repoPath: string;
   repoInfo?: RepoInfo;
   repoInput: string;
@@ -102,6 +171,8 @@ const state: AppState = {
   repoPath: '',
   repoInput: '',
   recentRepoPaths: loadRecentRepoPaths(),
+  activeMobileTab: 'history',
+  runMobileStep: 1,
   sessionSearch: '',
   sessionStatus: 'all',
   sessionSort: 'date-desc',
@@ -137,9 +208,25 @@ let pollRetryCount = 0;
 let pollInFlight = false;
 const maxPollRetries = 5;
 let mediaQuery: MediaQueryList | null = null;
+let lastMobileLayout = isCompactMobileViewport(window.innerWidth);
+let preferencesMenuCleanup: (() => void) | undefined;
 
 function onThemeChange(): void {
   if (state.themePreference === 'system') applyDesktopTheme();
+}
+
+function onViewportChange(): void {
+  const compact = isCompactMobileViewport(window.innerWidth);
+  if (compact === lastMobileLayout) return;
+  lastMobileLayout = compact;
+  render();
+}
+
+function canNavigateToView(view: View): boolean {
+  if (state.view === 'config' && state.configDirty && view !== 'config') {
+    return confirm(t('desktop.confirm.discardUnsavedConfig'));
+  }
+  return true;
 }
 
 function resetSessionFilters(): boolean {
@@ -264,7 +351,7 @@ function browserLocales(): string[] {
 
 function resolveDesktopLocale(raw: string, preference: DesktopLocalePreference, languages = browserLocales()): DesktopLocale {
   if (preference === 'en' || preference === 'ko') return preference;
-  return configLocale(raw) ?? languages.map(normalizeLocale).find((locale): locale is DesktopLocale => Boolean(locale)) ?? 'en';
+  return configLocale(raw) ?? languages.map(normalizeLocale).find((locale): locale is DesktopLocale => Boolean(locale)) ?? 'ko';
 }
 
 function resolveDesktopTheme(preference: DesktopThemePreference): 'light' | 'dark' {
@@ -386,12 +473,12 @@ function plainDecision(decision?: string, fallback?: string): string {
 }
 
 function plainSessionStatus(status?: SessionSummary['status'] | SessionDetail['status']): string {
-  if (status === 'completed') return t('desktop.value.completed');
-  if (status === 'failed') return t('desktop.value.failed');
-  if (status === 'interrupted') return t('desktop.value.interrupted');
-  if (status === 'in_progress') return t('desktop.value.inProgress');
-  if (status === 'unknown') return t('desktop.value.unknown');
-  return status ?? t('desktop.value.unknown');
+  if (status === 'completed') return t('desktop.sessions.status.completed');
+  if (status === 'failed') return t('desktop.sessions.status.failed');
+  if (status === 'interrupted') return t('desktop.sessions.status.interrupted');
+  if (status === 'in_progress') return t('desktop.sessions.status.inProgress');
+  if (status === 'unknown') return t('desktop.sessions.status.unknown');
+  return t('desktop.value.unknown');
 }
 
 function sessionDisplayTitle(session: SessionSummary): string {
@@ -451,10 +538,38 @@ function runReadiness(): RunReadiness {
     reasons.push(t('desktop.readiness.reason.configInvalid'));
     nextSteps.add(t('desktop.readiness.next.fixConfig'));
   }
+  if (state.configValidation?.valid !== false && repo?.hasConfig !== false && state.configRaw.trim()) {
+    const policy = evaluateConfigPolicy(state.configRaw);
+    if (policy.validJson && !policy.complete) {
+      reasons.push(t('desktop.readiness.reason.noActiveReviewers'));
+      nextSteps.add(t('desktop.readiness.next.addReviewer'));
+    }
+  }
   if (reasons.length > 0) {
     nextSteps.add(t('desktop.readiness.next.liveDoctor'));
   }
   return { ready: reasons.length === 0, reasons, nextSteps: [...nextSteps] };
+}
+
+function readinessBlockedReason(readiness = runReadiness()): string {
+  return readiness.reasons[0] ?? t('desktop.readiness.blockedBody');
+}
+
+function repoNeedsConfig(): boolean {
+  return Boolean(state.repoInfo?.trusted && state.repoInfo.isGitRepo && !state.repoInfo.hasConfig);
+}
+
+function defaultWorkspaceConfigRaw(): string {
+  return JSON.stringify(defaultWorkspaceConfig, null, 2);
+}
+
+function isPlaceholderConfig(raw: string): boolean {
+  try {
+    const parsed = JSON.parse(raw) as { reviewers?: unknown };
+    return Array.isArray(parsed.reviewers) && parsed.reviewers.length === 0;
+  } catch {
+    return false;
+  }
 }
 
 function sessionHasDegradedSignal(session?: SessionDetail): boolean {
@@ -590,11 +705,17 @@ function checkboxControl(label: string, checked: boolean, onChange: (checked: bo
   return control;
 }
 
+function isCompactMobileLayout(): boolean {
+  return isCompactMobileViewport(window.innerWidth);
+}
+
 function setView(view: View): void {
+  if (!canNavigateToView(view)) return;
   state.view = view;
   if (view === 'sessions') {
     state.attentionCount = 0;
     updateBadgeState();
+    state.activeMobileTab = 'history';
   }
   render();
 }
@@ -619,9 +740,9 @@ function loadLocalePreference(): DesktopLocalePreference {
     const value = window.localStorage.getItem(localePreferenceKey);
     if (value === 'en' || value === 'ko' || value === 'auto') return value;
   } catch {
-    return 'auto';
+    return 'ko';
   }
-  return 'auto';
+  return 'ko';
 }
 
 function saveLocalePreference(preference: DesktopLocalePreference): void {
@@ -875,6 +996,19 @@ async function openRepo(path: string): Promise<void> {
   }
 }
 
+async function chooseRepo(currentPath: string): Promise<void> {
+  if (state.busy) return;
+  try {
+    const selected = await selectRepositoryDirectory(t('desktop.action.openRepository'), currentPath || state.repoPath);
+    if (!selected) return;
+    state.repoInput = selected;
+    await openRepo(selected);
+  } catch (error) {
+    state.notice = error instanceof Error ? error.message : String(error);
+    render();
+  }
+}
+
 async function loadLiveDoctorStatus(): Promise<void> {
   if (state.liveDoctorLoading) return;
   state.liveDoctorLoading = true;
@@ -921,6 +1055,7 @@ async function selectSession(id: string): Promise<void> {
   render();
   try {
     state.selected = await getSessionDetail(id);
+    if (isCompactMobileLayout()) state.activeMobileTab = 'detail';
   } catch (error) {
     pushToast(error instanceof Error ? error.message : String(error), 'error')
   } finally {
@@ -934,12 +1069,13 @@ async function loadConfig(): Promise<void> {
   render();
   try {
     const config = await readConfig();
-    state.configRaw = config.raw;
+    const raw = repoNeedsConfig() && isPlaceholderConfig(config.raw) ? defaultWorkspaceConfigRaw() : config.raw;
+    state.configRaw = raw;
     state.configPath = config.path;
-    state.configOriginal = config.raw;
+    state.configOriginal = raw;
     state.configDirty = false;
-    applyDesktopLocale(config.raw);
-    state.configValidation = await validateConfig(config.raw, config.path);
+    applyDesktopLocale(raw);
+    state.configValidation = await validateConfig(raw, config.path);
     if (state.configPath.endsWith('.yml') || state.configPath.endsWith('.yaml')) {
       pushToast(t('desktop.notice.yamlReadOnly'), 'warning');
     }
@@ -971,6 +1107,8 @@ async function saveConfig(raw: string): Promise<void> {
     state.configOriginal = config.raw;
     state.configDirty = false;
     applyDesktopLocale(config.raw);
+    state.repoInfo = await getRepoInfo();
+    state.repoPath = state.repoInfo.path;
     pushToast(t('desktop.notice.savedConfig', { path: config.path }), 'success')
   } catch (error) {
     pushToast(error instanceof Error ? error.message : String(error), 'error')
@@ -978,6 +1116,18 @@ async function saveConfig(raw: string): Promise<void> {
     state.busy = false;
     render();
   }
+}
+
+async function createWorkspaceConfig(): Promise<void> {
+  let raw = state.configRaw;
+  if (!raw.trim() || isPlaceholderConfig(raw)) {
+    const config = await readConfig();
+    raw = isPlaceholderConfig(config.raw) ? defaultWorkspaceConfigRaw() : config.raw;
+    state.configPath = config.path;
+    state.configRaw = raw;
+    state.configOriginal = raw;
+  }
+  await saveConfig(raw);
 }
 
 async function validateConfigEditor(raw: string): Promise<void> {
@@ -1019,6 +1169,7 @@ async function startReview(staged: boolean): Promise<void> {
   try {
     pollRetryCount = 0;
     state.activeRun = await startReviewRun(staged);
+    if (isCompactMobileLayout()) state.runMobileStep = 3;
     pushToast(state.activeRun.message, 'success')
     scheduleReviewPoll();
   } catch (error) {
@@ -1066,7 +1217,7 @@ function reviewStageLabel(stage: string): string {
     case 'complete':
       return t('desktop.run.stageComplete');
     default:
-      return stage;
+      return t('desktop.value.unknown');
   }
 }
 
@@ -1171,7 +1322,12 @@ function renderShell(): HTMLElement {
   shell.dataset.testid = 'desktop-shell';
   const sidebar = el('aside', 'ca-sidebar');
   const brand = el('div', 'ca-brand');
-  brand.append(el('div', 'ca-brand-mark', 'CA'));
+  const brandMark = el('img', 'ca-brand-mark') as HTMLImageElement;
+  brandMark.alt = '';
+  brandMark.src = logoDataUri;
+  brandMark.width = 42;
+  brandMark.height = 42;
+  brand.append(brandMark);
   const brandText = el('div');
   brandText.append(el('strong', '', 'CodeAgora'));
   brandText.append(el('span', '', t('desktop.brand.surface')));
@@ -1204,7 +1360,12 @@ function renderShell(): HTMLElement {
 }
 
 function renderToolbar(): HTMLElement {
+  if (preferencesMenuCleanup) {
+    preferencesMenuCleanup();
+    preferencesMenuCleanup = undefined;
+  }
   const toolbar = el('header', 'ca-toolbar');
+  ensureFavicon();
   const title = el('div', 'ca-toolbar-title');
   title.append(el('h1', '', viewTitle()));
   title.append(el('p', 'ca-repo-subtitle', repoSubtitle()));
@@ -1312,14 +1473,68 @@ function renderToolbar(): HTMLElement {
   );
 
   preferences.append(localeControl, themeControl, notificationControl, soundControl, badgeControl);
-  actions.append(preferences);
+  const preferenceMenu = el('details', 'ca-preferences-menu') as HTMLDetailsElement;
+  const preferenceSummary = el('summary', 'ca-button', t('desktop.preferences.display'));
+  preferenceSummary.setAttribute('role', 'button');
+  preferenceSummary.setAttribute('aria-label', t('desktop.preferences.display'));
+  preferenceMenu.append(preferenceSummary);
+  preferenceMenu.append(preferences);
+  actions.append(preferenceMenu);
+  const teardownPreferenceMenu = (): void => {
+    document.removeEventListener('click', onOutsideClick, true);
+    document.removeEventListener('keydown', onEscapeKey, true);
+  };
+  const closePreferenceMenu = (): void => {
+    if (!preferenceMenu.open) return;
+    preferenceMenu.open = false;
+    teardownPreferenceMenu();
+  };
+  const onOutsideClick = (event: MouseEvent): void => {
+    if (!preferenceMenu.open) return;
+    const target = event.target as Node | null;
+    if (target && preferenceMenu.contains(target)) return;
+    closePreferenceMenu();
+  };
+  const onEscapeKey = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || !preferenceMenu.open) return;
+    closePreferenceMenu();
+  };
+  preferenceMenu.addEventListener('toggle', () => {
+    if (preferenceMenu.open) {
+      document.addEventListener('click', onOutsideClick, true);
+      document.addEventListener('keydown', onEscapeKey, true);
+    } else {
+      teardownPreferenceMenu();
+    }
+  });
+  preferencesMenuCleanup = teardownPreferenceMenu;
 
   actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected, true), 'ca-button', 'button-refresh'));
   const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'ca-button ca-primary', 'button-quick-review');
-  quickReview.disabled = state.busy || !runReadiness().ready;
+  const readiness = runReadiness();
+  quickReview.disabled = state.busy || !readiness.ready;
+  if (!readiness.ready) {
+    const reason = readinessBlockedReason(readiness);
+    quickReview.title = reason;
+    quickReview.setAttribute('aria-label', t('desktop.a11y.quickReviewBlocked', { reason }));
+  }
   actions.append(quickReview);
   toolbar.append(actions);
   return toolbar;
+}
+
+function ensureFavicon(): void {
+  const existing = document.querySelector<HTMLLinkElement>('link[data-codeagora-favicon="true"]');
+  if (existing) {
+    existing.href = logoDataUri;
+    return;
+  }
+  const icon = document.createElement('link');
+  icon.rel = 'icon';
+  icon.type = 'image/svg+xml';
+  icon.href = logoDataUri;
+  icon.dataset.codeagoraFavicon = 'true';
+  document.head.appendChild(icon);
 }
 
 function viewTitle(): string {
@@ -1399,6 +1614,9 @@ function renderSessions(): HTMLElement {
   const wrapper = el('div', 'ca-cockpit-page');
   wrapper.append(renderCockpitOverview());
 
+  const mobile = isCompactMobileLayout();
+  if (mobile) wrapper.append(renderSessionMobileTabs());
+
   const layout = el('div', 'ca-sessions-layout');
   layout.dataset.testid = 'sessions-layout';
   const listPanel = el('div', 'ca-session-list');
@@ -1439,7 +1657,7 @@ function renderSessions(): HTMLElement {
   for (const option of ['all', 'completed', 'failed', 'interrupted', 'in_progress', 'unknown'] as const) {
     const node = el('option') as HTMLOptionElement;
     node.value = option;
-    node.textContent = option === 'all' ? t('desktop.sessions.allStatuses') : option.replace('_', ' ');
+    node.textContent = option === 'all' ? t('desktop.sessions.allStatuses') : plainSessionStatus(option);
     node.selected = state.sessionStatus === option;
     status.append(node);
   }
@@ -1487,10 +1705,11 @@ function renderSessions(): HTMLElement {
   for (const session of visibleSessions) {
     const item = button('', () => {
       if (state.selected?.id === session.id) {
-        state.selected = undefined
-        render()
+        state.selected = undefined;
+        state.activeMobileTab = 'history';
+        render();
       } else {
-        void selectSession(session.id)
+        void selectSession(session.id);
       }
     }, state.selected?.id === session.id ? 'ca-session-row is-selected' : 'ca-session-row');
     item.dataset.testid = `session-row-${session.id.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
@@ -1511,10 +1730,44 @@ function renderSessions(): HTMLElement {
     }, 'ca-button ca-button-ghost', 'button-show-more-sessions'));
     listPanel.append(pagination);
   }
-  layout.append(listPanel);
-  layout.append(renderSessionDetail());
+  if (mobile) {
+    if (state.activeMobileTab === 'detail') {
+      layout.append(renderSessionDetail());
+    } else {
+      layout.append(listPanel);
+    }
+  } else {
+    layout.append(listPanel);
+    layout.append(renderSessionDetail());
+  }
   wrapper.append(layout);
   return wrapper;
+}
+
+function renderSessionMobileTabs(): HTMLElement {
+  const tabs = el('div', 'ca-mobile-tabs');
+  tabs.dataset.testid = 'session-mobile-tabs';
+  tabs.setAttribute('role', 'tablist');
+
+  const historyTab = button(t('desktop.sessions.mobileHistoryTab'), () => {
+    state.activeMobileTab = 'history';
+    render();
+  }, state.activeMobileTab === 'history' ? 'ca-button ca-primary ca-mobile-tab is-active' : 'ca-button ca-button-ghost ca-mobile-tab', 'button-session-history-tab');
+  historyTab.setAttribute('role', 'tab');
+  historyTab.setAttribute('aria-selected', String(state.activeMobileTab === 'history'));
+
+  const detailTab = button(t('desktop.sessions.mobileDetailTab'), () => {
+    if (!state.selected) return;
+    state.activeMobileTab = 'detail';
+    render();
+  }, state.activeMobileTab === 'detail' ? 'ca-button ca-primary ca-mobile-tab is-active' : 'ca-button ca-button-ghost ca-mobile-tab', 'button-session-detail-tab');
+  detailTab.setAttribute('role', 'tab');
+  detailTab.setAttribute('aria-selected', String(state.activeMobileTab === 'detail'));
+  detailTab.disabled = detailTab.disabled || !state.selected;
+  if (!state.selected) detailTab.title = t('desktop.sessions.mobileDetailHint');
+
+  tabs.append(historyTab, detailTab);
+  return tabs;
 }
 
 function renderCockpitOverview(): HTMLElement {
@@ -1595,7 +1848,7 @@ function formatTimestamp(value?: string): string {
 
 function decisionSummaryText(selected: SessionDetail): string {
   const lines = [
-    `# CodeAgora review decision`,
+    t('desktop.detail.decisionSummaryTitle'),
     '',
     `- Session: ${selected.id}`,
     `- Verdict: ${plainDecision(selected.decision, plainSessionStatus(selected.status))}`,
@@ -1626,8 +1879,24 @@ function renderSessionDetail(): HTMLElement {
     empty.append(el('span', 'ca-eyebrow', t('desktop.detail.eyebrow')));
     empty.append(el('h2', '', t('desktop.detail.emptyTitle')));
     empty.append(el('p', '', t('desktop.detail.emptyBody')));
+    if (isCompactMobileLayout()) {
+      empty.append(button(t('desktop.sessions.mobileBackToHistory'), () => {
+        state.activeMobileTab = 'history';
+        render();
+      }, 'ca-button ca-subtle', 'button-session-back-to-history-empty'));
+    }
     detail.append(empty);
     return detail;
+  }
+
+  if (isCompactMobileLayout()) {
+    const mobileHeader = el('div', 'ca-mobile-detail-head');
+    mobileHeader.append(el('span', 'ca-eyebrow', t('desktop.sessions.mobileDetailEyebrow')));
+    mobileHeader.append(button(t('desktop.sessions.mobileBackToHistory'), () => {
+      state.activeMobileTab = 'history';
+      render();
+    }, 'ca-button ca-button-ghost', 'button-session-back-to-history'));
+    detail.append(mobileHeader);
   }
 
   const banner = el('div', `ca-verdict-banner ${selected.decision === 'REJECT' ? 'ca-danger' : selected.decision === 'ACCEPT' ? 'ca-good' : 'ca-warn'}`);
@@ -1742,11 +2011,21 @@ function renderSessionDetail(): HTMLElement {
   if (selected.markdown) {
     const reportSection = el('details', 'ca-report-shell') as HTMLDetailsElement;
     const summary = el('summary', '', t('desktop.detail.rawReportPreview'));
-    const report = el('pre', 'ca-report');
+    const reportHead = el('div', 'ca-report-shell-head');
+    reportHead.append(el('strong', '', t('desktop.detail.rawReportPreview')));
+    reportHead.append(button(t('desktop.action.copyMarkdown'), async () => {
+      try {
+        await navigator.clipboard.writeText(selected.markdown ?? '');
+        pushToast(t('desktop.toast.copied'), 'success');
+      } catch {
+        pushToast(t('desktop.toast.copyFailed'), 'error');
+      }
+    }, 'ca-button ca-button-ghost', 'button-copy-raw-report'));
+    const report = el('pre', 'ca-report ca-report-raw');
     report.textContent = selected.markdown;
     report.tabIndex = 0;
     report.setAttribute('aria-label', t('desktop.a11y.reportScrollable'));
-    reportSection.append(summary, report);
+    reportSection.append(summary, reportHead, report);
     detail.append(reportSection);
   }
   return detail;
@@ -1784,6 +2063,7 @@ function renderRunReview(): HTMLElement {
   const panel = el('div', 'ca-run-panel');
   panel.dataset.testid = 'run-panel';
   const readiness = runReadiness();
+  const mobile = isCompactMobileLayout();
   const intro = el('div', 'ca-launch-intro');
   intro.append(el('span', 'ca-eyebrow', t('desktop.run.eyebrow')));
   intro.append(el('h2', '', t('desktop.run.title')));
@@ -1809,10 +2089,75 @@ function renderRunReview(): HTMLElement {
     }
     readinessPanel.append(nextList);
   }
+  if (repoNeedsConfig()) {
+    const setupActions = el('div', 'ca-config-status-actions');
+    setupActions.append(button(t('desktop.action.createConfig'), () => void createWorkspaceConfig(), 'ca-button ca-primary', 'button-create-config'));
+    setupActions.append(button(t('desktop.nav.config'), () => setView('config'), 'ca-button', 'button-open-config-from-readiness'));
+    readinessPanel.append(setupActions);
+  }
+
+  if (mobile) {
+    panel.append(renderRunMobileStepper(readiness, Boolean(state.activeRun)));
+    panel.append(readinessPanel);
+    if (!readiness.ready) return panel;
+
+    const currentStep = resolveRunMobileStep(state.runMobileStep, readiness.ready, Boolean(state.activeRun));
+    if (currentStep === 1) {
+      panel.append(renderRepositoryPicker());
+      const next = button(t('desktop.action.next'), () => {
+        state.runMobileStep = 2;
+        render();
+      }, 'ca-button ca-primary', 'button-run-mobile-next');
+      panel.append(next);
+      return panel;
+    }
+
+    if (currentStep === 2) {
+      panel.append(renderRepositoryPicker());
+      panel.append(renderRepoFacts());
+      panel.append(renderRunLaunchCards());
+      return panel;
+    }
+
+    panel.append(renderReviewRun());
+    return panel;
+  }
+
   panel.append(readinessPanel);
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
+  panel.append(renderRunLaunchCards());
+  panel.append(renderReviewRun());
+  return panel;
+}
 
+function renderRunMobileStepper(readiness: RunReadiness, hasRun: boolean): HTMLElement {
+  const stepper = el('div', 'ca-mobile-stepper');
+  stepper.dataset.testid = 'run-mobile-stepper';
+  stepper.append(el('span', 'ca-eyebrow', t('desktop.run.mobileStepperEyebrow')));
+
+  const activeStep = resolveRunMobileStep(state.runMobileStep, readiness.ready, hasRun);
+  const row = el('div', 'ca-mobile-step-row');
+  const steps: Array<[RunMobileStep, string, string, boolean]> = [
+    [1, t('desktop.run.mobileStep1Title'), t('desktop.run.mobileStep1Body'), true],
+    [2, t('desktop.run.mobileStep2Title'), t('desktop.run.mobileStep2Body'), readiness.ready],
+    [3, t('desktop.run.mobileStep3Title'), t('desktop.run.mobileStep3Body'), hasRun],
+  ];
+  for (const [step, title, body, enabled] of steps) {
+    const node = button(`${step}. ${title}`, () => {
+      state.runMobileStep = step;
+      render();
+    }, step === activeStep ? 'ca-button ca-primary ca-mobile-step is-active' : 'ca-button ca-button-ghost ca-mobile-step', `button-run-mobile-step-${step}`);
+    node.disabled = node.disabled || !enabled;
+    node.setAttribute('aria-pressed', String(step === activeStep));
+    node.append(el('span', 'ca-mobile-step-body', body));
+    row.append(node);
+  }
+  stepper.append(row);
+  return stepper;
+}
+
+function renderRunLaunchCards(): HTMLElement {
   const actions = el('div', 'ca-launch-cards');
   const staged = launchCard(t('desktop.run.stagedTitle'), t('desktop.run.stagedEyebrow'), t('desktop.run.stagedBody'), true, () => void startReview(true), 'button-review-staged-changes');
   const working = launchCard(t('desktop.run.workingTitle'), t('desktop.run.workingEyebrow'), t('desktop.run.workingBody'), false, () => void startReview(false), 'button-review-working-tree');
@@ -1821,16 +2166,20 @@ function renderRunReview(): HTMLElement {
     const cancel = button(t('desktop.action.cancelReview'), () => void cancelActiveReview(), 'ca-button ca-danger', 'button-cancel-review');
     actions.append(cancel);
   }
-  panel.append(actions);
-  panel.append(renderReviewRun());
-  return panel;
+  return actions;
 }
 
 function launchCard(label: string, eyebrow: string, description: string, primary: boolean, onClick: () => void, testId: string): HTMLButtonElement {
   const node = el('button', primary ? 'ca-launch-card ca-primary' : 'ca-launch-card');
   node.type = 'button';
   node.dataset.testid = testId;
-  node.disabled = state.busy || !runReadiness().ready;
+  const readiness = runReadiness();
+  node.disabled = state.busy || !readiness.ready;
+  if (!readiness.ready) {
+    const reason = readinessBlockedReason(readiness);
+    node.title = reason;
+    node.setAttribute('aria-label', t('desktop.a11y.reviewLaunchBlocked', { label, reason }));
+  }
   node.addEventListener('click', onClick);
   node.append(el('span', 'ca-eyebrow', eyebrow));
   node.append(el('strong', '', label));
@@ -1854,7 +2203,14 @@ function renderReviewRun(): HTMLElement {
     const empty = el('div', 'ca-empty-state ca-compact');
     empty.append(el('strong', '', t('desktop.run.noActiveTitle')));
     empty.append(el('p', '', t('desktop.run.noActiveBody')));
-    empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'ca-button ca-subtle', 'button-start-staged-review-empty'));
+    if (runReadiness().ready) {
+      empty.append(button(t('desktop.action.startReview'), () => void startReview(true), 'ca-button ca-subtle', 'button-start-staged-review-empty'));
+    } else {
+      empty.append(button(t('desktop.action.fixSetup'), () => {
+        setView('setup');
+        void loadSetup();
+      }, 'ca-button ca-subtle', 'button-fix-setup-empty-run'));
+    }
     section.append(empty);
     return section;
   }
@@ -1961,7 +2317,7 @@ function renderRepositoryPicker(): HTMLElement {
     }
   })
   section.append(input);
-  section.append(button(t('desktop.action.openRepository'), () => void openRepo(input.value), 'ca-button ca-primary', 'button-open-repository'));
+  section.append(button(t('desktop.action.openRepository'), () => void chooseRepo(input.value), 'ca-button ca-primary', 'button-open-repository'));
 
   if (state.recentRepoPaths.length > 0) {
     const recent = el('div', 'ca-recent-repos');
@@ -2058,15 +2414,25 @@ function renderConfig(): HTMLElement {
 
 function renderConfigStatusPanel(): HTMLElement {
   const validation = state.configValidation;
-  const ready = validation?.valid !== false;
-  const panel = el('section', ready ? 'ca-config-status ca-good' : 'ca-config-status ca-danger');
+  const readiness = runReadiness();
+  const configSyntaxInvalid = validation?.valid === false;
+  const policyIncomplete = Boolean(!configSyntaxInvalid && state.configRaw.trim() && !evaluateConfigPolicy(state.configRaw).complete);
+  const ready = validation?.valid !== false && readiness.ready;
+  const panel = el('section', ready ? 'ca-config-status ca-good' : configSyntaxInvalid ? 'ca-config-status ca-danger' : 'ca-config-status ca-warn');
   panel.dataset.testid = 'config-status-panel';
   panel.append(el('span', 'ca-eyebrow', t('desktop.config.statusEyebrow')));
-  panel.append(el('strong', '', ready ? t('desktop.config.statusReadyTitle') : t('desktop.config.statusBlockedTitle')));
-  panel.append(el('p', '', ready ? t('desktop.config.statusReadyBody') : t('desktop.config.statusBlockedBody')));
+  panel.append(el('strong', '', ready ? t('desktop.config.statusReadyTitle') : policyIncomplete ? t('desktop.config.noActiveReviewersTitle') : t('desktop.config.statusBlockedTitle')));
+  panel.append(el('p', '', ready ? t('desktop.config.statusReadyBody') : readinessBlockedReason(readiness)));
   const actions = el('div', 'ca-config-status-actions');
   actions.append(button(t('desktop.action.validateConfig'), () => void validateConfigEditor(state.configRaw), 'ca-button', 'button-validate-config-status'));
-  actions.append(button(t('desktop.nav.runReview'), () => setView('run'), 'ca-button ca-primary', 'button-run-from-config-status'));
+  const runButton = button(t('desktop.nav.runReview'), () => setView('run'), 'ca-button ca-primary', 'button-run-from-config-status');
+  runButton.disabled = state.busy || !readiness.ready;
+  if (!readiness.ready) {
+    const reason = readinessBlockedReason(readiness);
+    runButton.title = reason;
+    runButton.setAttribute('aria-label', t('desktop.a11y.reviewLaunchBlocked', { label: t('desktop.nav.runReview'), reason }));
+  }
+  actions.append(runButton);
   panel.append(actions);
   return panel;
 }
@@ -2137,7 +2503,9 @@ function renderConfigFacts(): HTMLElement {
   const reviewers = reviewerCountLabel(parsed.reviewers);
   const supporters = supporterCount(parsed.supporters);
   const finalJudge = agentLabel((parsed.head as Record<string, unknown> | undefined) ?? parsed.moderator);
-  appendMetric(facts, t('desktop.config.policyStatus'), state.configValidation?.valid === false ? t('desktop.value.needsFixes') : t('desktop.value.ready'), state.configValidation?.valid === false ? 'ca-warn' : 'ca-good');
+  const policy = evaluateConfigPolicy(state.configRaw);
+  const policyReady = state.configValidation?.valid !== false && policy.complete;
+  appendMetric(facts, t('desktop.config.policyStatus'), policyReady ? t('desktop.value.ready') : t('desktop.value.needsFixes'), policyReady ? 'ca-good' : 'ca-warn');
   appendMetric(facts, t('desktop.config.reviewMode'), mode);
   appendMetric(facts, t('desktop.config.reviewDepth'), t('desktop.config.reviewDepthValue', { reviewers, supporters }));
   appendMetric(facts, t('desktop.config.finalJudge'), finalJudge);
@@ -2145,12 +2513,8 @@ function renderConfigFacts(): HTMLElement {
 }
 
 function reviewerCountLabel(value: unknown): string {
-  if (Array.isArray(value)) return String(value.filter((entry) => isEnabledConfigEntry(entry)).length);
-  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-    const count = (value as { count?: unknown }).count;
-    return typeof count === 'number' ? String(count) : t('desktop.value.unknown');
-  }
-  return t('desktop.value.unknown');
+  const count = activeReviewerCount(value);
+  return count === undefined ? t('desktop.value.unknown') : String(count);
 }
 
 function supporterCount(value: unknown): string {
@@ -2158,12 +2522,6 @@ function supporterCount(value: unknown): string {
   const supporters = value as { pool?: unknown; devilsAdvocate?: unknown };
   const pool = Array.isArray(supporters.pool) ? supporters.pool.filter((entry) => isEnabledConfigEntry(entry)).length : 0;
   return String(pool + (supporters.devilsAdvocate ? 1 : 0));
-}
-
-function isEnabledConfigEntry(value: unknown): boolean {
-  return typeof value !== 'object' || value === null || Array.isArray(value)
-    ? true
-    : (value as { enabled?: unknown }).enabled !== false;
 }
 
 function agentLabel(value: unknown): string {
@@ -2204,6 +2562,7 @@ function renderSetup(): HTMLElement {
     if (provider.envVar) card.append(el('span', 'ca-provider-meta', `${provider.envVar} ${provider.redactedValue ?? ''}`.trim()));
     if (provider.binary) card.append(el('span', 'ca-provider-meta', provider.binary));
     if (provider.envVar) {
+      const providerKey = provider.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'provider';
       const copyEnvBtn = button(t('desktop.action.copyEnvVar'), async () => {
         try {
           await navigator.clipboard.writeText(provider.envVar!);
@@ -2211,7 +2570,9 @@ function renderSetup(): HTMLElement {
         } catch {
           pushToast(t('desktop.toast.copyFailed'), 'error');
         }
-      }, 'ca-button ca-button-ghost', 'button-copy-env');
+      }, 'ca-button ca-button-ghost', `button-copy-env-${providerKey}`);
+      copyEnvBtn.textContent = t('desktop.action.copyEnvVarWithName', { name: provider.name });
+      copyEnvBtn.setAttribute('aria-label', t('desktop.a11y.copyProviderEnvVar', { provider: provider.name, envVar: provider.envVar }));
       card.append(copyEnvBtn);
     }
     grid.append(card);
@@ -2241,28 +2602,18 @@ function renderSetupOverview(): HTMLElement {
   overview.dataset.testid = 'setup-overview';
   const hasConfiguredProvider = state.providers.some((provider) => provider.configured);
   const providerKnown = state.providers.length > 0;
+  const requiredGroup = el('section', 'ca-setup-group');
+  const requiredHead = el('div', 'ca-setup-group-head');
+  requiredHead.append(el('span', 'ca-eyebrow', t('desktop.setup.requiredGroupTitle')));
+  requiredHead.append(el('p', '', t('desktop.setup.requiredGroupBody')));
+  requiredGroup.append(requiredHead);
+  const requiredCards = el('div', 'ca-setup-status-grid');
   appendSetupStatusCard(
-    overview,
+    requiredCards,
     t('desktop.setup.localReview'),
     hasConfiguredProvider ? t('desktop.value.ready') : providerKnown ? t('desktop.value.optional') : t('desktop.value.unknown'),
     hasConfiguredProvider ? t('desktop.setup.localReviewReadyBody') : t('desktop.setup.localReviewOptionalBody'),
     hasConfiguredProvider ? 'good' : 'warn',
-  );
-  const actionReady = Boolean(state.githubActionStatus && state.githubActionStatus.codeagoraWorkflowCount > 0);
-  appendSetupStatusCard(
-    overview,
-    t('desktop.setup.prAutomation'),
-    actionReady ? t('desktop.value.ready') : state.githubActionStatus ? t('desktop.value.missing') : t('desktop.value.unknown'),
-    actionReady ? t('desktop.setup.prAutomationReadyBody') : t('desktop.setup.prAutomationMissingBody'),
-    actionReady ? 'good' : 'warn',
-  );
-  const evidenceReady = Boolean(state.evidenceStatus?.hasReleaseEvidence && state.evidenceStatus?.hasEvidenceManifest);
-  appendSetupStatusCard(
-    overview,
-    t('desktop.setup.resultEvidence'),
-    evidenceReady ? t('desktop.value.ready') : state.evidenceStatus ? t('desktop.value.needsFixes') : t('desktop.value.unknown'),
-    evidenceReady ? t('desktop.setup.resultEvidenceReadyBody') : t('desktop.setup.resultEvidenceMissingBody'),
-    evidenceReady ? 'good' : 'warn',
   );
   const live = state.liveDoctorStatus;
   const liveChecks = live?.liveChecks ?? [];
@@ -2270,7 +2621,7 @@ function renderSetupOverview(): HTMLElement {
   const liveFailed = liveChecks.filter((check) => check.status !== 'ok').length;
   const liveError = state.liveDoctorError;
   appendSetupStatusCard(
-    overview,
+    requiredCards,
     t('desktop.setup.liveReview'),
     live
       ? liveChecks.length > 0
@@ -2278,16 +2629,43 @@ function renderSetupOverview(): HTMLElement {
         : t('desktop.value.optional')
       : liveError
         ? t('desktop.value.needsFixes')
-      : t('desktop.value.unknown'),
+        : t('desktop.value.unknown'),
     live
       ? liveFailed > 0
         ? t('desktop.setup.liveReviewBlockedBody')
         : t('desktop.setup.liveReviewReadyBody')
       : liveError
         ? liveError
-      : t('desktop.setup.liveReviewMissingBody'),
+        : t('desktop.setup.liveReviewMissingBody'),
     live ? (liveFailed > 0 ? 'danger' : 'good') : liveError ? 'danger' : 'warn',
   );
+  requiredGroup.append(requiredCards);
+  overview.append(requiredGroup);
+
+  const optionalGroup = el('section', 'ca-setup-group');
+  const optionalHead = el('div', 'ca-setup-group-head');
+  optionalHead.append(el('span', 'ca-eyebrow', t('desktop.setup.optionalGroupTitle')));
+  optionalHead.append(el('p', '', t('desktop.setup.optionalGroupBody')));
+  optionalGroup.append(optionalHead);
+  const optionalCards = el('div', 'ca-setup-status-grid');
+  const actionReady = Boolean(state.githubActionStatus && state.githubActionStatus.codeagoraWorkflowCount > 0);
+  appendSetupStatusCard(
+    optionalCards,
+    t('desktop.setup.prAutomation'),
+    actionReady ? t('desktop.value.ready') : state.githubActionStatus ? t('desktop.value.missing') : t('desktop.value.unknown'),
+    actionReady ? t('desktop.setup.prAutomationReadyBody') : t('desktop.setup.prAutomationMissingBody'),
+    actionReady ? 'good' : 'warn',
+  );
+  const evidenceReady = Boolean(state.evidenceStatus?.hasReleaseEvidence && state.evidenceStatus?.hasEvidenceManifest);
+  appendSetupStatusCard(
+    optionalCards,
+    t('desktop.setup.resultEvidence'),
+    evidenceReady ? t('desktop.value.ready') : state.evidenceStatus ? t('desktop.value.needsFixes') : t('desktop.value.unknown'),
+    evidenceReady ? t('desktop.setup.resultEvidenceReadyBody') : t('desktop.setup.resultEvidenceMissingBody'),
+    evidenceReady ? 'good' : 'warn',
+  );
+  optionalGroup.append(optionalCards);
+  overview.append(optionalGroup);
   return overview;
 }
 
@@ -2297,6 +2675,27 @@ function appendSetupStatusCard(parent: HTMLElement, label: string, value: string
   card.append(el('strong', '', value));
   card.append(el('p', '', body));
   parent.append(card);
+}
+
+function renderSetupSnippetBlock(title: string, body: string, snippet: string, testId: string): HTMLElement {
+  const block = el('div', 'ca-snippet-block');
+  block.dataset.testid = testId;
+  const head = el('div', 'ca-snippet-head');
+  head.append(el('strong', '', title));
+  head.append(button(t('desktop.action.copy'), async () => {
+    try {
+      await navigator.clipboard.writeText(snippet);
+      pushToast(t('desktop.toast.copied'), 'success');
+    } catch {
+      pushToast(t('desktop.toast.copyFailed'), 'error');
+    }
+  }, 'ca-button ca-button-ghost', `${testId}-copy`));
+  block.append(head);
+  block.append(el('p', 'ca-repo-note', body));
+  const pre = el('pre', 'ca-snippet');
+  pre.textContent = snippet;
+  block.append(pre);
+  return block;
 }
 
 function renderLiveDoctorSetup(): HTMLElement {
@@ -2385,9 +2784,7 @@ function renderMcpSetup(): HTMLElement {
     const empty = el('div', 'ca-empty-state', t('desktop.setup.mcpEmpty'));
     section.append(empty);
   }
-  const snippet = el('pre', 'ca-snippet');
-  snippet.textContent = mcp.clientSnippet;
-  section.append(snippet);
+  section.append(renderSetupSnippetBlock(t('desktop.setup.localAutomationSnippetTitle'), t('desktop.setup.localAutomationSnippetBody'), mcp.clientSnippet, 'setup-mcp-snippet'));
   return section;
 }
 
@@ -2415,9 +2812,7 @@ function renderGitHubActionSetup(): HTMLElement {
     const empty = el('div', 'ca-empty-state', t('desktop.setup.workflowsEmpty'));
     section.append(empty);
   }
-  const snippet = el('pre', 'ca-snippet');
-  snippet.textContent = status.recommendedSnippet;
-  section.append(snippet);
+  section.append(renderSetupSnippetBlock(t('desktop.setup.prAutomationSnippetTitle'), t('desktop.setup.prAutomationSnippetBody'), status.recommendedSnippet, 'setup-github-action-snippet'));
   return section;
 }
 
@@ -2524,6 +2919,10 @@ function render(): void {
       lastView = state.view;
     } else {
       const content = appRoot.querySelector('.ca-content')
+      const toolbar = appRoot.querySelector('.ca-toolbar')
+      if (toolbar) {
+        toolbar.replaceWith(renderToolbar())
+      }
       if (content) {
         const newContent = renderContent()
         content.replaceChildren(...Array.from(newContent.childNodes))
@@ -2560,6 +2959,7 @@ async function bootstrap(): Promise<void> {
     });
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.addEventListener('change', onThemeChange);
+    window.addEventListener('resize', onViewportChange);
     applyDesktopLocale();
     try {
       const config = await readConfig();
@@ -2581,11 +2981,21 @@ async function bootstrap(): Promise<void> {
       window.addEventListener('keydown', onKeyDown);
     }
 
+    function onBeforeUnload(event: BeforeUnloadEvent): void {
+      if (state.configDirty) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+      cleanupListeners();
+    }
+
     function cleanupListeners(): void {
       if (mediaQuery) mediaQuery.removeEventListener('change', onThemeChange);
+      window.removeEventListener('resize', onViewportChange);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('beforeunload', onBeforeUnload);
     }
-    window.addEventListener('beforeunload', cleanupListeners);
+    window.addEventListener('beforeunload', onBeforeUnload);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     appRoot.innerHTML = `

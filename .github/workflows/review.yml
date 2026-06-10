@@ -49,13 +49,11 @@ jobs:
           cat > .ca/config.json << 'CONF'
           {
             "mode": "pragmatic",
-            "language": "en",
+            "language": "ko",
             "reviewers": [
-              { "id": "r-mimo", "model": "xiaomi/mimo-v2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" },
-              { "id": "r-qwen-coder", "model": "qwen/qwen3-coder-30b-a3b-instruct", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" },
-              { "id": "r-hy3", "model": "tencent/hy3-preview", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:api-contract" },
-              { "id": "r-deepseek-flash", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:security" },
-              { "id": "r-llama-scout", "model": "meta-llama/llama-4-scout", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" }
+              { "id": "r-gpt5", "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" },
+              { "id": "r-sonnet", "model": "anthropic/claude-sonnet-4.6", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:security" },
+              { "id": "r-deepseek", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:api-contract" }
             ],
             "supporters": {
               "pool": [
@@ -81,7 +79,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '8000'
+          max-diff-lines: '5000'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CODEAGORA_APP_ID: ${{ secrets.CODEAGORA_APP_ID }}

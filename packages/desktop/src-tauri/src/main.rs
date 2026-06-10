@@ -429,22 +429,37 @@ fn spawn_agora(root: &Path, args: &[&str], stdin_input: Option<String>) -> io::R
             Ok(child)
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            let mut fallback = Command::new("pnpm");
-            fallback
-                .args(["exec", "agora"])
-                .args(args)
-                .current_dir(root)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped());
-            if stdin_input.is_some() {
-                fallback.stdin(Stdio::piped());
-            }
-            let mut child = fallback.spawn()?;
+            let mut child = spawn_dev_agora(root, args, stdin_input.is_some())?;
             write_child_stdin(&mut child, stdin_input);
             Ok(child)
         }
         Err(error) => Err(error),
     }
+}
+
+fn workspace_root() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .ancestors()
+        .nth(3)
+        .map(Path::to_path_buf)
+        .unwrap_or(manifest_dir)
+}
+
+fn spawn_dev_agora(root: &Path, args: &[&str], pipe_stdin: bool) -> io::Result<Child> {
+    let workspace = workspace_root().to_string_lossy().to_string();
+    Command::new("pnpm")
+        .args(["--dir", &workspace, "--filter", "@codeagora/cli", "dev"])
+        .args(args)
+        .current_dir(root)
+        .stdin(if pipe_stdin {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
 }
 
 fn write_child_stdin(child: &mut Child, stdin_input: Option<String>) {
@@ -658,10 +673,6 @@ fn command_stdout(program: &str, args: &[&str], cwd: &Path) -> Option<String> {
     } else {
         Some(value)
     }
-}
-
-fn command_output(program: &str, args: &[&str], cwd: &Path) -> io::Result<std::process::Output> {
-    Command::new(program).args(args).current_dir(cwd).output()
 }
 
 fn git_stdout(args: &[&str], cwd: &Path) -> Option<String> {
@@ -1440,25 +1451,7 @@ fn run_dev_agora(
     args: &[&str],
     stdin_input: Option<String>,
 ) -> io::Result<std::process::Output> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace_dir = manifest_dir
-        .ancestors()
-        .nth(3)
-        .map(Path::to_path_buf)
-        .unwrap_or(manifest_dir);
-    let workspace = workspace_dir.to_string_lossy().to_string();
-    let mut child = Command::new("pnpm")
-        .args(["--dir", &workspace, "--filter", "@codeagora/cli", "dev"])
-        .args(args)
-        .current_dir(root)
-        .stdin(if stdin_input.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    let mut child = spawn_dev_agora(root, args, stdin_input.is_some())?;
     write_child_stdin(&mut child, stdin_input);
     child.wait_with_output()
 }
@@ -1684,6 +1677,9 @@ fn run_agora(
     args: &[&str],
     stdin_input: Option<String>,
 ) -> io::Result<std::process::Output> {
+    let is_usable_output = |output: &std::process::Output| {
+        output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty()
+    };
     let run = |program: &str, prefix_args: &[&str]| -> io::Result<std::process::Output> {
         let mut child = Command::new(program)
             .args(prefix_args)
@@ -1702,13 +1698,7 @@ fn run_agora(
     };
 
     let run_dev_cli = || -> io::Result<std::process::Output> {
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let workspace_dir = manifest_dir
-            .ancestors()
-            .nth(3)
-            .map(Path::to_path_buf)
-            .unwrap_or(manifest_dir);
-        let workspace = workspace_dir.to_string_lossy().to_string();
+        let workspace = workspace_root().to_string_lossy().to_string();
         run(
             "pnpm",
             &["--dir", &workspace, "--filter", "@codeagora/cli", "dev"],
@@ -1717,7 +1707,7 @@ fn run_agora(
 
     let run_pnpm_exec = || -> io::Result<std::process::Output> {
         match run("pnpm", &["exec", "agora"]) {
-            Ok(output) if !output.stdout.is_empty() => Ok(output),
+            Ok(output) if is_usable_output(&output) => Ok(output),
             Ok(_) => run_dev_cli(),
             Err(pnpm_error) if pnpm_error.kind() == io::ErrorKind::NotFound => run_dev_cli(),
             Err(pnpm_error) => Err(pnpm_error),
@@ -1725,7 +1715,7 @@ fn run_agora(
     };
 
     match run("agora", &[]) {
-        Ok(output) if !output.stdout.is_empty() => Ok(output),
+        Ok(output) if is_usable_output(&output) => Ok(output),
         Ok(_) => run_pnpm_exec(),
         Err(error) if error.kind() == io::ErrorKind::NotFound => run_pnpm_exec(),
         Err(error) => Err(error),
@@ -2237,19 +2227,20 @@ fn run_doctor_report(root: &Path, live: bool) -> Result<(Vec<DoctorCheck>, Docto
     } else {
         &["doctor", "--json"]
     };
-    let output = command_output("agora", args, root).map_err(|error| error.to_string())?;
+    let output = run_agora(root, args, None).map_err(|error| error.to_string())?;
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     parse_doctor_report(&stdout)
 }
 
 #[tauri::command]
-fn get_provider_status() -> Result<Vec<ProviderStatus>, String> {
-    let output = command_stdout(
-        "agora",
-        &["doctor", "--json"],
-        &std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")),
-    )
-    .ok_or_else(|| "Failed to run agora doctor".to_string())?;
+fn get_provider_status(state: State<'_, WorkspaceState>) -> Result<Vec<ProviderStatus>, String> {
+    let root = active_repo_root(&state)
+        .or_else(|_| std::env::current_dir().map_err(|error| error.to_string()))?;
+    let output = run_agora(&root, &["doctor", "--json"], None).map_err(|error| error.to_string())?;
+    let output = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if output.is_empty() {
+        return Err("Failed to run agora doctor".to_string());
+    }
     let parsed: serde_json::Value =
         serde_json::from_str(&output).map_err(|e| format!("Failed to parse doctor output: {e}"))?;
 
@@ -2351,6 +2342,7 @@ fn write_config(raw: String, state: State<'_, WorkspaceState>) -> Result<Desktop
 
 fn main() {
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::new().build());
 

@@ -3,7 +3,24 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { t, setLocale, getLocale, detectLocale } from '@codeagora/shared/i18n/index.js';
+
+const enMessages = JSON.parse(readFileSync(new URL('../i18n/locales/en.json', import.meta.url), 'utf-8')) as Record<string, unknown>;
+const koMessages = JSON.parse(readFileSync(new URL('../i18n/locales/ko.json', import.meta.url), 'utf-8')) as Record<string, unknown>;
+
+function flattenKeys(value: unknown, prefix = '', keys: string[] = []): string[] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return keys;
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (typeof child === 'object' && child !== null && !Array.isArray(child)) {
+      flattenKeys(child, path, keys);
+    } else {
+      keys.push(path);
+    }
+  }
+  return keys;
+}
 
 beforeEach(() => {
   setLocale('en');
@@ -70,6 +87,21 @@ describe('t() — translation', () => {
     // app.title exists in both; accessing it returns a value (not the key)
     const val = t('app.title');
     expect(val).not.toBe('app.title');
+  });
+
+  it('keeps English and Korean locale keys aligned', () => {
+    const enKeys = flattenKeys(enMessages).sort();
+    const koKeys = flattenKeys(koMessages).sort();
+    expect(koKeys).toEqual(enKeys);
+  });
+
+  it('localizes desktop status labels in Korean-first mode', () => {
+    setLocale('ko');
+    expect(t('desktop.sessions.status.completed')).toBe('완료됨');
+    expect(t('desktop.sessions.status.failed')).toBe('실패');
+    expect(t('desktop.sessions.status.inProgress')).toBe('진행 중');
+    expect(t('desktop.detail.decisionSummaryTitle')).toBe('# CodeAgora 판정 요약');
+    expect(t('desktop.action.copyDecisionSummary')).toBe('판정 요약 복사');
   });
 });
 
