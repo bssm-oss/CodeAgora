@@ -303,7 +303,7 @@ export function applyHeadVerdictSafety(
   const criticalIssues = allCritical.filter(
     (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
   );
-  if (criticalIssues.length > 0) {
+  if (criticalIssues.length === 0) {
     if (verdict.decision === 'REJECT') return verdict;
     return {
       decision: 'REJECT',
