@@ -37,7 +37,7 @@ export function evaluateConfigPolicy(raw: string): ConfigPolicyReadiness {
     const activeReviewers = activeReviewerCount(parsed.reviewers);
     return {
       activeReviewers,
-      complete: (activeReviewers ?? 0) > 0,
+      complete: (activeReviewers ?? 0) > 1,
       validJson: true,
     };
   } catch {
