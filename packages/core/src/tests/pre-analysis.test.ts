@@ -371,6 +371,24 @@ describe('buildEnrichedSection', () => {
     expect(result).toContain('Verify backward compat');
   });
 
+  it('should flag semantic guardrail files in the risk-focus pass', () => {
+    const ctx: EnrichedDiffContext = {
+      fileClassifications: new Map<string, FileClassification>([
+        ['packages/desktop/src/readiness.ts', 'logic'],
+      ]),
+      tscDiagnostics: [],
+      impactAnalysis: new Map(),
+      externalRules: [],
+      pathRuleNotes: [],
+    };
+
+    const result = buildEnrichedSection(ctx);
+
+    expect(result).toContain('Risk-Focus Pass');
+    expect(result).toContain('DATA_INTEGRITY');
+    expect(result).toContain('semantic guardrail file `packages/desktop/src/readiness.ts`');
+  });
+
   it('should combine all sections', () => {
     const ctx: EnrichedDiffContext = {
       fileClassifications: new Map<string, FileClassification>([
