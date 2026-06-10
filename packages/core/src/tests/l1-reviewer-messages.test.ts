@@ -27,6 +27,7 @@ describe('buildReviewerMessages', () => {
     expect(system).toContain('Analysis Checklist');
     expect(system).toContain('Severity Guide');
     expect(system).toContain('HARSHLY_CRITICAL');
+    expect(system).toContain('Guardrails and thresholds');
   });
 
   it('system does NOT contain diff content', () => {
@@ -254,6 +255,7 @@ Do one short second pass on the flagged buckets before finalizing findings.
       expect(system).toContain('CRITICAL');
       expect(system).toContain('WARNING');
       expect(system).toMatch(/untrusted/i);
+      expect(system).toContain('Guardrails and thresholds');
     });
 
     it('drops verbose sections: extensive analysis checklist, long examples', () => {

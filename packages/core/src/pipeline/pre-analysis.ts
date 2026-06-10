@@ -212,6 +212,7 @@ export function buildEnrichedSection(ctx: EnrichedDiffContext): string {
 const AUTH_RE = /\b(auth|login|logout|session|token|jwt|oauth|permission|role|rbac|acl|tenant|admin)\b/i;
 const SECURITY_RE = /\b(security|sanitize|validation|sql|query|secret|credential|password|crypto|encrypt|decrypt|csrf|xss|ssrf|exec|command|shell|upload|webhook|http|api|network|file system)\b/i;
 const DATA_RE = /\b(data|db|database|migration|schema|transaction|payment|billing|invoice|order|balance|ledger|persist|storage|rollback|idempot|consisten|write|delete|upsert|cache|queue)\b/i;
+const GUARDRAIL_RE = /\b(readiness|threshold|guard|gate|policy|contract|invariant|monotonic|limit|boundary)\b/i;
 
 function clipSignal(text: string, maxLength: number = 96): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -249,6 +250,13 @@ function buildRiskFocusBuckets(ctx: EnrichedDiffContext): RiskFocusBucket[] {
     if (AUTH_RE.test(filePath)) addRiskSignal(auth, fileSignal, 2);
     if (SECURITY_RE.test(filePath)) addRiskSignal(security, fileSignal, 2);
     if (DATA_RE.test(filePath)) addRiskSignal(dataIntegrity, fileSignal, 2);
+    if (GUARDRAIL_RE.test(filePath)) {
+      addRiskSignal(
+        dataIntegrity,
+        `semantic guardrail file \`${filePath}\` — re-check thresholds, gates, and default behavior`,
+        classification === 'config' ? 3 : 2,
+      );
+    }
   }
 
   for (const diag of ctx.tscDiagnostics.slice(0, 10)) {
@@ -257,6 +265,9 @@ function buildRiskFocusBuckets(ctx: EnrichedDiffContext): RiskFocusBucket[] {
     if (AUTH_RE.test(diagText)) addRiskSignal(auth, signal, 1);
     if (SECURITY_RE.test(diagText)) addRiskSignal(security, signal, 1);
     if (DATA_RE.test(diagText)) addRiskSignal(dataIntegrity, signal, 1);
+    if (GUARDRAIL_RE.test(diagText)) {
+      addRiskSignal(dataIntegrity, signal, 1);
+    }
   }
 
   for (const [, entry] of ctx.impactAnalysis.entries()) {
@@ -281,6 +292,9 @@ function buildRiskFocusBuckets(ctx: EnrichedDiffContext): RiskFocusBucket[] {
     if (AUTH_RE.test(source.text)) addRiskSignal(auth, signal, 2);
     if (SECURITY_RE.test(source.text)) addRiskSignal(security, signal, 2);
     if (DATA_RE.test(source.text)) addRiskSignal(dataIntegrity, signal, 2);
+    if (GUARDRAIL_RE.test(source.text)) {
+      addRiskSignal(dataIntegrity, signal, 2);
+    }
   }
 
   return [auth, security, dataIntegrity]

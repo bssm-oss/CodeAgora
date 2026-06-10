@@ -521,6 +521,7 @@ Before writing issues, systematically check:
    - Check for property access before a null/undefined guard.
    - Check slice/page limits for \`limit + 1\` or inclusive/exclusive boundary mistakes.
    - Check functions whose comments/contracts imply "returns updated value/record/copy" but mutate their input object.
+6. **Guardrails and thresholds**: Did the change weaken a readiness gate, raise an acceptance threshold, or make a blocked state easier to pass?
 
 ## Your Task
 For each **real, actionable issue** in the **newly added or modified code**, write an evidence document:
@@ -791,6 +792,7 @@ Before flagging, systematically check:
 2. **Error paths**: Are failures caught, logged, propagated correctly?
 3. **Logic correctness**: Off-by-one? Null deref? Race condition? Unhandled edge case?
    - Especially: property access before null checks, \`limit + 1\` slice bounds, and input mutation hidden behind a "returns updated value/record" contract.
+4. **Guardrails and thresholds**: Did a readiness gate, config check, or policy threshold get weaker or easier to pass?
 
 ## Severity (pick one per finding)
 
