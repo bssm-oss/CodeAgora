@@ -16,9 +16,13 @@ Pick one based on the room and how much time you want to spend on token cost.
 
 | Preset | Suggested models | When to use |
 |---|---|---|
-| Premium | `openai/gpt-5.3-codex`, `anthropic/claude-sonnet-4.6`, `deepseek/deepseek-v4-flash`, `qwen/qwen3.7-max`, `x-ai/grok-4.3` | Live demo where quality matters more than cost |
+| Fast | `google/gemini-2.5-flash`, `deepseek/deepseek-v4-flash`, `z-ai/glm-4.7-flash`, `qwen/qwen3-coder-flash` | Short live demo, preflight, or repeated iteration |
 | Balanced | `openai/gpt-5.3-codex`, `anthropic/claude-sonnet-4.5`, `qwen/qwen3-coder-flash`, `qwen/qwen3-next-80b-a3b-instruct`, `x-ai/grok-4.3` | Demo with better latency and lower spend |
+| Premium | `openai/gpt-5.3-codex`, `anthropic/claude-sonnet-4.6`, `deepseek/deepseek-v4-flash`, `qwen/qwen3.7-max`, `x-ai/grok-4.3` | Live demo where quality matters more than cost |
+| Deep | `openai/gpt-5.3-codex`, `anthropic/claude-sonnet-4.6`, `deepseek/deepseek-v4-flash`, `z-ai/glm-5.1`, `minimax/minimax-m3`, `x-ai/grok-4.3`, `qwen/qwen3.7-max` | Best when you want the strongest debate and don't care about spend |
 | Efficient | `qwen/qwen3-coder-flash`, `qwen/qwen3-next-80b-a3b-instruct`, `x-ai/grok-4.3` | Internal walkthrough or repeated practice runs |
+
+CLI init aliases are intentionally short: `fast` uses the quick OpenRouter flash lineup, `balanced`/`standard` use the starter lineup, and `premium`/`deep` use the thorough preset.
 
 ### Demo config
 
@@ -143,6 +147,8 @@ What to point out:
 - `--dry-run` shows readiness before you spend provider calls.
 - `--json-stream` proves the pipeline is incremental and machine-readable.
 - `agora explain` replays a previous session without re-running the review.
+- For a live demo, start with `agora doctor --live`, then run `agora review --staged --json-stream` so the room can watch progress events arrive in real time.
+- If you want to replay the result, copy the session ID from the review output and run `agora explain <session>`.
 
 ## MCP demo
 
@@ -172,6 +178,10 @@ Demo calls:
 ```
 
 ```json
+{ "name": "review_pr", "arguments": { "pr_number": 123, "post_review": true } }
+```
+
+```json
 { "name": "config_get", "arguments": { "key": "discussion.maxRounds" } }
 ```
 
@@ -183,6 +193,7 @@ What to point out:
 
 - `dry_run` is the preflight gate.
 - `review_full` returns the same stable machine contract as the CLI.
+- `review_pr` is the easiest way to show the bot posting inline comments on a real pull request. Replace `123` with the current demo PR number.
 - `config_get` and `get_leaderboard` show that MCP is not a shell wrapper.
 
 ## Desktop app demo

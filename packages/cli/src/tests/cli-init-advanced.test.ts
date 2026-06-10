@@ -241,6 +241,17 @@ describe('buildMultiProviderConfig()', () => {
 // ============================================================================
 
 describe('generatePresets()', () => {
+  const openrouterFastModels = [
+    'google/gemini-2.5-flash',
+    'deepseek/deepseek-v4-flash',
+    'z-ai/glm-4.7-flash',
+    'qwen/qwen3-coder-flash',
+  ];
+  const openrouterStarterModels = [
+    'qwen/qwen3-coder-flash',
+    'qwen/qwen3-next-80b-a3b-instruct',
+  ];
+
   it('returns fallback presets when no providers or CLI detected', () => {
     const env = makeEnv([{ name: 'groq', available: false }]);
     const presets = generatePresets(env, null);
@@ -248,6 +259,9 @@ describe('generatePresets()', () => {
     expect(presets.length).toBeGreaterThan(0);
     const ids = presets.map((p) => p.id);
     expect(ids).toContain('quick');
+    const quick = presets.find((p) => p.id === 'quick');
+    expect(quick!.reviewerCount).toBe(4);
+    expect(quick!.reviewerModels).toEqual(openrouterFastModels);
   });
 
   it('generates a "quick" preset from the first detected provider', () => {
@@ -332,6 +346,26 @@ describe('generatePresets()', () => {
     expect(quick!.models['groq']).toBe('llama-3.3-70b-versatile');
   });
 
+  it('uses the flash lineup for OpenRouter quick preset', () => {
+    const env = makeEnv([{ name: 'openrouter', available: true }]);
+    const presets = generatePresets(env, null);
+    const quick = presets.find((p) => p.id === 'quick');
+    expect(quick).toBeDefined();
+    expect(quick!.providers).toEqual(['openrouter']);
+    expect(quick!.reviewerCount).toBe(4);
+    expect(quick!.reviewerModels).toEqual(openrouterFastModels);
+  });
+
+  it('generates OpenRouter starter preset for balanced aliases', () => {
+    const env = makeEnv([{ name: 'openrouter', available: true }]);
+    const presets = generatePresets(env, null);
+    const starter = presets.find((p) => p.id === 'free');
+    expect(starter).toBeDefined();
+    expect(starter!.providers).toEqual(['openrouter']);
+    expect(starter!.reviewerCount).toBe(2);
+    expect(starter!.reviewerModels).toEqual(openrouterStarterModels);
+  });
+
   it('includes label with provider name for quick preset', () => {
     const env = makeEnv([{ name: 'anthropic', available: true }]);
     const presets = generatePresets(env, null);
@@ -355,6 +389,9 @@ describe('resolvePresetAlias()', () => {
 
   it('trims and normalizes case', () => {
     expect(resolvePresetAlias('  BuDGeT  ')).toBe('quick');
+    expect(resolvePresetAlias('fast')).toBe('quick');
+    expect(resolvePresetAlias('standard')).toBe('free');
+    expect(resolvePresetAlias('deep')).toBe('thorough');
     expect(resolvePresetAlias('  QUICK  ')).toBe('quick');
   });
 

@@ -91,6 +91,7 @@ export interface DynamicPreset {
   labelKo: string;
   providers: string[];
   models: Record<string, string>;
+  reviewerModels?: string[];
   reviewerCount: number;
   discussion: boolean;
   backend: 'api' | 'cli';
@@ -98,8 +99,11 @@ export interface DynamicPreset {
 
 const PRESET_ALIASES: Record<string, string> = {
   budget: 'quick',
+  fast: 'quick',
   balanced: 'free',
+  standard: 'free',
   premium: 'thorough',
+  deep: 'thorough',
 };
 
 export const PRESET_ALIAS_ENTRIES = Object.entries(PRESET_ALIASES).map(
@@ -371,6 +375,18 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   groq: 'llama-3.3-70b-versatile',
 };
 
+const OPENROUTER_FAST_REVIEWERS = [
+  'google/gemini-2.5-flash',
+  'deepseek/deepseek-v4-flash',
+  'z-ai/glm-4.7-flash',
+  'qwen/qwen3-coder-flash',
+];
+
+const OPENROUTER_STARTER_REVIEWERS = [
+  'qwen/qwen3-coder-flash',
+  'qwen/qwen3-next-80b-a3b-instruct',
+];
+
 // ============================================================================
 // Static fallback presets (used when catalog/detection unavailable)
 // ============================================================================
@@ -381,8 +397,9 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
     label: 'Quick review (OpenRouter)',
     labelKo: '\uBE60\uB978 \uB9AC\uBDF0 (OpenRouter)',
     providers: ['openrouter'],
-    models: { openrouter: 'xiaomi/mimo-v2.5' },
-    reviewerCount: 1,
+    models: { openrouter: OPENROUTER_FAST_REVIEWERS[0]! },
+    reviewerModels: OPENROUTER_FAST_REVIEWERS,
+    reviewerCount: OPENROUTER_FAST_REVIEWERS.length,
     discussion: false,
     backend: 'api',
   },
@@ -449,16 +466,18 @@ export function generatePresets(
     return PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5';
   }
 
-  // 1. "Quick review" — single fastest provider, 1 reviewer, no discussion
+  // 1. "Quick review" — fastest available provider, no discussion
   if (detected.length > 0) {
     const fastest = detected[0]!;
+    const openrouterFast = fastest === 'openrouter';
     presets.push({
       id: 'quick',
       label: `Quick review (${fastest})`,
       labelKo: `\uBE60\uB978 \uB9AC\uBDF0 (${fastest})`,
       providers: [fastest],
-      models: { [fastest]: bestModel(fastest) },
-      reviewerCount: 1,
+      models: { [fastest]: openrouterFast ? OPENROUTER_FAST_REVIEWERS[0]! : bestModel(fastest) },
+      reviewerModels: openrouterFast ? OPENROUTER_FAST_REVIEWERS : undefined,
+      reviewerCount: openrouterFast ? OPENROUTER_FAST_REVIEWERS.length : 1,
       discussion: false,
       backend: 'api',
     });
@@ -478,6 +497,18 @@ export function generatePresets(
       providers: freeDetected,
       models: freeModels,
       reviewerCount: Math.min(freeDetected.length * 2, 5),
+      discussion: false,
+      backend: 'api',
+    });
+  } else if (detected.includes('openrouter')) {
+    presets.push({
+      id: 'free',
+      label: 'Starter review (OpenRouter)',
+      labelKo: '\uC2A4\uD0C0\uD130 \uB9AC\uBDF0 (OpenRouter)',
+      providers: ['openrouter'],
+      models: { openrouter: OPENROUTER_STARTER_REVIEWERS[0]! },
+      reviewerModels: OPENROUTER_STARTER_REVIEWERS,
+      reviewerCount: OPENROUTER_STARTER_REVIEWERS.length,
       discussion: false,
       backend: 'api',
     });
@@ -714,11 +745,17 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
     );
   }
 
-  const selections: ProviderModelSelection[] = selected.providers.map((provider) => ({
-    provider,
-    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5',
-    backend: selected.backend,
-  }));
+  const selections: ProviderModelSelection[] = selected.reviewerModels?.length
+    ? selected.reviewerModels.map((model) => ({
+      provider: selected.providers[0]!,
+      model,
+      backend: selected.backend,
+    }))
+    : selected.providers.map((provider) => ({
+      provider,
+      model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5',
+      backend: selected.backend,
+    }));
 
   if (selections.length === 0) {
     throw new Error(`Preset "${preset}" has no providers.`);

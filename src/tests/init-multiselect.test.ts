@@ -131,6 +131,17 @@ function makeCli(available: string[]): DetectedCli[] {
 // ============================================================================
 
 describe('generatePresets()', () => {
+  const openrouterFastModels = [
+    'google/gemini-2.5-flash',
+    'deepseek/deepseek-v4-flash',
+    'z-ai/glm-4.7-flash',
+    'qwen/qwen3-coder-flash',
+  ];
+  const openrouterStarterModels = [
+    'qwen/qwen3-coder-flash',
+    'qwen/qwen3-next-80b-a3b-instruct',
+  ];
+
   it('returns fallback presets when no providers or CLIs detected', () => {
     const presets = generatePresets(makeEmptyEnv(), null);
     expect(presets).toHaveLength(3);
@@ -141,6 +152,8 @@ describe('generatePresets()', () => {
     for (const p of presets) {
       expect(p.providers).toContain('openrouter');
     }
+    expect(presets[0]!.reviewerCount).toBe(4);
+    expect(presets[0]!.reviewerModels).toEqual(openrouterFastModels);
   });
 
   it('returns fallback presets when no providers detected and no CLI available', () => {
@@ -156,6 +169,24 @@ describe('generatePresets()', () => {
     expect(quick!.providers).toEqual(['openai']);
     expect(quick!.reviewerCount).toBe(1);
     expect(quick!.discussion).toBe(false);
+  });
+
+  it('generates OpenRouter quick preset with the flash lineup', () => {
+    const presets = generatePresets(makeEnv(['openrouter']), null);
+    const quick = presets.find((p) => p.id === 'quick');
+    expect(quick).toBeDefined();
+    expect(quick!.providers).toEqual(['openrouter']);
+    expect(quick!.reviewerCount).toBe(4);
+    expect(quick!.reviewerModels).toEqual(openrouterFastModels);
+  });
+
+  it('generates OpenRouter starter preset for balanced aliases', () => {
+    const presets = generatePresets(makeEnv(['openrouter']), null);
+    const starter = presets.find((p) => p.id === 'free');
+    expect(starter).toBeDefined();
+    expect(starter!.providers).toEqual(['openrouter']);
+    expect(starter!.reviewerCount).toBe(2);
+    expect(starter!.reviewerModels).toEqual(openrouterStarterModels);
   });
 
   it('does not generate free preset when groq is detected', () => {
