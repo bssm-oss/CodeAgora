@@ -129,6 +129,29 @@ async function waitForCockpit() {
   throw new Error('Timed out waiting for the cockpit to render');
 }
 
+async function openAcceptancePanelIfNeeded() {
+  const readyScript = '(() => Boolean(document.querySelector("[data-testid=acceptance-panel]")))()';
+  const initial = runTauriMcpJson(['webview-execute-js', '--script', readyScript]);
+  if (initial.text?.startsWith('true')) return;
+
+  const openScript = `(() => {
+    const firstSession = document.querySelector("[data-testid^=session-row-]");
+    firstSession?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    const detailTab = document.querySelector("[data-testid=button-session-detail-tab]");
+    detailTab?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    return true;
+  })()`;
+  runTauriMcpJson(['webview-execute-js', '--script', openScript]);
+
+  const started = Date.now();
+  while (Date.now() - started < 10_000) {
+    const response = runTauriMcpJson(['webview-execute-js', '--script', readyScript]);
+    if (response.text?.startsWith('true')) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error('Timed out waiting for the acceptance panel to render');
+}
+
 function inspectVisualState() {
   const script = `(() => {
     window.scrollTo(0, 0);
@@ -144,12 +167,62 @@ function inspectVisualState() {
         clientHeight: el.clientHeight,
         scrollHeight: el.scrollHeight,
       }));
+    const layoutOverflow = [...document.querySelectorAll("*")]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1)
+      .slice(0, 40)
+      .map((el) => ({
+        tag: el.tagName,
+        className: String(el.className),
+        text: el.textContent?.trim(),
+        clientWidth: el.clientWidth,
+        scrollWidth: el.scrollWidth,
+      }));
+    const layoutOverflowLeaves = [...document.querySelectorAll("*")]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1)
+      .filter((el, _, all) => !all.some((other) => other !== el && el.contains(other)))
+      .slice(0, 20)
+      .map((el) => ({
+        tag: el.tagName,
+        className: String(el.className),
+        text: el.textContent?.trim(),
+        clientWidth: el.clientWidth,
+        scrollWidth: el.scrollWidth,
+      }));
     const cockpit = document.querySelector("[data-testid=cockpit-overview]");
     const acceptance = document.querySelector("[data-testid=acceptance-panel]");
+    const containerSelectors = [
+      "[data-testid=view-sessions]",
+      "[data-testid=view-run]",
+      "[data-testid=view-setup]",
+      "[data-testid=view-config]",
+      "[data-testid=cockpit-overview]",
+      "[data-testid=sessions-layout]",
+      "[data-testid=run-panel]",
+      "[data-testid=review-run]",
+      "[data-testid=setup-panel]",
+      "[data-testid=config-panel]",
+      ".ca-cockpit-overview",
+      ".ca-sessions-layout",
+      ".ca-run-panel",
+      ".ca-review-run",
+      ".ca-setup-panel",
+      ".ca-config-panel",
+      ".ca-detail",
+      ".ca-session-list",
+    ];
+    const containerWidths = Object.fromEntries(
+      containerSelectors.map((selector) => {
+        const el = document.querySelector(selector);
+        return [selector, el ? { clientWidth: el.clientWidth, scrollWidth: el.scrollWidth, className: String(el.className) } : null];
+      }),
+    );
     return {
       viewport: { width: innerWidth, height: innerHeight },
       horizontalOverflow: document.documentElement.scrollWidth > innerWidth + 1,
       overflow,
+      layoutOverflow,
+      layoutOverflowLeaves,
+      containerWidths,
       shellText: document.body.innerText?.replace(/\\s+/g, " ").trim() ?? "",
       cockpitText: cockpit?.textContent?.replace(/\\s+/g, " ").trim() ?? "",
       acceptanceText: acceptance?.textContent?.replace(/\\s+/g, " ").trim() ?? "",
@@ -217,8 +290,9 @@ try {
   runTauriMcpJson(['driver-session', 'start', '--port', String(port)]);
   runTauriMcpJson(['manage-window', '--action', 'resize', '--width', String(windowWidth), '--height', String(windowHeight)]);
   await waitForCockpit();
+  await openAcceptancePanelIfNeeded();
   const visual = inspectVisualState();
-  assert(visual.horizontalOverflow === false, 'Desktop visual QA found horizontal page overflow');
+  assert(visual.horizontalOverflow === false, `Desktop visual QA found horizontal page overflow:\n${JSON.stringify({ leaves: visual.layoutOverflowLeaves, containers: visual.containerWidths }, null, 2)}`);
   assert(Array.isArray(visual.overflow) && visual.overflow.length === 0, `Desktop visual QA found clipped text: ${JSON.stringify(visual.overflow, null, 2)}`);
   for (const expected of ['로컬 리뷰 준비 상태', '계속 진행 가능', '권장 다음 단계', '최근 업데이트']) {
     assert(visual.cockpitText.includes(expected), `Desktop cockpit is missing expected text: ${expected}`);

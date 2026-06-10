@@ -6,6 +6,7 @@
     "windows": ["main"],
     "permissions": [
       "core:default",
+      "dialog:allow-open",
       "mcp-bridge:default",
       "notification:default",
       "window-state:default"

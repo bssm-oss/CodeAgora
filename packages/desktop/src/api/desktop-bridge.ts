@@ -290,6 +290,24 @@ export async function openRepository(path: string): Promise<RepoInfo> {
   return { ...fallbackRepoInfo(), path };
 }
 
+export async function selectRepositoryDirectory(title: string, defaultPath?: string): Promise<string | undefined> {
+  if (!IS_TAURI) {
+    const selected = window.prompt(title, defaultPath ?? fallbackRepoInfo().path);
+    return selected?.trim() || undefined;
+  }
+
+  const selected = await invoke<string | string[] | null>('plugin:dialog|open', {
+    options: {
+      title,
+      directory: true,
+      multiple: false,
+      defaultPath,
+    },
+  });
+  if (Array.isArray(selected)) return typeof selected[0] === 'string' ? selected[0] : undefined;
+  return typeof selected === 'string' ? selected : undefined;
+}
+
 export async function getCommandContract(): Promise<DesktopCommandContract[]> {
   const result = await tauriCall<DesktopCommandContract[]>('get_command_contract');
   if (result) return result;
