@@ -48,9 +48,9 @@ describe('STATIC_PRESETS', () => {
     expect(ids).toContain('minimal');
   });
 
-  it('quick preset has 3 reviewers and no discussion', () => {
+  it('quick preset has 4 reviewers and no discussion', () => {
     const quick = STATIC_PRESETS.find((p) => p.id === 'quick')!;
-    expect(quick.reviewerCount).toBe(3);
+    expect(quick.reviewerCount).toBe(4);
     expect(quick.discussion).toBe(false);
   });
 
@@ -134,9 +134,9 @@ describe('buildPresetConfig() — required fields', () => {
 describe('buildPresetConfig() — quick preset', () => {
   const quickPreset = STATIC_PRESETS.find((p) => p.id === 'quick')!;
 
-  it('creates 3 reviewers', () => {
+  it('creates 4 reviewers', () => {
     const config = buildPresetConfig({ preset: quickPreset });
-    expect(config.reviewers).toHaveLength(3);
+    expect(config.reviewers).toHaveLength(4);
   });
 
   it('all reviewers use openrouter provider', () => {
@@ -176,6 +176,16 @@ describe('buildPresetConfig() — quick preset', () => {
     const config = buildPresetConfig({ preset: quickPreset });
     const ids = reviewers(config).map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('uses the flash lineup for reviewers', () => {
+    const config = buildPresetConfig({ preset: quickPreset });
+    expect(reviewers(config).map((r) => r.model)).toEqual([
+      'google/gemini-2.5-flash',
+      'deepseek/deepseek-v4-flash',
+      'z-ai/glm-4.7-flash',
+      'qwen/qwen3-coder-flash',
+    ]);
   });
 });
 

@@ -30,12 +30,19 @@ export interface PresetConfig {
   discussion: boolean;
 }
 
+const OPENROUTER_FAST_REVIEWERS = [
+  'google/gemini-2.5-flash',
+  'deepseek/deepseek-v4-flash',
+  'z-ai/glm-4.7-flash',
+  'qwen/qwen3-coder-flash',
+];
+
 const OPENROUTER_QUALITY_REVIEWERS = [
   'xiaomi/mimo-v2.5',
   'qwen/qwen3-coder-30b-a3b-instruct',
   'tencent/hy3-preview',
-  'deepseek/deepseek-v4-flash',
   'meta-llama/llama-4-scout',
+  'deepseek/deepseek-v4-flash',
 ];
 
 const OPENROUTER_QUALITY_SUPPORTERS = [
@@ -52,12 +59,12 @@ export const STATIC_PRESETS: PresetConfig[] = [
     id: 'quick',
     name: 'Quick Setup',
     nameKo: '빠른 설정',
-    description: '3 reviewers, no discussion — fast and cheap',
-    descriptionKo: '리뷰어 3개, 토론 없음 — 빠르고 저렴',
-    reviewerCount: 3,
+    description: '4 flash reviewers, no discussion — fast and cheap',
+    descriptionKo: 'Flash 리뷰어 4개, 토론 없음 — 빠르고 저렴',
+    reviewerCount: 4,
     providers: ['openrouter'],
-    models: { openrouter: OPENROUTER_QUALITY_REVIEWERS[0]! },
-    reviewerModels: OPENROUTER_QUALITY_REVIEWERS.slice(0, 3),
+    models: { openrouter: OPENROUTER_FAST_REVIEWERS[0]! },
+    reviewerModels: OPENROUTER_FAST_REVIEWERS,
     supporterModels: OPENROUTER_QUALITY_SUPPORTERS.slice(0, 1),
     devilsAdvocateModel: OPENROUTER_QUALITY_DA,
     moderatorModel: OPENROUTER_QUALITY_MODERATOR,
