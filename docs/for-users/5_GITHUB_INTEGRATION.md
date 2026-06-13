@@ -152,7 +152,7 @@ inputs:
     default: .ca/config.json
 
   github-token:
-    description: GitHub token for posting comments and setting status checks
+    description: GitHub token for posting comments and the configured verdict reporter
     required: true
 
   fail-on-reject:
@@ -166,9 +166,19 @@ inputs:
     default: '5000'
 
   post-results:
-    description: Post review comments and commit status to GitHub
+    description: Post review comments and the configured verdict reporter to GitHub
     required: false
     default: 'true'
+
+  reporter-mode:
+    description: GitHub verdict reporter to emit. One of check-run or commit-status.
+    required: false
+    default: check-run
+
+  check-run-name:
+    description: Name of the GitHub check run to create or update for the reviewed PR commit
+    required: false
+    default: CodeAgora Review
 
 outputs:
   verdict:
@@ -247,13 +257,15 @@ runs:
         CONFIG_PATH: ${{ inputs.config-path }}
 ```
 
-When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs. Failures to read or validate the config file are surfaced via `degraded`/`degraded-reason`, but the input precedence remains: CLI flag > CONFIG_PATH env > default (`.ca/config.json`).
+When `post-results` is `false`, required GitHub credentials are unavailable, provider credentials are missing, the PR context is incomplete or untrusted, the PR is an untrusted fork context, the diff is too large, or the PR head SHA is stale, the action reports degraded/skipped state through `degraded`, `degraded-reason`, and `verdict` outputs. Untrusted fork PRs are skipped before provider-backed reviewers are invoked. Failures to read or validate the config file are surfaced via `degraded`/`degraded-reason`, but the input precedence remains: CLI flag > CONFIG_PATH env > default (`.ca/config.json`).
 
 Stable `degraded-reason` values:
 
 ```txt
 missing-github-token
+untrusted-github-context
 missing-provider-secrets
+untrusted-fork-pr
 fork-missing-provider-secrets
 posting-disabled
 diff-too-large
@@ -310,9 +322,10 @@ comment count to the summary body. It does not probe subsets of comments with
 successful `createReview` calls, because those probes create real PR review
 side effects and can duplicate comments.
 
-### 3.5 Status Check Integration
+### 3.5 Status And Check-Run Integration
 
 ```typescript
+// reporter-mode: commit-status
 // POST /repos/{owner}/{repo}/statuses/{sha}
 await octokit.repos.createCommitStatus({
   owner,
@@ -322,6 +335,21 @@ await octokit.repos.createCommitStatus({
   context: 'CodeAgora / review',
   description: verdictToDescription(verdict),
   target_url: reviewUrl,                     // links to the posted review
+});
+
+// reporter-mode: check-run
+// Create or update the configured check run for the same reviewed PR commit.
+await octokit.checks.create({
+  owner,
+  repo,
+  name: 'CodeAgora Review',
+  head_sha: headSha,
+  status: 'completed',
+  conclusion: verdictToCheckConclusion(verdict.decision), // 'success' | 'failure' | 'neutral'
+  output: {
+    title: `CodeAgora ${verdict.decision}`,
+    summary: verdictToDescription(verdict),
+  },
 });
 
 function verdictToState(decision: HeadVerdict['decision']): 'success' | 'failure' | 'pending' {
@@ -339,11 +367,21 @@ function verdictToDescription(verdict: HeadVerdict): string {
     case 'NEEDS_HUMAN': return 'Human review required for unresolved issues';
   }
 }
+
+function verdictToCheckConclusion(decision: HeadVerdict['decision']): 'success' | 'failure' | 'neutral' {
+  switch (decision) {
+    case 'ACCEPT':      return 'success';
+    case 'REJECT':      return 'failure';
+    case 'NEEDS_HUMAN': return 'neutral';
+  }
+}
 ```
 
 When `fail-on-reject` is `true`, the action process exits with code 1 on
-REJECT. The status check alone is advisory; the exit code is what GitHub reads
-to mark the required check as failed.
+REJECT. The selected reporter is advisory; the exit code is what GitHub reads
+to mark the workflow job as failed. `reporter-mode: check-run` creates or
+updates the named check run on the reviewed PR head SHA. `reporter-mode:
+commit-status` writes the legacy commit status context instead.
 
 ---
 
@@ -462,11 +500,19 @@ to mark the required check as failed.
 }
 ```
 
-### 4.3 Downstream SARIF Upload
+### 4.3 Optional SARIF Upload
 
-The CodeAgora Action generates a SARIF file, but it does not upload that file to
-GitHub Code Scanning. Caller workflows own that handoff so repositories can
-choose between Code Scanning upload, artifact upload, both, or neither.
+The CodeAgora Action generates a SARIF file and exposes the validated path as
+the `sarif-file` output. When `upload-sarif: 'true'` is set, the composite
+Action hands that generated file to `github/codeql-action/upload-sarif@v4`.
+When Code Scanning upload is disabled or the upload action is unavailable, the
+Action uploads the same generated file as a `codeagora-sarif` workflow artifact
+fallback using the `sarif-file` output path.
+
+SARIF upload and artifact fallback are suppressed when the review is degraded
+or skipped. The Action also suppresses PR review comments, commit statuses,
+check runs, reviewer requests, labels, and other GitHub writes after any
+degraded or untrusted-context decision.
 
 Default path:
 
@@ -477,13 +523,21 @@ Default path:
 The path can be overridden with `github.sarifOutputPath` in `.ca/config.json`.
 CodeAgora validates this path before writing the file.
 
-Example downstream Code Scanning upload:
+Example Code Scanning upload:
 
 ```yaml
-- uses: github/codeql-action/upload-sarif@v4
-  if: always()
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+  checks: write
+  security-events: write
+
+steps:
+- uses: bssm-oss/CodeAgora@v0.1.0-rc.6
   with:
-    sarif_file: /tmp/codeagora-results.sarif
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    upload-sarif: 'true'
 ```
 
 Requirement: Code Scanning must be enabled on the repository. It is free for
@@ -492,8 +546,10 @@ repositories.
 
 ### 4.4 VS Code SARIF Viewer Compatibility
 
-The SARIF Viewer extension reads SARIF 2.1.0 files. To support local dev
-workflows, caller workflows can upload the generated SARIF file as an artifact:
+The SARIF Viewer extension reads SARIF 2.1.0 files. The Action automatically
+uploads the generated SARIF file as a `codeagora-sarif` artifact fallback when
+Code Scanning upload is disabled or unavailable. Caller workflows can also
+upload the generated SARIF file themselves:
 
 ```yaml
 - name: Upload SARIF artifact

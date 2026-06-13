@@ -6,6 +6,11 @@ Concise maintainer notes for local setup, checks, and release/documentation poin
 
 ## Setup
 
+This workspace is pnpm-only. Use pnpm for checkout setup, workspace scripts,
+package filters, and local validation; do not use npm or yarn for workspace
+workflows. npm is only acceptable for package artifact checks such as
+`npm pack`.
+
 ```bash
 pnpm install
 pnpm build

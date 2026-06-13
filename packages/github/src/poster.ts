@@ -9,7 +9,13 @@
 import { Octokit } from '@octokit/rest';
 import type { GitHubConfig } from './client.js';
 import { createOctokit } from './client.js';
-import type { GitHubReview, PostResult } from './types.js';
+import type {
+  GitHubCommitStatusPayload,
+  GitHubCommitStatusState,
+  GitHubCommitStatusVerdict,
+  GitHubReview,
+  PostResult,
+} from './types.js';
 import { findPriorReviews, dismissPriorReviews } from './dedup.js';
 import { redactSecrets } from '@codeagora/shared/utils/redaction.js';
 
@@ -343,36 +349,66 @@ export async function handleNeedsHuman(
 }
 
 /**
+ * Build the GitHub Commit Status API payload for a CodeAgora review result.
+ *
+ * GitHub commit statuses do not have a neutral state. Neutral/manual/degraded
+ * outcomes are reported as pending so they stay visible without falsely passing
+ * or failing the reviewed PR commit.
+ */
+export function buildCommitStatusPayload(options: {
+  config: GitHubConfig,
+  sha: string,
+  verdict: GitHubCommitStatusVerdict,
+  reviewUrl?: string,
+  context?: string,
+}): GitHubCommitStatusPayload {
+  const stateMap: Record<GitHubCommitStatusVerdict, GitHubCommitStatusState> = {
+    ACCEPT: 'success',
+    REJECT: 'failure',
+    NEEDS_HUMAN: 'pending',
+    NEUTRAL: 'pending',
+    DEGRADED: 'pending',
+    SKIPPED: 'pending',
+  };
+
+  const descriptionMap: Record<GitHubCommitStatusVerdict, string> = {
+    ACCEPT: 'All issues resolved \u2014 ready to merge',
+    REJECT: 'Blocking issues found',
+    NEEDS_HUMAN: 'Human review required for unresolved issues',
+    NEUTRAL: 'No blocking verdict; human review may proceed',
+    DEGRADED: 'CodeAgora review degraded; inspect workflow outputs',
+    SKIPPED: 'CodeAgora review skipped; inspect workflow outputs',
+  };
+
+  return {
+    owner: options.config.owner,
+    repo: options.config.repo,
+    sha: options.sha,
+    state: stateMap[options.verdict] ?? 'pending',
+    context: options.context ?? 'CodeAgora / review',
+    description: descriptionMap[options.verdict] ?? 'Review complete',
+    target_url: options.reviewUrl,
+  };
+}
+
+/**
  * Set a commit status check reflecting the review verdict.
  */
 export async function setCommitStatus(
   config: GitHubConfig,
   sha: string,
-  verdict: PostResult['verdict'],
+  verdict: GitHubCommitStatusVerdict,
   reviewUrl: string,
   octokit?: Octokit,
 ): Promise<void> {
   const kit = octokit ?? createOctokit(config);
 
-  const stateMap: Record<string, 'success' | 'failure' | 'pending'> = {
-    ACCEPT: 'success',
-    REJECT: 'failure',
-    NEEDS_HUMAN: 'pending',
-  };
-
-  const descriptionMap: Record<string, string> = {
-    ACCEPT: 'All issues resolved \u2014 ready to merge',
-    REJECT: 'Blocking issues found',
-    NEEDS_HUMAN: 'Human review required for unresolved issues',
-  };
-
-  await kit.repos.createCommitStatus({
-    owner: config.owner,
-    repo: config.repo,
+  const payload = buildCommitStatusPayload({
+    config,
     sha,
-    state: stateMap[verdict] ?? 'pending',
-    context: 'CodeAgora / review',
-    description: descriptionMap[verdict] ?? 'Review complete',
-    target_url: reviewUrl,
+    verdict,
+    reviewUrl,
   });
+
+  await kit.repos.createCommitStatus({ ...payload });
 }

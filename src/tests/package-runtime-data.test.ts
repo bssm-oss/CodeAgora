@@ -26,8 +26,10 @@ describe('package runtime data packaging', () => {
 
   it('beta smoke installs packed tarballs and exercises postinstall plus MCP auto-review paths', () => {
     const smoke = fs.readFileSync('scripts/beta-smoke.mjs', 'utf-8');
+    const postinstall = fs.readFileSync('scripts/postinstall.cjs', 'utf-8');
 
-    expect(smoke).toContain('--foreground-scripts');
+    expect(smoke).toContain('--stream');
+    expect(smoke).toContain('--allow-build=@codeagora/review');
     expect(smoke).toContain('smokeRootPostinstall');
     expect(smoke).toContain('Tarball-installed CLI dry-run');
     expect(smoke).toContain('smokeInstalledMcpAutoReview');
@@ -35,5 +37,7 @@ describe('package runtime data packaging', () => {
     expect(smoke).toContain('provider/API failures');
     expect(smoke).toContain('estimatedCost');
     expect(smoke).toContain('totalEstimatedCost');
+    expect(postinstall).toContain('pnpm add -g @codeagora/mcp');
+    expect(postinstall).not.toContain('Desktop app');
   });
 });

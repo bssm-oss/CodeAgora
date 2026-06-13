@@ -849,7 +849,11 @@ export function formatDoctorReport(result: DoctorResult): string {
     nextSteps.push('Run `agora env set openrouter <api-key>` or install/auth one supported CLI backend, then rerun `agora doctor`.');
   }
   if (hasLiveHealthFailure && !hasConfiguredApiFailure) {
-    nextSteps.push('Fix the live provider errors above, then rerun `agora doctor --live`.');
+    const failedProviders = Array.from(
+      new Set((result.liveChecks ?? []).filter((check) => check.status !== 'ok').map((check) => check.provider)),
+    );
+    const providerHint = failedProviders.length === 1 ? failedProviders[0] : '<provider>';
+    nextSteps.push(`The key is present, but the provider rejected the live check. Replace it with \`agora env set ${providerHint} <new-api-key>\`, then rerun \`agora doctor --live\`. Credential store: ${getCredentialsPath()}`);
   } else if (hasApiWarnings) {
     nextSteps.push('Run `agora env set openrouter <api-key>` if you want API-backed reviews, then rerun `agora doctor --live`.');
   } else if (hasCliWarnings) {

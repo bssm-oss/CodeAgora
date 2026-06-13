@@ -8,6 +8,9 @@ import {
   writeBenchmarkMetricsArtifacts,
 } from '../metrics/benchmark.js';
 
+const rawApiKey = 'OPENAI_API_KEY=sk-test-secret';
+const rawBearer = 'Authorization: Bearer test-secret';
+
 async function writeJson(filePath: string, value: unknown): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, JSON.stringify(value, null, 2), 'utf-8');
@@ -107,5 +110,60 @@ describe('benchmark metrics report', () => {
     const paths = await writeBenchmarkMetricsArtifacts(report, path.join(root, 'out'));
     expect(JSON.parse(await readFile(paths.jsonPath, 'utf-8')).schemaVersion).toBe('codeagora.metrics.benchmark.v1');
     expect(await readFile(paths.markdownPath, 'utf-8')).toContain('# Benchmark Metrics');
+  });
+
+  it('redacts sensitive values before writing JSON and Markdown artifacts', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'codeagora-metrics-redaction-'));
+    const report = {
+      schemaVersion: 'codeagora.metrics.benchmark.v1' as const,
+      generatedAt: '2026-04-28T00:00:00.000Z',
+      resultsDir: path.join(root, rawApiKey),
+      fixturesDir: path.join(root, rawBearer),
+      runtime: null,
+      score: {
+        totalCases: 1,
+        recallCases: 1,
+        fpRegressionCases: 0,
+        meanRecallAtK: { 3: 1, 5: 1, 10: 1 },
+        fpRegressionsTriggered: 0,
+        metrics: {
+          truePositives: 1,
+          falsePositives: 0,
+          falseNegatives: 0,
+          actualFindings: 1,
+          expectedFindings: 1,
+          precision: 1,
+          recall: 1,
+          f1: 1,
+          fpCleanRate: null,
+        },
+        perCase: [{
+          fixtureId: rawApiKey,
+          category: 'security',
+          isFpRegression: false,
+          matched: [],
+          missed: [],
+          falsePositives: [],
+          metrics: {
+            truePositives: 1,
+            falsePositives: 0,
+            falseNegatives: 0,
+            actualFindings: 1,
+            expectedFindings: 1,
+          },
+          recallAtK: { 3: 1, 5: 1, 10: 1 },
+        }],
+      },
+    };
+
+    const paths = await writeBenchmarkMetricsArtifacts(report, path.join(root, 'out'));
+    const json = await readFile(paths.jsonPath, 'utf-8');
+    const markdown = await readFile(paths.markdownPath, 'utf-8');
+    const combined = `${json}\n${markdown}`;
+
+    expect(combined).not.toContain('sk-test-secret');
+    expect(combined).not.toContain('Bearer test-secret');
+    expect(combined).toContain('OPENAI_API_KEY=[REDACTED]');
+    expect(combined).toContain('Authorization: Bearer [REDACTED]');
   });
 });

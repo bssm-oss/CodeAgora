@@ -480,13 +480,17 @@ export function filterIgnoredFiles<T extends { filePath: string }>(
   files: T[],
   patterns: string[]
 ): T[] {
-  if (patterns.length === 0) return files;
+  const normalizedFiles = normalizeReviewFiles(files);
+  if (patterns.length === 0) return normalizedFiles;
 
   const regexes = patterns
-    .filter((p) => p.trim() && !p.startsWith('#'))
-    .map((p) => globToRegex(p.trim()));
+    .map((p) => normalizeWorkspaceRelativePath(p.trim()))
+    .filter((p): p is string => p !== null && !p.startsWith('#'))
+    .map((p) => globToRegex(p));
 
-  return files.filter((file) => {
+  if (regexes.length === 0) return normalizedFiles;
+
+  return normalizedFiles.filter((file) => {
     return !regexes.some((rx) => rx.test(file.filePath));
   });
 }
@@ -495,20 +499,59 @@ function splitFilesByPatterns<T extends { filePath: string }>(
   files: T[],
   patterns: string[]
 ): { included: T[]; excluded: string[] } {
-  if (patterns.length === 0) {
-    return { included: files, excluded: [] };
-  }
-
   const included = filterIgnoredFiles(files, patterns);
-  const excludedSet = new Set(files.map((f) => f.filePath));
-  for (const file of included) {
-    excludedSet.delete(file.filePath);
+  const includedPaths = new Set(included.map((f) => f.filePath));
+  const excluded: string[] = [];
+
+  for (const file of files) {
+    const normalizedPath = normalizeWorkspaceRelativePath(file.filePath);
+    if (!normalizedPath) {
+      excluded.push(file.filePath);
+      continue;
+    }
+    if (!includedPaths.has(normalizedPath)) {
+      excluded.push(normalizedPath);
+    }
   }
 
   return {
     included,
-    excluded: Array.from(excludedSet),
+    excluded: [...new Set(excluded)],
   };
+}
+
+function normalizeReviewFiles<T extends { filePath: string }>(files: T[]): T[] {
+  const normalizedFiles: T[] = [];
+  for (const file of files) {
+    const normalizedPath = normalizeWorkspaceRelativePath(file.filePath);
+    if (!normalizedPath) continue;
+    normalizedFiles.push(
+      normalizedPath === file.filePath
+        ? file
+        : { ...file, filePath: normalizedPath }
+    );
+  }
+  return normalizedFiles;
+}
+
+function normalizeWorkspaceRelativePath(inputPath: string): string | null {
+  if (!inputPath || inputPath.includes('\x00')) return null;
+
+  const posixPath = inputPath.replace(/\\/g, '/');
+  if (path.posix.isAbsolute(posixPath)) return null;
+
+  const normalizedPath = path.posix.normalize(posixPath);
+  if (
+    !normalizedPath ||
+    normalizedPath === '.' ||
+    normalizedPath === '..' ||
+    normalizedPath.startsWith('../') ||
+    path.posix.isAbsolute(normalizedPath)
+  ) {
+    return null;
+  }
+
+  return normalizedPath;
 }
 
 /**

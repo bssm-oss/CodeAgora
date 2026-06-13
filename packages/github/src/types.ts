@@ -27,3 +27,22 @@ export interface PostResult {
   reviewUrl: string;
   verdict: 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
 }
+
+export type GitHubCommitStatusState = 'success' | 'failure' | 'pending';
+export type GitHubCheckRunConclusion = 'success' | 'failure' | 'neutral';
+
+export type GitHubCommitStatusVerdict =
+  | PostResult['verdict']
+  | 'NEUTRAL'
+  | 'DEGRADED'
+  | 'SKIPPED';
+
+export interface GitHubCommitStatusPayload {
+  owner: string;
+  repo: string;
+  sha: string;
+  state: GitHubCommitStatusState;
+  context: string;
+  description: string;
+  target_url?: string;
+}

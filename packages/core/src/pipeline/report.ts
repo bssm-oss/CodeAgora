@@ -5,6 +5,7 @@
 
 import type { PipelineTelemetry, BackendCallRecord } from './telemetry.js';
 import { estimateCost } from './cost-estimator.js';
+import { redactDeep, redactSecrets } from '@codeagora/shared/utils/redaction.js';
 
 export interface PerformanceReport {
   summary: {
@@ -181,9 +182,9 @@ export function formatReportText(report: PerformanceReport): string {
     lines.push(`- Most expensive reviewer: ${report.mostExpensive.reviewerId} (${report.mostExpensive.cost})`);
   }
 
-  return lines.join('\n');
+  return redactSecrets(lines.join('\n'));
 }
 
 export function formatReportJson(report: PerformanceReport): string {
-  return JSON.stringify(report, null, 2);
+  return JSON.stringify(redactDeep(report), null, 2);
 }

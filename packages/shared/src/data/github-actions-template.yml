@@ -6,7 +6,8 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  statuses: write
+  checks: write
+  security-events: write
 
 jobs:
   review:
@@ -22,5 +23,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
           max-diff-lines: '5000'
+          reporter-mode: check-run
+          upload-sarif: 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

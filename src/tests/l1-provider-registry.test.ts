@@ -8,7 +8,17 @@ import { createGroq } from '@ai-sdk/groq';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { getModel, getSupportedProviders, clearProviderCache } from '@codeagora/core/l1/provider-registry.js';
+import {
+  getModel,
+  getSupportedProviders,
+  clearProviderCache,
+  isSupportedProviderName,
+  SUPPORTED_PROVIDER_NAMES,
+} from '@codeagora/core/l1/provider-registry.js';
+import {
+  PROVIDER_ENV_VARS,
+  SUPPORTED_PROVIDER_NAMES as SHARED_SUPPORTED_PROVIDER_NAMES,
+} from '@codeagora/shared/providers/env-vars.js';
 
 vi.mock('@ai-sdk/anthropic', () => ({
   createAnthropic: vi.fn(() => (modelId: string) => ({ modelId, provider: 'anthropic' })),
@@ -52,6 +62,19 @@ describe('Provider Registry', () => {
 
   it('returns the retained API provider set', () => {
     expect(getSupportedProviders()).toEqual(supportedProviders);
+  });
+
+  it('keeps exported supported names consistent with shared provider env metadata', () => {
+    const sharedProviders = Object.keys(PROVIDER_ENV_VARS);
+
+    expect(SUPPORTED_PROVIDER_NAMES).toEqual(sharedProviders);
+    expect(getSupportedProviders()).toEqual(sharedProviders);
+    expect(SUPPORTED_PROVIDER_NAMES).toEqual(SHARED_SUPPORTED_PROVIDER_NAMES);
+
+    for (const provider of sharedProviders) {
+      expect(isSupportedProviderName(provider)).toBe(true);
+    }
+    expect(isSupportedProviderName('unknown-provider')).toBe(false);
   });
 
   it('creates Anthropic, OpenAI, OpenRouter, and Groq models with their own env vars', () => {

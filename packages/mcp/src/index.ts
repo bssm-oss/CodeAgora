@@ -6,15 +6,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { registerReviewQuick } from './tools/review-quick.js';
-import { registerReviewFull } from './tools/review-full.js';
-import { registerReviewPr } from './tools/review-pr.js';
-import { registerDryRun } from './tools/dry-run.js';
-import { registerExplain } from './tools/explain.js';
-import { registerLeaderboard } from './tools/leaderboard.js';
-import { registerStats } from './tools/stats.js';
-import { registerConfigGet } from './tools/config-get.js';
-import { registerConfigSet } from './tools/config-set.js';
+import { registerMcpTools } from './registry.js';
 import { readMcpPackageVersion } from './version.js';
 
 const server = new McpServer({
@@ -22,16 +14,7 @@ const server = new McpServer({
   version: readMcpPackageVersion(),
 });
 
-// Register all tools
-registerReviewQuick(server);
-registerReviewFull(server);
-registerReviewPr(server);
-registerDryRun(server);
-registerExplain(server);
-registerLeaderboard(server);
-registerStats(server);
-registerConfigGet(server);
-registerConfigSet(server);
+registerMcpTools(server);
 
 // Start stdio transport
 const transport = new StdioServerTransport();

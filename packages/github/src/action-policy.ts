@@ -14,10 +14,14 @@ export interface ActionInputs {
   maxDiffLines: number;
   postResults: boolean;
   configPath: string;
+  reporterMode: ActionReporterMode;
+  checkRunName: string;
   baseSha?: string;
   baseRepo?: string;
   headRepo?: string;
 }
+
+export type ActionReporterMode = 'commit-status' | 'check-run';
 
 export interface ActionPolicy {
   shouldRunReview: boolean;
@@ -32,11 +36,159 @@ export interface ActionGuidance {
   nextSteps: string[];
 }
 
+export type PrivilegedGitHubOperation =
+  | 'review-comment'
+  | 'issue-comment'
+  | 'commit-status'
+  | 'check-run'
+  | 'reviewer-mutation'
+  | 'label-mutation'
+  | 'release';
+
+export interface PrivilegedGitHubOperationContext {
+  token?: string;
+  baseRepo?: string;
+  headRepo?: string;
+  repository?: string;
+  eventName?: string;
+  ref?: string;
+}
+
+export interface PrivilegedGitHubOperationDecision {
+  allowed: boolean;
+  operation: PrivilegedGitHubOperation;
+  degradedReason?: ActionDegradedReason;
+  message?: string;
+}
+
+export type GitHubTokenPermissionLevel = 'none' | 'read' | 'write';
+
+export type GitHubTokenPermissionMap = Record<string, GitHubTokenPermissionLevel | undefined>;
+
+export interface GitHubTokenPermissionRequirements {
+  postResults?: boolean;
+  reporterMode?: ActionReporterMode;
+  uploadSarif?: boolean;
+}
+
+export interface GitHubTokenPermissionValidation {
+  valid: boolean;
+  required: GitHubTokenPermissionMap;
+  missing: string[];
+  excessive: string[];
+}
+
 const providerSecretList = [...new Set(Object.values(PROVIDER_ENV_VARS))].join(', ');
+
+const permissionRank: Record<GitHubTokenPermissionLevel, number> = {
+  none: 0,
+  read: 1,
+  write: 2,
+};
+
+function formatPermission(name: string, level: GitHubTokenPermissionLevel): string {
+  return `${name}: ${level}`;
+}
+
+function normalizePermissionLevel(value: unknown): GitHubTokenPermissionLevel | undefined {
+  if (value === 'none' || value === 'read' || value === 'write') {
+    return value;
+  }
+  return undefined;
+}
+
+export function getRequiredGitHubTokenPermissions(
+  requirements: GitHubTokenPermissionRequirements = {},
+): GitHubTokenPermissionMap {
+  const postResults = requirements.postResults ?? true;
+  const reporterMode = requirements.reporterMode ?? 'check-run';
+  const required: GitHubTokenPermissionMap = {
+    contents: 'read',
+    'pull-requests': postResults ? 'write' : 'read',
+  };
+
+  if (postResults && reporterMode === 'check-run') {
+    required.checks = 'write';
+  }
+  if (postResults && reporterMode === 'commit-status') {
+    required.statuses = 'write';
+  }
+  if (requirements.uploadSarif) {
+    required['security-events'] = 'write';
+  }
+
+  return required;
+}
+
+export function validateGitHubTokenPermissions(
+  permissions: GitHubTokenPermissionMap | 'read-all' | 'write-all' | undefined,
+  requirements: GitHubTokenPermissionRequirements = {},
+): GitHubTokenPermissionValidation {
+  const required = getRequiredGitHubTokenPermissions(requirements);
+  const missing: string[] = [];
+  const excessive: string[] = [];
+
+  if (!permissions) {
+    return {
+      valid: false,
+      required,
+      missing: Object.entries(required).map(([name, level]) => formatPermission(name, level ?? 'none')),
+      excessive,
+    };
+  }
+
+  if (permissions === 'read-all' || permissions === 'write-all') {
+    return {
+      valid: false,
+      required,
+      missing: permissions === 'read-all'
+        ? Object.entries(required)
+          .filter(([, level]) => level === 'write')
+          .map(([name, level]) => formatPermission(name, level ?? 'none'))
+        : [],
+      excessive: [permissions],
+    };
+  }
+
+  for (const [name, requiredLevel] of Object.entries(required)) {
+    const actualLevel = normalizePermissionLevel(permissions[name]);
+    if (!actualLevel || permissionRank[actualLevel] < permissionRank[requiredLevel ?? 'none']) {
+      missing.push(formatPermission(name, requiredLevel ?? 'none'));
+      continue;
+    }
+    if (permissionRank[actualLevel] > permissionRank[requiredLevel ?? 'none']) {
+      excessive.push(formatPermission(name, actualLevel));
+    }
+  }
+
+  for (const [name, value] of Object.entries(permissions)) {
+    const actualLevel = normalizePermissionLevel(value);
+    if (!actualLevel || actualLevel === 'none' || required[name]) {
+      continue;
+    }
+    excessive.push(formatPermission(name, actualLevel));
+  }
+
+  return {
+    valid: missing.length === 0 && excessive.length === 0,
+    required,
+    missing,
+    excessive,
+  };
+}
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined || value === '') return defaultValue;
   return value.toLowerCase() === 'true';
+}
+
+function parseReporterMode(value: string | undefined): ActionReporterMode {
+  const normalized = value?.trim();
+  if (!normalized || normalized === 'check-run' || normalized === 'commit-status') {
+    return (normalized || 'check-run') as ActionReporterMode;
+  }
+
+  throw new Error('--reporter-mode must be either commit-status or check-run');
 }
 
 export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = process.env): ActionInputs {
@@ -57,6 +209,7 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
   const failOnReject = parseBoolean(args['fail-on-reject'], false);
   const maxDiffLines = parseInt(args['max-diff-lines'] ?? '5000', 10);
   const postResults = parseBoolean(args['post-results'], true);
+  const reporterMode = parseReporterMode(args['reporter-mode'] ?? env['CODEAGORA_REPORTER_MODE']);
 
   // configPath normalization: CLI > env > default
   let configPath = args['config-path'];
@@ -67,6 +220,7 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
     configPath = '.ca/config.json';
   }
 
+  const checkRunName = args['check-run-name']?.trim() || env['CODEAGORA_CHECK_RUN_NAME']?.trim() || 'CodeAgora Review';
   const baseSha = args['base-sha'];
   const baseRepo = args['base-repo'];
   const headRepo = args['head-repo'];
@@ -77,7 +231,22 @@ export function parseActionInputs(argv: string[], env: NodeJS.ProcessEnv = proce
   if (!repo || !repo.includes('/')) throw new Error('--repo must be in owner/repo format');
   if (isNaN(maxDiffLines)) throw new Error('--max-diff-lines must be a valid number');
 
-  return { diff, pr, sha, repo, token, failOnReject, maxDiffLines, postResults, configPath, baseSha, baseRepo, headRepo };
+  return {
+    diff,
+    pr,
+    sha,
+    repo,
+    token,
+    failOnReject,
+    maxDiffLines,
+    postResults,
+    configPath,
+    reporterMode,
+    checkRunName,
+    baseSha,
+    baseRepo,
+    headRepo,
+  };
 }
 
 export function hasProviderCredentials(
@@ -93,11 +262,82 @@ export function isForkContext(inputs: Pick<ActionInputs, 'baseRepo' | 'headRepo'
   return Boolean(inputs.baseRepo && inputs.headRepo && inputs.baseRepo !== inputs.headRepo);
 }
 
+function hasTrustedPrContext(inputs: Pick<ActionInputs, 'baseRepo' | 'headRepo' | 'repo'>): boolean {
+  return Boolean(inputs.baseRepo && inputs.headRepo && inputs.baseRepo === inputs.headRepo && inputs.baseRepo === inputs.repo);
+}
+
+export function evaluatePrivilegedGitHubOperation(
+  operation: PrivilegedGitHubOperation,
+  context: PrivilegedGitHubOperationContext,
+): PrivilegedGitHubOperationDecision {
+  if (!context.token?.trim()) {
+    return {
+      allowed: false,
+      operation,
+      degradedReason: 'missing-github-token',
+      message: `Blocked privileged GitHub ${operation} because no GitHub token is available.`,
+    };
+  }
+
+  if (operation === 'release') {
+    const trustedReleaseRef = context.eventName === 'push' && Boolean(context.ref?.startsWith('refs/tags/v'));
+    if (!trustedReleaseRef) {
+      return {
+        allowed: false,
+        operation,
+        degradedReason: 'untrusted-github-context',
+        message: `Blocked privileged GitHub ${operation} outside a trusted version-tag push context.`,
+      };
+    }
+    return { allowed: true, operation };
+  }
+
+  if (!context.baseRepo || !context.headRepo || !context.repository) {
+    return {
+      allowed: false,
+      operation,
+      degradedReason: 'untrusted-github-context',
+      message: `Blocked privileged GitHub ${operation} because PR base/head repository metadata is incomplete.`,
+    };
+  }
+
+  if (context.baseRepo !== context.headRepo || context.baseRepo !== context.repository) {
+    return {
+      allowed: false,
+      operation,
+      degradedReason: context.baseRepo !== context.headRepo ? 'untrusted-fork-pr' : 'untrusted-github-context',
+      message: `Blocked privileged GitHub ${operation} because the PR repository context is not trusted.`,
+    };
+  }
+
+  return { allowed: true, operation };
+}
+
 export function determineActionPolicy(
   inputs: ActionInputs,
   env: NodeJS.ProcessEnv = process.env,
 ): ActionPolicy {
   const fork = isForkContext(inputs);
+
+  if (fork) {
+    return {
+      shouldRunReview: false,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'untrusted-fork-pr',
+      verdictOverride: 'SKIPPED',
+    };
+  }
+
+  if (!hasTrustedPrContext(inputs)) {
+    return {
+      shouldRunReview: false,
+      shouldPostResults: false,
+      degraded: true,
+      degradedReason: 'untrusted-github-context',
+      verdictOverride: 'SKIPPED',
+    };
+  }
 
   if (!inputs.token && inputs.postResults) {
     return {
@@ -150,6 +390,15 @@ export function getActionGuidance(reason: ActionDegradedReason): ActionGuidance 
           'If you only need a dry run, switch to the CLI or MCP dry-run path instead of the Action.',
         ],
       };
+    case 'untrusted-github-context':
+      return {
+        why: 'The workflow context is not trusted enough for provider-backed review or GitHub write operations.',
+        nextSteps: [
+          'Run CodeAgora from a pull_request event where base, head, and repository metadata all point to the same repository.',
+          'For release publication, use the protected version-tag release workflow rather than a pull request workflow.',
+          'Keep comment, status, reviewer, label, SARIF, and release writes disabled until the trusted context is restored.',
+        ],
+      };
     case 'missing-provider-secrets':
       return {
         why: 'The review pipeline cannot start because no provider credential is available.',
@@ -157,6 +406,15 @@ export function getActionGuidance(reason: ActionDegradedReason): ActionGuidance 
           `Add one retained provider secret to the workflow environment: ${providerSecretList}.`,
           'For local setup, run `agora env set openrouter <api-key>` or `agora env set groq <api-key>`, then `agora doctor --live`.',
           'Use `agora review --dry-run` locally or the MCP `dry_run` tool when you need config/diff inspection without a live review.',
+        ],
+      };
+    case 'untrusted-fork-pr':
+      return {
+        why: 'The pull request comes from a fork, so CodeAgora will not run provider-backed reviewers against untrusted code in this workflow context.',
+        nextSteps: [
+          'Review the fork PR manually first, then rerun CodeAgora from a trusted branch or maintainer-controlled workflow.',
+          'Keep automatic provider-backed review disabled for untrusted fork PR events.',
+          `Confirm the trusted workflow has one retained provider secret available: ${providerSecretList}.`,
         ],
       };
     case 'fork-missing-provider-secrets':

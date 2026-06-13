@@ -2,11 +2,15 @@
  * Path Validation Utility Tests
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { validateDiffPath, validatePathWithinRoot } from '@codeagora/shared/utils/path-validation.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('validateDiffPath', () => {
   it('accepts a normal absolute path /tmp/review.diff', () => {
@@ -38,6 +42,22 @@ describe('validateDiffPath', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBeTruthy();
+    }
+  });
+
+  it('rejects encoded traversal segments', () => {
+    const result = validateDiffPath('patches/%2e%2e/secret.diff');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain('Path traversal detected');
+    }
+  });
+
+  it('rejects separator-variant traversal segments', () => {
+    const result = validateDiffPath('patches\\..\\secret.diff');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain('Path traversal detected');
     }
   });
 
@@ -108,14 +128,65 @@ describe('validatePathWithinRoot', () => {
     }
   });
 
-  it('rejects traversal before resolving files', async () => {
+  it('rejects traversal inputs before filesystem access', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'path-root-'));
+    const realpathSpy = vi.spyOn(fs, 'realpath');
     try {
-      const result = await validatePathWithinRoot('../../.env', root);
+      const cases = [
+        '../secret.diff',
+        'patches/../../secret.diff',
+        'patches/%2e%2e/secret.diff',
+        'patches%2f%2e%2e%2fsecret.diff',
+        'patches\\..\\secret.diff',
+        'patches%5c..%5csecret.diff',
+      ];
+
+      for (const inputPath of cases) {
+        const result = await validatePathWithinRoot(inputPath, root);
+        expect(result.success, inputPath).toBe(false);
+        if (!result.success) {
+          expect(result.error).toContain('Path traversal detected');
+        }
+      }
+
+      expect(realpathSpy).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects relative paths that resolve outside the root', async () => {
+    const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'path-parent-'));
+    const root = path.join(parent, 'workspace');
+    const outside = path.join(parent, 'outside');
+    try {
+      await fs.mkdir(root);
+      await fs.mkdir(outside);
+      await fs.writeFile(path.join(outside, 'secret.diff'), 'secret');
+
+      const result = await validatePathWithinRoot('../outside/secret.diff', root);
 
       expect(result.success).toBe(false);
     } finally {
-      await fs.rm(root, { recursive: true, force: true });
+      await fs.rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects absolute paths that resolve outside the root', async () => {
+    const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'path-parent-'));
+    const root = path.join(parent, 'workspace');
+    const outside = path.join(parent, 'outside');
+    try {
+      await fs.mkdir(root);
+      await fs.mkdir(outside);
+      const outsidePath = path.join(outside, 'secret.diff');
+      await fs.writeFile(outsidePath, 'secret');
+
+      const result = await validatePathWithinRoot(outsidePath, root);
+
+      expect(result.success).toBe(false);
+    } finally {
+      await fs.rm(parent, { recursive: true, force: true });
     }
   });
 
@@ -134,6 +205,48 @@ describe('validatePathWithinRoot', () => {
         fs.rm(root, { recursive: true, force: true }),
         fs.rm(outside, { recursive: true, force: true }),
       ]);
+    }
+  });
+
+  it('rejects symlinked directories that resolve outside the root', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'path-root-'));
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'path-outside-'));
+    try {
+      await fs.writeFile(path.join(outside, 'secret.diff'), 'secret');
+      await fs.symlink(outside, path.join(root, 'linked-dir'));
+
+      const result = await validatePathWithinRoot('linked-dir/secret.diff', root);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain('Path resolves outside the repository root');
+      }
+    } finally {
+      await Promise.all([
+        fs.rm(root, { recursive: true, force: true }),
+        fs.rm(outside, { recursive: true, force: true }),
+      ]);
+    }
+  });
+
+  it('allows symlinks that resolve inside the root', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'path-root-'));
+    try {
+      const targetDir = path.join(root, 'patches');
+      const targetPath = path.join(targetDir, 'review.diff');
+      const linkPath = path.join(root, 'linked-review.diff');
+      await fs.mkdir(targetDir);
+      await fs.writeFile(targetPath, 'diff --git a/a b/a');
+      await fs.symlink(targetPath, linkPath);
+
+      const result = await validatePathWithinRoot('linked-review.diff', root);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe(await fs.realpath(targetPath));
+      }
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 });

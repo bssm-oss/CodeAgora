@@ -17,6 +17,7 @@ const mockBuildDefaultConfig = vi.fn();
 const mockNormalizeConfig = vi.fn();
 const mockFormatOutput = vi.fn().mockReturnValue('formatted-output');
 const mockFormatError = vi.fn().mockReturnValue('formatted-error');
+const mockClassifyCliErrorExitCode = vi.fn().mockReturnValue(3);
 const mockLoadCredentials = vi.fn().mockResolvedValue(undefined);
 const mockRecoverStaleSessions = vi.fn().mockResolvedValue(0);
 const mockDetectAvailableProvider = vi.fn();
@@ -60,6 +61,7 @@ vi.mock('../options/review-options.js', () => ({
 
 vi.mock('../utils/errors.js', () => ({
   formatError: mockFormatError,
+  classifyCliErrorExitCode: mockClassifyCliErrorExitCode,
 }));
 
 vi.mock('../utils/colors.js', () => ({

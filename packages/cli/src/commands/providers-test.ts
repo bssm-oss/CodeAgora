@@ -36,10 +36,14 @@ function looksLikeApiKey(value: string): boolean {
 // Public API
 // ============================================================================
 
-export function testProviders(): ProviderTestResult[] {
+export function testProviders(providerFilter?: string): ProviderTestResult[] {
+  const normalizedFilter = providerFilter?.trim().toLowerCase();
   const results: ProviderTestResult[] = [];
 
   for (const [name, envVar] of Object.entries(PROVIDER_ENV_VARS)) {
+    if (normalizedFilter && name !== normalizedFilter && envVar.toLowerCase() !== normalizedFilter) {
+      continue;
+    }
     const value = process.env[envVar];
     if (!value) {
       results.push({ name, envVar, status: 'missing' });

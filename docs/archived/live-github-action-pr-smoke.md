@@ -50,8 +50,8 @@ provider quality evidence.
 
 | Scenario | Evidence | Result |
 |----------|----------|--------|
-| Fork PR without provider secrets | `pnpm vitest run src/tests/github-action-parse-args.test.ts` | `determineActionPolicy()` returns `SKIPPED`, `degraded: true`, and `degradedReason: "fork-missing-provider-secrets"` without treating `GITHUB_TOKEN` as an LLM provider secret |
-| Same-repository GitHub Models path with only `GITHUB_TOKEN` | `pnpm vitest run src/tests/github-action-parse-args.test.ts` | `determineActionPolicy()` runs and posts because GitHub Models uses the workflow `GITHUB_TOKEN`; fork PRs still exclude `GITHUB_TOKEN` as a provider credential and skip with `fork-missing-provider-secrets` |
+| Fork PR, even with provider secrets present | `pnpm vitest run src/tests/github-action-parse-args.test.ts packages/github/src/tests/action-runtime.test.ts` | `determineActionPolicy()` returns `SKIPPED`, `degraded: true`, and `degradedReason: "untrusted-fork-pr"` before reviewer/provider invocation |
+| Same-repository GitHub Models path with only `GITHUB_TOKEN` | `pnpm vitest run src/tests/github-action-parse-args.test.ts` | `determineActionPolicy()` runs and posts because GitHub Models uses the workflow `GITHUB_TOKEN`; fork PRs remain skipped as `untrusted-fork-pr` |
 | Missing GitHub token while posting is enabled | `pnpm vitest run src/tests/github-action-parse-args.test.ts` | returns `SKIPPED`, `degraded: true`, and `degradedReason: "missing-github-token"` |
 | Stale or force-pushed head SHA | `pnpm vitest run src/tests/github-action-parse-args.test.ts` | `isStaleHead()` detects mismatched expected/current head SHAs before posting |
 | Runtime provider/API failure | `pnpm vitest run src/tests/critical-core-errors-orchestrator.test.ts` | all-reviewer provider failures produce an error result with provider/API failure details, classified reviewer causes, `agora doctor --live` guidance, and the failed session path |

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { describe, expect, it } from 'vitest';
+import { parse as parseYaml } from 'yaml';
 
 const repoRoot = process.cwd();
 
@@ -37,13 +38,52 @@ describe('GitHub Actions runtime readiness', () => {
     }
   });
 
-  it('documents SARIF as generated output with caller-owned upload', () => {
+  it('wires optional Code Scanning upload to the generated SARIF path', () => {
+    const action = readText('action.yml');
+    const template = readText('packages/shared/src/data/github-actions-template.yml');
     const docs = readText('docs/for-users/5_GITHUB_INTEGRATION.md');
 
-    expect(docs).toContain('it does not upload that file to');
+    expect(action).toContain('upload-sarif:');
+    expect(action).toContain('sarif-file:');
+    expect(action).toContain('uses: github/codeql-action/upload-sarif@v4');
+    expect(action).toContain("inputs.upload-sarif == 'true' && steps.review.outputs.sarif-file != '' && steps.review.outputs.degraded != 'true'");
+    expect(action).toContain('id: upload-codeagora-sarif');
+    expect(action).toContain('continue-on-error: true');
+    expect(action).toContain('sarif_file: ${{ steps.review.outputs.sarif-file }}');
+    expect(action).toContain('uses: actions/upload-artifact@v7');
+    expect(action).toContain("steps.review.outputs.degraded != 'true' && (inputs.upload-sarif != 'true' || steps.upload-codeagora-sarif.outcome == 'failure')");
+    expect(action).toContain('path: ${{ steps.review.outputs.sarif-file }}');
+    expect(action).toContain('if-no-files-found: error');
+    expect(template).toContain('security-events: write');
+    expect(template).toContain("upload-sarif: 'true'");
+    expect(docs).toContain("upload-sarif: 'true'");
+    expect(docs).toContain('`sarif-file` output');
     expect(docs).toContain('github/codeql-action/upload-sarif@v4');
+    expect(docs).toContain('actions/upload-artifact@v7');
+    expect(docs).toContain('artifact fallback');
+    expect(docs).toContain('suppressed when the review is degraded');
     expect(docs).not.toContain('uploadSarif()');
     expect(docs).not.toContain('POST /code-scanning/sarifs');
+  });
+
+  it('passes fork metadata to the runtime policy and suppresses degraded SARIF publication', () => {
+    const action = readText('action.yml');
+
+    expect(action).toContain('--base-repo "$BASE_REPO"');
+    expect(action).toContain('--head-repo "$HEAD_REPO"');
+    expect(action).toContain('BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}');
+    expect(action).toContain('HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}');
+    expect(action).toContain('steps.review.outputs.degraded != \'true\'');
+
+    const parsed = parseYaml(action);
+    const steps = parsed.runs.steps as Array<Record<string, unknown>>;
+    const reviewStep = steps.find((step) => step.id === 'review');
+    const sarifUploadStep = steps.find((step) => step.id === 'upload-codeagora-sarif');
+    const sarifArtifactStep = steps.find((step) => step.name === 'Upload CodeAgora SARIF artifact fallback');
+
+    expect(reviewStep).toBeDefined();
+    expect(sarifUploadStep?.if).toContain("steps.review.outputs.degraded != 'true'");
+    expect(sarifArtifactStep?.if).toContain("steps.review.outputs.degraded != 'true'");
   });
 
   it('keeps the generated Action bundle syntactically valid on Node 20', () => {

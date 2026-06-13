@@ -6,6 +6,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { PipelineTelemetry } from '@codeagora/core/pipeline/telemetry.js';
 import { generateReport, formatReportText, formatReportJson } from '@codeagora/core/pipeline/report.js';
 
+const rawApiKey = 'OPENAI_API_KEY=sk-test-secret';
+const rawBearer = 'Authorization: Bearer test-secret';
+
+function expectNoRawSecrets(output: string): void {
+  expect(output).not.toContain('sk-test-secret');
+  expect(output).not.toContain('Bearer test-secret');
+}
+
 describe('generateReport', () => {
   let telemetry: PipelineTelemetry;
 
@@ -207,6 +215,25 @@ describe('formatReportText', () => {
     expect(text).toContain('FAIL: connection refused');
   });
 
+  it('redacts sensitive values from generated text reports', async () => {
+    const telemetry = new PipelineTelemetry();
+    telemetry.record({
+      reviewerId: 'broken',
+      provider: 'openai',
+      model: 'gpt-4o',
+      latencyMs: 100,
+      success: false,
+      error: `${rawApiKey}\n${rawBearer}`,
+    });
+
+    const report = await generateReport(telemetry);
+    const text = formatReportText(report);
+
+    expectNoRawSecrets(text);
+    expect(text).toContain('OPENAI_API_KEY=[REDACTED]');
+    expect(text).toContain('Authorization: Bearer [REDACTED]');
+  });
+
   it('빈 리포트 → 테이블 헤더만 있고 Summary는 0 값', async () => {
     const telemetry = new PipelineTelemetry();
     const report = await generateReport(telemetry);
@@ -240,6 +267,26 @@ describe('formatReportJson', () => {
     expect(parsed).toHaveProperty('slowest');
     expect(parsed).toHaveProperty('mostExpensive');
     expect(parsed.perReviewer).toHaveLength(1);
+  });
+
+  it('redacts sensitive values from generated JSON reports', async () => {
+    const telemetry = new PipelineTelemetry();
+    telemetry.record({
+      reviewerId: 'broken',
+      provider: 'openai',
+      model: 'gpt-4o',
+      latencyMs: 100,
+      success: false,
+      error: `${rawApiKey}\n${rawBearer}`,
+    });
+
+    const report = await generateReport(telemetry);
+    const json = formatReportJson(report);
+    const parsed = JSON.parse(json);
+
+    expectNoRawSecrets(json);
+    expect(parsed.perReviewer[0].error).toContain('OPENAI_API_KEY=[REDACTED]');
+    expect(parsed.perReviewer[0].error).toContain('Authorization: Bearer [REDACTED]');
   });
 
   it('빈 리포트도 valid JSON', async () => {

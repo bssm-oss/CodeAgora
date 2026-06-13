@@ -4,9 +4,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleNeedsHuman, setCommitStatus } from '../poster.js';
+import { buildCommitStatusPayload, handleNeedsHuman, setCommitStatus } from '../poster.js';
 import type { GitHubConfig } from '../client.js';
-import type { PostResult } from '../types.js';
+import type { GitHubCommitStatusVerdict, PostResult } from '../types.js';
 
 // ============================================================================
 // Helpers
@@ -149,46 +149,42 @@ describe('setCommitStatus()', () => {
     vi.clearAllMocks();
   });
 
-  it('sets state "success" for ACCEPT verdict', async () => {
-    const octokit = makeOctokit();
-    await setCommitStatus(
-      makeConfig(),
-      'abc123',
-      'ACCEPT' as PostResult['verdict'],
-      'https://github.com/pr/review',
-      octokit as never,
-    );
+  it.each([
+    ['ACCEPT', 'success', 'ready to merge'],
+    ['REJECT', 'failure', 'Blocking issues'],
+    ['NEEDS_HUMAN', 'pending', 'Human review required'],
+    ['NEUTRAL', 'pending', 'No blocking verdict'],
+    ['DEGRADED', 'pending', 'review degraded'],
+    ['SKIPPED', 'pending', 'review skipped'],
+  ] as const)('maps %s to commit status %s', (verdict, state, description) => {
+    const payload = buildCommitStatusPayload({
+      config: makeConfig(),
+      sha: 'abc123',
+      verdict,
+      reviewUrl: 'https://github.com/pr/review',
+    });
 
-    const call = octokit.repos.createCommitStatus.mock.calls[0][0];
-    expect(call.state).toBe('success');
+    expect(payload.state).toBe(state);
+    expect(payload.description).toContain(description);
   });
 
-  it('sets state "failure" for REJECT verdict', async () => {
+  it('posts the mapped GitHub commit status to the reviewed PR commit SHA', async () => {
     const octokit = makeOctokit();
     await setCommitStatus(
       makeConfig(),
-      'abc123',
-      'REJECT' as PostResult['verdict'],
+      'reviewed-head-sha',
+      'DEGRADED' as GitHubCommitStatusVerdict,
       'https://github.com/pr/review',
       octokit as never,
     );
 
+    expect(octokit.repos.createCommitStatus).toHaveBeenCalledOnce();
     const call = octokit.repos.createCommitStatus.mock.calls[0][0];
-    expect(call.state).toBe('failure');
-  });
-
-  it('sets state "pending" for NEEDS_HUMAN verdict', async () => {
-    const octokit = makeOctokit();
-    await setCommitStatus(
-      makeConfig(),
-      'abc123',
-      'NEEDS_HUMAN' as PostResult['verdict'],
-      'https://github.com/pr/review',
-      octokit as never,
-    );
-
-    const call = octokit.repos.createCommitStatus.mock.calls[0][0];
+    expect(call.owner).toBe('test-owner');
+    expect(call.repo).toBe('test-repo');
+    expect(call.sha).toBe('reviewed-head-sha');
     expect(call.state).toBe('pending');
+    expect(call.target_url).toBe('https://github.com/pr/review');
   });
 
   it('uses context "CodeAgora / review"', async () => {

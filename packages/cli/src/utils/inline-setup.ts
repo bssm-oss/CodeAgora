@@ -6,7 +6,7 @@
 import { createInterface } from 'readline';
 import { saveCredential } from '@codeagora/core/config/credentials.js';
 import { buildDefaultConfig } from '@codeagora/core/config/loader.js';
-import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { PROVIDER_ENV_VARS, getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 import { CA_ROOT } from '@codeagora/shared/utils/fs.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -206,7 +206,7 @@ export function parseCredentialInput(input: string, preferredProvider = 'groq'):
   const key = input.trim();
   const detected = detectProviderFromKey(key);
   const provider = detected === 'unknown' ? normalizeProviderInput(preferredProvider) ?? 'groq' : detected;
-  const envVar = PROVIDER_ENV_VARS[provider] ?? `${provider.toUpperCase().replace(/-/g, '_')}_API_KEY`;
+  const envVar = getProviderEnvVar(provider);
   return { provider, envVar, key };
 }
 

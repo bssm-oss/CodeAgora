@@ -175,8 +175,8 @@ function binPath(installDir, name) {
 
 function installTarball(tarballPath, label) {
   const installDir = fs.mkdtempSync(path.join(os.tmpdir(), `codeagora-${label}-install-`));
-  console.log(`$ npm install ${tarballPath}  # ${label} tarball install smoke`);
-  runCapture('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarballPath], {
+  console.log(`$ pnpm add ${tarballPath}  # ${label} tarball install smoke`);
+  runCapture('pnpm', ['add', '--ignore-scripts', tarballPath], {
     cwd: installDir,
     env: smokeEnv({
       HOME: installDir,
@@ -191,8 +191,8 @@ function installTarball(tarballPath, label) {
 function smokeRootPostinstall(rootTarball) {
   const installDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-root-postinstall-'));
   try {
-    console.log(`$ npm install --foreground-scripts ${rootTarball}  # root package postinstall smoke`);
-    const output = runCapture('npm', ['install', '--foreground-scripts', '--no-audit', '--no-fund', rootTarball], {
+    console.log(`$ pnpm add --stream --allow-build=@codeagora/review ${rootTarball}  # root package postinstall smoke`);
+    const output = runCapture('pnpm', ['add', '--stream', '--allow-build=@codeagora/review', rootTarball], {
       cwd: installDir,
       env: smokeEnv({
         HOME: installDir,
