@@ -1,5 +1,10 @@
 import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
-import { activeReviewerCount, evaluateConfigPolicy, isEnabledConfigEntry } from './readiness.js';
+import {
+  activeReviewerCount,
+  evaluateConfigPolicy,
+  isEnabledConfigEntry,
+  providerCredentialRequirements,
+} from './readiness.js';
 import { isCompactMobileViewport, resolveRunMobileStep, type RunMobileStep, type SessionMobileTab } from './layout.js';
 import { logoDataUri } from './logo.js';
 import {
@@ -561,6 +566,11 @@ function runReadiness(): RunReadiness {
     if (policy.validJson && !policy.complete) {
       reasons.push(t('desktop.readiness.reason.noActiveReviewers'));
       nextSteps.add(t('desktop.readiness.next.addReviewer'));
+    }
+    const providerKeys = providerCredentialRequirements(state.configRaw, state.providers);
+    if (policy.validJson && providerKeys.length > 0 && state.providers.length > 0 && providerKeys.every((item) => !item.configured)) {
+      reasons.push(t('desktop.readiness.reason.providerKeyMissing'));
+      nextSteps.add(t('desktop.readiness.next.providerKey'));
     }
   }
   if (reasons.length > 0) {
@@ -1363,7 +1373,7 @@ function renderShell(): HTMLElement {
     const navButton = button(label, () => {
       setView(view);
       if (view === 'config' && !state.configRaw) void loadConfig();
-      if (view === 'setup' && state.providers.length === 0) void loadSetup();
+      if ((view === 'run' || view === 'config' || view === 'setup') && state.providers.length === 0) void loadSetup();
     }, state.view === view ? 'ca-nav-button ca-active' : 'ca-nav-button', testId);
     nav.append(navButton);
   }
@@ -2117,6 +2127,7 @@ function renderRunReview(): HTMLElement {
   if (mobile) {
     panel.append(renderRunMobileStepper(readiness, Boolean(state.activeRun)));
     panel.append(readinessPanel);
+    panel.append(renderProviderCredentialPanel('run'));
     if (!readiness.ready) return panel;
 
     const currentStep = resolveRunMobileStep(state.runMobileStep, readiness.ready, Boolean(state.activeRun));
@@ -2142,6 +2153,7 @@ function renderRunReview(): HTMLElement {
   }
 
   panel.append(readinessPanel);
+  panel.append(renderProviderCredentialPanel('run'));
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
   panel.append(renderRunLaunchCards());
@@ -2391,6 +2403,7 @@ function renderConfig(): HTMLElement {
   header.append(el('span', 'ca-config-path', state.configPath));
   panel.append(header);
   panel.append(renderConfigStatusPanel());
+  panel.append(renderProviderCredentialPanel('config'));
   panel.append(renderConfigFacts());
   panel.append(renderConfigValidation());
 
@@ -2552,6 +2565,93 @@ function agentLabel(value: unknown): string {
   return [provider ?? backend, model].filter(Boolean).join(' / ') || t('desktop.value.unknown');
 }
 
+function providerKeyTestId(provider: string): string {
+  return provider.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'provider';
+}
+
+function renderProviderCredentialPanel(context: 'run' | 'config' | 'setup'): HTMLElement {
+  const policy = evaluateConfigPolicy(state.configRaw);
+  const requirements = providerCredentialRequirements(state.configRaw, state.providers);
+  const statusKnown = state.providers.length > 0;
+  const configuredCount = requirements.filter((item) => item.configured).length;
+  const allConfigured = requirements.length > 0 && configuredCount === requirements.length;
+  const noneConfigured = requirements.length > 0 && statusKnown && configuredCount === 0;
+  const tone = !policy.validJson
+    ? 'warn'
+    : allConfigured
+      ? 'good'
+      : noneConfigured
+        ? 'danger'
+        : 'warn';
+  const panel = el('section', `ca-credential-panel ca-${tone}`);
+  panel.dataset.testid = `${context}-credential-panel`;
+  panel.append(el('span', 'ca-eyebrow', t('desktop.credentials.eyebrow')));
+  panel.append(el(
+    'strong',
+    '',
+    allConfigured
+      ? t('desktop.credentials.readyTitle')
+      : noneConfigured
+        ? t('desktop.credentials.missingTitle')
+        : t('desktop.credentials.checkTitle'),
+  ));
+  panel.append(el(
+    'p',
+    '',
+    allConfigured
+      ? t('desktop.credentials.readyBody')
+      : noneConfigured
+        ? t('desktop.credentials.missingBody')
+        : t('desktop.credentials.checkBody'),
+  ));
+  panel.append(el('p', 'ca-credential-store-note', t('desktop.credentials.storeNote', { configPath: state.configPath })));
+
+  if (!policy.validJson) {
+    panel.append(el('p', 'ca-repo-note ca-warn', t('desktop.credentials.invalidConfigBody')));
+    return panel;
+  }
+
+  if (requirements.length === 0) {
+    panel.append(el('p', 'ca-repo-note', t('desktop.credentials.noApiProviders')));
+  } else {
+    const grid = el('div', 'ca-credential-grid');
+    for (const requirement of requirements) {
+      const card = el('div', requirement.configured ? 'ca-credential-card ca-good' : 'ca-credential-card ca-warn');
+      card.append(el('span', requirement.configured ? 'ca-provider-ok ca-status-pill' : 'ca-provider-missing ca-status-pill', requirement.configured ? t('desktop.value.ready') : t('desktop.value.missing')));
+      card.append(el('strong', '', requirement.provider));
+      card.append(el('span', 'ca-provider-meta', t('desktop.credentials.envVarLabel', { envVar: requirement.envVar })));
+      card.append(el('span', 'ca-provider-meta', t('desktop.credentials.agentUseCount', { count: requirement.sourceCount })));
+      const command = `agora env set ${requirement.provider} <api-key>`;
+      const commandLine = el('code', 'ca-command-inline', command);
+      card.append(commandLine);
+      card.append(button(t('desktop.action.copy'), async () => {
+        try {
+          await navigator.clipboard.writeText(command);
+          pushToast(t('desktop.toast.copied'), 'success');
+        } catch {
+          pushToast(t('desktop.toast.copyFailed'), 'error');
+        }
+      }, 'ca-button ca-button-ghost', `button-copy-provider-command-${providerKeyTestId(requirement.provider)}`));
+      grid.append(card);
+    }
+    panel.append(grid);
+  }
+
+  const actions = el('div', 'ca-config-status-actions');
+  actions.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button', `button-refresh-credentials-${context}`));
+  actions.append(button(
+    state.liveDoctorLoading ? t('desktop.setup.liveReviewLoading') : t('desktop.setup.liveReviewCheck'),
+    () => void loadLiveDoctorStatus(),
+    'ca-button ca-primary',
+    `button-live-check-credentials-${context}`,
+  ));
+  if (context !== 'config') {
+    actions.append(button(t('desktop.nav.config'), () => setView('config'), 'ca-button ca-subtle', `button-open-config-credentials-${context}`));
+  }
+  panel.append(actions);
+  return panel;
+}
+
 function renderSetup(): HTMLElement {
   const panel = el('div', 'ca-setup-panel');
   panel.dataset.testid = 'setup-panel';
@@ -2564,6 +2664,7 @@ function renderSetup(): HTMLElement {
   header.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button', 'button-refresh-setup'));
   panel.append(header);
   panel.append(renderSetupOverview());
+  panel.append(renderProviderCredentialPanel('setup'));
 
   const providerDetails = el('details', 'ca-integration-section') as HTMLDetailsElement;
   providerDetails.append(el('summary', '', t('desktop.setup.reviewEngines')));

@@ -1,7 +1,7 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -2515,20 +2515,9 @@ fn run_doctor_report(
     parse_doctor_report(&stdout)
 }
 
-#[tauri::command]
-fn get_provider_status(state: State<'_, WorkspaceState>) -> Result<Vec<ProviderStatus>, String> {
-    let root = active_repo_root(&state)
-        .or_else(|_| std::env::current_dir().map_err(|error| error.to_string()))?;
-    let output =
-        run_agora(&root, &["doctor", "--json"], None).map_err(|error| error.to_string())?;
-    let output = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if output.is_empty() {
-        return Err("Failed to run agora doctor".to_string());
-    }
-    let parsed: serde_json::Value =
-        serde_json::from_str(&output).map_err(|e| format!("Failed to parse doctor output: {e}"))?;
-
+fn provider_statuses_from_doctor_report(parsed: &Value) -> Vec<ProviderStatus> {
     let mut statuses = Vec::new();
+    let mut seen_api = HashSet::new();
 
     // Extract provider statuses from doctor checks
     if let Some(checks) = parsed.get("checks").and_then(|v| v.as_array()) {
@@ -2539,6 +2528,83 @@ fn get_provider_status(state: State<'_, WorkspaceState>) -> Result<Vec<ProviderS
                 .and_then(|v| v.as_str())
                 .unwrap_or("warn");
             let message = check.get("message").and_then(|v| v.as_str()).unwrap_or("");
+
+            let mut extracted_structured_provider = false;
+            if let Some(details) = check.get("details") {
+                if let Some(providers) = details.get("providers").and_then(|v| v.as_array()) {
+                    for provider_status in providers {
+                        let Some(provider) =
+                            provider_status.get("provider").and_then(|v| v.as_str())
+                        else {
+                            continue;
+                        };
+                        let env_var = provider_status
+                            .get("envVar")
+                            .and_then(|v| v.as_str())
+                            .map(|value| value.to_string());
+                        let configured = provider_status
+                            .get("set")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(status == "pass");
+                        let key = format!("{}:{}", provider, env_var.as_deref().unwrap_or(""));
+                        if seen_api.insert(key) {
+                            statuses.push(ProviderStatus {
+                                name: provider.to_string(),
+                                kind: "api".to_string(),
+                                env_var,
+                                configured,
+                                redacted_value: if configured {
+                                    Some("set".to_string())
+                                } else {
+                                    None
+                                },
+                                binary: None,
+                            });
+                        }
+                        extracted_structured_provider = true;
+                    }
+                }
+
+                if let Some(keys) = details.get("keys").and_then(|v| v.as_array()) {
+                    for key_status in keys {
+                        let env_var = key_status
+                            .get("envVar")
+                            .and_then(|v| v.as_str())
+                            .map(|value| value.to_string());
+                        let Some(providers) =
+                            key_status.get("providers").and_then(|v| v.as_array())
+                        else {
+                            continue;
+                        };
+                        for provider in providers {
+                            let Some(provider) = provider.as_str() else {
+                                continue;
+                            };
+                            let seen_key =
+                                format!("{}:{}", provider, env_var.as_deref().unwrap_or(""));
+                            if seen_api.insert(seen_key) {
+                                statuses.push(ProviderStatus {
+                                    name: provider.to_string(),
+                                    kind: "api".to_string(),
+                                    env_var: env_var.clone(),
+                                    configured: status == "pass",
+                                    redacted_value: if status == "pass" {
+                                        Some("set".to_string())
+                                    } else {
+                                        None
+                                    },
+                                    binary: None,
+                                });
+                            }
+                            extracted_structured_provider = true;
+                        }
+                    }
+                }
+            }
+
+            if extracted_structured_provider {
+                continue;
+            }
 
             // Only include checks that look like provider checks
             if name.contains("API key") || name.contains("provider") || name.contains("backend") {
@@ -2583,7 +2649,22 @@ fn get_provider_status(state: State<'_, WorkspaceState>) -> Result<Vec<ProviderS
         }
     }
 
-    Ok(statuses)
+    statuses
+}
+
+#[tauri::command]
+fn get_provider_status(state: State<'_, WorkspaceState>) -> Result<Vec<ProviderStatus>, String> {
+    let root = active_repo_root(&state)
+        .or_else(|_| std::env::current_dir().map_err(|error| error.to_string()))?;
+    let output =
+        run_agora(&root, &["doctor", "--json"], None).map_err(|error| error.to_string())?;
+    let output = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if output.is_empty() {
+        return Err("Failed to run agora doctor".to_string());
+    }
+    let parsed: serde_json::Value =
+        serde_json::from_str(&output).map_err(|e| format!("Failed to parse doctor output: {e}"))?;
+    Ok(provider_statuses_from_doctor_report(&parsed))
 }
 
 #[tauri::command]
@@ -2934,6 +3015,50 @@ mod tests {
             updated
         );
         assert!(!root.join(".ca/config.json.tmp").exists());
+    }
+
+    #[test]
+    fn desktop_provider_status_preserves_structured_doctor_provider_details() {
+        let report = json!({
+            "checks": [
+                {
+                    "name": "Configured API credentials",
+                    "status": "pass",
+                    "message": "Config API credentials ready: OPENROUTER_API_KEY",
+                    "details": {
+                        "providers": [
+                            {
+                                "provider": "openrouter",
+                                "envVar": "OPENROUTER_API_KEY",
+                                "set": true
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Available API keys",
+                    "status": "pass",
+                    "message": "API keys found for openrouter (OPENROUTER_API_KEY)",
+                    "details": {
+                        "keys": [
+                            {
+                                "envVar": "OPENROUTER_API_KEY",
+                                "providers": ["openrouter"]
+                            }
+                        ]
+                    }
+                }
+            ],
+            "cliBackends": []
+        });
+
+        let statuses = provider_statuses_from_doctor_report(&report);
+        assert_eq!(statuses.len(), 1);
+        assert_eq!(statuses[0].name, "openrouter");
+        assert_eq!(statuses[0].kind, "api");
+        assert_eq!(statuses[0].env_var.as_deref(), Some("OPENROUTER_API_KEY"));
+        assert!(statuses[0].configured);
+        assert_eq!(statuses[0].redacted_value.as_deref(), Some("set"));
     }
 
     #[test]

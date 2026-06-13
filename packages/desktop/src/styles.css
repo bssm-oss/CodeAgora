@@ -1557,6 +1557,83 @@ summary {
   margin: 0;
 }
 
+.ca-credential-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+.ca-credential-panel.ca-good {
+  border-color: color-mix(in srgb, var(--good) 42%, var(--border));
+  background: var(--good-soft);
+}
+
+.ca-credential-panel.ca-warn {
+  border-color: color-mix(in srgb, var(--warn) 42%, var(--border));
+  background: var(--warn-soft);
+}
+
+.ca-credential-panel.ca-danger {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  background: var(--danger-soft);
+}
+
+.ca-credential-panel > strong {
+  font-size: var(--text-lg);
+}
+
+.ca-credential-panel p {
+  max-width: 76ch;
+  margin: 0;
+}
+
+.ca-credential-store-note {
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.ca-credential-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.ca-credential-card {
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.ca-credential-card.ca-good {
+  border-color: color-mix(in srgb, var(--good) 36%, var(--border));
+}
+
+.ca-credential-card.ca-warn {
+  border-color: color-mix(in srgb, var(--warn) 36%, var(--border));
+}
+
+.ca-command-inline {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
 .ca-config-status-actions {
   display: flex;
   flex-wrap: wrap;
