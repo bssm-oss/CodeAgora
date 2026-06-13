@@ -40,6 +40,7 @@ describe('release workflow readiness gates', () => {
     expect(release).toContain('release-evidence-${{ github.ref_name }}');
     expect(release).toContain('prerelease: ${{ contains(github.ref_name, \'-\') }}');
     expect(rootPackage.scripts['evidence:security-smoke']).toBe('node scripts/security-evidence-smoke.mjs');
-    expect(rootPackage.scripts['evidence:desktop-security']).toBe('node scripts/desktop-security-evidence.mjs');
+    expect(rootPackage.scripts['evidence:redaction-path-safety']).toBe('node scripts/redaction-path-safety-evidence.mjs');
+    expect(rootPackage.scripts['evidence:github-security']).toBe('node scripts/github-security-evidence.mjs');
   });
 });
