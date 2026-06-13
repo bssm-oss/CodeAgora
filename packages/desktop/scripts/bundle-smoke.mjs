@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertMacosDesktopArtifact } from './desktop-artifacts.mjs';
 
 const packageRoot = path.resolve(import.meta.dirname, '..');
 const bundleRoot = path.join(packageRoot, 'src-tauri', 'target', 'release', 'bundle');
+const tauriConfig = JSON.parse(fs.readFileSync(path.join(packageRoot, 'src-tauri', 'tauri.conf.json'), 'utf8'));
 
 function assert(condition, message) {
   if (!condition) {
@@ -29,6 +31,12 @@ const apps = findFiles(bundleRoot, (absolute, entry) => entry.isDirectory() && a
 const dmgFiles = findFiles(bundleRoot, (absolute, entry) => entry.isFile() && absolute.endsWith('.dmg'));
 
 if (process.platform === 'darwin') {
+  const releaseArtifact = assertMacosDesktopArtifact({
+    cwd: path.resolve(packageRoot, '..', '..'),
+    bundleRoot,
+    productName: tauriConfig.productName,
+    version: tauriConfig.version,
+  });
   assert(apps.length > 0, 'macOS .app bundle was not produced');
   const app = apps[0];
   const infoPlist = fs.readFileSync(path.join(app, 'Contents', 'Info.plist'), 'utf8');
@@ -37,6 +45,9 @@ if (process.platform === 'darwin') {
   const executable = path.join(app, 'Contents', 'MacOS', executableName);
   assert(fs.existsSync(executable), `macOS app executable is missing: ${executable}`);
   assert(fs.statSync(executable).mode & 0o111, `macOS app executable is not executable: ${executable}`);
+  if (!dmgFiles.includes(releaseArtifact.path)) {
+    dmgFiles.unshift(releaseArtifact.path);
+  }
 }
 
 assert(apps.length > 0 || dmgFiles.length > 0, 'No desktop bundle artifacts were produced');

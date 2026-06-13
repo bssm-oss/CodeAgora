@@ -2,6 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {
+  MACOS_ARM64_SIGNING_EVIDENCE_FILENAME,
+  locateMacosDesktopArtifact,
+  readMacosArm64SigningEvidence,
+  validateMacosArm64SigningEvidence,
+} from './desktop-artifacts.mjs';
 
 const packageRoot = path.resolve(import.meta.dirname, '..');
 const repoRoot = path.resolve(packageRoot, '..', '..');
@@ -29,8 +35,24 @@ function fileEvidence(relativePath) {
 const packageJson = readJson(path.join(packageRoot, 'package.json'));
 const tauriConfig = readJson(path.join(packageRoot, 'src-tauri', 'tauri.conf.json'));
 const main = fs.readFileSync(path.join(packageRoot, 'src-tauri', 'src', 'main.rs'), 'utf8');
+const macosArm64Artifact = locateMacosDesktopArtifact({
+  cwd: repoRoot,
+  bundleRoot: path.join(packageRoot, 'src-tauri', 'target', 'release', 'bundle'),
+  productName: tauriConfig.productName,
+  version: packageJson.version,
+  arch: 'arm64',
+});
+const macosArm64SigningEvidence = readMacosArm64SigningEvidence({
+  cwd: repoRoot,
+  evidenceRoot,
+});
+const macosArm64SigningValidation = validateMacosArm64SigningEvidence({
+  artifact: macosArm64Artifact,
+  evidence: macosArm64SigningEvidence.evidence,
+});
 
 const commands = [
+  'open_external_link',
   'open_repository',
   'get_repo_info',
   'list_sessions',
@@ -79,8 +101,12 @@ const manifest = {
   packagingDecision: {
     releaseChannel: 'official-desktop',
     publicDesktopLaunch: true,
-    signing: 'captured-by-release-evidence',
-    notarization: 'captured-by-release-evidence',
+    signing: macosArm64SigningValidation.valid
+      ? 'valid-macos-arm64-release-evidence'
+      : 'missing-or-invalid-macos-arm64-release-evidence',
+    notarization: macosArm64SigningValidation.valid
+      ? 'valid-macos-arm64-release-evidence'
+      : 'missing-or-invalid-macos-arm64-release-evidence',
     updater: 'disabled-unless-release-evidence-enables-it',
     packageSmoke: 'pnpm --filter @codeagora/desktop smoke',
     appE2e: 'pnpm --filter @codeagora/desktop app:e2e',
@@ -89,6 +115,26 @@ const manifest = {
     liveReviewSmoke: 'pnpm --filter @codeagora/desktop live:review-smoke (real provider smoke when provider credentials are available)',
     bundleSmoke: 'pnpm --filter @codeagora/desktop bundle:smoke',
     rcGate: 'pnpm rc:desktop-gate',
+  },
+  releaseArtifacts: {
+    macosArm64: {
+      platform: macosArm64Artifact.platform,
+      arch: macosArm64Artifact.arch,
+      tauriArch: macosArm64Artifact.tauriArch,
+      artifactType: macosArm64Artifact.artifactType,
+      present: macosArm64Artifact.present,
+      expectedFilename: macosArm64Artifact.expectedFilename,
+      path: macosArm64Artifact.relativePath,
+      size: macosArm64Artifact.size ?? 0,
+      sha256: macosArm64Artifact.sha256 ?? null,
+      error: macosArm64Artifact.error ?? null,
+    },
+    macosArm64SigningEvidence: {
+      path: macosArm64SigningEvidence.relativePath
+        ?? path.join('.sisyphus', 'evidence', MACOS_ARM64_SIGNING_EVIDENCE_FILENAME),
+      present: macosArm64SigningEvidence.present,
+      validation: macosArm64SigningValidation,
+    },
   },
   artifacts: [
     fileEvidence('dist/index.html'),

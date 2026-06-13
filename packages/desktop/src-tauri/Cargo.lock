@@ -548,6 +548,7 @@ dependencies = [
 name = "codeagora-desktop"
 version = "0.1.0-rc.6"
 dependencies = [
+ "regex",
  "serde",
  "serde_json",
  "tauri",

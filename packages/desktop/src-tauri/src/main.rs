@@ -1,3 +1,4 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -189,11 +190,12 @@ struct DesktopCommandContract {
     notes: &'static str,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SessionExport {
     format: String,
     file_name: String,
+    file_path: String,
     content: String,
 }
 
@@ -683,7 +685,9 @@ fn config_path(root: &Path) -> Option<PathBuf> {
     ["config.json", "config.yml", "config.yaml"]
         .iter()
         .map(|name| root.join(".ca").join(name))
-        .find(|path| path.is_file())
+        .find(|path| {
+            path.is_file() && bounded_existing_workspace_path(root, path, "config").is_ok()
+        })
 }
 
 fn review_ignore_path(root: &Path) -> Option<PathBuf> {
@@ -704,12 +708,18 @@ fn session_count(root: &Path) -> usize {
 
     date_dirs
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .filter_map(|entry| fs::read_dir(entry.path()).ok())
+        .filter_map(|entry| {
+            bounded_existing_workspace_path(root, &entry.path(), "session date directory").ok()
+        })
+        .filter(|path| path.is_dir())
+        .filter_map(|path| fs::read_dir(path).ok())
         .map(|entries| {
             entries
                 .filter_map(Result::ok)
-                .filter(|entry| entry.path().is_dir())
+                .filter_map(|entry| {
+                    bounded_existing_workspace_path(root, &entry.path(), "session directory").ok()
+                })
+                .filter(|path| path.is_dir())
                 .count()
         })
         .sum()
@@ -721,8 +731,101 @@ fn dirty_file_count(root: &Path) -> usize {
         .unwrap_or(0)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ExternalOpenCommand {
+    program: &'static str,
+    args: Vec<String>,
+}
+
+fn validate_external_link_url(raw: &str) -> Result<String, String> {
+    let url = raw.trim();
+    if url.is_empty() || url != raw {
+        return Err("Invalid external link URL".to_string());
+    }
+    if !url
+        .get(..8)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("https://"))
+    {
+        return Err("Unsupported external link scheme".to_string());
+    }
+    if url
+        .chars()
+        .any(|ch| ch.is_control() || ch.is_whitespace() || ch == '\\')
+    {
+        return Err("Invalid external link URL".to_string());
+    }
+
+    let authority = url["https://".len()..]
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or_default();
+    if authority.is_empty()
+        || authority.contains('@')
+        || authority.starts_with('.')
+        || authority.ends_with('.')
+    {
+        return Err("Invalid external link URL".to_string());
+    }
+    Ok(url.to_string())
+}
+
+fn external_open_command_for(url: &str) -> Result<ExternalOpenCommand, String> {
+    let safe_url = validate_external_link_url(url)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        return Ok(ExternalOpenCommand {
+            program: "open",
+            args: vec![safe_url],
+        });
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        return Ok(ExternalOpenCommand {
+            program: "rundll32.exe",
+            args: vec!["url.dll,FileProtocolHandler".to_string(), safe_url],
+        });
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        return Ok(ExternalOpenCommand {
+            program: "xdg-open",
+            args: vec![safe_url],
+        });
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", unix)))]
+    {
+        Err("External link opening is unsupported on this platform".to_string())
+    }
+}
+
+fn open_external_link_with_system(url: &str) -> Result<(), String> {
+    let command = external_open_command_for(url)?;
+    let status = Command::new(command.program)
+        .args(&command.args)
+        .status()
+        .map_err(|_| "External link opener failed to start".to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("External link opener returned a non-zero status".to_string())
+    }
+}
+
 fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
     vec![
+        DesktopCommandContract {
+            name: "open_external_link",
+            classification: "desktop-external-open",
+            reads_project: false,
+            mutates_project: false,
+            spawns_process: true,
+            notes:
+                "Validates https-only external links before delegating to the platform opener.",
+        },
         DesktopCommandContract {
             name: "open_repository",
             classification: "read-only",
@@ -757,11 +860,11 @@ fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
         },
         DesktopCommandContract {
             name: "export_session",
-            classification: "read-only",
+            classification: "project-mutation",
             reads_project: true,
-            mutates_project: false,
+            mutates_project: true,
             spawns_process: false,
-            notes: "Exports canonical session artifacts as markdown, JSON, or SARIF text.",
+            notes: "Writes redacted session evidence under .ca/desktop-exports using safe filenames.",
         },
         DesktopCommandContract {
             name: "run_review",
@@ -868,6 +971,14 @@ fn desktop_command_contracts() -> Vec<DesktopCommandContract> {
             spawns_process: false,
             notes: "Reports this desktop bridge contract for UI and release evidence.",
         },
+        DesktopCommandContract {
+            name: "set_notification_preferences",
+            classification: "desktop-preference",
+            reads_project: false,
+            mutates_project: false,
+            spawns_process: false,
+            notes: "Updates in-memory desktop notification preferences without touching repository state.",
+        },
     ]
 }
 
@@ -881,6 +992,67 @@ fn read_optional_text(path: &Path) -> Option<String> {
     fs::read_to_string(path)
         .ok()
         .filter(|raw| !raw.trim().is_empty())
+}
+
+fn canonical_workspace_root(root: &Path) -> Result<PathBuf, String> {
+    root.canonicalize()
+        .map_err(|error| format!("Cannot resolve workspace root {}: {error}", root.display()))
+}
+
+fn bounded_existing_workspace_path(
+    root: &Path,
+    path: &Path,
+    label: &str,
+) -> Result<PathBuf, String> {
+    let workspace_root = canonical_workspace_root(root)?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|error| format!("Cannot resolve {label} path {}: {error}", path.display()))?;
+    if canonical.starts_with(&workspace_root) {
+        Ok(canonical)
+    } else {
+        Err(format!(
+            "Rejected {label} path outside workspace: {}",
+            path.display()
+        ))
+    }
+}
+
+fn bounded_write_workspace_path(root: &Path, path: &Path, label: &str) -> Result<PathBuf, String> {
+    if path.exists() {
+        return bounded_existing_workspace_path(root, path, label);
+    }
+
+    let workspace_root = canonical_workspace_root(root)?;
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    };
+    let mut existing_parent = absolute
+        .parent()
+        .ok_or_else(|| format!("Cannot resolve {label} path parent: {}", absolute.display()))?;
+    while !existing_parent.exists() {
+        existing_parent = existing_parent.parent().ok_or_else(|| {
+            format!(
+                "Cannot resolve existing {label} path ancestor for {}",
+                absolute.display()
+            )
+        })?;
+    }
+    let canonical_parent = existing_parent.canonicalize().map_err(|error| {
+        format!(
+            "Cannot resolve existing {label} path ancestor {}: {error}",
+            existing_parent.display()
+        )
+    })?;
+    if !canonical_parent.starts_with(&workspace_root) {
+        return Err(format!(
+            "Rejected {label} path outside workspace: {}",
+            path.display()
+        ));
+    }
+    Ok(absolute)
 }
 
 fn read_session_verdict(dir: &Path) -> Option<Value> {
@@ -1244,7 +1416,11 @@ fn session_entry(
 }
 
 fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
-    let dir = session_dir(root, id)?;
+    let requested_dir = session_dir(root, id)?;
+    if !requested_dir.exists() {
+        return Err(format!("Session not found: {id}"));
+    }
+    let dir = bounded_existing_workspace_path(root, &requested_dir, "session directory")?;
     if !dir.is_dir() {
         return Err(format!("Session not found: {id}"));
     }
@@ -1312,7 +1488,14 @@ fn session_list_value(workspace_root: &Path) -> Result<Value, String> {
         {
             continue;
         }
-        let mut session_dirs = fs::read_dir(date_entry.path())
+        let Ok(date_dir) = bounded_existing_workspace_path(
+            workspace_root,
+            &date_entry.path(),
+            "session date directory",
+        ) else {
+            continue;
+        };
+        let mut session_dirs = fs::read_dir(date_dir)
             .map_err(|error| error.to_string())?
             .filter_map(Result::ok)
             .filter(|entry| entry.path().is_dir())
@@ -1322,7 +1505,14 @@ fn session_list_value(workspace_root: &Path) -> Result<Value, String> {
 
         for session_entry_dir in session_dirs {
             let session_id = session_entry_dir.file_name().to_string_lossy().to_string();
-            let dir = session_entry_dir.path();
+            let requested_dir = session_entry_dir.path();
+            let Ok(dir) = bounded_existing_workspace_path(
+                workspace_root,
+                &requested_dir,
+                "session directory",
+            ) else {
+                continue;
+            };
             let metadata = read_json(&dir.join("metadata.json"));
             let verdict = read_session_verdict(&dir);
             sessions.push(session_entry(
@@ -1367,10 +1557,46 @@ fn cli_session_export(root: &Path, id: &str, format: &str) -> Result<String, Str
     Err(redact_sensitive(&String::from_utf8_lossy(&output.stderr)))
 }
 
+fn export_file_name(id: &str, format: &str) -> Result<String, String> {
+    let (date, session_id) = session_parts(id)?;
+    let extension = match format {
+        "markdown" | "md" => "md",
+        "json" => "json",
+        "sarif" => "sarif",
+        _ => return Err(format!("Unsupported export format: {format}")),
+    };
+    Ok(format!("codeagora-session-{date}-{session_id}.{extension}"))
+}
+
+fn write_session_export_file(
+    root: &Path,
+    file_name: &str,
+    content: &str,
+) -> Result<String, String> {
+    if file_name.contains('/') || file_name.contains('\\') || file_name.contains("..") {
+        return Err(format!("Unsafe export filename: {file_name}"));
+    }
+
+    let export_dir = bounded_write_workspace_path(
+        root,
+        &root.join(".ca").join("desktop-exports"),
+        "desktop export directory",
+    )?;
+    fs::create_dir_all(&export_dir).map_err(|error| error.to_string())?;
+    let export_dir =
+        bounded_existing_workspace_path(root, &export_dir, "desktop export directory")?;
+    let export_path =
+        bounded_write_workspace_path(root, &export_dir.join(file_name), "desktop export file")?;
+    fs::write(&export_path, content).map_err(|error| error.to_string())?;
+    let export_path = bounded_existing_workspace_path(root, &export_path, "desktop export file")?;
+    Ok(export_path.display().to_string())
+}
+
 fn export_session_value(root: &Path, id: &str, format: &str) -> Result<SessionExport, String> {
     let detail = session_detail_value(root, id)?;
     let normalized = format.trim().to_ascii_lowercase();
-    match normalized.as_str() {
+    let file_name = export_file_name(id, &normalized)?;
+    let (format, raw_content) = match normalized.as_str() {
         "markdown" | "md" => {
             let content = detail
                 .get("markdown")
@@ -1379,24 +1605,23 @@ fn export_session_value(root: &Path, id: &str, format: &str) -> Result<SessionEx
                 .unwrap_or_else(|| {
                     serde_json::to_string_pretty(&detail).unwrap_or_else(|_| "{}".to_string())
                 });
-            Ok(SessionExport {
-                format: "markdown".to_string(),
-                file_name: format!("codeagora-session-{}.md", id.replace('/', "-")),
-                content,
-            })
+            ("markdown".to_string(), content)
         }
-        "json" => Ok(SessionExport {
-            format: "json".to_string(),
-            file_name: format!("codeagora-session-{}.json", id.replace('/', "-")),
-            content: serde_json::to_string_pretty(&detail).map_err(|error| error.to_string())?,
-        }),
-        "sarif" => Ok(SessionExport {
-            format: "sarif".to_string(),
-            file_name: format!("codeagora-session-{}.sarif", id.replace('/', "-")),
-            content: cli_session_export(root, id, "sarif")?,
-        }),
-        _ => Err(format!("Unsupported export format: {format}")),
-    }
+        "json" => (
+            "json".to_string(),
+            serde_json::to_string_pretty(&detail).map_err(|error| error.to_string())?,
+        ),
+        "sarif" => ("sarif".to_string(), cli_session_export(root, id, "sarif")?),
+        _ => return Err(format!("Unsupported export format: {format}")),
+    };
+    let content = redact_sensitive(&raw_content);
+    let file_path = write_session_export_file(root, &file_name, &content)?;
+    Ok(SessionExport {
+        format,
+        file_name,
+        file_path,
+        content,
+    })
 }
 
 fn config_format_from_path(path: Option<&Path>) -> &'static str {
@@ -1492,6 +1717,12 @@ fn redact_secret(value: &str) -> String {
     format!("***{suffix}")
 }
 
+fn redact_pattern(input: String, pattern: &str, replacement: &str) -> String {
+    Regex::new(pattern)
+        .map(|regex| regex.replace_all(&input, replacement).to_string())
+        .unwrap_or(input)
+}
+
 fn redact_sensitive(raw: &str) -> String {
     let mut redacted = raw.to_string();
     for (key, value) in std::env::vars() {
@@ -1504,6 +1735,26 @@ fn redact_sensitive(raw: &str) -> String {
             redacted = redacted.replace(&value, &redact_secret(&value));
         }
     }
+    redacted = redact_pattern(
+        redacted,
+        r#"(?i)("?(?:[A-Z][A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)|api[_-]?key|token|secret|password)"?\s*[:=]\s*)("?)[^"',}\s]+("?)"#,
+        "${1}${2}[REDACTED]${3}",
+    );
+    redacted = redact_pattern(
+        redacted,
+        r#"(?i)\b(Authorization\s*:\s*Bearer\s+)[^\s"']+"#,
+        "${1}[REDACTED]",
+    );
+    redacted = redact_pattern(
+        redacted,
+        r#"\b(Bearer\s+)[A-Za-z0-9._~+/=-]+"#,
+        "${1}[REDACTED]",
+    );
+    redacted = redact_pattern(
+        redacted,
+        r#"\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|xox[baprs]-[A-Za-z0-9-]{8,}|AIza[0-9A-Za-z_-]{12,})\b"#,
+        "[REDACTED]",
+    );
     redacted
 }
 
@@ -1589,17 +1840,32 @@ fn github_action_status(root: &Path) -> GitHubActionStatus {
     }
 }
 
-fn existing_path(path: PathBuf) -> Option<String> {
-    path.is_file().then(|| path.display().to_string())
+fn existing_bounded_path(root: &Path, path: PathBuf, label: &str) -> Option<String> {
+    if !path.is_file() {
+        return None;
+    }
+    bounded_existing_workspace_path(root, &path, label)
+        .ok()
+        .map(|path| path.display().to_string())
 }
 
 fn evidence_status(root: &Path) -> EvidenceStatus {
-    let release_evidence_path = existing_path(root.join("docs").join("RELEASE_EVIDENCE.md"));
-    let benchmark_report_path = existing_path(root.join("docs").join("live-benchmark-report.md"));
-    let evidence_manifest_path = existing_path(
+    let release_evidence_path = existing_bounded_path(
+        root,
+        root.join("docs").join("RELEASE_EVIDENCE.md"),
+        "release evidence",
+    );
+    let benchmark_report_path = existing_bounded_path(
+        root,
+        root.join("docs").join("live-benchmark-report.md"),
+        "benchmark report",
+    );
+    let evidence_manifest_path = existing_bounded_path(
+        root,
         root.join(".sisyphus")
             .join("evidence")
             .join("evidence-manifest.json"),
+        "evidence manifest",
     );
     EvidenceStatus {
         has_release_evidence: release_evidence_path.is_some(),
@@ -1622,6 +1888,7 @@ fn write_config_for_root(raw: &str, root: &Path) -> Result<DesktopConfig, String
         }
         None => root.join(".ca").join("config.json"),
     };
+    let path = bounded_write_workspace_path(root, &path, "config")?;
     let validation = validate_config_raw(raw, root, config_format_from_path(Some(&path)));
     if !validation.valid {
         return Err(format!("Invalid config: {}", validation.errors.join("; ")));
@@ -1811,6 +2078,12 @@ fn open_repository(path: String, state: State<'_, WorkspaceState>) -> Result<Rep
 #[tauri::command]
 fn get_command_contract() -> Result<Vec<DesktopCommandContract>, String> {
     Ok(desktop_command_contracts())
+}
+
+#[tauri::command]
+fn open_external_link(url: String) -> Result<bool, String> {
+    open_external_link_with_system(&url)?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -2167,9 +2440,14 @@ fn cancel_review_run(
 #[tauri::command]
 fn read_config(state: State<'_, WorkspaceState>) -> Result<DesktopConfig, String> {
     let root = active_repo_root(&state)?;
-    let path = config_path(&root).unwrap_or_else(|| root.join(".ca").join("config.json"));
-    let raw = fs::read_to_string(&path)
-        .unwrap_or_else(|_| "{\n  \"language\": \"en\",\n  \"reviewers\": []\n}\n".to_string());
+    let existing_path = config_path(&root);
+    let path = existing_path
+        .clone()
+        .unwrap_or_else(|| root.join(".ca").join("config.json"));
+    let raw = existing_path
+        .as_ref()
+        .and_then(|path| fs::read_to_string(path).ok())
+        .unwrap_or_else(|| "{\n  \"language\": \"en\",\n  \"reviewers\": []\n}\n".to_string());
     Ok(DesktopConfig {
         raw,
         path: path.display().to_string(),
@@ -2191,7 +2469,9 @@ fn validate_config(
     Ok(validate_config_raw(&raw, &root, format))
 }
 
-fn parse_doctor_report(stdout: &str) -> Result<(Vec<DoctorCheck>, DoctorSummary, Vec<LiveCheckResult>), String> {
+fn parse_doctor_report(
+    stdout: &str,
+) -> Result<(Vec<DoctorCheck>, DoctorSummary, Vec<LiveCheckResult>), String> {
     if stdout.trim().is_empty() {
         return Err("Failed to run agora doctor".to_string());
     }
@@ -2221,7 +2501,10 @@ fn parse_doctor_report(stdout: &str) -> Result<(Vec<DoctorCheck>, DoctorSummary,
     Ok((checks, summary, live_checks))
 }
 
-fn run_doctor_report(root: &Path, live: bool) -> Result<(Vec<DoctorCheck>, DoctorSummary, Vec<LiveCheckResult>), String> {
+fn run_doctor_report(
+    root: &Path,
+    live: bool,
+) -> Result<(Vec<DoctorCheck>, DoctorSummary, Vec<LiveCheckResult>), String> {
     let args: &[&str] = if live {
         &["doctor", "--live", "--json"]
     } else {
@@ -2236,7 +2519,8 @@ fn run_doctor_report(root: &Path, live: bool) -> Result<(Vec<DoctorCheck>, Docto
 fn get_provider_status(state: State<'_, WorkspaceState>) -> Result<Vec<ProviderStatus>, String> {
     let root = active_repo_root(&state)
         .or_else(|_| std::env::current_dir().map_err(|error| error.to_string()))?;
-    let output = run_agora(&root, &["doctor", "--json"], None).map_err(|error| error.to_string())?;
+    let output =
+        run_agora(&root, &["doctor", "--json"], None).map_err(|error| error.to_string())?;
     let output = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if output.is_empty() {
         return Err("Failed to run agora doctor".to_string());
@@ -2383,6 +2667,7 @@ fn main() {
             write_config,
             get_repo_info,
             open_repository,
+            open_external_link,
             set_notification_preferences,
             get_command_contract
         ])
@@ -2663,7 +2948,8 @@ mod tests {
     { "provider": "anthropic", "model": "claude-4", "status": "timeout", "error": "timeout (10s)" }
   ]
 }"#;
-        let (checks, summary, live_checks) = parse_doctor_report(report).expect("parse live doctor report");
+        let (checks, summary, live_checks) =
+            parse_doctor_report(report).expect("parse live doctor report");
         assert_eq!(checks.len(), 1);
         assert_eq!(checks[0].name, "Node.js version");
         assert_eq!(summary.pass, 1);
@@ -2716,6 +3002,269 @@ mod tests {
         let root = fixture_workspace();
         let error = session_detail_value(&root, "../outside").expect_err("invalid session id");
         assert!(error.contains("Invalid session id"));
+    }
+
+    #[test]
+    fn desktop_file_access_boundary_allows_project_and_evidence_paths() {
+        let root = fixture_workspace();
+        let canonical_root = root.canonicalize().expect("canonical fixture root");
+
+        let config =
+            bounded_existing_workspace_path(&root, &root.join(".ca").join("config.json"), "config")
+                .expect("project config should be inside workspace");
+        assert!(config.starts_with(&canonical_root));
+
+        let detail = session_detail_value(&root, "2026-05-06/e2e-001")
+            .expect("canonical session detail should be readable");
+        assert_eq!(
+            detail.pointer("/entry/id").and_then(Value::as_str),
+            Some("2026-05-06/e2e-001")
+        );
+
+        let evidence = evidence_status(&root);
+        assert!(evidence.has_release_evidence);
+        assert!(evidence.has_benchmark_report);
+        assert!(evidence.has_evidence_manifest);
+        assert!(evidence
+            .release_evidence_path
+            .as_deref()
+            .is_some_and(|path| Path::new(path).starts_with(&canonical_root)));
+    }
+
+    #[test]
+    fn desktop_file_access_boundary_writes_redacted_exports_to_safe_workspace_location() {
+        let root = fixture_workspace();
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/result.json",
+            r#"{
+  "decision": "REJECT",
+  "reasoning": "Provider diagnostic included Authorization: Bearer ghp_desktopsecret123456789",
+  "apiKey": "sk-or-v1-desktopsecret123456789",
+  "issues": [
+    {
+      "severity": "CRITICAL",
+      "filePath": "src/app.ts",
+      "lineRange": [12, 18],
+      "title": "Secret-bearing diagnostic",
+      "confidence": 91,
+      "evidence": ["OPENROUTER_API_KEY=sk-or-v1-evidenceleak123456789"]
+    }
+  ]
+}
+"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/e2e-001/report.md",
+            "# Desktop export\n\nOPENROUTER_API_KEY=sk-or-v1-reportleak123456789\nAuthorization: Bearer ghp_reportsecret123456789\n",
+        );
+
+        let export =
+            export_session_value(&root, "2026-05-06/e2e-001", "json").expect("json export");
+        assert_eq!(
+            export.file_name,
+            "codeagora-session-2026-05-06-e2e-001.json"
+        );
+        assert!(!export.file_name.contains('/'));
+        assert!(!export.file_name.contains('\\'));
+        assert!(!export.file_name.contains(".."));
+
+        let canonical_root = root.canonicalize().expect("canonical fixture root");
+        let export_path = PathBuf::from(&export.file_path);
+        assert!(export_path.starts_with(&canonical_root));
+        assert_eq!(
+            export_path
+                .parent()
+                .and_then(Path::file_name)
+                .and_then(|name| name.to_str()),
+            Some("desktop-exports")
+        );
+        assert_eq!(
+            fs::read_to_string(&export_path).expect("read written export"),
+            export.content
+        );
+        for leaked in [
+            "sk-or-v1-desktopsecret123456789",
+            "ghp_desktopsecret123456789",
+            "sk-or-v1-evidenceleak123456789",
+        ] {
+            assert!(
+                !export.content.contains(leaked),
+                "export content leaked {leaked}"
+            );
+        }
+        assert!(export.content.contains("[REDACTED]"));
+
+        let markdown =
+            export_session_value(&root, "2026-05-06/e2e-001", "markdown").expect("markdown export");
+        let markdown_path = PathBuf::from(&markdown.file_path);
+        assert!(markdown_path.starts_with(&canonical_root));
+        assert_eq!(
+            fs::read_to_string(&markdown_path).expect("read written markdown export"),
+            markdown.content
+        );
+        for leaked in ["sk-or-v1-reportleak123456789", "ghp_reportsecret123456789"] {
+            assert!(
+                !markdown.content.contains(leaked),
+                "markdown export leaked {leaked}"
+            );
+        }
+    }
+
+    #[test]
+    fn desktop_file_access_boundary_rejects_paths_outside_workspace() {
+        let root = fixture_workspace();
+        let outside = temp_workspace("outside-file");
+        write_file(&outside, "secrets.txt", "not for desktop\n");
+
+        let error =
+            bounded_existing_workspace_path(&root, &outside.join("secrets.txt"), "project file")
+                .expect_err("outside file should be rejected");
+        assert!(error.contains("outside workspace"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn desktop_file_access_boundary_rejects_export_directory_symlink_escapes() {
+        use std::os::unix::fs as unix_fs;
+
+        let root = fixture_workspace();
+        let outside = temp_workspace("outside-export");
+        let export_dir = root.join(".ca").join("desktop-exports");
+        if export_dir.exists() {
+            fs::remove_dir_all(&export_dir).expect("remove export dir");
+        }
+        unix_fs::symlink(&outside, &export_dir).expect("create export symlink");
+
+        let error = export_session_value(&root, "2026-05-06/e2e-001", "json")
+            .expect_err("symlinked export directory should be rejected");
+        assert!(error.contains("outside workspace"));
+        assert!(
+            fs::read_dir(&outside)
+                .expect("outside export dir should be readable")
+                .next()
+                .is_none(),
+            "export should not write outside the workspace"
+        );
+    }
+
+    #[test]
+    fn desktop_external_link_boundary_accepts_https_links_only() {
+        assert_eq!(
+            validate_external_link_url("https://codeagora.dev/docs?view=desktop#release")
+                .expect("https URL should be accepted"),
+            "https://codeagora.dev/docs?view=desktop#release"
+        );
+        assert_eq!(
+            validate_external_link_url("HTTPS://github.com/bssm-oss/CodeAgora")
+                .expect("scheme matching should be case-insensitive"),
+            "HTTPS://github.com/bssm-oss/CodeAgora"
+        );
+    }
+
+    #[test]
+    fn desktop_external_link_boundary_rejects_unsafe_or_unsupported_schemes() {
+        for url in [
+            "",
+            " https://codeagora.dev",
+            "https://codeagora.dev ",
+            "http://codeagora.dev",
+            "mailto:security@codeagora.dev",
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "data:text/html,<script>alert(1)</script>",
+            "tauri://localhost/settings",
+            "shell:open",
+            "https://",
+            "https://user@example.com/private",
+            "https://example.com\\@evil.test",
+            "https://example.com/\nhttps://evil.test",
+        ] {
+            let error = match validate_external_link_url(url) {
+                Ok(_) => panic!("{url} should be rejected"),
+                Err(error) => error,
+            };
+            assert!(
+                error.contains("Invalid external link URL")
+                    || error.contains("Unsupported external link scheme"),
+                "unexpected error for {url}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn desktop_external_link_boundary_uses_approved_platform_open_path() {
+        let command = external_open_command_for("https://github.com/bssm-oss/CodeAgora")
+            .expect("valid external link should produce opener command");
+
+        #[cfg(target_os = "macos")]
+        {
+            assert_eq!(command.program, "open");
+            assert_eq!(command.args, vec!["https://github.com/bssm-oss/CodeAgora"]);
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            assert_eq!(command.program, "rundll32.exe");
+            assert_eq!(
+                command.args,
+                vec![
+                    "url.dll,FileProtocolHandler",
+                    "https://github.com/bssm-oss/CodeAgora"
+                ]
+            );
+        }
+
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            assert_eq!(command.program, "xdg-open");
+            assert_eq!(command.args, vec!["https://github.com/bssm-oss/CodeAgora"]);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn desktop_file_access_boundary_rejects_symlink_escapes() {
+        use std::os::unix::fs as unix_fs;
+
+        let root = fixture_workspace();
+        let outside = temp_workspace("outside-symlink");
+        write_file(
+            &outside,
+            "session/metadata.json",
+            r#"{ "status": "completed" }"#,
+        );
+        write_file(
+            &outside,
+            "session/result.json",
+            r#"{ "decision": "ACCEPT", "issues": [] }"#,
+        );
+        let link_path = root
+            .join(".ca")
+            .join("sessions")
+            .join("2026-05-06")
+            .join("escape-001");
+        unix_fs::symlink(outside.join("session"), &link_path).expect("create session symlink");
+
+        let error = session_detail_value(&root, "2026-05-06/escape-001")
+            .expect_err("symlinked session escape should be rejected");
+        assert!(error.contains("outside workspace"));
+
+        fs::remove_file(root.join("docs").join("RELEASE_EVIDENCE.md"))
+            .expect("remove fixture release evidence");
+        write_file(&outside, "RELEASE_EVIDENCE.md", "# Escaped evidence\n");
+        unix_fs::symlink(
+            outside.join("RELEASE_EVIDENCE.md"),
+            root.join("docs").join("RELEASE_EVIDENCE.md"),
+        )
+        .expect("create evidence symlink");
+
+        let evidence = evidence_status(&root);
+        assert!(!evidence.has_release_evidence);
+        assert!(evidence.release_evidence_path.is_none());
+        assert!(evidence.has_benchmark_report);
+        assert!(evidence.has_evidence_manifest);
     }
 
     #[test]
