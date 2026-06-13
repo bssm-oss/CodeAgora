@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runDesktopSecurityEvidence } from './desktop-security-evidence.mjs';
 import { recordGateCommandEvidence } from './evidence-recorder.mjs';
 import { runRedactionPathSafetyEvidence } from './redaction-path-safety-evidence.mjs';
 import { runReleaseGateCommand, spawnProcess } from './release-gate-runner.mjs';
@@ -70,11 +71,7 @@ function recordPlaceholderCommandEvidence(evidenceDir, gate) {
 }
 
 function requiredRcEvidence() {
-  return EXPECTED_EVIDENCE.filter((entry) => tierIncluded(entry.tier, 'rc') && !isDesktopEvidence(entry));
-}
-
-function isDesktopEvidence(entry) {
-  return entry.name?.startsWith('desktop-') || entry.command?.startsWith('pnpm desktop:') || entry.command === 'pnpm rc:desktop-gate';
+  return EXPECTED_EVIDENCE.filter((entry) => tierIncluded(entry.tier, 'rc'));
 }
 
 async function recordSecurityGate(evidenceDir, options) {
@@ -104,6 +101,13 @@ async function recordRedactionPathSafetyEvidence(evidenceDir) {
   });
 }
 
+async function recordDesktopSecurityEvidence(evidenceDir) {
+  await runDesktopSecurityEvidence({
+    evidenceDir,
+    skipTests: true,
+  });
+}
+
 async function generateManifest(evidenceDir) {
   const result = await spawnProcess({
     file: process.execPath,
@@ -114,7 +118,6 @@ async function generateManifest(evidenceDir) {
       '--output',
       path.join(evidenceDir, 'evidence-manifest.json'),
       '--require=rc',
-      '--surface=cli-mcp-github',
     ],
     cwd: process.cwd(),
     env: process.env,
@@ -136,12 +139,16 @@ function assertSecurityCaptured(evidenceDir) {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
   const securityEntry = manifest.entries.find((entry) => entry.name === 'security-regression');
   const redactionPathSafetyEntry = manifest.entries.find((entry) => entry.name === 'redaction-path-safety-evidence');
+  const desktopSecurityEntry = manifest.entries.find((entry) => entry.name === 'desktop-security-evidence');
 
   if (!securityEntry) {
     throw new Error('security-regression entry is missing from the evidence manifest');
   }
   if (!redactionPathSafetyEntry) {
     throw new Error('redaction-path-safety-evidence entry is missing from the evidence manifest');
+  }
+  if (!desktopSecurityEntry) {
+    throw new Error('desktop-security-evidence entry is missing from the evidence manifest');
   }
   if (securityEntry.command !== 'pnpm test:security') {
     throw new Error(`security-regression command drifted: ${securityEntry.command}`);
@@ -177,6 +184,31 @@ function assertSecurityCaptured(evidenceDir) {
   if (redactionPathSafetyArtifact.checks?.symlinkEscapesRejected !== true) {
     throw new Error('redaction-path-safety-evidence did not capture symlink path safety');
   }
+  if (desktopSecurityEntry.command !== 'pnpm evidence:desktop-security') {
+    throw new Error(`desktop-security-evidence command drifted: ${desktopSecurityEntry.command}`);
+  }
+  if (desktopSecurityEntry.tier !== 'rc') {
+    throw new Error(`desktop-security-evidence tier drifted: ${desktopSecurityEntry.tier}`);
+  }
+  if (desktopSecurityEntry.exists !== true) {
+    throw new Error('desktop-security-evidence artifact is missing from the rc manifest');
+  }
+  const desktopSecurityArtifact = JSON.parse(fs.readFileSync(path.join(evidenceDir, desktopSecurityEntry.filename), 'utf-8'));
+  if (desktopSecurityArtifact.schemaVersion !== 'codeagora.desktop-security-evidence.v1') {
+    throw new Error(`desktop-security-evidence schema drifted: ${desktopSecurityArtifact.schemaVersion}`);
+  }
+  if (desktopSecurityArtifact.tests?.passed !== true) {
+    throw new Error('desktop-security-evidence tests were not captured as passed');
+  }
+  if (desktopSecurityArtifact.checks?.minimalMainWindowCapability !== true) {
+    throw new Error('desktop-security-evidence did not capture Tauri capability boundaries');
+  }
+  if (desktopSecurityArtifact.checks?.workspacePathBoundariesEnforced !== true) {
+    throw new Error('desktop-security-evidence did not capture workspace path boundaries');
+  }
+  if (desktopSecurityArtifact.checks?.desktopExportsRedactSecrets !== true) {
+    throw new Error('desktop-security-evidence did not capture desktop export redaction');
+  }
   if (manifest.gateSummary?.passed !== true) {
     throw new Error('rc evidence manifest gate summary did not pass');
   }
@@ -195,6 +227,7 @@ async function run(options) {
       if (
         entry.name === 'security-regression'
         || entry.name === 'redaction-path-safety-evidence'
+        || entry.name === 'desktop-security-evidence'
       ) {
         continue;
       }
@@ -207,6 +240,7 @@ async function run(options) {
 
     await recordSecurityGate(evidenceDir, options);
     await recordRedactionPathSafetyEvidence(evidenceDir);
+    await recordDesktopSecurityEvidence(evidenceDir);
     await generateManifest(evidenceDir);
     const manifestPath = assertSecurityCaptured(evidenceDir);
     console.log(`Security evidence smoke passed: ${path.relative(process.cwd(), manifestPath)}`);

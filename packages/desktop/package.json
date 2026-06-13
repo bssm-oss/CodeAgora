@@ -20,6 +20,7 @@
     "smoke": "pnpm build && node scripts/smoke.mjs",
     "tauri:build": "tauri build",
     "tauri:check": "pnpm build && cd src-tauri && cargo check",
+    "tauri:test": "cd src-tauri && cargo test desktop_file_access_boundary && cargo test desktop_external_link_boundary",
     "tauri:dev": "pnpm build && cd src-tauri && cargo run",
     "typecheck": "tsc --noEmit",
     "visual:qa": "pnpm build && node scripts/visual-qa.mjs"

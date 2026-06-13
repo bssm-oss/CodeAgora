@@ -17,6 +17,7 @@ export type SessionDetail = SessionDetailView;
 export interface SessionExport {
   format: string;
   fileName: string;
+  filePath?: string;
   content: string;
 }
 

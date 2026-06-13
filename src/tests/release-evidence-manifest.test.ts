@@ -161,6 +161,7 @@ describe('release evidence manifest', () => {
         'desktop-visual-qa.json',
         'desktop-gate.log',
         'desktop-evidence-manifest.json',
+        'desktop-security-evidence.json',
         'security-regression.log',
         'redaction-path-safety-evidence.json',
         'github-security-evidence.json',
@@ -179,10 +180,17 @@ describe('release evidence manifest', () => {
 
       const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'evidence-manifest.json'), 'utf-8'));
       const desktopGate = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-gate');
+      const desktopSecurity = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-security-evidence');
       const redactionPathSafety = manifest.entries.find((entry: { name: string }) => entry.name === 'redaction-path-safety-evidence');
       const githubSecurity = manifest.entries.find((entry: { name: string }) => entry.name === 'github-security-evidence');
       expect(desktopGate.requiredForRelease).not.toBe(false);
       expect(desktopGate.exists).toBe(true);
+      expect(desktopSecurity).toMatchObject({
+        filename: 'desktop-security-evidence.json',
+        command: 'pnpm evidence:desktop-security',
+        tier: 'rc',
+        exists: true,
+      });
       expect(redactionPathSafety).toMatchObject({
         filename: 'redaction-path-safety-evidence.json',
         command: 'pnpm evidence:redaction-path-safety',
@@ -266,6 +274,7 @@ describe('release evidence manifest', () => {
       const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'evidence-manifest.json'), 'utf-8'));
       const securityEntry = manifest.entries.find((entry: { name: string }) => entry.name === 'security-regression');
       const redactionPathSafetyEntry = manifest.entries.find((entry: { name: string }) => entry.name === 'redaction-path-safety-evidence');
+      const desktopSecurityEntry = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-security-evidence');
       const githubSecurityEntry = manifest.entries.find((entry: { name: string }) => entry.name === 'github-security-evidence');
       expect(securityEntry).toMatchObject({
         filename: 'security-regression.log',
@@ -300,6 +309,28 @@ describe('release evidence manifest', () => {
         checks: {
           persistedSessionArtifactRedaction: true,
           symlinkEscapesRejected: true,
+        },
+      });
+      expect(desktopSecurityEntry).toMatchObject({
+        filename: 'desktop-security-evidence.json',
+        command: 'pnpm evidence:desktop-security',
+        tier: 'rc',
+        exists: true,
+      });
+      const desktopSecurityArtifact = JSON.parse(
+        fs.readFileSync(path.join(dir, 'desktop-security-evidence.json'), 'utf-8'),
+      );
+      expect(desktopSecurityArtifact).toMatchObject({
+        schemaVersion: 'codeagora.desktop-security-evidence.v1',
+        releaseTier: 'rc',
+        tests: {
+          skipped: true,
+          passed: true,
+        },
+        checks: {
+          minimalMainWindowCapability: true,
+          workspacePathBoundariesEnforced: true,
+          desktopExportsRedactSecrets: true,
         },
       });
       expect(githubSecurityEntry).toMatchObject({

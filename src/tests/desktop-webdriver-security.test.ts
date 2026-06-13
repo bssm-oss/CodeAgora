@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { DESKTOP_RELEASE_CHECKS } from '../../scripts/desktop-release-gate-runner.mjs';
 
 const cargoToml = fs.readFileSync('packages/desktop/src-tauri/Cargo.toml', 'utf-8');
 const rustMain = fs.readFileSync('packages/desktop/src-tauri/src/main.rs', 'utf-8');
@@ -24,8 +25,14 @@ describe('desktop WebDriver automation security boundary', () => {
   it('does not enable the WebDriver feature in release build or desktop RC bundle scripts', () => {
     expect(desktopPackage.scripts['tauri:build']).toBe('tauri build');
     expect(desktopPackage.scripts['bundle:smoke']).not.toContain('webdriver-automation');
-    expect(rootPackage.scripts['rc:desktop-gate']).toContain('macos:webdriver-e2e');
+    expect(rootPackage.scripts['rc:desktop-gate']).toBe('node scripts/desktop-release-gate-runner.mjs');
+    expect(DESKTOP_RELEASE_CHECKS.map((check) => check.command)).toContain(
+      'pnpm desktop:macos-webdriver-e2e',
+    );
     expect(rootPackage.scripts['rc:desktop-gate']).not.toContain('--features webdriver-automation');
+    expect(DESKTOP_RELEASE_CHECKS.map((check) => check.command).join('\n')).not.toContain(
+      '--features webdriver-automation',
+    );
 
     expect(desktopPackage.scripts['macos:webdriver-e2e']).toContain('tauri build --debug --features webdriver-automation');
     expect(rootPackage.scripts['desktop:macos-webdriver-e2e']).toContain('macos:webdriver-e2e');

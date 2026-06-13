@@ -13,7 +13,9 @@ import {
   getProviderStatus,
   getReviewRun,
   getSessionDetail,
+  isApprovedExternalUrl,
   listSessions,
+  openExternalLink,
   openRepository,
   readConfig,
   selectRepositoryDirectory,
@@ -324,6 +326,22 @@ function onKeyDown(event: KeyboardEvent): void {
     return;
   }
 
+}
+
+function externalAnchorFromClick(event: MouseEvent): HTMLAnchorElement | null {
+  const target = event.target instanceof Element ? event.target : null;
+  const anchor = target?.closest('a[href]');
+  if (!(anchor instanceof HTMLAnchorElement)) return null;
+  return isApprovedExternalUrl(anchor.href) ? anchor : null;
+}
+
+function onExternalLinkClick(event: MouseEvent): void {
+  const anchor = externalAnchorFromClick(event);
+  if (!anchor) return;
+  event.preventDefault();
+  void openExternalLink(anchor.href).catch((error) => {
+    pushToast(error instanceof Error ? error.message : String(error), 'warning');
+  });
 }
 
 function normalizeLocale(value?: string): DesktopLocale | undefined {
@@ -2960,6 +2978,7 @@ async function bootstrap(): Promise<void> {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.addEventListener('change', onThemeChange);
     window.addEventListener('resize', onViewportChange);
+    window.addEventListener('click', onExternalLinkClick);
     applyDesktopLocale();
     try {
       const config = await readConfig();
@@ -2992,6 +3011,7 @@ async function bootstrap(): Promise<void> {
     function cleanupListeners(): void {
       if (mediaQuery) mediaQuery.removeEventListener('change', onThemeChange);
       window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('click', onExternalLinkClick);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('beforeunload', onBeforeUnload);
     }

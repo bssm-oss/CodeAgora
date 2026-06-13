@@ -20,6 +20,7 @@ The current Tauri bridge exposes an explicit command contract through `get_comma
 
 | Command | Class | Project mutation | Process spawn | Boundary |
 |---------|-------|------------------|---------------|----------|
+| `open_external_link` | desktop-external-open | no | yes, platform opener only | Validates `https://` links before handing them to the OS external opener; unsafe or unsupported schemes are rejected. |
 | `open_repository` | read-only | no | yes, `git` only | Resolves a selected path to the nearest git root and makes it the active workspace for later commands. |
 | `get_repo_info` | read-only | no | yes, `git` only | Detects git/config/session/review helper state for the current trusted workspace. |
 | `list_sessions` | read-only | no | no | Reads canonical `.ca/sessions` artifacts without migration. |

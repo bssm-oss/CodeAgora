@@ -52,6 +52,7 @@ assert(main.includes('#[cfg(debug_assertions)]'), 'MCP bridge must remain debug-
 assert(main.includes('tauri_plugin_webdriver_automation::init()'), 'WebDriver automation plugin is not registered');
 
 const requiredCommands = [
+  'open_external_link',
   'open_repository',
   'get_repo_info',
   'list_sessions',

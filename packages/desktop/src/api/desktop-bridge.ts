@@ -290,6 +290,30 @@ export async function openRepository(path: string): Promise<RepoInfo> {
   return { ...fallbackRepoInfo(), path };
 }
 
+export function isApprovedExternalUrl(raw: string): boolean {
+  const url = raw.trim();
+  if (!url || url !== raw) return false;
+  if (!url.toLowerCase().startsWith('https://')) return false;
+  if (/[\s\\\u0000-\u001f\u007f]/u.test(url)) return false;
+
+  const authority = url.slice('https://'.length).split(/[/?#]/u, 1)[0] ?? '';
+  if (!authority || authority.includes('@') || authority.startsWith('.') || authority.endsWith('.')) {
+    return false;
+  }
+  return true;
+}
+
+export async function openExternalLink(url: string): Promise<void> {
+  if (!isApprovedExternalUrl(url)) {
+    throw new Error('Unsupported external link URL. CodeAgora Desktop only opens https links externally.');
+  }
+
+  const opened = await tauriCall<boolean>('open_external_link', { url });
+  if (opened) return;
+
+  throw new Error('External link opening requires the CodeAgora Desktop shell.');
+}
+
 export async function selectRepositoryDirectory(title: string, defaultPath?: string): Promise<string | undefined> {
   if (!IS_TAURI) {
     const selected = window.prompt(title, defaultPath ?? fallbackRepoInfo().path);
