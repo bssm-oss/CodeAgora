@@ -7,9 +7,11 @@ name: CodeAgora Review
 #   (examples: missing credentials, untrusted context, diff too large, posting failures, stale PR head). Runtime
 #   logs and the job summary include the matching reason plus next-step guidance. Loading the
 #   repository config uses a default path; failures to load the config are surfaced via degraded
-#   outputs but do not change input precedence (CLI > env > default). When review posting is
-#   disabled, the run still executes but is marked degraded. Untrusted fork PRs are
-#   always skipped before provider-backed reviewers are invoked.
+#   outputs but do not change input precedence (CLI > env > default). Provider runtime failures
+#   after startup, such as quota, auth, rate-limit, billing, or provider availability failures,
+#   are also marked degraded instead of being reported as code-review rejects. When review posting
+#   is disabled, the run still executes but is marked degraded. Untrusted fork PRs are always
+#   skipped before provider-backed reviewers are invoked.
 # - `reporter-mode` selects exactly one GitHub verdict reporter: `check-run` or `commit-status`.
 # - GitHub write operations are suppressed after any degraded/untrusted decision. This includes
 #   review comments, verdict reporters, reviewer/label mutations, Code Scanning upload, and the
@@ -60,7 +62,8 @@ inputs:
 outputs:
   verdict:
     description: >
-      Final verdict — ACCEPT, REJECT, NEEDS_HUMAN, or SKIPPED.
+      Final verdict — ACCEPT, REJECT, NEEDS_HUMAN, DEGRADED, or SKIPPED.
+      DEGRADED is returned if provider/runtime infrastructure prevents a review result.
       SKIPPED is returned if the skip label is present or the run cannot start because
       required credentials are missing.
     value: ${{ steps.review.outputs.verdict }}
@@ -80,8 +83,8 @@ outputs:
   degraded:
     description: >
       Whether the action ran in degraded or skipped mode (true if SKIPPED or degraded).
-      Disabled posting, missing credentials, diff limits, stale heads, config failures, and
-      posting failures set this to true.
+      Disabled posting, missing credentials, diff limits, provider runtime failures, stale heads,
+      config failures, and posting failures set this to true.
     value: ${{ steps.review.outputs.degraded }}
 
   degraded-reason:
@@ -89,7 +92,7 @@ outputs:
       Stable reason code for degraded or skipped mode.
       Values include missing-github-token, untrusted-github-context, missing-provider-secrets,
       untrusted-fork-pr, fork-missing-provider-secrets, posting-disabled, diff-too-large,
-      config-load-failed, stale-head-sha, github-post-failed, and sarif-write-failed.
+      config-load-failed, provider-runtime-failed, stale-head-sha, github-post-failed, and sarif-write-failed.
       Always set if degraded is true.
     value: ${{ steps.review.outputs.degraded-reason }}
 

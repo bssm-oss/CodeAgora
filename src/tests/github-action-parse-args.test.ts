@@ -454,6 +454,7 @@ describe('github-action production policy', () => {
       'posting-disabled',
       'diff-too-large',
       'config-load-failed',
+      'provider-runtime-failed',
       'stale-head-sha',
       'github-post-failed',
       'sarif-write-failed',
@@ -518,6 +519,14 @@ describe('github-action production policy', () => {
     expect(staleHead.nextSteps).toEqual(expect.arrayContaining([
       expect.stringContaining('Rerun the workflow'),
       expect.stringContaining('branch head'),
+    ]));
+
+    const providerRuntime = getActionGuidance('provider-runtime-failed');
+    expect(providerRuntime.why).toContain('provider-backed reviewers');
+    expect(providerRuntime.nextSteps).toEqual(expect.arrayContaining([
+      expect.stringContaining('agora doctor --live'),
+      expect.stringContaining('quota'),
+      expect.stringContaining('does not mean CodeAgora found code defects'),
     ]));
   });
 });

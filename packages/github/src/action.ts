@@ -38,6 +38,13 @@ import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 
 const DEFAULT_SARIF_OUTPUT_PATH = '/tmp/codeagora-results.sarif';
 
+function isProviderRuntimePipelineFailure(message: string | undefined): boolean {
+  const text = message ?? '';
+  return /provider\/API failures/i.test(text) ||
+    (/all reviewers failed/i.test(text) && /(auth|api key|credential|quota|rate.?limit|limit exceeded|billing|provider|network|timeout|circuit open)/i.test(text)) ||
+    /(auth error|api key|credential|quota|rate.?limit|limit exceeded|weekly limit|billing|provider unavailable|network connectivity|circuit breaker)/i.test(text);
+}
+
 async function writeSarifOutput(
   evidenceDocs: EvidenceDocument[],
   sessionId: string,
@@ -233,6 +240,20 @@ async function main(): Promise<void> {
   console.log('::endgroup::');
 
   if (result.status === 'error') {
+    if (isProviderRuntimePipelineFailure(result.error)) {
+      const detail = result.error ?? 'Provider-backed reviewers failed before CodeAgora could produce a verdict.';
+      logActionDiagnostic('Provider runtime degraded', 'provider-runtime-failed', detail);
+      markActionDegraded('provider-runtime-failed');
+      writeActionSummary('degraded', 'provider-runtime-failed', detail);
+      writeDocumentedActionOutputs({
+        verdict: 'DEGRADED',
+        reviewUrl: '',
+        sessionId: result.sessionId === 'unknown' ? undefined : result.sessionId,
+      });
+      console.log('Verdict: DEGRADED');
+      return;
+    }
+
     console.error(`::error::Pipeline failed: ${result.error}`);
     process.exit(2);
   }

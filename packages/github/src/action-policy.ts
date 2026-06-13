@@ -450,6 +450,15 @@ export function getActionGuidance(reason: ActionDegradedReason): ActionGuidance 
           'Fix the config file and rerun the workflow after the file is readable and valid.',
         ],
       };
+    case 'provider-runtime-failed':
+      return {
+        why: 'The review pipeline started, but provider-backed reviewers could not produce a usable result because credentials, quota, rate limits, network connectivity, or provider availability failed.',
+        nextSteps: [
+          'Run `agora doctor --live` with the same provider credentials to confirm whether the key is valid and within quota.',
+          'Rotate or top up the provider key when the provider reports quota, weekly limit, billing, or authentication failures.',
+          'Rerun the workflow after provider health is restored; this state does not mean CodeAgora found code defects.',
+        ],
+      };
     case 'stale-head-sha':
       return {
         why: 'The PR head changed before CodeAgora could post the review, so the result was skipped.',
