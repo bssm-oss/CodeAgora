@@ -21,9 +21,10 @@ export function validateDiffPath(
     return err('Path must not contain null bytes');
   }
 
-  // Rule 2: reject if the input contains '..' path segments (traversal attempt)
-  const parts = diffPath.split(/[\\/]/);
-  if (parts.includes('..')) {
+  // Rule 2: reject if the input contains traversal path segments.
+  // Decode URL-escaped inputs first so `%2e%2e`, `%2f`, and `%5c` variants
+  // cannot reach path resolution as ordinary filenames.
+  if (hasTraversalSegment(diffPath)) {
     return err(`Path traversal detected: "${diffPath}" contains ".." segments`);
   }
 
@@ -67,9 +68,8 @@ export async function validatePathWithinRoot(
     return err('Path must not contain null bytes');
   }
 
-  const parts = inputPath.split(/[\\/]/);
-  if (parts.includes('..')) {
-    return err('Path traversal detected: path contains ".." segments');
+  if (hasTraversalSegment(inputPath)) {
+    return err(`Path traversal detected: "${inputPath}" contains ".." segments`);
   }
 
   const root = path.resolve(rootDir);
@@ -103,4 +103,31 @@ export async function validatePathWithinRoot(
 function isPathWithinRoot(candidate: string, root: string): boolean {
   const relative = path.relative(root, candidate);
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function hasTraversalSegment(inputPath: string): boolean {
+  return decodedPathViews(inputPath).some((candidate) => candidate.split(/[\\/]/).includes('..'));
+}
+
+function decodedPathViews(inputPath: string): string[] {
+  const views = [inputPath];
+  let current = inputPath;
+
+  for (let i = 0; i < 3; i++) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(current);
+    } catch {
+      break;
+    }
+
+    if (decoded === current) {
+      break;
+    }
+
+    views.push(decoded);
+    current = decoded;
+  }
+
+  return views;
 }

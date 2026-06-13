@@ -1,4 +1,6 @@
 export * from './action-policy.js';
+export * from './action-event.js';
+export * from './action-reporting.js';
 export * from './client.js';
 export * from './comment.js';
 export * from './dedup.js';

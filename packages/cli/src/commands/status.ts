@@ -7,7 +7,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { bold, dim, statusColor } from '../utils/colors.js';
 import { t } from '@codeagora/shared/i18n/index.js';
-import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { getProviderEnvVar, SUPPORTED_PROVIDER_NAMES } from '@codeagora/shared/providers/env-vars.js';
 
 // ============================================================================
 // Helpers
@@ -108,12 +108,12 @@ export async function getStatus(baseDir: string): Promise<string> {
   lines.push('');
   lines.push(bold(t('cli.status.providers')));
 
-  const providerNames = Object.keys(PROVIDER_ENV_VARS);
+  const providerNames = SUPPORTED_PROVIDER_NAMES;
   const configured: string[] = [];
   const withKeys: string[] = [];
 
   for (const name of providerNames) {
-    const envVar = PROVIDER_ENV_VARS[name]!;
+    const envVar = getProviderEnvVar(name);
     const hasKey = Boolean(process.env[envVar]);
     if (hasKey) {
       configured.push(name);

@@ -12,7 +12,7 @@ import {
   isDeclarativeReviewers,
   expandDeclarativeReviewers,
 } from '../config/loader.js';
-import { PROVIDER_ENV_VARS } from '@codeagora/shared/providers/env-vars.js';
+import { PROVIDER_ENV_VARS, getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 import { chunkDiffWithMetadata, type ChunkMetadata } from './chunker.js';
 
 export type { TokenUsage };
@@ -85,7 +85,7 @@ export function formatDryRunNextSteps(result: DryRunResult): string[] {
       .filter((item) => item.status === 'no-api-key')
       .map((item) => item.provider);
     const setupSteps = missingProviders.map((provider) => {
-      const envVar = PROVIDER_ENV_VARS[provider] ?? `${provider.toUpperCase().replace(/-/g, '_')}_API_KEY`;
+      const envVar = getProviderEnvVar(provider);
       return `Run \`agora env set ${provider} <api-key>\` to save ${envVar}.`;
     });
     return [
@@ -228,7 +228,10 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
   }
 
   for (const provider of seenProviders) {
-    const envVar = PROVIDER_ENV_VARS[provider];
+    const envVar =
+      provider in PROVIDER_ENV_VARS
+        ? PROVIDER_ENV_VARS[provider as keyof typeof PROVIDER_ENV_VARS]
+        : undefined;
     if (!envVar) {
       health.push({ provider, status: 'unknown' });
     } else if (process.env[envVar]) {
@@ -244,7 +247,7 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
   if (autoCount > 0) {
     const missingKeys = health
       .filter((h) => h.status === 'no-api-key')
-      .map((h) => `${PROVIDER_ENV_VARS[h.provider] ?? h.provider}`);
+      .map((h) => getProviderEnvVar(h.provider));
     if (missingKeys.length > 0) {
       warnings.push(
         `${autoCount} auto reviewer(s) assigned at runtime — missing keys: ${missingKeys.join(', ')}`
@@ -360,7 +363,7 @@ export function formatDryRunText(result: DryRunResult): string {
 
   lines.push('Provider Health:');
   for (const h of result.health) {
-    const envVar = PROVIDER_ENV_VARS[h.provider];
+    const envVar = getProviderEnvVar(h.provider);
     if (h.status === 'available') {
       lines.push(`  ✓ ${h.provider} (${envVar} set)`);
     } else if (h.status === 'no-api-key') {

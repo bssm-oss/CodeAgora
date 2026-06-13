@@ -510,10 +510,12 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       if (!options.quiet) console.error(t('cli.info.reviewPosted', { url: postResult.reviewUrl }));
     }
 
-    const exitCode = getAgentReviewExitCode(result, {
-      failOnReject: options.failOnReject,
-      failOnSeverity: options.failOnSeverity,
-    });
+    const exitCode = result.status === 'error' && result.error
+      ? classifyCliErrorExitCode(new Error(result.error))
+      : getAgentReviewExitCode(result, {
+          failOnReject: options.failOnReject,
+          failOnSeverity: options.failOnSeverity,
+        });
     if (exitCode !== 0) {
       process.exit(exitCode);
     }

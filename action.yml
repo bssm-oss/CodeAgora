@@ -4,11 +4,16 @@ name: CodeAgora Review
 # CONTRACT NOTES:
 # - The `review:skip` label is always caller-owned. The Action NEVER mutates skip labels.
 # - The action exposes `degraded` and `degraded-reason` outputs for any degraded or skipped run
-#   (examples: missing credentials, diff too large, posting failures, stale PR head). Runtime
+#   (examples: missing credentials, untrusted context, diff too large, posting failures, stale PR head). Runtime
 #   logs and the job summary include the matching reason plus next-step guidance. Loading the
 #   repository config uses a default path; failures to load the config are surfaced via degraded
 #   outputs but do not change input precedence (CLI > env > default). When review posting is
-#   disabled, the run still executes but is marked degraded.
+#   disabled, the run still executes but is marked degraded. Untrusted fork PRs are
+#   always skipped before provider-backed reviewers are invoked.
+# - `reporter-mode` selects exactly one GitHub verdict reporter: `check-run` or `commit-status`.
+# - GitHub write operations are suppressed after any degraded/untrusted decision. This includes
+#   review comments, verdict reporters, reviewer/label mutations, Code Scanning upload, and the
+#   SARIF artifact fallback.
 #
 description: Multi-agent debate-driven code review for pull requests
 
@@ -19,7 +24,7 @@ inputs:
     default: .ca/config.json
 
   github-token:
-    description: GitHub token for posting comments and setting status checks
+    description: GitHub token for posting comments and the configured verdict reporter
     required: true
 
   fail-on-reject:
@@ -33,9 +38,24 @@ inputs:
     default: '5000'
 
   post-results:
-    description: Post review comments and commit status to GitHub
+    description: Post review comments and the configured verdict reporter to GitHub
     required: false
     default: 'true'
+
+  reporter-mode:
+    description: GitHub verdict reporter to emit when posting is enabled. One of check-run or commit-status.
+    required: false
+    default: check-run
+
+  check-run-name:
+    description: Name of the GitHub check run to create or update for the reviewed PR commit
+    required: false
+    default: CodeAgora Review
+
+  upload-sarif:
+    description: Upload the generated SARIF file to GitHub Code Scanning. The SARIF file is also uploaded as a workflow artifact when Code Scanning upload is disabled or unavailable.
+    required: false
+    default: 'false'
 
 outputs:
   verdict:
@@ -53,6 +73,10 @@ outputs:
     description: CodeAgora session ID for audit trail
     value: ${{ steps.review.outputs.session-id }}
 
+  sarif-file:
+    description: Validated path to the generated SARIF file, when SARIF output was written
+    value: ${{ steps.review.outputs.sarif-file }}
+
   degraded:
     description: >
       Whether the action ran in degraded or skipped mode (true if SKIPPED or degraded).
@@ -63,9 +87,9 @@ outputs:
   degraded-reason:
     description: >
       Stable reason code for degraded or skipped mode.
-      Values include missing-github-token, missing-provider-secrets, fork-missing-provider-secrets,
-      posting-disabled, diff-too-large, config-load-failed, stale-head-sha,
-      github-post-failed, and sarif-write-failed.
+      Values include missing-github-token, untrusted-github-context, missing-provider-secrets,
+      untrusted-fork-pr, fork-missing-provider-secrets, posting-disabled, diff-too-large,
+      config-load-failed, stale-head-sha, github-post-failed, and sarif-write-failed.
       Always set if degraded is true.
     value: ${{ steps.review.outputs.degraded-reason }}
 
@@ -125,6 +149,8 @@ runs:
           --fail-on-reject "$FAIL_ON_REJECT" \
           --max-diff-lines "$MAX_DIFF_LINES" \
           --post-results "$POST_RESULTS" \
+          --reporter-mode "$REPORTER_MODE" \
+          --check-run-name "$CHECK_RUN_NAME" \
           --base-sha "$BASE_SHA" \
           --base-repo "$BASE_REPO" \
           --head-repo "$HEAD_REPO" \
@@ -138,7 +164,27 @@ runs:
         FAIL_ON_REJECT: ${{ inputs.fail-on-reject }}
         MAX_DIFF_LINES: ${{ inputs.max-diff-lines }}
         POST_RESULTS: ${{ inputs.post-results }}
+        REPORTER_MODE: ${{ inputs.reporter-mode }}
+        CHECK_RUN_NAME: ${{ inputs.check-run-name }}
         BASE_SHA: ${{ github.event.pull_request.base.sha }}
         BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
         HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         CONFIG_PATH: ${{ inputs.config-path }}
+
+    - name: Upload CodeAgora SARIF
+      id: upload-codeagora-sarif
+      if: ${{ inputs.upload-sarif == 'true' && steps.review.outputs.sarif-file != '' && steps.review.outputs.degraded != 'true' }}
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: ${{ steps.review.outputs.sarif-file }}
+        category: codeagora
+
+    - name: Upload CodeAgora SARIF artifact fallback
+      if: ${{ steps.review.outputs.sarif-file != '' && steps.review.outputs.degraded != 'true' && (inputs.upload-sarif != 'true' || steps.upload-codeagora-sarif.outcome == 'failure') }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: codeagora-sarif
+        path: ${{ steps.review.outputs.sarif-file }}
+        if-no-files-found: error
+        retention-days: 30

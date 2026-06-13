@@ -6,6 +6,7 @@
 
 import { appendMarkdown, getLogsDir } from './fs.js';
 import path from 'path';
+import { redactDeep, redactSecrets } from './redaction.js';
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
@@ -46,12 +47,14 @@ export class SessionLogger {
   }
 
   private log(level: LogLevel, message: string, data?: unknown): void {
+    const safeMessage = redactSecrets(message);
+    const safeData = data === undefined ? undefined : redactDeep(data);
     const entry: LogEntry = {
       timestamp: Date.now(),
       level,
       component: this.component,
-      message,
-      data,
+      message: safeMessage,
+      data: safeData,
     };
 
     this.logs.push(entry);
@@ -59,9 +62,9 @@ export class SessionLogger {
     // Also log to stderr in development so machine-readable stdout stays clean.
     if (process.env.NODE_ENV !== 'production') {
       const timestamp = new Date(entry.timestamp).toISOString();
-      console.error(`[${timestamp}] ${level} [${this.component}] ${message}`);
-      if (data) {
-        console.error(data);
+      console.error(`[${timestamp}] ${level} [${this.component}] ${safeMessage}`);
+      if (safeData) {
+        console.error(safeData);
       }
     }
   }

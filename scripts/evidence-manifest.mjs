@@ -3,37 +3,21 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { EVIDENCE_COMMAND_LOG } from './evidence-recorder.mjs';
+import { assertGateExitStatusesPass, evaluateGateCommandEvidence, readGateCommandEvidence } from './release-gate-evaluator.mjs';
+import { assertReleaseGateSummaryPass, summarizeReleaseGates } from './release-gate-summary.mjs';
+import { EXPECTED_EVIDENCE, RELEASE_GATE_EXECUTIONS, RELEASE_TIERS, SCHEMA_VERSION } from './release-gates.mjs';
 
-const SCHEMA_VERSION = 'codeagora.release-evidence.v1';
-const RELEASE_TIERS = ['beta', 'rc', 'stable'];
-
-const EXPECTED_EVIDENCE = [
-  { name: 'typecheck', filename: 'typecheck.log', command: 'pnpm typecheck', tier: 'beta', redactionStatus: 'safe-to-publish' },
-  { name: 'lint', filename: 'lint.log', command: 'pnpm lint', tier: 'beta', redactionStatus: 'safe-to-publish' },
-  { name: 'build', filename: 'build.log', command: 'pnpm build', tier: 'beta', redactionStatus: 'safe-to-publish' },
-  { name: 'test', filename: 'test.log', command: 'pnpm test --no-file-parallelism', tier: 'beta', redactionStatus: 'safe-to-publish' },
-  { name: 'cross-surface-parity', filename: 'cross-surface-parity.log', command: 'pnpm vitest run src/tests/cross-surface-parity.test.ts', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'bench-ci', filename: 'bench-ci.log', command: 'pnpm bench:ci', tier: 'beta', redactionStatus: 'safe-to-publish' },
-  { name: 'beta-smoke', filename: 'beta-smoke.log', command: 'pnpm release:beta-smoke', tier: 'beta', redactionStatus: 'safe-to-publish' },
-  { name: 'package-root-dry-run', filename: 'package-root-dry-run.log', command: 'pnpm pack --dry-run', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'package-mcp-dry-run', filename: 'package-mcp-dry-run.log', command: 'pnpm --filter @codeagora/mcp pack --dry-run', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'action-smoke', filename: 'action-smoke.log', command: 'pnpm build:action && pnpm release:beta-smoke', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'mcp-smoke', filename: 'mcp-smoke.log', command: 'covered by pnpm release:beta-smoke', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'desktop-app-e2e', filename: 'desktop-app-e2e.log', command: 'pnpm desktop:app-e2e', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'desktop-macos-webdriver-e2e', filename: 'desktop-macos-webdriver-e2e.log', command: 'pnpm desktop:macos-webdriver-e2e', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'desktop-visual-qa', filename: 'desktop-visual-qa.json', command: 'pnpm desktop:visual-qa', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'desktop-gate', filename: 'desktop-gate.log', command: 'pnpm rc:desktop-gate', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'desktop-evidence-manifest', filename: 'desktop-evidence-manifest.json', command: 'pnpm desktop:evidence', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'security-regression', filename: 'security-regression.log', command: 'pnpm test:security', tier: 'rc', redactionStatus: 'safe-to-publish' },
-  { name: 'live-benchmark-report', filename: 'live-benchmark-report.md', sourcePath: path.join('docs', 'archived', 'live-benchmark-report.md'), command: 'pnpm bench:fn:run with provider secrets', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
-  { name: 'live-github-action-pr-smoke', filename: 'live-github-action-pr-smoke.md', sourcePath: path.join('docs', 'archived', 'live-github-action-pr-smoke.md'), command: 'manual GitHub Action PR smoke matrix', tier: 'stable', redactionStatus: 'redacted-required', liveOnly: true },
-];
+const RELEASE_SURFACES = ['all', 'cli-mcp-github'];
+import { RELEASE_EVIDENCE_METADATA_LOG } from './evidence-recorder.mjs';
 
 function parseArgs(argv) {
   const options = {
     evidenceDir: path.join('.sisyphus', 'evidence'),
     output: undefined,
     require: undefined,
+    surface: 'all',
   };
 
   for (let index = 0; index < argv.length; index++) {
@@ -52,6 +36,10 @@ function parseArgs(argv) {
       options.require = argv[++index];
     } else if (arg?.startsWith('--require=')) {
       options.require = arg.slice('--require='.length);
+    } else if (arg === '--surface') {
+      options.surface = argv[++index];
+    } else if (arg?.startsWith('--surface=')) {
+      options.surface = arg.slice('--surface='.length);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -59,6 +47,9 @@ function parseArgs(argv) {
 
   if (options.require && !RELEASE_TIERS.includes(options.require)) {
     throw new Error(`--require must be one of: ${RELEASE_TIERS.join(', ')}`);
+  }
+  if (!RELEASE_SURFACES.includes(options.surface)) {
+    throw new Error(`--surface must be one of: ${RELEASE_SURFACES.join(', ')}`);
   }
 
   return options;
@@ -85,26 +76,133 @@ function tierIncluded(entryTier, requiredTier) {
   return RELEASE_TIERS.indexOf(entryTier) <= RELEASE_TIERS.indexOf(requiredTier);
 }
 
+function isDesktopEvidence(entry) {
+  return entry.name?.startsWith('desktop-') || entry.command?.startsWith('pnpm desktop:') || entry.command === 'pnpm rc:desktop-gate';
+}
+
+function evidenceEntriesForSurface(surface) {
+  if (surface === 'cli-mcp-github') {
+    return EXPECTED_EVIDENCE.filter((entry) => !isDesktopEvidence(entry));
+  }
+  return EXPECTED_EVIDENCE;
+}
+
+function deterministicLocalGatesForManifest(entries, requiredTier) {
+  return entries.filter((entry) => {
+    if (entry.execution !== RELEASE_GATE_EXECUTIONS.LOCAL_COMMAND) {
+      return false;
+    }
+    return requiredTier ? tierIncluded(entry.tier, requiredTier) : true;
+  });
+}
+
+function readReleaseEvidenceMetadata(evidenceDir) {
+  const metadataPath = path.join(evidenceDir, RELEASE_EVIDENCE_METADATA_LOG);
+  if (!fs.existsSync(metadataPath)) {
+    return [];
+  }
+
+  return fs.readFileSync(metadataPath, 'utf-8').split('\n').flatMap((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return [];
+    }
+    try {
+      return [{ ...JSON.parse(trimmed), metadataLine: index + 1 }];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Invalid release evidence metadata JSON on line ${index + 1}: ${message}`);
+    }
+  });
+}
+
+function latestMetadataByName(metadataEntries) {
+  const latest = new Map();
+  for (const entry of metadataEntries) {
+    if (typeof entry?.name !== 'string') {
+      continue;
+    }
+    latest.set(entry.name, entry);
+  }
+  return latest;
+}
+
+function latestGateCommandEvidenceByName(gateEvidenceEntries) {
+  const latest = new Map();
+  for (const entry of gateEvidenceEntries) {
+    if (typeof entry?.name !== 'string') {
+      continue;
+    }
+    latest.set(entry.name, entry);
+  }
+  return latest;
+}
+
+function publicGateCommandEvidence(entry) {
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    schemaVersion: entry.schemaVersion ?? null,
+    name: entry.name ?? null,
+    command: entry.command ?? null,
+    exitCode: Number.isInteger(entry.exitCode) ? entry.exitCode : null,
+    passed: typeof entry.passed === 'boolean' ? entry.passed : null,
+    timestamp: entry.timestamp ?? null,
+    startedAt: entry.startedAt ?? null,
+    finishedAt: entry.finishedAt ?? null,
+    logPath: entry.logPath ?? null,
+    logLink: entry.logLink ?? null,
+    ledgerLine: entry.ledgerLine ?? null,
+  };
+}
+
 function buildManifest(options) {
   const evidenceDir = path.resolve(options.evidenceDir);
-  const entries = EXPECTED_EVIDENCE.map((entry) => {
+  const evidenceMetadata = readReleaseEvidenceMetadata(evidenceDir);
+  const metadataByName = latestMetadataByName(evidenceMetadata);
+  const gateCommandEvidence = readGateCommandEvidence(path.join(evidenceDir, EVIDENCE_COMMAND_LOG));
+  const gateCommandEvidenceByName = latestGateCommandEvidenceByName(gateCommandEvidence);
+  const expectedEvidence = evidenceEntriesForSurface(options.surface);
+  const entries = expectedEvidence.map((entry) => {
     const artifactPath = entry.sourcePath ? path.resolve(entry.sourcePath) : path.join(evidenceDir, entry.filename);
     const exists = fs.existsSync(artifactPath);
     const stat = exists ? fs.statSync(artifactPath) : undefined;
+    const latestMetadata = metadataByName.get(entry.name) ?? null;
+    const latestCommandEvidence = publicGateCommandEvidence(gateCommandEvidenceByName.get(entry.name));
     return {
       ...entry,
       path: path.relative(process.cwd(), artifactPath),
       exists,
       sizeBytes: stat?.size ?? 0,
       sha256: exists ? sha256(artifactPath) : null,
+      latestMetadata,
+      latestCommandEvidence,
+      artifactLinks: latestMetadata?.artifactLinks ?? [],
+      outputLinks: latestMetadata?.outputLinks ?? [],
     };
+  });
+  const gateExitStatus = evaluateGateCommandEvidence({
+    evidenceDir: options.evidenceDir,
+    requiredTier: options.require,
+    gates: deterministicLocalGatesForManifest(expectedEvidence, options.require),
+  });
+  const gateSummary = summarizeReleaseGates({
+    entries,
+    gateExitStatus,
+    requiredTier: options.require,
   });
 
   return {
     schemaVersion: SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
     commitSha: commitSha(),
+    surface: options.surface,
     evidenceDir: path.relative(process.cwd(), evidenceDir),
+    evidenceMetadataStore: path.relative(process.cwd(), path.join(evidenceDir, RELEASE_EVIDENCE_METADATA_LOG)),
+    gateExitStatus,
+    gateSummary,
     entries,
   };
 }
@@ -117,20 +215,31 @@ function enforceRequired(manifest, requiredTier) {
   throw new Error(`Missing required ${requiredTier} evidence: ${names}`);
 }
 
+function enforceGateExitStatuses(manifest, requiredTier) {
+  if (!requiredTier) return;
+  assertGateExitStatusesPass(manifest.gateExitStatus);
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const outputPath = path.resolve(options.output ?? path.join(options.evidenceDir, 'evidence-manifest.json'));
   const manifest = buildManifest(options);
   enforceRequired(manifest, options.require);
+  enforceGateExitStatuses(manifest, options.require);
+  if (options.require) {
+    assertReleaseGateSummaryPass(manifest.gateSummary);
+  }
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`Wrote ${path.relative(process.cwd(), outputPath)}`);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }

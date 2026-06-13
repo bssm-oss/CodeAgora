@@ -182,6 +182,44 @@ describe('filterIgnoredFiles', () => {
     const result = filterIgnoredFiles(files, ['**/*.test.ts']);
     expect(result.some((f) => f.filePath.endsWith('.test.ts'))).toBe(false);
   });
+
+  it('matches ignore patterns against normalized workspace-relative paths', () => {
+    const result = filterIgnoredFiles(
+      [
+        { filePath: './src/generated.ts' },
+        { filePath: 'src/app.ts' },
+      ],
+      ['src/generated.ts'],
+    );
+
+    expect(result.map((f) => f.filePath)).toEqual(['src/app.ts']);
+  });
+
+  it('does not include paths that normalize outside the workspace root', () => {
+    const result = filterIgnoredFiles(
+      [
+        { filePath: 'src/app.ts' },
+        { filePath: '../secrets.ts' },
+        { filePath: 'src/../../secrets.ts' },
+        { filePath: '/tmp/secrets.ts' },
+      ],
+      [],
+    );
+
+    expect(result.map((f) => f.filePath)).toEqual(['src/app.ts']);
+  });
+
+  it('does not let outside-root ignore patterns match workspace files', () => {
+    const result = filterIgnoredFiles(
+      [
+        { filePath: 'src/app.ts' },
+        { filePath: '../src/app.ts' },
+      ],
+      ['../**'],
+    );
+
+    expect(result.map((f) => f.filePath)).toEqual(['src/app.ts']);
+  });
 });
 
 // ============================================================================
@@ -390,6 +428,70 @@ describe('chunkDiff', () => {
     expect(chunks[0].files).toContain('src/foo.ts');
   });
 
+  it('excludes build and generated artifacts from review chunks while keeping source lookalikes', async () => {
+    const diff = `diff --git a/dist/bundle.js b/dist/bundle.js
+--- a/dist/bundle.js
++++ b/dist/bundle.js
+@@ -1,2 +1,3 @@
+ const bundled = true;
++const noisy = true;
+diff --git a/build/client/index.js b/build/client/index.js
+--- a/build/client/index.js
++++ b/build/client/index.js
+@@ -1,2 +1,3 @@
+ const built = true;
++const noisyBuild = true;
+diff --git a/src/api/client.gen.ts b/src/api/client.gen.ts
+--- a/src/api/client.gen.ts
++++ b/src/api/client.gen.ts
+@@ -1,2 +1,3 @@
+ export const generatedClient = {};
++export const noisyGeneratedClient = {};
+diff --git a/src/generated-report.ts b/src/generated-report.ts
+--- a/src/generated-report.ts
++++ b/src/generated-report.ts
+@@ -1,2 +1,3 @@
+ export const report = {};
++export const nextReport = {};
+diff --git a/src/build-tools.ts b/src/build-tools.ts
+--- a/src/build-tools.ts
++++ b/src/build-tools.ts
+@@ -1,2 +1,3 @@
+ export const tool = {};
++export const nextTool = {};
+diff --git a/distribution/index.ts b/distribution/index.ts
+--- a/distribution/index.ts
++++ b/distribution/index.ts
+@@ -1,2 +1,3 @@
+ export const distribution = {};
++export const nextDistribution = {};
+`;
+    const result = await chunkDiffWithMetadata(diff, { maxTokens: 8000 });
+
+    expect(result.chunks).toHaveLength(1);
+    expect(result.metadata.diffChunking.excludedByBuiltinPatterns).toEqual([
+      'dist/bundle.js',
+      'build/client/index.js',
+      'src/api/client.gen.ts',
+    ]);
+    expect(result.metadata.includedFiles).toEqual([
+      'src/generated-report.ts',
+      'src/build-tools.ts',
+      'distribution/index.ts',
+    ]);
+    expect(result.chunks[0].files).toEqual([
+      'src/generated-report.ts',
+      'src/build-tools.ts',
+      'distribution/index.ts',
+    ]);
+    expect(result.chunks[0].diffContent).not.toContain('dist/bundle.js');
+    expect(result.chunks[0].diffContent).not.toContain('build/client/index.js');
+    expect(result.chunks[0].diffContent).not.toContain('src/api/client.gen.ts');
+    expect(result.chunks[0].diffContent).toContain('src/generated-report.ts');
+    expect(result.chunks[0].diffContent).toContain('src/build-tools.ts');
+    expect(result.chunks[0].diffContent).toContain('distribution/index.ts');
+  });
+
   it('returns empty when all files are ignored by .reviewignore', async () => {
     const tmpDir = await mkdtemp(path.join(tmpdir(), 'chunker-ignore-'));
     try {
@@ -403,6 +505,66 @@ describe('chunkDiff', () => {
 `;
       const chunks = await chunkDiff(diff, { cwd: tmpDir });
       expect(chunks).toEqual([]);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('applies .reviewignore only to normalized workspace-relative paths', async () => {
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'chunker-normalized-ignore-'));
+    try {
+      await writeFile(path.join(tmpDir, '.reviewignore'), 'src/generated.ts\n', 'utf-8');
+      const diff = `diff --git a/./src/generated.ts b/./src/generated.ts
+--- a/./src/generated.ts
++++ b/./src/generated.ts
+@@ -1,2 +1,3 @@
+ generated
++new
+diff --git a/src/app.ts b/src/app.ts
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,2 +1,3 @@
+ app
++new
+`;
+      const result = await chunkDiffWithMetadata(diff, { cwd: tmpDir });
+
+      expect(result.metadata.includedFiles).toEqual(['src/app.ts']);
+      expect(result.metadata.diffChunking.excludedByReviewIgnorePatterns).toEqual([
+        'src/generated.ts',
+      ]);
+      expect(result.chunks).toHaveLength(1);
+      expect(result.chunks[0].files).toEqual(['src/app.ts']);
+    } finally {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('excludes outside-workspace diff paths instead of letting .reviewignore match or include them', async () => {
+    const tmpDir = await mkdtemp(path.join(tmpdir(), 'chunker-outside-ignore-'));
+    try {
+      await writeFile(path.join(tmpDir, '.reviewignore'), '../**\n', 'utf-8');
+      const diff = `diff --git a/../secrets.ts b/../secrets.ts
+--- a/../secrets.ts
++++ b/../secrets.ts
+@@ -1,2 +1,3 @@
+ secret
++new
+diff --git a/src/app.ts b/src/app.ts
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -1,2 +1,3 @@
+ app
++new
+`;
+      const result = await chunkDiffWithMetadata(diff, { cwd: tmpDir });
+
+      expect(result.metadata.includedFiles).toEqual(['src/app.ts']);
+      expect(result.metadata.diffChunking.excludedByReviewIgnorePatterns).toEqual([]);
+      expect(result.metadata.excludedFiles).toContain('../secrets.ts');
+      expect(result.chunks).toHaveLength(1);
+      expect(result.chunks[0].files).toEqual(['src/app.ts']);
+      expect(result.chunks[0].files).not.toContain('../secrets.ts');
     } finally {
       await rm(tmpDir, { recursive: true, force: true });
     }

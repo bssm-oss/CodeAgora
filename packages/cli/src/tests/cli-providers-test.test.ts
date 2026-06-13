@@ -90,6 +90,23 @@ describe('testProviders', () => {
     expect(anthropic).toBeDefined();
     expect(anthropic!.envVar).toBe('ANTHROPIC_API_KEY');
   });
+
+  it('filters to a single provider by provider name', () => {
+    const results = testProviders('openrouter');
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      name: 'openrouter',
+      envVar: 'OPENROUTER_API_KEY',
+    });
+  });
+
+  it('filters to a single provider by env var name', () => {
+    const results = testProviders('OPENROUTER_API_KEY');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].name).toBe('openrouter');
+  });
 });
 
 describe('formatProviderTestResults', () => {

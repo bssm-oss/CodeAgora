@@ -71,6 +71,18 @@ describe('buildSarifReport — structure', () => {
     expect(ruleIds).toContain('CA004');
   });
 
+  it('driver rules include stable SARIF metadata', () => {
+    const report = buildSarifReport([], 'sess-001', '2026-03-21');
+    const rule = report.runs[0]!.tool.driver.rules.find((candidate) => candidate.id === 'CA002')!;
+    expect(rule.name).toBe('CriticalIssue');
+    expect(rule.fullDescription.text).toContain('CRITICAL');
+    expect(rule.helpUri).toContain('CodeAgora');
+    expect(rule.properties.tags).toContain('critical');
+    expect(rule.properties.precision).toBe('high');
+    expect(rule.properties.problemSeverity).toBe('CRITICAL');
+    expect(rule.properties['security-severity']).toBe('8.0');
+  });
+
   it('produces empty results array for empty evidenceDocs', () => {
     const report = buildSarifReport([], 'sess-001', '2026-03-21');
     expect(report.runs[0]!.results).toHaveLength(0);
@@ -94,6 +106,7 @@ describe('buildSarifReport — severity mapping', () => {
     const result = report.runs[0]!.results[0]!;
     expect(result.level).toBe('error');
     expect(result.ruleId).toBe('CA002');
+    expect(result.ruleIndex).toBe(1);
   });
 
   it('maps WARNING to level "warning" and ruleId CA003', () => {
@@ -137,11 +150,24 @@ describe('buildSarifReport — result content', () => {
     expect(loc.artifactLocation.uriBaseId).toBe('%SRCROOT%');
   });
 
+  it('normalizes artifact URIs for SARIF and GitHub code scanning', () => {
+    const report = buildSarifReport([makeDoc({ filePath: '../src\\db queries.ts' })], 's', 'd');
+    const loc = report.runs[0]!.results[0]!.locations[0]!.physicalLocation;
+    expect(loc.artifactLocation.uri).toBe('src/db%20queries.ts');
+  });
+
   it('sets region startLine and endLine from lineRange', () => {
     const report = buildSarifReport([makeDoc({ lineRange: [20, 25] })], 's', 'd');
     const region = report.runs[0]!.results[0]!.locations[0]!.physicalLocation.region;
     expect(region.startLine).toBe(20);
     expect(region.endLine).toBe(25);
+  });
+
+  it('normalizes invalid regions so SARIF line numbers remain valid', () => {
+    const report = buildSarifReport([makeDoc({ lineRange: [20, 10] })], 's', 'd');
+    const region = report.runs[0]!.results[0]!.locations[0]!.physicalLocation.region;
+    expect(region.startLine).toBe(20);
+    expect(region.endLine).toBe(20);
   });
 
   it('sets fixes when suggestion is present', () => {
@@ -167,6 +193,30 @@ describe('buildSarifReport — result content', () => {
     const docs = [makeDoc({ filePath: 'a.ts' }), makeDoc({ filePath: 'b.ts' })];
     const report = buildSarifReport(docs, 's', 'd');
     expect(report.runs[0]!.results).toHaveLength(2);
+  });
+
+  it('adds stable fingerprints and finding metadata properties', () => {
+    const report = buildSarifReport(
+      [
+        makeDoc({
+          reviewerId: 'security-reviewer',
+          source: 'llm',
+          confidence: 91,
+          suggestionVerified: 'passed',
+        }),
+      ],
+      's',
+      'd',
+    );
+    const result = report.runs[0]!.results[0]!;
+    expect(result.partialFingerprints?.primaryLocationLineHash).toMatch(/^[a-f0-9]{32}$/);
+    expect(result.properties).toMatchObject({
+      severity: 'CRITICAL',
+      reviewerId: 'security-reviewer',
+      source: 'llm',
+      confidence: 91,
+      suggestionVerified: 'passed',
+    });
   });
 });
 
@@ -206,7 +256,8 @@ describe('buildSarifReport — discussion metadata', () => {
     });
 
     const report = buildSarifReport([doc], 's', 'd', '1.0.0', meta);
-    expect(report.runs[0]!.results[0]!.properties).toBeUndefined();
+    expect(report.runs[0]!.results[0]!.properties?.['discussionId']).toBeUndefined();
+    expect(report.runs[0]!.results[0]!.properties?.['severity']).toBe('CRITICAL');
   });
 });
 

@@ -1,9 +1,9 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env -S pnpm exec tsx
 /**
  * Fetch the models.dev API and update the bundled snapshot.
  *
  * Usage:
- *   npx tsx scripts/update-models-snapshot.ts
+ *   pnpm exec tsx scripts/update-models-snapshot.ts
  *
  * This fetches https://models.dev/api.json, filters to CodeAgora's supported
  * providers, and writes the result to packages/shared/src/data/models-dev-snapshot.json.

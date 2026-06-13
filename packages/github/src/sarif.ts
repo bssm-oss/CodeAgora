@@ -3,8 +3,9 @@
  * Converts EvidenceDocument[] to SARIF JSON for GitHub Code Scanning.
  */
 
+import crypto from 'crypto';
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
-import { SARIF_SEVERITY_RULES } from '@codeagora/shared/contracts/stable.js';
+import { REVIEW_SEVERITIES, SARIF_SEVERITY_RULES } from '@codeagora/shared/contracts/stable.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 // ============================================================================
@@ -34,11 +35,20 @@ interface SarifRule {
   id: string;
   name: string;
   shortDescription: { text: string };
+  fullDescription: { text: string };
+  helpUri: string;
   defaultConfiguration: { level: string };
+  properties: {
+    tags: string[];
+    precision: 'medium' | 'high';
+    problemSeverity: string;
+    'security-severity'?: string;
+  };
 }
 
 interface SarifResult {
   ruleId: string;
+  ruleIndex: number;
   level: 'error' | 'warning' | 'note';
   message: { text: string; markdown?: string };
   locations: Array<{
@@ -48,6 +58,7 @@ interface SarifResult {
     };
   }>;
   fixes?: Array<{ description: { text: string } }>;
+  partialFingerprints?: Record<string, string>;
   properties?: Record<string, unknown>;
 }
 
@@ -62,15 +73,72 @@ const SARIF_RULE_DESCRIPTIONS: Record<string, string> = {
   CA004: 'Suggestion from multi-agent review',
 };
 
-const SARIF_RULES: SarifRule[] = Object.values(SARIF_SEVERITY_RULES).map((rule) => ({
-  id: rule.ruleId,
-  name: rule.ruleName,
-  shortDescription: { text: SARIF_RULE_DESCRIPTIONS[rule.ruleId] ?? 'CodeAgora review finding' },
-  defaultConfiguration: { level: rule.level },
-}));
+const SARIF_SECURITY_SEVERITY: Record<string, string | undefined> = {
+  HARSHLY_CRITICAL: '9.0',
+  CRITICAL: '8.0',
+  WARNING: '5.0',
+  SUGGESTION: undefined,
+};
 
-function sarifRuleForSeverity(severity: string): { level: SarifResult['level']; ruleId: string } {
-  return SARIF_SEVERITY_RULES[severity as keyof typeof SARIF_SEVERITY_RULES] ?? SARIF_SEVERITY_RULES.SUGGESTION;
+const SARIF_RULES: SarifRule[] = REVIEW_SEVERITIES.map((severity) => {
+  const rule = SARIF_SEVERITY_RULES[severity];
+  return {
+    id: rule.ruleId,
+    name: rule.ruleName,
+    shortDescription: { text: SARIF_RULE_DESCRIPTIONS[rule.ruleId] ?? 'CodeAgora review finding' },
+    fullDescription: {
+      text: `${severity} finding produced by CodeAgora's multi-agent code review pipeline.`,
+    },
+    helpUri: 'https://github.com/bssm-oss/CodeAgora',
+    defaultConfiguration: { level: rule.level },
+    properties: {
+      tags: ['code-review', 'codeagora', severity.toLowerCase().replaceAll('_', '-')],
+      precision: severity === 'SUGGESTION' ? 'medium' : 'high',
+      problemSeverity: severity,
+      ...(SARIF_SECURITY_SEVERITY[severity]
+        ? { 'security-severity': SARIF_SECURITY_SEVERITY[severity] }
+        : {}),
+    },
+  };
+});
+
+const SARIF_RULE_INDEX = new Map(SARIF_RULES.map((rule, index) => [rule.id, index]));
+
+function sarifRuleForSeverity(
+  severity: string,
+): { level: SarifResult['level']; ruleId: string; ruleIndex: number } {
+  const rule = SARIF_SEVERITY_RULES[severity as keyof typeof SARIF_SEVERITY_RULES] ?? SARIF_SEVERITY_RULES.SUGGESTION;
+  return {
+    level: rule.level,
+    ruleId: rule.ruleId,
+    ruleIndex: SARIF_RULE_INDEX.get(rule.ruleId) ?? SARIF_RULE_INDEX.get(SARIF_SEVERITY_RULES.SUGGESTION.ruleId) ?? 0,
+  };
+}
+
+function normalizeLineNumber(value: number | undefined, fallback = 1): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.trunc(value));
+}
+
+function normalizeRegion(lineRange: [number, number]): { startLine: number; endLine: number } {
+  const startLine = normalizeLineNumber(lineRange[0]);
+  const endLine = Math.max(startLine, normalizeLineNumber(lineRange[1], startLine));
+  return { startLine, endLine };
+}
+
+function normalizeArtifactUri(filePath: string): string {
+  const withoutNul = filePath.replaceAll('\0', '');
+  const slashPath = withoutNul.trim().replaceAll('\\', '/');
+  const withoutScheme = slashPath.replace(/^file:\/+/i, '').replace(/^[A-Za-z]:\//, '');
+  const segments = withoutScheme.split('/').filter((segment) => {
+    return segment.length > 0 && segment !== '.' && segment !== '..';
+  });
+  const normalized = segments.join('/') || 'unknown';
+  return encodeURI(normalized);
+}
+
+function stableFingerprint(input: string): string {
+  return crypto.createHash('sha256').update(input).digest('hex').slice(0, 32);
 }
 
 // ============================================================================
@@ -97,6 +165,8 @@ export function buildSarifReport(
   const safeDocs = redactDeep(evidenceDocs);
   const results: SarifResult[] = safeDocs.map((doc) => {
     const mapping = sarifRuleForSeverity(doc.severity);
+    const region = normalizeRegion(doc.lineRange);
+    const artifactUri = normalizeArtifactUri(doc.filePath);
 
     const markdown = [
       `**Problem:** ${doc.problem}`,
@@ -106,6 +176,7 @@ export function buildSarifReport(
 
     const result: SarifResult = {
       ruleId: mapping.ruleId,
+      ruleIndex: mapping.ruleIndex,
       level: mapping.level,
       message: {
         text: doc.issueTitle,
@@ -115,16 +186,25 @@ export function buildSarifReport(
         {
           physicalLocation: {
             artifactLocation: {
-              uri: doc.filePath,
+              uri: artifactUri,
               uriBaseId: '%SRCROOT%',
             },
-            region: {
-              startLine: Math.max(1, doc.lineRange[0]),
-              endLine: Math.max(1, doc.lineRange[1]),
-            },
+            region,
           },
         },
       ],
+      partialFingerprints: {
+        primaryLocationLineHash: stableFingerprint(
+          `${artifactUri}:${region.startLine}:${region.endLine}:${mapping.ruleId}:${doc.issueTitle}`,
+        ),
+      },
+      properties: {
+        severity: doc.severity,
+        ...(doc.reviewerId ? { reviewerId: doc.reviewerId } : {}),
+        ...(doc.source ? { source: doc.source } : {}),
+        ...(doc.confidence !== undefined ? { confidence: doc.confidence } : {}),
+        ...(doc.suggestionVerified ? { suggestionVerified: doc.suggestionVerified } : {}),
+      },
     };
 
     if (doc.suggestion) {
@@ -136,6 +216,7 @@ export function buildSarifReport(
     const meta = discussionMeta?.get(locKey);
     if (meta) {
       result.properties = {
+        ...result.properties,
         discussionId: meta.discussionId,
         rounds: meta.rounds,
         consensusReached: meta.consensusReached,

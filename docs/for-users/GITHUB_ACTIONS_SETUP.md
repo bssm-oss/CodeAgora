@@ -2,7 +2,7 @@
 
 This guide shows the recommended ways to run CodeAgora on pull requests.
 
-Use this when you want PR inline comments, a summary verdict, and a commit status check from the `bssm-oss/CodeAgora` GitHub Action.
+Use this when you want PR inline comments, a summary verdict, and one configured GitHub verdict reporter from the `bssm-oss/CodeAgora` GitHub Action.
 
 ## Quick start: OpenRouter
 
@@ -75,7 +75,8 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  statuses: write
+  checks: write
+  security-events: write
 
 jobs:
   review:
@@ -96,6 +97,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
           max-diff-lines: '5000'
+          reporter-mode: check-run
+          upload-sarif: 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 ```
@@ -106,7 +109,8 @@ The Action posts:
 
 - inline comments for confirmed findings
 - a summary review with the final verdict
-- a commit status check
+- either a GitHub check run or a commit status, based on `reporter-mode`
+- a Code Scanning SARIF upload when `upload-sarif` is enabled, or a `codeagora-sarif` workflow artifact fallback when Code Scanning upload is disabled or unavailable
 
 Add a `review:skip` label to skip CodeAgora for a PR.
 
@@ -179,28 +183,33 @@ Example with the recommended OpenRouter quality lineup:
 
 | Input | Default | Description |
 |---|---:|---|
-| `github-token` | required | Token used to fetch the PR diff, post review comments, and set commit status. Usually `${{ secrets.GITHUB_TOKEN }}`. |
+| `github-token` | required | Token used to fetch the PR diff, post review comments, and emit the configured reporter. Usually `${{ secrets.GITHUB_TOKEN }}`. |
 | `config-path` | `.ca/config.json` | Path to the CodeAgora config relative to the repository root. |
 | `fail-on-reject` | `true` | When `true`, the Action exits non-zero if the final verdict is `REJECT`. |
 | `max-diff-lines` | `5000` | Skips the review when the PR diff exceeds this many lines. Use `0` for unlimited. |
-| `post-results` | `true` | When `false`, runs without posting PR comments/status. |
+| `post-results` | `true` | When `false`, runs without posting PR comments or reporter results. |
+| `reporter-mode` | `check-run` | Emits exactly one verdict reporter: `check-run` or `commit-status`. |
+| `check-run-name` | `CodeAgora Review` | Name of the GitHub check run to create or update when `reporter-mode` is `check-run`. |
+| `upload-sarif` | `false` | Uploads the generated SARIF file to GitHub Code Scanning via `github/codeql-action/upload-sarif@v4`; when disabled or unavailable, the Action uploads the generated SARIF file as the `codeagora-sarif` workflow artifact fallback. |
 
 ## Required permissions
 
-Use these permissions for normal PR review posting:
+Use these permissions for normal PR review posting with the default `reporter-mode: check-run`:
 
 ```yaml
 permissions:
   contents: read
   pull-requests: write
-  statuses: write
+  checks: write
 ```
 
-`issues: write` is optional for workflows that manage labels themselves. CodeAgora does not mutate the `review:skip` label.
+Use `statuses: write` instead of `checks: write` when `reporter-mode: commit-status` is selected. Add `security-events: write` only when `upload-sarif: 'true'` is enabled.
+
+CodeAgora does not mutate the `review:skip` label, so `issues: write` is not required for the Action.
 
 ## Fork PRs
 
-Repository secrets are not available to untrusted fork PRs. For public repos, prefer one of these patterns:
+Repository secrets are not available to untrusted fork PRs. CodeAgora also treats fork PRs as an untrusted workflow context and returns `verdict=SKIPPED`, `degraded=true`, and `degraded-reason=untrusted-fork-pr` before invoking provider-backed reviewers, even if a provider secret is present. For public repos, prefer one of these patterns:
 
 - skip CodeAgora for fork PRs and let maintainers run it after review
 - require maintainer approval before running workflows from forks
@@ -243,8 +252,9 @@ The Action exposes these outputs for downstream workflow steps:
 | `verdict` | `ACCEPT`, `REJECT`, `NEEDS_HUMAN`, or `SKIPPED` |
 | `review-url` | URL of the posted GitHub review when available |
 | `session-id` | CodeAgora session ID for audit/debugging |
+| `sarif-file` | Validated path to the generated SARIF file when SARIF output was written |
 | `degraded` | `true` when the run was degraded or skipped |
-| `degraded-reason` | Stable reason code such as `diff-too-large`, `missing-provider-secrets`, or `config-load-failed`; the Action logs and job summary show the matching remediation hint |
+| `degraded-reason` | Stable reason code such as `diff-too-large`, `missing-provider-secrets`, `untrusted-github-context`, `untrusted-fork-pr`, or `config-load-failed`; the Action logs and job summary show the matching remediation hint |
 | `head-sha` | PR head SHA reviewed by CodeAgora |
 | `base-sha` | PR base SHA used for diff acquisition |
 
@@ -253,7 +263,7 @@ The Action exposes these outputs for downstream workflow steps:
 1. **Config not found**: commit `.ca/config.json`, set `config-path`, and rerun after the file is valid.
 2. **Missing provider secret**: add the matching secret and pass it through `env:`.
 3. **Provider fails**: verify the API key, model name, provider quota, and context size.
-4. **Fork PR skipped**: expected when secrets are unavailable to forked PRs; rerun from a trusted branch if needed.
+4. **Fork PR skipped**: expected for untrusted fork PR contexts; rerun from a trusted branch or maintainer-controlled workflow if needed.
 5. **Diff too large**: split the PR or raise `max-diff-lines` only if your provider can handle it.
 6. **Action blocks merge**: set `fail-on-reject: 'false'` if you want review results without a required failure gate.
 

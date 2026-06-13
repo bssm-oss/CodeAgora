@@ -28,6 +28,7 @@ describe('release workflow readiness gates', () => {
 
   it('requires publish approval, provenance, preflight, and uploaded evidence artifacts', () => {
     const release = read('.github/workflows/release.yml');
+    const rootPackage = JSON.parse(read('package.json'));
 
     expect(release).toContain('environment: npm-publish');
     expect(release).toContain('id-token: write');
@@ -38,5 +39,7 @@ describe('release workflow readiness gates', () => {
     expect(release).toContain('actions/upload-artifact@v7');
     expect(release).toContain('release-evidence-${{ github.ref_name }}');
     expect(release).toContain('prerelease: ${{ contains(github.ref_name, \'-\') }}');
+    expect(rootPackage.scripts['evidence:security-smoke']).toBe('node scripts/security-evidence-smoke.mjs');
+    expect(rootPackage.scripts['evidence:desktop-security']).toBe('node scripts/desktop-security-evidence.mjs');
   });
 });

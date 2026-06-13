@@ -8,6 +8,10 @@ import { createGroq } from '@ai-sdk/groq';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import {
+  PROVIDER_ENV_VARS,
+  type SupportedProviderName,
+} from '@codeagora/shared/providers/env-vars.js';
 import type { LanguageModel } from 'ai';
 
 // ============================================================================
@@ -16,6 +20,15 @@ import type { LanguageModel } from 'ai';
 
 /** A callable that returns a LanguageModel for a given model ID. */
 type ProviderInstance = (modelId: string) => LanguageModel;
+
+type ProviderFactoryConfig<Name extends SupportedProviderName> = {
+  create: (apiKey: string) => ProviderInstance;
+  apiKeyEnvVar: (typeof PROVIDER_ENV_VARS)[Name];
+};
+
+type ProviderFactoryRegistry = {
+  [Name in SupportedProviderName]: ProviderFactoryConfig<Name>;
+};
 
 function toProviderInstance(provider: ProviderInstance): ProviderInstance {
   return provider;
@@ -33,17 +46,17 @@ const PROVIDER_FACTORIES = {
   anthropic: {
     create: (apiKey: string) =>
       toProviderInstance(createAnthropic({ apiKey })),
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+    apiKeyEnvVar: PROVIDER_ENV_VARS.anthropic,
   },
   openai: {
     create: (apiKey: string) =>
       toProviderInstance(createOpenAI({ apiKey })),
-    apiKeyEnvVar: 'OPENAI_API_KEY',
+    apiKeyEnvVar: PROVIDER_ENV_VARS.openai,
   },
   openrouter: {
     create: (apiKey: string) =>
       toProviderInstance(createOpenRouter({ apiKey })),
-    apiKeyEnvVar: 'OPENROUTER_API_KEY',
+    apiKeyEnvVar: PROVIDER_ENV_VARS.openrouter,
   },
   'opencode-go': {
     create: (apiKey: string) =>
@@ -52,7 +65,7 @@ const PROVIDER_FACTORIES = {
         baseURL: 'https://opencode.ai/zen/go/v1',
         apiKey,
       })),
-    apiKeyEnvVar: 'OPENCODE_API_KEY',
+    apiKeyEnvVar: PROVIDER_ENV_VARS['opencode-go'],
   },
   'opencode-zen': {
     create: (apiKey: string) =>
@@ -60,16 +73,20 @@ const PROVIDER_FACTORIES = {
         baseURL: 'https://opencode.ai/zen/v1',
         apiKey,
       })),
-    apiKeyEnvVar: 'OPENCODE_API_KEY',
+    apiKeyEnvVar: PROVIDER_ENV_VARS['opencode-zen'],
   },
   groq: {
     create: (apiKey: string) =>
       toProviderInstance(createGroq({ apiKey })),
-    apiKeyEnvVar: 'GROQ_API_KEY',
+    apiKeyEnvVar: PROVIDER_ENV_VARS.groq,
   },
-} as const;
+} satisfies ProviderFactoryRegistry;
 
-type ProviderName = keyof typeof PROVIDER_FACTORIES;
+export type ProviderName = keyof typeof PROVIDER_FACTORIES;
+
+export const SUPPORTED_PROVIDER_NAMES = Object.freeze(
+  Object.keys(PROVIDER_FACTORIES) as ProviderName[]
+);
 
 // ============================================================================
 // Singleton Cache
@@ -97,13 +114,13 @@ function getOrCreateProvider(providerName: string): ProviderInstance {
   const cached = providerCache.get(providerName);
   if (cached) return cached;
 
-  const config = PROVIDER_FACTORIES[providerName as ProviderName];
-  if (!config) {
+  if (!isSupportedProviderName(providerName)) {
     throw new Error(
-      `Unknown API provider: '${providerName}'. Supported: ${Object.keys(PROVIDER_FACTORIES).join(', ')}`
+      `Unknown API provider: '${providerName}'. Supported: ${SUPPORTED_PROVIDER_NAMES.join(', ')}`
     );
   }
 
+  const config = PROVIDER_FACTORIES[providerName];
   const apiKey = process.env[config.apiKeyEnvVar];
   if (!apiKey) {
     throw new Error(
@@ -118,9 +135,13 @@ function getOrCreateProvider(providerName: string): ProviderInstance {
 }
 
 export function getSupportedProviders(): string[] {
-  return Object.keys(PROVIDER_FACTORIES);
+  return [...SUPPORTED_PROVIDER_NAMES];
 }
 
 export function clearProviderCache(): void {
   providerCache.clear();
+}
+
+export function isSupportedProviderName(providerName: string): providerName is ProviderName {
+  return Object.prototype.hasOwnProperty.call(PROVIDER_FACTORIES, providerName);
 }

@@ -190,6 +190,12 @@ envCommand.action(() => {
   console.log(formatEnvironmentCredentials(listEnvironmentCredentials()));
 });
 envCommand
+  .command('list')
+  .description('List saved/loaded API key status')
+  .action(() => {
+    console.log(formatEnvironmentCredentials(listEnvironmentCredentials()));
+  });
+envCommand
   .command('set <provider-or-env> [api-key]')
   .description('Save an API key to the CodeAgora credential store')
   .option('--stdin', 'read API key from stdin', false)
@@ -325,9 +331,17 @@ program.command('config-edit').description('Open config in $EDITOR').action(asyn
   catch (error) { console.error('Error:', error instanceof Error ? error.message : error); process.exit(1); }
 });
 
-program.command('providers-test').description('Verify API key status for all providers').action(() => {
-  console.log(formatProviderTestResults(testProviders()));
-});
+program.command('providers-test')
+  .description('Verify API key status for providers')
+  .option('--provider <name>', 'only check one provider, e.g. openrouter')
+  .action((options: { provider?: string }) => {
+    const results = testProviders(options.provider);
+    if (options.provider && results.length === 0) {
+      console.error(`Unknown provider: ${options.provider}`);
+      process.exit(1);
+    }
+    console.log(formatProviderTestResults(results));
+  });
 
 // === Persona management ===
 

@@ -16,6 +16,8 @@ CodeAgora runs multiple LLM reviewers in parallel, lets them challenge each othe
 
 ## Quick Start
 
+### Published CLI
+
 ```bash
 npm i -g @codeagora/review@rc
 agora init
@@ -23,6 +25,18 @@ git diff | agora review
 ```
 
 Current release: `0.1.0-rc.6`.
+
+### Source Checkout
+
+CodeAgora is a pnpm-only workspace. Use pnpm for local setup, scripts, package filters, and release validation; do not use npm or yarn for workspace workflows.
+
+```bash
+pnpm install
+pnpm build
+pnpm typecheck
+pnpm test
+pnpm dev review path/to/diff.patch
+```
 
 ## Why CodeAgora
 
@@ -60,6 +74,7 @@ permissions:
   contents: read
   pull-requests: write
   statuses: write
+  checks: write
 
 jobs:
   review:

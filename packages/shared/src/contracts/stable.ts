@@ -52,7 +52,9 @@ export type McpErrorCode = typeof MCP_ERROR_CODES[number];
 
 export const ACTION_DEGRADED_REASONS = [
   'missing-github-token',
+  'untrusted-github-context',
   'missing-provider-secrets',
+  'untrusted-fork-pr',
   'fork-missing-provider-secrets',
   'posting-disabled',
   'diff-too-large',

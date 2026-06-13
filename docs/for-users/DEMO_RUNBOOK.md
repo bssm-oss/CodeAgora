@@ -228,6 +228,7 @@ permissions:
   contents: read
   pull-requests: write
   statuses: write
+  checks: write
 
 jobs:
   review:
@@ -243,13 +244,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
           max-diff-lines: '5000'
+          reporter-mode: check-run
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
 What to point out:
 
-- It posts inline comments, a verdict summary, and a status check.
+- It posts inline comments, a verdict summary, and the configured verdict reporter.
 - One OpenRouter key is enough for the demo stack above.
 - For fork PRs, keep the guardrail that skips secret-backed execution.
 

@@ -1180,7 +1180,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
   }
 
   // Warn if the primary provider's API key is missing
-  const primaryEnvVar = PROVIDER_ENV_VARS[primaryProvider];
+  const primaryEnvVar = getProviderEnvVar(primaryProvider);
   if (primaryEnvVar && !process.env[primaryEnvVar]) {
     p.note(
       `${primaryEnvVar} is not set. Reviews will fail until you set it:\n\n` +
@@ -1213,7 +1213,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
   await writeFile(reviewIgnorePath, reviewIgnoreContent, force, created, skipped);
 
   // Provider health check: ping one model from each configured provider
-  const envVar = PROVIDER_ENV_VARS[primaryProvider];
+  const envVar = getProviderEnvVar(primaryProvider);
   if (envVar && process.env[envVar]) {
     const spinner = p.spinner();
     spinner.start(t('cli.init.healthCheck'));

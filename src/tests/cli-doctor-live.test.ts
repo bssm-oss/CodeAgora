@@ -526,7 +526,8 @@ describe('runDoctorWithLive()', () => {
     expect(result.summary.fail).toBeGreaterThan(0);
     expect(result.liveChecks?.[0].error).toContain('[REDACTED]');
     expect(result.liveChecks?.[0].error).not.toContain('sk-1234567890secret');
-    expect(report).toContain('Fix the live provider errors above');
+    expect(report).toContain('The key is present, but the provider rejected the live check');
+    expect(report).toContain('agora env set groq <new-api-key>');
   });
 });
 

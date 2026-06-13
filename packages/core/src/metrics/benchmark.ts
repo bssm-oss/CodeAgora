@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { GoldenBugFixtureSchema, type GoldenBugFixture } from '@codeagora/shared/types/golden-bug.js';
+import { redactDeep, redactSecrets } from '@codeagora/shared/utils/redaction.js';
 import {
   aggregate,
   scoreCase,
@@ -161,7 +162,7 @@ export async function writeBenchmarkMetricsArtifacts(
   await fs.mkdir(outDir, { recursive: true });
   const jsonPath = path.join(outDir, 'benchmark-metrics.json');
   const markdownPath = path.join(outDir, 'benchmark-metrics.md');
-  await fs.writeFile(jsonPath, JSON.stringify(report, null, 2) + '\n', 'utf-8');
-  await fs.writeFile(markdownPath, formatBenchmarkMetricsMarkdown(report) + '\n', 'utf-8');
+  await fs.writeFile(jsonPath, JSON.stringify(redactDeep(report), null, 2) + '\n', 'utf-8');
+  await fs.writeFile(markdownPath, redactSecrets(formatBenchmarkMetricsMarkdown(report)) + '\n', 'utf-8');
   return { jsonPath, markdownPath };
 }
