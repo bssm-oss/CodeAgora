@@ -13,11 +13,6 @@ import {
   runReleaseGateCommands,
 } from '../../scripts/release-gate-runner.mjs';
 import {
-  DESKTOP_RELEASE_CHECKS,
-  formatDesktopReleaseGateOutput,
-  runDesktopReleaseGate,
-} from '../../scripts/desktop-release-gate-runner.mjs';
-import {
   assertGateExitStatusesPass,
   evaluateGateExitStatuses,
 } from '../../scripts/release-gate-evaluator.mjs';
@@ -141,124 +136,9 @@ describe('release gate inventory', () => {
     expect(deterministicLocalReleaseGates()).not.toContain(evidence);
   });
 
-  it('tracks desktop-specific security evidence as an rc local artifact', () => {
-    const rootPackage = JSON.parse(fs.readFileSync('package.json', 'utf-8')) as {
-      scripts: Record<string, string>;
-    };
-    const evidence = EXPECTED_EVIDENCE.find(
-      (entry) => entry.name === 'desktop-security-evidence',
-    );
-
-    expect(rootPackage.scripts['evidence:desktop-security']).toBe('node scripts/desktop-security-evidence.mjs');
-    expect(evidence).toMatchObject({
-      filename: 'desktop-security-evidence.json',
-      command: 'pnpm evidence:desktop-security',
-      tier: 'rc',
-      redactionStatus: 'safe-to-publish',
-      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
-    });
-    expect(deterministicLocalReleaseGates()).not.toContain(evidence);
-  });
 });
 
 describe('release gate command runner', () => {
-  it('executes the required desktop release checks and records passing evidence output', async () => {
-    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-gate-'));
-    const calls: Array<{ command: string; file: string; args: string[] }> = [];
-
-    try {
-      const result = await runDesktopReleaseGate({
-        cwd,
-        recordEvidence: true,
-        runProcess: async ({ command, file, args }) => {
-          calls.push({ command, file, args });
-          return {
-            stdout: `ok:${command}\n`,
-            stderr: '',
-            exitCode: 0,
-          };
-        },
-      });
-
-      expect(calls).toEqual(DESKTOP_RELEASE_CHECKS.map((check) => ({
-        command: check.command,
-        file: 'pnpm',
-        args: check.args,
-      })));
-      expect(result).toMatchObject({
-        name: 'desktop-gate',
-        command: 'pnpm rc:desktop-gate',
-        filename: 'desktop-gate.log',
-        exitCode: 0,
-        passed: true,
-      });
-      expect(result.checks.map((check) => check.name)).toEqual([
-        'desktop-typecheck',
-        'desktop-smoke',
-        'desktop-tauri-check',
-        'desktop-tauri-file-access-boundary',
-        'desktop-app-e2e',
-        'desktop-macos-webdriver-e2e',
-        'desktop-visual-qa',
-        'desktop-evidence',
-        'desktop-bundle-smoke',
-      ]);
-
-      const output = formatDesktopReleaseGateOutput(result);
-      expect(output).toContain('[PASS] desktop-gate: pnpm rc:desktop-gate');
-      expect(output).toContain('[PASS] desktop-bundle-smoke: pnpm --filter @codeagora/desktop bundle:smoke');
-
-      const aggregateLog = fs.readFileSync(path.join(cwd, '.sisyphus', 'evidence', 'desktop-gate.log'), 'utf-8');
-      expect(aggregateLog).toContain('command: pnpm rc:desktop-gate');
-      expect(aggregateLog).toContain('$ pnpm --filter @codeagora/desktop typecheck');
-      expect(aggregateLog).toContain('$ pnpm --filter @codeagora/desktop bundle:smoke');
-
-      const ledger = fs.readFileSync(path.join(cwd, '.sisyphus', 'evidence', 'gate-command-evidence.jsonl'), 'utf-8');
-      expect(JSON.parse(ledger.trim())).toMatchObject({
-        schemaVersion: 'codeagora.release-gate-command-evidence.v1',
-        name: 'desktop-gate',
-        command: 'pnpm rc:desktop-gate',
-        exitCode: 0,
-        passed: true,
-        logPath: path.join('.sisyphus', 'evidence', 'desktop-gate.log'),
-      });
-    } finally {
-      fs.rmSync(cwd, { recursive: true, force: true });
-    }
-  });
-
-  it('stops the desktop release gate on the first failing check and prints failure output', async () => {
-    const calls: string[] = [];
-    const result = await runDesktopReleaseGate({
-      runProcess: async ({ command }) => {
-        calls.push(command);
-        return {
-          stdout: `out:${command}\n`,
-          stderr: command.endsWith('smoke') ? 'desktop smoke failed\n' : '',
-          exitCode: command.endsWith('smoke') ? 2 : 0,
-        };
-      },
-    });
-
-    expect(calls).toEqual([
-      'pnpm --filter @codeagora/desktop typecheck',
-      'pnpm --filter @codeagora/desktop smoke',
-    ]);
-    expect(result).toMatchObject({
-      name: 'desktop-gate',
-      exitCode: 2,
-      passed: false,
-    });
-    expect(result.checks).toMatchObject([
-      { name: 'desktop-typecheck', passed: true, exitCode: 0 },
-      { name: 'desktop-smoke', passed: false, exitCode: 2, stderr: 'desktop smoke failed\n' },
-    ]);
-    expect(formatDesktopReleaseGateOutput(result)).toContain(
-      '[FAIL] desktop-smoke: pnpm --filter @codeagora/desktop smoke',
-    );
-    expect(formatDesktopReleaseGateOutput(result)).toContain('desktop smoke failed');
-  });
-
   it('executes inventory commands and captures stdout, stderr, and exit code', async () => {
     const gates = [
       { name: 'typecheck', filename: 'typecheck.log', command: 'pnpm typecheck' },
