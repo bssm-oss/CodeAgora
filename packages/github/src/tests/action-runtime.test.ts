@@ -504,6 +504,89 @@ describe('GitHub Action runtime', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  it('marks provider runtime failures degraded instead of failing the Action job', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const summaryFile = path.join(tempDir, 'summary.md');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const eventFile = path.join(tempDir, 'event.json');
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_STEP_SUMMARY = summaryFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.OPENROUTER_API_KEY = 'provider-secret';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      repo: 'owner/repo',
+      sha: inputSha,
+      pr: 42,
+      diff: diffFile,
+      token: 'ghp_test',
+      configPath: '.ca/config.json',
+      baseSha: 'base123',
+      maxDiffLines: 0,
+      failOnReject: true,
+      postResults: true,
+      reporterMode: 'check-run',
+      baseRepo: 'owner/repo',
+      headRepo: 'owner/repo',
+      checkRunName: 'CodeAgora Review',
+    } as never);
+
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: false,
+      shouldRunReview: true,
+      shouldPostResults: true,
+      verdictOverride: undefined,
+    } as never);
+
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue({ github: {} } as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'error',
+      sessionId: '001',
+      date: '2026-06-13',
+      error: [
+        'All reviewers failed (forfeited or errored) due to provider/API failures.',
+        '- r-gpt5 (openrouter/openai/gpt-5.3-codex): auth: Auth error (permanent): Key limit exceeded (weekly limit).',
+        'Recovery hint: check provider API keys, quota/rate limits, network connectivity, and circuit breaker status with `agora doctor --live`.',
+      ].join('\n'),
+    } as never);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.mapToGitHubReview).not.toHaveBeenCalled();
+    expect(mocks.postReview).not.toHaveBeenCalled();
+    expect(mocks.setCommitStatus).not.toHaveBeenCalled();
+    expect(mocks.fetchPrMetadata).not.toHaveBeenCalled();
+    expect(mocks.createAppOctokit).not.toHaveBeenCalled();
+    expect(mocks.handleNeedsHuman).not.toHaveBeenCalled();
+    expect(mocks.validateActionOutputPath).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+
+    const output = await readFile(outputFile, 'utf-8');
+    expect(output).toContain(`head-sha=${eventHeadSha}`);
+    expect(output).toContain('base-sha=base123');
+    expect(output).toContain('degraded=true');
+    expect(output).toContain('degraded-reason=provider-runtime-failed');
+    expect(output).toContain('verdict=DEGRADED');
+    expect(output).toContain('review-url=');
+    expect(output).toContain('session-id=001');
+
+    const summary = await readFile(summaryFile, 'utf-8');
+    expect(summary).toContain('CodeAgora review degraded');
+    expect(summary).toContain('Reason: `provider-runtime-failed`');
+    expect(summary).toContain('Key limit exceeded');
+    expect(summary).toContain('agora doctor --live');
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
   it('blocks privileged GitHub comments, reporters, and mutations when the write context is not trusted', async () => {
     const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));

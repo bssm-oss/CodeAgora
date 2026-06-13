@@ -59,6 +59,7 @@ export const ACTION_DEGRADED_REASONS = [
   'posting-disabled',
   'diff-too-large',
   'config-load-failed',
+  'provider-runtime-failed',
   'stale-head-sha',
   'github-post-failed',
   'sarif-write-failed',
