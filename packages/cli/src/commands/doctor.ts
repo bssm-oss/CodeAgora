@@ -31,6 +31,7 @@ export interface DoctorCheck {
 export interface DoctorResult {
   checks: DoctorCheck[];
   summary: { pass: number; fail: number; warn: number };
+  nextSteps?: string[];
   liveChecks?: LiveCheckResult[];
   cliBackends?: DetectedCli[];
 }
@@ -413,6 +414,54 @@ function summarizeChecks(checks: DoctorCheck[]): DoctorResult['summary'] {
   };
 }
 
+export function buildDoctorNextSteps(result: Pick<DoctorResult, 'checks' | 'liveChecks'>): string[] {
+  const blocking = result.checks.filter((check) => check.status === 'fail');
+  const warnings = result.checks.filter((check) => check.status === 'warn');
+  const nextSteps: string[] = [];
+  const hasConfigFailure = blocking.some((check) => check.name === 'Config file' || check.name === 'Config validity');
+  const hasWorkspaceFailure = blocking.some((check) => check.name === '.ca/ directory');
+  const hasConfiguredApiFailure = blocking.some((check) => check.name === 'Configured API credentials');
+  const hasConfiguredCliFailure = blocking.some((check) => check.name === 'Configured CLI backends');
+  const hasReviewBackendFailure = blocking.some((check) => check.name === 'Review backend');
+  const hasLiveHealthFailure = blocking.some((check) => check.name === 'Live API health');
+  const hasApiWarnings = warnings.some((check) => check.name === 'Available API keys');
+  const hasCliWarnings = warnings.some((check) => check.name === 'Available CLI backends');
+
+  if (hasWorkspaceFailure) {
+    nextSteps.push('Run `agora init` in the workspace to create the missing project files.');
+  }
+  if (hasConfigFailure && !hasWorkspaceFailure) {
+    nextSteps.push('Fix the config errors, then rerun `agora doctor`.');
+  }
+  if (hasConfiguredApiFailure) {
+    nextSteps.push('Run `agora env set <provider> <api-key>` for the missing provider, then rerun `agora doctor --live`.');
+  }
+  if (hasConfiguredCliFailure) {
+    nextSteps.push('Install or authenticate the CLI backends named in `.ca/config`, then rerun `agora doctor`.');
+  }
+  if (hasReviewBackendFailure) {
+    nextSteps.push('Run `agora env set openrouter <api-key>` or install/auth one supported CLI backend, then rerun `agora doctor`.');
+  }
+  if (hasLiveHealthFailure && !hasConfiguredApiFailure) {
+    const failedProviders = Array.from(
+      new Set((result.liveChecks ?? []).filter((check) => check.status !== 'ok').map((check) => check.provider)),
+    );
+    const providerHint = failedProviders.length === 1 ? failedProviders[0] : '<provider>';
+    nextSteps.push(`The key is present, but the provider rejected the live check. Replace it with \`agora env set ${providerHint} <new-api-key>\`, then rerun \`agora doctor --live\`. Credential store: ${getCredentialsPath()}`);
+  } else if (hasApiWarnings) {
+    nextSteps.push('Run `agora env set openrouter <api-key>` if you want API-backed reviews, then rerun `agora doctor --live`.');
+  } else if (hasCliWarnings) {
+    nextSteps.push('Install/auth a CLI backend if you want CLI-backed reviews, then rerun `agora doctor`.');
+  }
+  if (blocking.length === 0 && warnings.length === 0) {
+    nextSteps.push('Run `agora review --dry-run` or `agora review --staged` next.');
+  } else if (blocking.length === 0) {
+    nextSteps.push('Rerun `agora review --dry-run` after the warnings above are resolved.');
+  }
+
+  return nextSteps;
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -518,7 +567,9 @@ export async function runDoctor(baseDir: string): Promise<DoctorResult> {
   checks.push(checkAvailableCliBackends(cliBackends, hasApiKey));
   checks.push(checkReviewBackend(hasApiKey, hasAvailableCli));
 
-  return { checks, summary: summarizeChecks(checks), cliBackends };
+  const result: DoctorResult = { checks, summary: summarizeChecks(checks), cliBackends };
+  result.nextSteps = buildDoctorNextSteps(result);
+  return result;
 }
 
 function summarizeLiveHealth(liveChecks: LiveCheckResult[]): DoctorCheck {
@@ -568,6 +619,7 @@ export async function runDoctorWithLive(baseDir: string): Promise<DoctorResult> 
   }
 
   result.summary = summarizeChecks(result.checks);
+  result.nextSteps = buildDoctorNextSteps(result);
   return result;
 }
 
@@ -823,47 +875,7 @@ export function formatDoctorReport(result: DoctorResult): string {
     lines.push(formatLiveCheckReport(result.liveChecks));
   }
 
-  const nextSteps: string[] = [];
-  const hasConfigFailure = blocking.some((check) => check.name === 'Config file' || check.name === 'Config validity');
-  const hasWorkspaceFailure = blocking.some((check) => check.name === '.ca/ directory');
-  const hasConfiguredApiFailure = blocking.some((check) => check.name === 'Configured API credentials');
-  const hasConfiguredCliFailure = blocking.some((check) => check.name === 'Configured CLI backends');
-  const hasReviewBackendFailure = blocking.some((check) => check.name === 'Review backend');
-  const hasLiveHealthFailure = blocking.some((check) => check.name === 'Live API health');
-  const hasApiWarnings = warnings.some((check) => check.name === 'Available API keys');
-  const hasCliWarnings = warnings.some((check) => check.name === 'Available CLI backends');
-
-  if (hasWorkspaceFailure) {
-    nextSteps.push('Run `agora init` in the workspace to create the missing project files.');
-  }
-  if (hasConfigFailure && !hasWorkspaceFailure) {
-    nextSteps.push('Fix the config errors, then rerun `agora doctor`.');
-  }
-  if (hasConfiguredApiFailure) {
-    nextSteps.push('Run `agora env set <provider> <api-key>` for the missing provider, then rerun `agora doctor --live`.');
-  }
-  if (hasConfiguredCliFailure) {
-    nextSteps.push('Install or authenticate the CLI backends named in `.ca/config`, then rerun `agora doctor`.');
-  }
-  if (hasReviewBackendFailure) {
-    nextSteps.push('Run `agora env set openrouter <api-key>` or install/auth one supported CLI backend, then rerun `agora doctor`.');
-  }
-  if (hasLiveHealthFailure && !hasConfiguredApiFailure) {
-    const failedProviders = Array.from(
-      new Set((result.liveChecks ?? []).filter((check) => check.status !== 'ok').map((check) => check.provider)),
-    );
-    const providerHint = failedProviders.length === 1 ? failedProviders[0] : '<provider>';
-    nextSteps.push(`The key is present, but the provider rejected the live check. Replace it with \`agora env set ${providerHint} <new-api-key>\`, then rerun \`agora doctor --live\`. Credential store: ${getCredentialsPath()}`);
-  } else if (hasApiWarnings) {
-    nextSteps.push('Run `agora env set openrouter <api-key>` if you want API-backed reviews, then rerun `agora doctor --live`.');
-  } else if (hasCliWarnings) {
-    nextSteps.push('Install/auth a CLI backend if you want CLI-backed reviews, then rerun `agora doctor`.');
-  }
-  if (blocking.length === 0 && warnings.length === 0) {
-    nextSteps.push('Run `agora review --dry-run` or `agora review --staged` next.');
-  } else if (blocking.length === 0) {
-    nextSteps.push('Rerun `agora review --dry-run` after the warnings above are resolved.');
-  }
+  const nextSteps = result.nextSteps ?? buildDoctorNextSteps(result);
 
   if (nextSteps.length > 0) {
     lines.push('Next steps');

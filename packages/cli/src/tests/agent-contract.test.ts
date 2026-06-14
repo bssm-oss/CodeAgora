@@ -209,6 +209,11 @@ describe('CLI exit code classification', () => {
     expect(classifyCliErrorExitCode(new Error('Groq rate limit exceeded'))).toBe(3);
     expect(classifyCliErrorExitCode(new Error('Reviewer timed out'))).toBe(3);
     expect(classifyCliErrorExitCode(new Error('Pipeline failed after retries'))).toBe(3);
+    expect(classifyCliErrorExitCode(new Error([
+      'All reviewers failed (forfeited or errored) due to provider/API failures.',
+      '- r1 (openrouter/xiaomi/mimo-v2.5): auth: Auth error (permanent): Missing Authentication header',
+      'Recovery hint: check provider API keys, quota/rate limits, network connectivity, and circuit breaker status with `agora doctor --live`.',
+    ].join('\n')))).toBe(3);
   });
 
   it('redacts secrets from formatted error messages and verbose stacks', () => {
