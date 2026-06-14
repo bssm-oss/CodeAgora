@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # .github
 
@@ -12,7 +12,7 @@ GitHub Actions workflows, issue templates, and PR configuration. Automates CI/CD
 |------|---------|
 | `workflows/ci.yml` | Lint, typecheck, and test on push/PR to main (Node 20, 22) |
 | `workflows/release.yml` | Build and publish npm packages on version tag (v*) |
-| `workflows/review.yml` | Run CodeAgora review on PRs; post findings as comments (skippable via `review:skip` label) |
+| `workflows/review.yml` | Run CodeAgora review on PRs; requires `OPENROUTER_API_KEY`, skips forks and `review:skip` PRs, posts findings through the local composite Action |
 | `workflows/pr-size.yml` | Auto-label PRs by diff size (XS, S, M, L, XL) |
 | `workflows/build-action.yml` | Rebuild `dist/action.js` bundle on push to main (auto-commits via `[skip ci]`) |
 | `workflows/provider-health.yml` | Scheduled provider health checks across registered API providers |
@@ -31,6 +31,10 @@ GitHub Actions workflows, issue templates, and PR configuration. Automates CI/CD
 - **Node version matrix**: CI tests against Node 20 and 22; update `matrix.node-version` if adding new versions
 - **pnpm version**: Currently pinned to `version: 10` in workflow steps; update when upgrading
 - **Review workflow**: Checks for `review:skip` label to skip CodeAgora review; respects PR size threshold
+- **OpenRouter secret handling**: Pass `OPENROUTER_API_KEY` only through `env: OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}`. Do not write provider keys into generated `.ca/config.json`, logs, docs examples, or committed files.
+- **Fork PR boundary**: Untrusted fork PRs must skip before provider-backed reviewers run. Do not weaken this to "try without secrets".
+- **Action-source verification**: Changes to `action.yml`, `.github/workflows/review.yml`, `.github/workflows/build-action.yml`, or bundled Action runtime inputs/outputs require `pnpm build:action` plus focused Action tests.
+- **Evidence boundary**: CI and degraded-path tests prove deterministic policy behavior. Live Action posting evidence requires a real `pull_request` workflow run and matching evidence artifacts.
 - **Release triggers**: Triggered only on tags matching `v*` pattern (e.g., `v1.2.3`)
 - **Issue templates**: Update YAML frontmatter in `.md` files for form fields and defaults
 - **Permissions**: Review workflow has read/write perms for PRs and status checks; release has write for contents

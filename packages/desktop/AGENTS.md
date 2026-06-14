@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-04-27 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-04-27 | Updated: 2026-06-14 -->
 
 # desktop/ (@codeagora/desktop)
 
@@ -13,6 +13,7 @@ The desktop app owns session browsing, session detail display, local review laun
 - Read existing `.ca/sessions` and `.ca/config.json` semantics rather than inventing new storage.
 - Keep signing, notarization, updater, distribution, and support policy explicit in release evidence instead of treating packaging as an implementation detail.
 - Do not add web dashboard, terminal TUI, or external webhook delivery dependencies here.
+- Setup panels for MCP or GitHub Actions are readiness/guidance surfaces, not substitutes for live MCP or live Action evidence.
 
 ## Key Files
 | File | Description |
@@ -27,3 +28,4 @@ The desktop app owns session browsing, session detail display, local review laun
 - Frontend-only changes still need package typecheck/smoke where practical.
 - Any Tauri command, Rust, bridge-contract, packaging, or desktop evidence change requires `pnpm rc:desktop-gate` before release claims.
 - Desktop evidence is a first-class release gate, but it must not substitute for CLI, GitHub Action, or MCP evidence.
+- Signing, notarization, updater, and distribution claims require explicit artifacts; a local dev launch alone is not release evidence.

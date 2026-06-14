@@ -115,26 +115,40 @@ function validateArg(arg: string, name: string): string {
   return arg;
 }
 
+function modelArgs(flag: string, model: string, name = 'model'): string[] {
+  if (!model || model === 'auto') {
+    return [];
+  }
+  return [flag, validateArg(model, name)];
+}
+
 // ============================================================================
 // Command Builders (return binary + args, no shell)
 // ============================================================================
 
 function buildCommand(input: BackendInput): CliCommand {
-  const { backend, model, provider } = input;
+  const { backend, model, provider, prompt } = input;
 
   switch (backend) {
     case 'opencode': {
       if (!provider) throw new Error('OpenCode backend requires provider parameter');
       return {
         bin: 'opencode',
-        args: ['run', '-m', `${validateArg(provider, 'provider')}/${validateArg(model, 'model')}`],
+        args: [
+          'run',
+          ...(
+            model && model !== 'auto'
+              ? ['-m', `${validateArg(provider, 'provider')}/${validateArg(model, 'model')}`]
+              : []
+          ),
+        ],
         useStdin: true,
       };
     }
     case 'codex':
       return {
         bin: 'codex',
-        args: ['exec', '-m', validateArg(model, 'model'), '-'],
+        args: ['exec', '--skip-git-repo-check', ...modelArgs('-m', model), '-'],
         useStdin: true,
       };
     case 'gemini':
@@ -152,13 +166,13 @@ function buildCommand(input: BackendInput): CliCommand {
     case 'copilot':
       return {
         bin: 'copilot',
-        args: ['-s', '--allow-all', '--model', validateArg(model, 'model')],
-        useStdin: true,
+        args: ['-s', '--allow-all', ...modelArgs('--model', model), '-p', prompt],
+        useStdin: false,
       };
     case 'cursor':
       return {
         bin: 'agent',
-        args: [],
+        args: ['-p', '--trust'],
         useStdin: true,
       };
     case 'antigravity':

@@ -103,7 +103,13 @@ describe('GitHub Actions runtime readiness', () => {
     expect(review).toContain('OPENROUTER_API_KEY');
     expect(review).toContain('provider=openrouter');
     expect(review).not.toContain('provider=groq');
-    expect(review).toContain('qwen/qwen3.7-max');
+    expect(review).toContain('qwen/qwen3-235b-a22b-2507');
+    expect(review).toContain('deepseek/deepseek-v4-flash');
+    expect(review).toContain('qwen/qwen3.5-9b');
+    expect(review).toContain('z-ai/glm-4.7-flash');
+    expect(review).toContain('openai/gpt-oss-120b');
+    expect(review).toContain('moonshotai/kimi-k2.5');
+    expect(review).toContain('"enabled": false');
     expect(bench).not.toContain('models: read');
     expect(bench).toContain('config.openrouter-low-cost-5x2.json');
     expect(bench).toContain('OPENROUTER_API_KEY');

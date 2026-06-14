@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # tests
 
@@ -60,6 +60,24 @@ Tests are **centralized**, not colocated with source. This enables:
 ```bash
 pnpm test           # Run root and package-local tests through vitest.config.ts
 ```
+
+**GitHub Action verification:**
+
+When touching `packages/github/src/action.ts`, `packages/github/src/action-policy.ts`, `action.yml`, `.github/workflows/*`, Action SARIF/diff handling, or provider-secret policy, run focused Action coverage before broader tests:
+
+```bash
+pnpm vitest run src/tests/github-action-parse-args.test.ts packages/github/src/tests/action-runtime.test.ts src/tests/github-actions-runtime.test.ts
+pnpm vitest run src/tests/github-action-diff-path-security.test.ts src/tests/github-action-sarif-path.test.ts src/tests/github-action-pr-smoke-recorder.test.ts
+pnpm vitest run packages/github/src/tests/action-event.test.ts packages/github/src/tests/action-reporting.test.ts packages/github/src/tests/github-poster.test.ts packages/github/src/tests/sarif.test.ts
+```
+
+For token, fork, permission, or secret-boundary changes, also run the relevant security/evidence scripts where practical. These tests are deterministic coverage; they do not prove live provider quality or live GitHub posting.
+
+**Preset and backend verification:**
+
+- `agora init --preset` changes need focused init/preset tests and generated-config smoke.
+- L1 CLI backend changes need `src/tests/l1-backend.test.ts` plus clean-diff smoke coverage.
+- L2/L3 moderation or clean-report changes need focused edge-case/verdict tests.
 
 **Vitest configuration** (`vitest.config.ts` at repo root):
 - **Globals enabled**: `describe`, `it`, `expect`, `beforeEach`, `afterEach` available without imports

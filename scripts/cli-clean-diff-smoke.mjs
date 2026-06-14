@@ -23,6 +23,17 @@ const PROVIDER_DEFAULT_MODELS = {
   openai: 'gpt-4.1-mini',
   openrouter: 'xiaomi/mimo-v2.5',
 };
+const REVIEW_BACKENDS = new Set(['api', 'claude', 'codex', 'gemini', 'antigravity', 'copilot', 'cursor', 'opencode', 'pi']);
+const BACKEND_DEFAULT_MODELS = {
+  claude: 'sonnet',
+  codex: 'auto',
+  gemini: 'gemini-2.5-pro',
+  antigravity: 'auto',
+  copilot: 'auto',
+  cursor: 'auto',
+  opencode: 'deepseek-v4-flash',
+  pi: 'auto',
+};
 
 const CLEAN_FIXTURE_DIFF = [
   'diff --git a/src/math.ts b/src/math.ts',
@@ -47,7 +58,9 @@ const FIXTURE_KINDS = new Set(['clean-diff', 'staged-diff', 'patch-file', 'inval
 
 function parseArgs(argv) {
   const options = {
+    backend: process.env.CODEAGORA_SMOKE_BACKEND || 'api',
     provider: process.env.CODEAGORA_SMOKE_PROVIDER || 'openrouter',
+    providerExplicit: Boolean(process.env.CODEAGORA_SMOKE_PROVIDER),
     model: process.env.CODEAGORA_SMOKE_MODEL || '',
     cli: process.env.CODEAGORA_SMOKE_CLI || '',
     output: '',
@@ -69,8 +82,14 @@ function parseArgs(argv) {
       options.keepTemp = true;
     } else if (arg === '--provider') {
       options.provider = argv[++index] ?? options.provider;
+      options.providerExplicit = true;
     } else if (arg?.startsWith('--provider=')) {
       options.provider = arg.slice('--provider='.length);
+      options.providerExplicit = true;
+    } else if (arg === '--backend') {
+      options.backend = argv[++index] ?? options.backend;
+    } else if (arg?.startsWith('--backend=')) {
+      options.backend = arg.slice('--backend='.length);
     } else if (arg === '--model') {
       options.model = argv[++index] ?? options.model;
     } else if (arg?.startsWith('--model=')) {
@@ -110,6 +129,9 @@ function parseArgs(argv) {
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0) {
     throw new Error(`Invalid --timeout-ms value: ${options.timeoutMs}`);
   }
+  if (!REVIEW_BACKENDS.has(options.backend)) {
+    throw new Error(`Invalid --backend value: ${options.backend}. Expected one of: ${Array.from(REVIEW_BACKENDS).join(', ')}.`);
+  }
   if (options.patchFile && options.fixture === 'clean-diff') {
     options.fixture = 'patch-file';
   }
@@ -122,8 +144,14 @@ function parseArgs(argv) {
   if (options.patchFile) {
     options.patchFile = path.resolve(options.patchFile);
   }
+  if ((options.fixture === 'missing-provider-key' || options.fixture === 'provider-failure') && options.backend !== 'api') {
+    throw new Error(`--fixture ${options.fixture} requires --backend api.`);
+  }
+  if (options.backend === 'opencode' && !options.providerExplicit) {
+    options.provider = 'opencode-go';
+  }
   if (!options.model) {
-    options.model = PROVIDER_DEFAULT_MODELS[options.provider] || 'auto';
+    options.model = defaultModelForOptions(options);
   }
 
   return options;
@@ -137,6 +165,7 @@ function printHelp() {
     '',
     'Options:',
     '  --dry-run              Validate runner and fixture plumbing without provider calls',
+    '  --backend <name>       Review backend for live config: api, claude, codex, gemini, antigravity, copilot, cursor, opencode, or pi (default: api)',
     '  --provider <name>      Provider for live review config (default: openrouter)',
     '  --model <name>         Reviewer/head model for live review config (default: auto)',
     '  --cli <path>           CLI entrypoint or binary to execute',
@@ -151,6 +180,13 @@ function printHelp() {
 
 function providerEnvVar(provider) {
   return PROVIDER_ENV[provider] ?? `${provider.toUpperCase().replace(/-/g, '_')}_API_KEY`;
+}
+
+function defaultModelForOptions(options) {
+  if (options.backend === 'api') {
+    return PROVIDER_DEFAULT_MODELS[options.provider] || 'auto';
+  }
+  return BACKEND_DEFAULT_MODELS[options.backend] || 'auto';
 }
 
 function defaultCredentialsPath() {
@@ -192,11 +228,20 @@ function loadCredentialStoreIntoEnv(credentialsPath = defaultCredentialsPath(), 
 }
 
 function fixtureRequiresProviderCredentials(options) {
-  return !options.dryRun && options.fixture !== 'invalid-config' && options.fixture !== 'missing-provider-key' && options.fixture !== 'provider-failure';
+  return options.backend === 'api'
+    && !options.dryRun
+    && options.fixture !== 'invalid-config'
+    && options.fixture !== 'missing-provider-key'
+    && options.fixture !== 'provider-failure';
 }
 
 function fixtureRecordsRequiredEnvVar(options) {
-  return fixtureRequiresProviderCredentials(options) || options.fixture === 'missing-provider-key' || options.fixture === 'provider-failure';
+  return options.backend === 'api'
+    && (fixtureRequiresProviderCredentials(options) || options.fixture === 'missing-provider-key' || options.fixture === 'provider-failure');
+}
+
+function fixtureIsolatesUserHome(options) {
+  return options.backend === 'api';
 }
 
 function reviewTimeoutSeconds(options) {
@@ -210,19 +255,23 @@ function hasNoExpectedReviewDecision(fixture) {
 }
 
 function createSmokeConfig(options) {
-  const model = options.model || PROVIDER_DEFAULT_MODELS[options.provider] || 'auto';
+  const model = options.model || defaultModelForOptions(options);
   const timeoutSeconds = reviewTimeoutSeconds(options);
+  const backend = options.backend;
+  const includeProvider = backend === 'api' || backend === 'opencode';
   const agent = {
     id: 'clean-diff-smoke-reviewer',
     model,
-    backend: 'api',
-    provider: options.provider,
+    backend,
     enabled: true,
     timeout: timeoutSeconds,
     maxOutputTokens: 2048,
   };
+  if (includeProvider) {
+    agent.provider = options.provider;
+  }
 
-  return {
+  const config = {
     mode: 'pragmatic',
     language: 'en',
     reviewers: [agent],
@@ -235,8 +284,7 @@ function createSmokeConfig(options) {
       personaAssignment: 'random',
     },
     moderator: {
-      backend: 'api',
-      provider: options.provider,
+      backend,
       model,
       timeout: timeoutSeconds,
       maxOutputTokens: 2048,
@@ -253,8 +301,7 @@ function createSmokeConfig(options) {
       codeSnippetRange: 10,
     },
     head: {
-      backend: 'api',
-      provider: options.provider,
+      backend,
       model,
       enabled: true,
       timeout: timeoutSeconds,
@@ -268,6 +315,11 @@ function createSmokeConfig(options) {
       enabled: false,
     },
   };
+  if (includeProvider) {
+    config.moderator.provider = options.provider;
+    config.head.provider = options.provider;
+  }
+  return config;
 }
 
 function resolveCliCommand(options) {
@@ -598,11 +650,18 @@ function evaluateOutcome({ options, childResult, parsed, parseError, missingEnvV
     const diagnosticLine = errorLines.find((line) => /auth|user not found|quota|rate limit/i.test(line))
       ?? errorLines.find((line) => /api|provider|forfeit/i.test(line))
       ?? errorLines.find((line) => line);
-    if (diagnosticLine && /auth|api|provider|quota|rate limit|user not found|forfeit/i.test(errorText)) {
+    if (options.backend === 'api' && diagnosticLine && /auth|api|provider|quota|rate limit|user not found|forfeit/i.test(errorText)) {
       return {
         status: 'fail',
         passed: false,
         reason: `Live provider check failed with saved ${providerEnvVar(options.provider)} from ${defaultCredentialsPath()}: ${diagnosticLine}`,
+      };
+    }
+    if (options.backend !== 'api' && diagnosticLine) {
+      return {
+        status: 'fail',
+        passed: false,
+        reason: `Live ${options.backend} CLI backend check failed: ${diagnosticLine}`,
       };
     }
     return { status: 'fail', passed: false, reason: `CLI exited with ${childResult.exitCode}` };
@@ -671,6 +730,7 @@ function buildTranscript({ result, childResult, command }) {
     `smokeSchemaVersion: ${result.schemaVersion}`,
     `surface: ${result.surface}`,
     `mode: ${result.mode}`,
+    `backend: ${result.backend}`,
     `provider: ${result.provider}`,
     `model: ${result.model}`,
     `command: ${command}`,
@@ -798,15 +858,17 @@ async function runSmoke(options) {
     const command = buildCommandPreview(cli.file, reviewArgs);
     const env = {
       ...process.env,
-      HOME: fixtureDir,
-      USERPROFILE: fixtureDir,
       TMPDIR: fixtureDir,
-      XDG_CONFIG_HOME: fixtureDir,
       NODE_ENV: 'production',
       CODEAGORA_LANG: 'en',
       LANG: 'en_US.UTF-8',
       CI: '1',
     };
+    if (fixtureIsolatesUserHome(options)) {
+      env.HOME = fixtureDir;
+      env.USERPROFILE = fixtureDir;
+      env.XDG_CONFIG_HOME = fixtureDir;
+    }
     if (options.fixture === 'missing-provider-key') {
       delete env[requiredEnvVar];
     } else if (options.fixture === 'provider-failure') {
@@ -848,6 +910,7 @@ async function runSmoke(options) {
           : ['src/math.ts'],
       },
       mode: options.dryRun ? 'dry-run' : 'live',
+      backend: options.backend,
       provider: options.provider,
       model: options.model,
       requiredEnvVar: fixtureRecordsRequiredEnvVar(options) ? requiredEnvVar : null,

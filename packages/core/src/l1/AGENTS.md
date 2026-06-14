@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # l1 — Parallel Reviewers
 
@@ -35,6 +35,7 @@ None (single layer execution)
 - `executeReviewers()` — main entry: takes ReviewerInput[], runs all in parallel, returns ReviewOutput[]
 - `parseEvidenceResponse()` — converts reviewer response to findings
 - `executeBackend()` — low-level backend execution (API or CLI)
+- Local CLI backends include tool-specific argument shapes. Keep Codex, Claude, OpenCode, Cursor, Antigravity, and other CLI spawn behavior covered by backend tests/smokes before declaring support.
 
 **Concurrency Model:**
 - Reviewers within a chunk: Promise.allSettled batch (concurrency 5)
@@ -53,6 +54,7 @@ None (single layer execution)
 **Backend Execution:**
 - API backend: mock Vercel AI SDK responses
 - CLI backend: mock spawn execution, validate sanitized args
+- CLI backend changes should also be smoke-tested through `scripts/cli-clean-diff-smoke.mjs` where practical.
 - Timeout handling (skip failed, continue with rest)
 - Error responses (non-zero exit code)
 
@@ -87,6 +89,7 @@ None (single layer execution)
 - Config specifies backend (api or cli)
 - API: direct Vercel AI SDK call
 - CLI: spawn process, read stdout, validate exit code
+- Omit model flags for CLI model values that mean auto/default when the target CLI expects that behavior.
 
 **Evidence Document Structure:**
 ```markdown

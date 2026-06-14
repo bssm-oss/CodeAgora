@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # CLI Commands Directory
 
@@ -9,8 +9,9 @@ Command implementations for CodeAgora CLI. Each file exports a public function t
 ## Key Files
 | File | Description |
 |------|-------------|
-| `init.ts` | Initialize CodeAgora in a project (wizard + default setup) |
+| `init.ts` | Initialize CodeAgora in a project; owns presets, aliases, generated configs, and local/Action setup UX |
 | `doctor.ts` | Environment and config health checks |
+| `env.ts` | Local provider key storage/status commands |
 | `providers.ts` | List supported providers and API key status |
 | `providers-test.ts` | Verify API keys work (live tests) |
 | `sessions.ts` | Past review session management |
@@ -21,6 +22,7 @@ Command implementations for CodeAgora CLI. Each file exports a public function t
 | `costs.ts` | Cost analytics |
 | `status.ts` | CodeAgora status overview |
 | `config-set.ts` | Mutate config values |
+| `config-get.ts` | Read config values |
 | `learn.ts` | Pattern learning |
 
 ## Subdirectories
@@ -34,6 +36,9 @@ None — all commands are flat in this directory.
 - Session commands read from `.ca/sessions/{YYYY-MM-DD}/{NNN}/`
 - Config commands read from `.ca/config.json` or `.ca/config.yaml`
 - All external input is validated before use
+- Keep `init.ts` preset output aligned with tests in `src/tests/init-multiselect.test.ts` and `packages/cli/src/tests/cli-init-advanced.test.ts`.
+- `agora env set <provider>` is the preferred local key UX. Do not print saved key values; status output should show presence only.
+- Action setup should prefer `--preset action` / `--preset github-action` and `OPENROUTER_API_KEY`.
 
 ### Common Patterns
 - **Session format**: `YYYY-MM-DD/NNN` (date/ID)
@@ -41,6 +46,8 @@ None — all commands are flat in this directory.
 - **File operations**: All async via `fs/promises`
 - **Output**: Return formatted strings or structured data for `formatters/` to render
 - **Error handling**: Throw descriptive errors; CLI layer catches and formats
+- **Machine output**: JSON/NDJSON command output must remain parseable and free of human diagnostics on stdout.
+- **Backend setup**: Distinguish API providers that need environment/credential keys from CLI backends that need installed/authenticated local tools.
 
 ### Adding a New Command
 1. Create `command-name.ts` in this directory

@@ -1,17 +1,20 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # MCP Package (@codeagora/mcp)
 
 ## Purpose
-MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code review pipeline as tools for Claude and other AI agents. Wraps the core pipeline with review, dry-run, leaderboard/stats, session/config, and explanation tools. Runs as a CLI subprocess using stdio transport.
+MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code review pipeline as tools for MCP-compatible clients, IDEs, and agents. Wraps the core pipeline with review, dry-run, leaderboard/stats, session/config, and explanation tools. Runs as a CLI subprocess using stdio transport.
 
 ## Key Files
 
 | File | Description |
 |------|-------------|
 | `src/index.ts` | MCP server setup — creates McpServer, registers all 9 tools, starts stdio transport |
+| `src/registry.ts` | Central tool registration and catalog metadata |
 | `src/helpers.ts` | Shared logic: `runReviewCompact()`, `runReviewRaw()`, `getStagedDiff()` — core review orchestration |
+| `src/post-actions.ts` | Post-review action helpers |
+| `src/version.ts` | MCP package/runtime version reporting |
 | `src/tools/review-quick.ts` | `review_quick` tool — L1-only (parallel reviewers), no debate, no head verdict |
 | `src/tools/review-full.ts` | `review_full` tool — Full L0→L1→L2→L3 pipeline with debate and consensus |
 | `src/tools/review-pr.ts` | `review_pr` tool — PR-specific review with GitHub integration (issues, comments) |
@@ -53,9 +56,11 @@ MCP (Model Context Protocol) server that exposes CodeAgora's multi-LLM code revi
 
 **Key Commands:**
 - `pnpm vitest run packages/mcp/src/tests/tool-handlers.test.ts packages/mcp/src/tests/tools.test.ts`
+- `pnpm vitest run packages/mcp/src/tests/stdio-startup.test.ts` for startup/tool-list changes
 - `pnpm --filter @codeagora/mcp build`
 - Built binary: `node dist/index.js` or `codeagora-mcp` (via bin entry in package.json)
 - Package smoke is included in `pnpm release:beta-smoke`
+- Do not write logs, banners, or warnings to stdout before/during stdio protocol handling. Use stderr for diagnostics.
 
 ### Common Patterns
 
@@ -90,6 +95,8 @@ server.tool(
 - Preserve stable `status`, `code`, `message`, and optional `details` fields for agent callers.
 - For `repo_path`, tell callers whether to omit it, pass the workspace root, or stay inside the server/repo boundary.
 - Do not leak raw filesystem, provider secret, token, or transport internals into compact responses.
+- Keep errors structured and stable for agent callers: `status`, `code`, `message`, and optional redacted `details`.
+- Verify MCP tool listing/calls through the MCP SDK path; avoid relying on hand-rolled JSON-RPC framing for release claims.
 
 ### Tool Catalog
 
@@ -117,7 +124,7 @@ server.tool(
 - Built-ins: `fs/promises`, `path`, `os` for temp file handling
 
 ### Architecture Notes
-- All tools call `runReviewWithDiff()` or variants in helpers.ts
+- All tools call `runReviewCompact()`, `runReviewRaw()`, `getStagedDiff()`, or related helpers in `helpers.ts`
 - Diff is written to temp file, passed to the shared review path, then cleaned up in finally block
 - Results formatted with compact/shared response helpers for consistent response structure
 - Tools may accept explicit `repo_path`; validate it before reading config/session state

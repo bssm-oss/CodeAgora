@@ -53,7 +53,7 @@ describe('CLI clean-diff smoke runner', () => {
     expect(CLEAN_FIXTURE_DIFF).not.toMatch(/token|password|secret|api[_-]?key/i);
   });
 
-  it('builds a single-reviewer provider config for the smoke run', () => {
+  it('builds a single-reviewer API provider config for the smoke run', () => {
     const options = parseArgs(['--provider', 'groq', '--model', 'llama-3.3-70b-versatile']);
     const config = createSmokeConfig(options);
 
@@ -64,12 +64,73 @@ describe('CLI clean-diff smoke runner', () => {
       model: 'llama-3.3-70b-versatile',
       backend: 'api',
     });
+    expect(config.moderator).toMatchObject({
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
+      backend: 'api',
+    });
     expect(config.discussion.enabled).toBe(false);
     expect(config.errorHandling.maxRetries).toBe(0);
   });
 
+  it('builds a provider-free CLI backend config for the smoke run', () => {
+    const options = parseArgs(['--backend', 'claude', '--model', 'sonnet']);
+    const config = createSmokeConfig(options);
+
+    expect(options).toMatchObject({
+      backend: 'claude',
+      provider: 'openrouter',
+      model: 'sonnet',
+    });
+    expect(config.reviewers[0]).toMatchObject({
+      id: 'clean-diff-smoke-reviewer',
+      model: 'sonnet',
+      backend: 'claude',
+    });
+    expect(config.reviewers[0]).not.toHaveProperty('provider');
+    expect(config.moderator).toMatchObject({
+      model: 'sonnet',
+      backend: 'claude',
+    });
+    expect(config.moderator).not.toHaveProperty('provider');
+    expect(config.head).toMatchObject({
+      model: 'sonnet',
+      backend: 'claude',
+    });
+    expect(config.head).not.toHaveProperty('provider');
+  });
+
+  it('defaults installed CLI backends to locally usable model/provider combinations', () => {
+    expect(parseArgs(['--backend', 'codex'])).toMatchObject({
+      backend: 'codex',
+      model: 'auto',
+      provider: 'openrouter',
+    });
+    expect(parseArgs(['--backend', 'copilot'])).toMatchObject({
+      backend: 'copilot',
+      model: 'auto',
+      provider: 'openrouter',
+    });
+    expect(parseArgs(['--backend', 'cursor'])).toMatchObject({
+      backend: 'cursor',
+      model: 'auto',
+      provider: 'openrouter',
+    });
+    expect(parseArgs(['--backend', 'antigravity'])).toMatchObject({
+      backend: 'antigravity',
+      model: 'auto',
+      provider: 'openrouter',
+    });
+    expect(parseArgs(['--backend', 'opencode'])).toMatchObject({
+      backend: 'opencode',
+      model: 'deepseek-v4-flash',
+      provider: 'opencode-go',
+    });
+  });
+
   it('accepts the pnpm argument separator before smoke options', () => {
     expect(parseArgs(['--', '--dry-run'])).toMatchObject({
+      backend: 'api',
       dryRun: true,
       provider: 'openrouter',
       model: 'xiaomi/mimo-v2.5',
@@ -248,6 +309,32 @@ describe('CLI clean-diff smoke runner', () => {
     expect(outcome.reason).toContain('User not found');
   });
 
+  it('reports CLI backend runtime failures without blaming saved provider credentials', () => {
+    const outcome = evaluateOutcome({
+      options: parseArgs(['--backend', 'codex']),
+      childResult: {
+        exitCode: 3,
+        signal: null,
+        timedOut: false,
+        stdout: '',
+        stderr: '',
+        durationMs: 10,
+      },
+      parsed: {
+        status: 'error',
+        error: 'All reviewers failed.\n- clean-diff-smoke-reviewer (codex/auto): Backend error: not trusted',
+      },
+      parseError: null,
+      missingEnvVar: null,
+    });
+
+    expect(outcome).toMatchObject({
+      status: 'fail',
+      passed: false,
+      reason: 'Live codex CLI backend check failed: All reviewers failed.',
+    });
+  });
+
   it('executes dry-run mode and returns a structured run result', async () => {
     const result = await runSmoke(parseArgs(['--dry-run']));
 
@@ -271,6 +358,93 @@ describe('CLI clean-diff smoke runner', () => {
     });
     expect(result.parsed.includedFiles).toContain('src/math.ts');
     expect(result.cli.exitCode).toBe(0);
+  });
+
+  it('does not require provider credentials for CLI backend live smoke runs', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-cli-backend-smoke-'));
+    const cliPath = path.join(dir, 'fake-cli.mjs');
+    const capturePath = path.join(dir, 'fake-cli-capture.json');
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    const originalCapture = process.env.CODEAGORA_FAKE_CAPTURE;
+
+    try {
+      delete process.env.OPENROUTER_API_KEY;
+      fs.writeFileSync(
+        cliPath,
+        [
+          '#!/usr/bin/env node',
+          'import fs from "node:fs";',
+          'import path from "node:path";',
+          'const config = JSON.parse(fs.readFileSync(".ca/config.json", "utf-8"));',
+          'const sessionDir = path.join(process.cwd(), ".ca", "sessions", "2026-06-11", "cli-backend-session");',
+          'fs.mkdirSync(sessionDir, { recursive: true });',
+          'fs.writeFileSync(path.join(sessionDir, "result.json"), JSON.stringify({ schemaVersion: "codeagora.session.v1" }));',
+          'fs.writeFileSync(process.env.CODEAGORA_FAKE_CAPTURE, JSON.stringify({',
+          '  argv: process.argv.slice(2),',
+          '  openrouterPresent: Boolean(process.env.OPENROUTER_API_KEY),',
+          '  reviewer: config.reviewers[0],',
+          '  moderator: config.moderator,',
+          '  head: config.head',
+          '}));',
+          'console.log(JSON.stringify({',
+          '  schemaVersion: "codeagora.review.v1",',
+          '  status: "success",',
+          '  sessionId: "cli-backend-session",',
+          '  date: "2026-06-11",',
+          '  summary: { decision: "ACCEPT", severityCounts: {} },',
+          '  evidenceDocs: []',
+          '}));',
+          '',
+        ].join('\n'),
+        'utf-8',
+      );
+      fs.chmodSync(cliPath, 0o755);
+      process.env.CODEAGORA_FAKE_CAPTURE = capturePath;
+
+      const result = await runSmoke(parseArgs(['--backend', 'codex', '--cli', cliPath]));
+      const captured = JSON.parse(fs.readFileSync(capturePath, 'utf-8'));
+
+      expect(result).toMatchObject({
+        mode: 'live',
+        backend: 'codex',
+        provider: 'openrouter',
+        model: 'auto',
+        requiredEnvVar: null,
+        passed: true,
+        outcome: {
+          status: 'pass',
+          passed: true,
+        },
+      });
+      expect(captured.openrouterPresent).toBe(false);
+      expect(captured.reviewer).toMatchObject({
+        backend: 'codex',
+        model: 'auto',
+      });
+      expect(captured.reviewer).not.toHaveProperty('provider');
+      expect(captured.moderator).toMatchObject({
+        backend: 'codex',
+        model: 'auto',
+      });
+      expect(captured.moderator).not.toHaveProperty('provider');
+      expect(captured.head).toMatchObject({
+        backend: 'codex',
+        model: 'auto',
+      });
+      expect(captured.head).not.toHaveProperty('provider');
+    } finally {
+      if (originalKey === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = originalKey;
+      }
+      if (originalCapture === undefined) {
+        delete process.env.CODEAGORA_FAKE_CAPTURE;
+      } else {
+        process.env.CODEAGORA_FAKE_CAPTURE = originalCapture;
+      }
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('executes staged-diff mode in an isolated git fixture and records the observed CLI exit code', async () => {
