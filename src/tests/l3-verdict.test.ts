@@ -330,6 +330,25 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.decision).toBe('REJECT');
     });
 
+    it('routes forced tie-break critical discussions to human review even above the confidence boundary', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-forced-tie',
+            finalSeverity: 'CRITICAL',
+            consensusReached: true,
+            avgConfidence: 59,
+            reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.[0]).toContain('d-forced-tie');
+    });
+
     it('does not block on critical discussions with unknown:0 locations', async () => {
       const report = makeReport({
         discussions: [
@@ -514,6 +533,28 @@ describe('applyHeadVerdictSafety()', () => {
 
     expect(verdict.decision).toBe('NEEDS_HUMAN');
     expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
+  });
+
+  it('overrides REJECT to NEEDS_HUMAN for forced tie-break critical discussions', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-forced-tie',
+          finalSeverity: 'CRITICAL',
+          consensusReached: true,
+          avgConfidence: 59,
+          reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'REJECT',
+      reasoning: 'LLM rejected a forced tie-break critical.',
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.questionsForHuman?.[0]).toContain('d-forced-tie');
   });
 
   it('does not let invalid critical locations override an LLM accept verdict', () => {
