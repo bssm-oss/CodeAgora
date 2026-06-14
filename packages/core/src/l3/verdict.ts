@@ -111,8 +111,11 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
     const confStr = d.avgConfidence != null
       ? (isKo ? `, 신뢰도: ${d.avgConfidence}%` : `, confidence: ${d.avgConfidence}%`)
       : '';
+    const sourceStr = d.resolutionSource
+      ? (isKo ? `, 판정 출처: ${d.resolutionSource}` : `, resolution source: ${d.resolutionSource}`)
+      : '';
     return [
-      `- [${d.finalSeverity}] ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${consensus}, ${d.rounds} ${isKo ? '라운드' : 'round(s)'}${confStr}`,
+      `- [${d.finalSeverity}] ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${consensus}, ${d.rounds} ${isKo ? '라운드' : 'round(s)'}${confStr}${sourceStr}`,
       wrapUntrustedBlock(`moderator_reasoning_${d.discussionId}`, d.reasoning),
     ].join('\n');
   }).join('\n');
@@ -265,7 +268,8 @@ function hasActionableEvidenceLocation(doc: EvidenceDocument): boolean {
 }
 
 function isForcedTieBreak(verdict: DiscussionVerdict): boolean {
-  return /tie broken by forced decision/i.test(verdict.reasoning);
+  return verdict.resolutionSource === 'forced-tie-break' ||
+    /tie broken by forced decision/i.test(verdict.reasoning);
 }
 
 function isCleanModeratorReport(report: ModeratorReport): boolean {

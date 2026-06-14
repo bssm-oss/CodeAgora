@@ -69,6 +69,7 @@ export async function runModerator(input: ModeratorInput): Promise<ModeratorRepo
         reasoning: `Discussion failed: ${errorMessage}`,
         consensusReached: false,
         rounds: 0,
+        resolutionSource: 'discussion-failed',
       };
       verdicts.push(errorVerdict);
       roundsPerDiscussion[discussions[i].id] = [];
@@ -122,6 +123,7 @@ async function runDiscussion(
       reasoning: 'No supporters available — discussion skipped',
       consensusReached: false,
       rounds: 0,
+      resolutionSource: 'discussion-skipped',
     };
     await writeDiscussionVerdict(date, sessionId, skippedVerdict);
     return { verdict: skippedVerdict, rounds };
@@ -229,6 +231,7 @@ async function runDiscussion(
         reasoning: consensus.reasoning!,
         consensusReached: true,
         rounds: roundNum,
+        resolutionSource: consensus.resolutionSource ?? 'supporter-consensus',
       };
 
       // Write verdict file
@@ -256,6 +259,7 @@ async function runDiscussion(
       reasoning: 'Moderator disabled; unresolved discussion escalated directly to head verdict.',
       consensusReached: false,
       rounds: settings.maxRounds,
+      resolutionSource: 'moderator-disabled',
     };
 
     await writeDiscussionVerdict(date, sessionId, verdict);
@@ -286,6 +290,7 @@ async function runDiscussion(
     reasoning: finalVerdict.reasoning,
     consensusReached: false,
     rounds: settings.maxRounds,
+    resolutionSource: 'moderator-forced',
   };
 
   emitter?.emitEvent({
@@ -485,6 +490,7 @@ interface ConsensusResult {
   reached: boolean;
   severity?: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED';
   reasoning?: string;
+  resolutionSource?: DiscussionVerdict['resolutionSource'];
 }
 
 export function checkConsensus(round: DiscussionRound, discussion: Discussion, isLastRound = false): ConsensusResult {
@@ -502,6 +508,7 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
       reached: true,
       severity: discussion.severity as ConsensusResult['severity'],
       reasoning: 'All supporters agreed on the issue',
+      resolutionSource: 'supporter-consensus',
     };
   }
 
@@ -515,12 +522,14 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
         reached: true,
         severity: 'CRITICAL',
         reasoning: 'All supporters rejected HARSHLY_CRITICAL claim — downgraded to CRITICAL for human review',
+        resolutionSource: 'supporter-consensus',
       };
     }
     return {
       reached: true,
       severity: 'DISMISSED',
       reasoning: 'All supporters rejected the issue',
+      resolutionSource: 'supporter-consensus',
     };
   }
 
@@ -534,6 +543,7 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
       reached: true,
       severity: discussion.severity as ConsensusResult['severity'],
       reasoning: `Majority consensus (${agreeCount}/${supporters.length} agree)`,
+      resolutionSource: 'supporter-consensus',
     };
   }
 
@@ -544,12 +554,14 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
         reached: true,
         severity: 'CRITICAL',
         reasoning: `Majority rejected HARSHLY_CRITICAL claim (${disagreeCount}/${supporters.length} disagree) — downgraded to CRITICAL`,
+        resolutionSource: 'supporter-consensus',
       };
     }
     return {
       reached: true,
       severity: 'DISMISSED',
       reasoning: `Majority rejected (${disagreeCount}/${supporters.length} disagree)`,
+      resolutionSource: 'supporter-consensus',
     };
   }
 
@@ -559,6 +571,7 @@ export function checkConsensus(round: DiscussionRound, discussion: Discussion, i
       reached: true,
       severity: discussion.severity as ConsensusResult['severity'],
       reasoning: `Tie broken by forced decision on last round (${agreeCount} agree, ${disagreeCount} disagree)`,
+      resolutionSource: 'forced-tie-break',
     };
   }
 

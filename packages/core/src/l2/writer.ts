@@ -177,6 +177,9 @@ function formatVerdict(verdict: DiscussionVerdict): string {
   lines.push(`**Final Severity:** ${verdict.finalSeverity}`);
   lines.push(`**Consensus Reached:** ${verdict.consensusReached ? 'Yes' : 'No (Escalated)'}`);
   lines.push(`**Rounds:** ${verdict.rounds}`);
+  if (verdict.resolutionSource) {
+    lines.push(`**Resolution Source:** ${verdict.resolutionSource}`);
+  }
   lines.push('');
 
   lines.push('## Reasoning');

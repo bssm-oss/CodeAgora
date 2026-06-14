@@ -135,6 +135,13 @@ export interface DiscussionVerdict {
   reasoning: string;
   consensusReached: boolean;
   rounds: number;
+  resolutionSource?:
+    | 'supporter-consensus'
+    | 'forced-tie-break'
+    | 'moderator-forced'
+    | 'moderator-disabled'
+    | 'discussion-skipped'
+    | 'discussion-failed';
   /** Average confidence (0-100) of the underlying evidence docs, computed after L2 */
   avgConfidence?: number;
 }

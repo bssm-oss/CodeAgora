@@ -338,6 +338,7 @@ describe('makeHeadVerdict()', () => {
             finalSeverity: 'CRITICAL',
             consensusReached: true,
             avgConfidence: 59,
+            resolutionSource: 'forced-tie-break',
             reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
           }),
         ],
@@ -347,6 +348,26 @@ describe('makeHeadVerdict()', () => {
 
       expect(verdict.decision).toBe('NEEDS_HUMAN');
       expect(verdict.questionsForHuman?.[0]).toContain('d-forced-tie');
+    });
+
+    it('uses resolutionSource instead of parsing reasoning for forced tie-break criticals', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-forced-source',
+            finalSeverity: 'CRITICAL',
+            consensusReached: true,
+            avgConfidence: 59,
+            resolutionSource: 'forced-tie-break',
+            reasoning: 'Moderator summarized a split vote.',
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.[0]).toContain('d-forced-source');
     });
 
     it('does not block on critical discussions with unknown:0 locations', async () => {
@@ -412,7 +433,12 @@ describe('makeHeadVerdict()', () => {
       mockExecuteBackend.mockResolvedValue('DECISION: ACCEPT\nREASONING: Only actionable discussions remain.\nQUESTIONS: none');
       const report = makeReport({
         discussions: [
-          makeVerdict({ discussionId: 'd-actionable-warning', finalSeverity: 'WARNING', consensusReached: true }),
+          makeVerdict({
+            discussionId: 'd-actionable-warning',
+            finalSeverity: 'WARNING',
+            consensusReached: true,
+            resolutionSource: 'supporter-consensus',
+          }),
           makeVerdict({
             discussionId: 'd-invalid-critical',
             filePath: 'unknown',
@@ -452,6 +478,7 @@ describe('makeHeadVerdict()', () => {
       expect(backendInput?.prompt).not.toContain('unknown:0');
       expect(backendInput?.prompt).toContain('CRITICAL: 0 issues');
       expect(backendInput?.prompt).toContain('Total discussions: 1');
+      expect(backendInput?.prompt).toContain('resolution source: supporter-consensus');
     });
   });
 });
@@ -543,6 +570,7 @@ describe('applyHeadVerdictSafety()', () => {
           finalSeverity: 'CRITICAL',
           consensusReached: true,
           avgConfidence: 59,
+          resolutionSource: 'forced-tie-break',
           reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
         }),
       ],
