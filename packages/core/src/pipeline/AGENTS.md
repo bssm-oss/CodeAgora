@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # pipeline — Orchestrator
 
@@ -47,6 +47,8 @@ Pipeline Orchestrator connects all 4 review layers (L0-L3) into a single cohesiv
 - `estimateCost()` — predicts API costs
 - `runDryrun()` — simulates verdict without execution
 - `checkAutoApprove()` — evaluates auto-merge criteria
+- Dry-run is provider-free: no LLM calls, no live provider quality signal, and no GitHub posting evidence.
+- Dry-run/readiness logic must not over-block CLI backend configs as missing API keys when local CLI tools are the actual runtime dependency.
 
 **State & Session:**
 - SessionManager maintains execution state
@@ -98,6 +100,7 @@ Pipeline Orchestrator connects all 4 review layers (L0-L3) into a single cohesiv
 - Full pipeline: load config → resolve reviewers → chunk diff → execute chunks → deduplicate → discuss → verdict
 - Multi-chunk workflows with parallel execution
 - Resume from partial state
+- Compact output and degraded reason codes are cross-surface contracts for CLI, GitHub Action, MCP, sessions, and Desktop. Keep them backward compatible.
 
 ### Common Patterns
 

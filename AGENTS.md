@@ -1,9 +1,9 @@
-<!-- Generated: 2026-03-20 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # CodeAgora
 
 ## Purpose
-Multi-LLM code review pipeline where multiple AI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Supported release surfaces are the CLI, GitHub Action, MCP server, and Tauri desktop app.
+Multi-LLM code review pipeline where API and local CLI reviewers independently analyze code, debate conflicting opinions, and a head agent renders a final verdict. Supported release surfaces are the CLI, GitHub Action, MCP server, and Tauri desktop app; all four must route through shared core behavior rather than defining separate review semantics.
 
 ## Key Files
 
@@ -45,6 +45,22 @@ Multi-LLM code review pipeline where multiple AI reviewers independently analyze
 - Run CLI in dev: `pnpm dev <command>`
 - Regenerate the bundled GitHub Action after action-source changes: `pnpm build:action`
 - Package/evidence smoke: `pnpm release:beta-smoke`, `pnpm evidence:manifest -- --require=rc`
+- For `agora init --preset ...`, the source of truth is `packages/cli/src/commands/init.ts` (`generatePresets`, `buildPresetConfig`, and `PRESET_ALIASES`).
+- Validate local CLI backend readiness with `agora doctor` / `agora doctor --live`; CLI-backed configs may run without provider API keys only when required local tools are installed and authenticated.
+- For GitHub Action setup, prefer `agora init --preset action` / `--preset github-action`; this is the cheap OpenRouter Actions preset.
+
+### Runtime Scope And Presets
+- Supported release surfaces are exactly CLI, GitHub Action, MCP, and Desktop unless roadmap and release evidence are updated first.
+- The GitHub Action preset is OpenRouter-only, cheap by default, uses five low-cost reviewers, one discussion round, and direct head escalation via `z-ai/glm-5.1`.
+- `fast` and `budget` alias to `quick`; `balanced` and `standard` alias to `free`; `local` and `local-cli` alias to `cli`; `gha` and `github-action` alias to `action`.
+- Local CLI presets are for installed/authenticated local tools such as Codex, Claude, OpenCode, Cursor, and Antigravity. Do not add Copilot to the default CLI preset without an explicit decision.
+
+### Credentials And Key Handling
+- Prefer `agora env set <provider>` for local provider keys; saved credentials live in `~/.config/codeagora/credentials` with `0o600` permissions.
+- Environment variables remain supported, especially `OPENROUTER_API_KEY` for GitHub Actions and smoke tests.
+- Never store provider keys in `.ca/config.*`, committed docs, fixtures, session artifacts, or evidence logs.
+- Error output, JSON/NDJSON contracts, MCP responses, Desktop exports, and evidence artifacts must redact secrets.
+- GitHub token handling is separate from provider credentials; fork PRs and missing secrets must degrade safely before provider-backed work.
 
 ### Architecture Overview
 ```
@@ -64,6 +80,9 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - Run: `pnpm test` (root Vitest config includes root and package-local tests)
 - E2E tests use `forks` pool; unit tests use default pool
 - Coverage targets the active workspace packages under `packages/*`
+- Local CLI backend changes need smoke coverage for CLI-backed readiness paths as well as API-key-backed paths; dry-run plumbing is not live provider evidence.
+- GitHub Action preset or runtime changes need focused Action tests and `pnpm build:action` when the bundled runtime can change.
+- MCP behavior changes should verify tool listing/calls through the MCP SDK path, not hand-rolled JSON-RPC framing.
 
 ### Common Patterns
 - TypeScript strict mode everywhere
@@ -76,7 +95,9 @@ CLI Layer → L0 (Model Intelligence) → Pre-Analysis → L1 (Parallel Reviewer
 - Do not reintroduce retired web dashboard, terminal TUI, or notification package surfaces.
 - Keep desktop claims backed by package, launch, WebDriver, visual QA, export, signing/notarization/updater, and release-evidence gates.
 - Do not widen the stable release contract beyond CLI, GitHub Action, MCP, and Desktop without explicit roadmap/evidence updates.
-- Do not treat deterministic tests as live provider or live GitHub evidence; release claims need the artifacts named in `docs/archived/RELEASE_EVIDENCE.md`.
+- Keep Desktop as an official supported local UI surface, but do not let Desktop introduce config formats, verdict semantics, or release promises that diverge from CLI, GitHub Action, or MCP.
+- Do not treat deterministic tests, dry-runs, or provider-free smoke as live provider, live CLI quality, or live GitHub evidence; release claims need the artifacts and tiers named in `docs/archived/RELEASE_EVIDENCE.md`.
+- Stable GitHub Action claims require real pull-request workflow evidence, including degraded paths for forks, missing provider secrets, stale heads, oversized diffs, provider failures, and posting failures.
 
 ## Repository Map
 

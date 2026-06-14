@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # CLI Source Directory
 
@@ -10,7 +10,7 @@ Core CLI source code: entrypoint, commands, formatters, options parsing, and uti
 | File | Description |
 |------|-------------|
 | `index.ts` | CLI entrypoint and main command router |
-| `commands/` | 14 command modules |
+| `commands/` | Flat command modules; verify current inventory before editing |
 | `formatters/` | Output formatting logic |
 | `options/` | CLI option parsing |
 | `utils/` | Helper functions |
@@ -28,6 +28,9 @@ Core CLI source code: entrypoint, commands, formatters, options parsing, and uti
 - Check `formatters/` to see output formatting patterns
 - Use `utils/colors.ts` and `utils/errors.ts` for consistent styling and error handling
 - Commands integrate with the core pipeline via `runPipeline()` from `@codeagora/core`
+- `commands/review.ts` owns stdin/path/`--staged`/PR/dry-run review entry behavior.
+- Formatters own machine-readable output stability; do not add progress or warnings to JSON/NDJSON stdout.
+- Stable CLI options need help text, CLI reference/docs parity, and focused tests when added or changed.
 
 ### Common Patterns
 - Commands use async/await and commander hooks
@@ -35,6 +38,7 @@ Core CLI source code: entrypoint, commands, formatters, options parsing, and uti
 - All commands export a primary function that is called by the command handler
 - Error handling uses `classifyError()` to determine exit codes
 - i18n support via `t()` from `@codeagora/shared/i18n`
+- `commands/init.ts` is the source of truth for generated presets, including local CLI and OpenRouter Action presets.
 
 ## Dependencies
 - Core: `@codeagora/core`, `@codeagora/shared`

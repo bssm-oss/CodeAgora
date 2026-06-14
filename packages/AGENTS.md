@@ -1,10 +1,10 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # packages
 
 ## Purpose
-Monorepo workspace containing scoped packages (`@codeagora/*`) that implement the multi-LLM code review pipeline. Each package has a focused responsibility: shared utilities and types, core review logic (L0-L3), CLI entrypoint, GitHub integration, MCP server support, and the official desktop UI.
+Monorepo workspace containing scoped packages (`@codeagora/*`) that implement the multi-LLM code review pipeline. Each package has a focused responsibility: shared utilities and types, core review logic (L0-L3), CLI entrypoint, GitHub integration, MCP-compatible agent/IDE support, and the official desktop UI.
 
 ## Subdirectories
 
@@ -14,7 +14,7 @@ Monorepo workspace containing scoped packages (`@codeagora/*`) that implement th
 | `core/` | Review pipeline implementation (L0 model intelligence, L1 parallel reviewers, L2 debate, L3 head verdict), config management, session handling, plugin system |
 | `cli/` | CLI entrypoint (`codeagora` / `agora` commands), command definitions, formatters, user prompts — orchestrates core pipeline |
 | `github/` | GitHub PR integration: diff parsing, SARIF generation, comment posting, deduplication, Actions support |
-| `mcp/` | MCP (Model Context Protocol) server with 9 tools exposing review pipeline to Claude and other MCP clients |
+| `mcp/` | MCP (Model Context Protocol) server with 9 tools exposing the review pipeline to MCP-compatible clients, IDEs, and agents |
 | `desktop/` | Official Tauri app over existing CLI/core/session/config contracts |
 
 ## For AI Agents
@@ -37,12 +37,18 @@ Monorepo workspace containing scoped packages (`@codeagora/*`) that implement th
 - `pnpm dev <command>` — run the CLI package directly
 - Each package has its own `package.json` with `main`, `types`, and `bin` (if applicable)
 
+**Current Stabilization Focus:**
+- Stable package work targets CLI, GitHub Action, MCP, and Desktop only.
+- Action-source changes require `pnpm build:action` and an intentional `dist/action.js` diff review.
+- Desktop bridge, Rust, package, or release-evidence changes require the relevant desktop gate, normally `pnpm rc:desktop-gate`.
+- Release/evidence changes require `pnpm evidence:manifest -- --require=rc` when making RC/stable claims.
+
 **Dependencies Flow:**
 - `shared` — no internal deps, foundation layer
 - `core` — depends on `shared`
 - `cli`, `github`, `mcp`, `desktop` — depend on `core`/`shared` contracts, directly or through CLI/session artifacts
 - `cli` also depends on `github` (orchestration)
-- `mcp` also depends on `cli` (tools expose CLI functions)
+- `mcp` imports selected CLI modules for command/review behavior; keep package startup, `tools/list`, and packed-runtime smoke green when changing this boundary.
 
 ### Common Patterns
 

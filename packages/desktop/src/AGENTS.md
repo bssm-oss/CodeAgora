@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-06-05 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-06-05 | Updated: 2026-06-14 -->
 
 # desktop/src/
 
@@ -20,6 +20,8 @@ Browser-side desktop app: state, rendering, keyboard/theme handling, setup panel
 - Use shared i18n keys from `@codeagora/shared`; update `en.json` and `ko.json` together.
 - Keep frontend state derived from canonical CLI/core/session/config contracts.
 - Desktop copy should present the app as an official supported local UI while staying honest about platform/package limitations.
+- Cockpit/setup/evidence views should surface provider readiness, MCP status, GitHub Action setup, degraded state, and release evidence through canonical contracts.
+- Browser fallback data is illustrative only and must never be treated as product truth or release evidence.
 
 ## Verification
 - UI-only changes need targeted desktop smoke or typecheck where practical.

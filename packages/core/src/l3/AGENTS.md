@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # l3 — Head Verdict
 
@@ -31,6 +31,7 @@ None (final layer, minimal module structure)
 - `makeHeadVerdict()` — main entry: takes ModeratorReport, returns HeadVerdict
 - `groupDiff()` — groups findings by file
 - `scanUnconfirmedQueue()` — identifies findings requiring human review
+- Clean moderator reports with no actionable discussions, suggestions, or unconfirmed issues should remain deterministically ACCEPT; do not call the head model just to reinterpret an empty report.
 
 **Decision Criteria:**
 - LLM verdict: evaluates reasoning quality + confidence metrics
@@ -44,6 +45,7 @@ None (final layer, minimal module structure)
 - Mock LLM response parsing
 - Fallback on timeout/error
 - Verdict confidence extraction
+- Clean-report guard coverage should stay in tests when touching verdict fallback logic.
 
 **Rule-Based Fallback:**
 - Severity weighting (CRITICAL > HIGH > MEDIUM > LOW > WARNING)

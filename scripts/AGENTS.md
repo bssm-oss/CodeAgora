@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-06-05 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-06-05 | Updated: 2026-06-14 -->
 
 # scripts/
 
@@ -22,6 +22,27 @@ Repository automation for action bundles, release/package smoke, evidence manife
 - Prefer structured parsing and explicit exits over log scraping.
 - Keep generated artifacts out of source unless the release process explicitly requires them.
 - If a script changes release evidence, update the related docs under `docs/archived/RELEASE_EVIDENCE.md` or current rc evidence notes.
+
+## Action-Source Change Checklist
+
+If action source or bundled dependencies change, expected local verification is:
+
+```bash
+pnpm build:action
+git diff -- dist/action.js
+pnpm release:beta-smoke
+pnpm evidence:github-security
+```
+
+`pnpm build:action` is required after edits that affect `packages/github/src/action.ts`, `packages/github/src/**` code reachable from the Action bundle, `packages/core/src/**`, `packages/shared/src/**`, `action.yml`, or `scripts/build-action.mjs`. Review the `dist/action.js` diff intentionally; do not silently rewrite it.
+
+## Evidence Boundaries
+
+- `pnpm release:beta-smoke` is provider-free package/MCP/Action runtime smoke coverage.
+- `pnpm bench:ci` is deterministic benchmark/reference validation, not live provider evidence.
+- `pnpm evidence:github-security` records token/fork/security policy evidence for RC manifests.
+- `pnpm evidence:github-action-pr-smoke` is valid live Action evidence only from an actual GitHub Actions `pull_request` context with CodeAgora Action outputs.
+- Do not use deterministic tests, skipped provider paths, or local dry-runs as stable live-provider or live-GitHub-posting evidence. Stable or RC promotion claims must follow `docs/archived/RELEASE_EVIDENCE.md`.
 
 ## Anti-Patterns
 - Do not make live provider/network evidence a substitute for `pnpm bench:ci`.

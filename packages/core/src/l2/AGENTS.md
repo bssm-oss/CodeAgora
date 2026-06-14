@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # l2 — Discussion & Debate
 
@@ -36,6 +36,7 @@ None (single layer orchestration)
 - `runModerator()` — main entry: takes evidence documents, runs discussion rounds, returns ModeratorReport
 - `applyThreshold()` — filters low-severity/low-agreement issues
 - `deduplicateDiscussions()` — merges redundant findings
+- `ModeratorConfig.enabled === false` means unresolved discussions skip forced moderator decision and escalate directly to L3/head.
 
 **State Management:**
 - Discussion state persisted per session (for resume capability)
@@ -67,6 +68,7 @@ None (single layer orchestration)
 
 **Integration:**
 - Full flow: L1 evidence → dedup → threshold → discussion rounds → L3 verdict
+- Presets may intentionally use one supporter plus devil's advocate for low-cost Action runs; do not assume all production configs have 2-5 supporters.
 
 ### Common Patterns
 
