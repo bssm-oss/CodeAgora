@@ -54,6 +54,15 @@ export function formatError(error: Error, verbose: boolean): string {
 export function classifyCliErrorExitCode(error: Error): CliExitCode {
   const msg = error.message.toLowerCase();
   if (
+    msg.includes('provider/api failures') ||
+    msg.includes('all reviewers failed') ||
+    msg.includes('forfeited or errored') ||
+    msg.includes('reviewer timed out') ||
+    msg.includes('pipeline timed out')
+  ) {
+    return 3;
+  }
+  if (
     msg.includes('config') ||
     msg.includes('invalid output format') ||
     msg.includes('requires --pr') ||
