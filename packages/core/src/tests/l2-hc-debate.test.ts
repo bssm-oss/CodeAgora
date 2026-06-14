@@ -49,6 +49,7 @@ describe('checkConsensus — HARSHLY_CRITICAL all agree', () => {
     const result = checkConsensus(round, discussion);
     expect(result.reached).toBe(true);
     expect(result.severity).toBe('HARSHLY_CRITICAL');
+    expect(result.resolutionSource).toBe('supporter-consensus');
   });
 });
 
@@ -139,6 +140,7 @@ describe('checkConsensus — HARSHLY_CRITICAL tie', () => {
     const result = checkConsensus(round, discussion, /* isLastRound */ true);
     expect(result.reached).toBe(true);
     expect(result.severity).toBe('HARSHLY_CRITICAL');
+    expect(result.resolutionSource).toBe('forced-tie-break');
   });
 
   it('does not reach consensus on tie during non-last round', () => {

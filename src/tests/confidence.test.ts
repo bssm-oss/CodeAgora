@@ -121,6 +121,18 @@ describe('adjustConfidenceFromDiscussion', () => {
     expect(adjustConfidenceFromDiscussion(50, verdict4)).toBe(80);
   });
 
+  it('does not boost confidence for forced tie-break decisions', () => {
+    const verdict = {
+      filePath: 'src/foo.ts',
+      lineRange: [10, 12] as [number, number],
+      consensusReached: true,
+      finalSeverity: 'CRITICAL',
+      rounds: 1,
+      resolutionSource: 'forced-tie-break',
+    };
+    expect(adjustConfidenceFromDiscussion(60, verdict)).toBe(50);
+  });
+
   it('clamps between 0 and 100', () => {
     const verdictHigh = {
       filePath: 'src/foo.ts',

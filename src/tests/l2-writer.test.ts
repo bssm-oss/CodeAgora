@@ -244,6 +244,13 @@ describe('writeDiscussionVerdict()', () => {
     expect(content).toContain('5');
   });
 
+  it('writes the resolution source when present', async () => {
+    await writeDiscussionVerdict(DATE, SESSION_ID, makeVerdict({ resolutionSource: 'forced-tie-break' }));
+    const [, content] = mockWriteMarkdown.mock.calls[0];
+    expect(content).toContain('Resolution Source');
+    expect(content).toContain('forced-tie-break');
+  });
+
   it('includes the reasoning text in the content', async () => {
     const reasoning = 'The panel reached a clear agreement.';
     await writeDiscussionVerdict(DATE, SESSION_ID, makeVerdict({ reasoning }));

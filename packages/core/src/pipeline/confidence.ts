@@ -7,6 +7,8 @@ export interface DiscussionVerdictLike {
   consensusReached: boolean;
   finalSeverity: string;
   rounds: number;
+  resolutionSource?: string;
+  reasoning?: string;
 }
 
 /**
@@ -145,6 +147,12 @@ export function adjustConfidenceFromDiscussion(
   verdict: DiscussionVerdictLike
 ): number {
   let adjusted = baseConfidence;
+  const forcedTieBreak = verdict.resolutionSource === 'forced-tie-break' ||
+    /tie broken by forced decision/i.test(verdict.reasoning ?? '');
+  if (forcedTieBreak) {
+    adjusted -= 10;
+    return Math.max(0, Math.min(100, adjusted));
+  }
   if (verdict.consensusReached) {
     if (verdict.finalSeverity === 'DISMISSED') {
       return 0;
