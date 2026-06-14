@@ -124,6 +124,7 @@ export const ModeratorConfigSchema = z.object({
   provider: z.string().optional(),
   maxOutputTokens: z.number().int().positive().max(32768).optional(),
   timeout: z.number().default(120),
+  enabled: z.boolean().default(true),
   /**
    * Forced-decision output format. Default (undefined/'markdown') uses the
    * existing regex-based parser (structured "severity:" field → JSON-like

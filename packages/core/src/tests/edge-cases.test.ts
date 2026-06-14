@@ -246,6 +246,7 @@ describe('runModerator — maxRounds=0 (8)', () => {
       model: 'claude-3-haiku',
       provider: 'anthropic',
       timeout: 30,
+      enabled: true,
     };
 
     const supporterPoolConfig = {
@@ -277,6 +278,60 @@ describe('runModerator — maxRounds=0 (8)', () => {
     // moderatorForcedDecision is called, returns a verdict.
     expect(result.discussions).toHaveLength(1);
     expect(result.summary.totalDiscussions).toBe(1);
+  });
+
+  it('escalates unresolved discussions directly to head when moderator is disabled', async () => {
+    const discussion = {
+      id: 'disc-no-moderator',
+      issueTitle: 'Escalate Without Moderator',
+      filePath: 'src/foo.ts',
+      lineRange: [1, 10] as [number, number],
+      severity: 'WARNING' as const,
+      evidenceDocs: [],
+      codeSnippet: '',
+      status: 'pending' as const,
+    };
+
+    const moderatorConfig = {
+      backend: 'api' as const,
+      model: 'z-ai/glm-5.1',
+      provider: 'openrouter',
+      timeout: 30,
+      enabled: false,
+    };
+
+    const supporterPoolConfig = {
+      pool: [
+        { id: 's1', backend: 'api' as const, model: 'z-ai/glm-5.1', provider: 'openrouter', enabled: true, timeout: 30, persona: 'supporter' },
+      ],
+      pickCount: 1,
+      pickStrategy: 'random' as const,
+      devilsAdvocate: { id: 'da', backend: 'api' as const, model: 'moonshotai/kimi-k2.5', provider: 'openrouter', enabled: false, timeout: 30, persona: 'devil' },
+      personaPool: ['supporter'],
+      personaAssignment: 'random' as const,
+    };
+
+    const result = await runModerator({
+      config: moderatorConfig,
+      supporterPoolConfig,
+      discussions: [discussion],
+      settings: {
+        enabled: true,
+        maxRounds: 0,
+        registrationThreshold: { HARSHLY_CRITICAL: 1, CRITICAL: 1, WARNING: 2, SUGGESTION: null },
+        codeSnippetRange: 10,
+        objectionTimeout: 60,
+        maxObjectionRounds: 1,
+      },
+      date: '2026-03-21',
+      sessionId: '001',
+    });
+
+    expect(result.discussions).toHaveLength(1);
+    expect(result.discussions[0]!.finalSeverity).toBe('WARNING');
+    expect(result.discussions[0]!.consensusReached).toBe(false);
+    expect(result.discussions[0]!.reasoning).toContain('Moderator disabled');
+    expect(result.summary.escalated).toBe(1);
   });
 });
 

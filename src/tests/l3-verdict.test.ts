@@ -69,6 +69,23 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.decision).toBe('ACCEPT');
     });
 
+    it('does not call LLM head for a clean report with no actionable findings', async () => {
+      mockExecuteBackend.mockResolvedValue(
+        'DECISION: NEEDS_HUMAN\nREASONING: No issues were provided.\nQUESTIONS: inspect manually',
+      );
+      const report = makeReport();
+
+      const verdict = await makeHeadVerdict(report, {
+        backend: 'api',
+        model: 'head-model',
+        provider: 'test-provider',
+        enabled: true,
+      });
+
+      expect(verdict.decision).toBe('ACCEPT');
+      expect(mockExecuteBackend).not.toHaveBeenCalled();
+    });
+
     it('returns ACCEPT when all discussions are consensus and none are critical', async () => {
       const report = makeReport({
         discussions: [

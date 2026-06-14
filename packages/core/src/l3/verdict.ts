@@ -26,6 +26,10 @@ export async function makeHeadVerdict(
   language?: 'en' | 'ko',
   onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<HeadVerdict> {
+  if (isCleanModeratorReport(report)) {
+    return ruleBasedVerdict(report, mode);
+  }
+
   // Try LLM-based verdict if configured
   if (headConfig?.enabled !== false && headConfig?.model) {
     try {
@@ -258,6 +262,14 @@ function hasActionableDiscussionLocation(discussion: { filePath: string; lineRan
 
 function hasActionableEvidenceLocation(doc: EvidenceDocument): boolean {
   return doc.filePath !== 'unknown' && hasValidLineRange(doc.lineRange);
+}
+
+function isCleanModeratorReport(report: ModeratorReport): boolean {
+  return (
+    !report.discussions.some(hasActionableDiscussionLocation) &&
+    !report.unconfirmedIssues.some(hasActionableEvidenceLocation) &&
+    !report.suggestions.some(hasActionableEvidenceLocation)
+  );
 }
 
 function parseHeadResponse(response: string, report: ModeratorReport): HeadVerdict {

@@ -247,6 +247,30 @@ async function runDiscussion(
   }
 
   // Max rounds reached, moderator forces decision
+  if (moderatorConfig.enabled === false) {
+    const verdict: DiscussionVerdict = {
+      discussionId: discussion.id,
+      filePath: discussion.filePath,
+      lineRange: discussion.lineRange,
+      finalSeverity: discussion.severity as DiscussionVerdict['finalSeverity'],
+      reasoning: 'Moderator disabled; unresolved discussion escalated directly to head verdict.',
+      consensusReached: false,
+      rounds: settings.maxRounds,
+    };
+
+    await writeDiscussionVerdict(date, sessionId, verdict);
+
+    emitter?.emitEvent({
+      type: 'discussion-end',
+      discussionId: discussion.id,
+      finalSeverity: verdict.finalSeverity,
+      consensusReached: false,
+      rounds: settings.maxRounds,
+    });
+
+    return { verdict, rounds };
+  }
+
   const finalVerdict = await moderatorForcedDecision(
     discussion,
     rounds,
