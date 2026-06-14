@@ -208,4 +208,12 @@ export interface SessionMetadata {
   configHash?: string;
   /** Machine-readable cache lookup/write metadata. No raw config, providers, or source context. */
   cache?: CacheMetadata;
+  /** Current-run no-code review scope classification for early ACCEPT paths. */
+  reviewScope?: 'docs-only' | 'generated-only' | 'code-change' | 'empty';
+  /** Explicit latest-diff classification used to decide whether code review is required. */
+  newDiffClassification?: 'docs-only' | 'generated-only' | 'code-change' | 'empty';
+  /** Whether the normal reviewer/debate/head pipeline is required for this diff. */
+  codeReviewRequired?: boolean;
+  /** Whether TypeScript suggestion verification/noise surfacing was skipped for a no-code diff. */
+  tsVerificationSkipped?: boolean;
 }

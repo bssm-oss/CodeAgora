@@ -44,6 +44,7 @@ export function registerInitCommand(program: Command): void {
           if (options.ci && result.created.some(f => f.includes('codeagora-review.yml'))) {
             console.log('Created: .github/workflows/codeagora-review.yml');
             console.log('  Add OPENROUTER_API_KEY to your repository secrets:');
+            console.log('  gh secret set OPENROUTER_API_KEY');
             console.log('  Settings -> Secrets -> Actions -> New repository secret');
           }
           if (result.created.length > 0) printNextSteps();
@@ -90,7 +91,8 @@ export function registerInitCommand(program: Command): void {
         if (result.created.length > 0) console.log('CodeAgora initialized successfully.');
         if (options.ci && result.created.some(f => f.includes('codeagora-review.yml'))) {
           console.log('Created: .github/workflows/codeagora-review.yml');
-          console.log('  Add GROQ_API_KEY to your repository secrets:');
+          console.log('  Add OPENROUTER_API_KEY to your repository secrets:');
+          console.log('  gh secret set OPENROUTER_API_KEY');
           console.log('  Settings -> Secrets -> Actions -> New repository secret');
         }
         if (result.created.length > 0) printNextSteps();

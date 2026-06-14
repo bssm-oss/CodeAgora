@@ -47,6 +47,29 @@ describe('registerInitCommand', () => {
     expect(runInitInteractive).not.toHaveBeenCalled();
   });
 
+  it('prints gh secret guidance when action preset creates a workflow', async () => {
+    vi.spyOn(init, 'runInit').mockResolvedValue({
+      created: ['/tmp/.ca/config.json', '/tmp/.github/workflows/codeagora-review.yml'],
+      skipped: [],
+      warnings: [],
+    });
+
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((message?: unknown) => {
+      logs.push(String(message ?? ''));
+    });
+
+    const program = new Command();
+    registerInitCommand(program);
+
+    await program.parseAsync(['node', 'agora', 'init', '--preset', 'action', '--ci', '--yes']);
+
+    const output = logs.join('\n');
+    expect(output).toContain('Created: .github/workflows/codeagora-review.yml');
+    expect(output).toContain('OPENROUTER_API_KEY');
+    expect(output).toContain('gh secret set OPENROUTER_API_KEY');
+  });
+
   it('builds schema-valid generated groq config for non-interactive init paths', () => {
     const generated = init.buildCustomConfig({
       provider: 'groq',
