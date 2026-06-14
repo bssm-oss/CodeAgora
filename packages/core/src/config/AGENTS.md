@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # config — Configuration Management
 
@@ -43,9 +43,10 @@ None (configuration utilities)
 {
   version: string,
   mode: 'auto' | 'conservative' | 'aggressive',
-  reviewers: [ { model, provider, config: {} } | { auto: true } ],
-  moderator: { enabled, supporter_pool },
-  head: { enabled, model, provider },
+  reviewers: [ { id, backend, provider?, model, enabled, timeout } | { id, auto: true } ],
+  supporters: { pool, pickCount, devilsAdvocate, personaPool },
+  moderator: { backend, provider?, model, enabled, timeout },
+  head: { backend, provider?, model, enabled, timeout },
   rules: [ ... ],
   plugins: [ ... ]
 }
@@ -66,6 +67,7 @@ None (configuration utilities)
 - Invalid enum values → error
 - Type mismatches → error
 - Nested schema validation (reviewers, moderator, head, rules)
+- Backend schema, executor, CLI detection, preset generation, and docs must stay aligned when adding or changing a backend.
 
 **Credentials:**
 - Load from ~/.config/codeagora/credentials
@@ -103,15 +105,9 @@ None (configuration utilities)
 10. Cache for session duration
 
 **Credential Handling:**
-```
-credentials = {
-  openai_api_key: process.env.OPENAI_API_KEY,
-  anthropic_api_key: process.env.ANTHROPIC_API_KEY,
-  openrouter_api_key: process.env.OPENROUTER_API_KEY,
-  opencode_api_key: process.env.OPENCODE_API_KEY,
-  groq_api_key: process.env.GROQ_API_KEY,
-}
-```
+- Use `@codeagora/shared/providers/env-vars` as the source of truth for provider environment variable names.
+- Local saved keys are loaded from `~/.config/codeagora/credentials`.
+- CLI backends may require installed/authenticated tools instead of API keys.
 
 **Mode Preset Logic:**
 - `auto` (default): balanced (5 reviewers)

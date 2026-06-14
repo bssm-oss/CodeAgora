@@ -5,7 +5,7 @@
  * rather than just counting severities. Falls back to rule-based logic on failure.
  */
 
-import type { ModeratorReport, HeadVerdict, EvidenceDocument } from '../types/core.js';
+import type { ModeratorReport, HeadVerdict, EvidenceDocument, DiscussionVerdict } from '../types/core.js';
 import type { HeadConfig } from '../types/config.js';
 import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
 import { untrustedContentInstruction, wrapUntrustedBlock } from '../security/untrusted-content.js';
@@ -26,6 +26,10 @@ export async function makeHeadVerdict(
   language?: 'en' | 'ko',
   onBackendCall?: (call: BackendCallRecord) => void,
 ): Promise<HeadVerdict> {
+  if (isCleanModeratorReport(report)) {
+    return ruleBasedVerdict(report, mode);
+  }
+
   // Try LLM-based verdict if configured
   if (headConfig?.enabled !== false && headConfig?.model) {
     try {
@@ -260,6 +264,18 @@ function hasActionableEvidenceLocation(doc: EvidenceDocument): boolean {
   return doc.filePath !== 'unknown' && hasValidLineRange(doc.lineRange);
 }
 
+function isForcedTieBreak(verdict: DiscussionVerdict): boolean {
+  return /tie broken by forced decision/i.test(verdict.reasoning);
+}
+
+function isCleanModeratorReport(report: ModeratorReport): boolean {
+  return (
+    !report.discussions.some(hasActionableDiscussionLocation) &&
+    !report.unconfirmedIssues.some(hasActionableEvidenceLocation) &&
+    !report.suggestions.some(hasActionableEvidenceLocation)
+  );
+}
+
 function parseHeadResponse(response: string, report: ModeratorReport): HeadVerdict {
   const decisionMatch = response.match(/DECISION:\s*(ACCEPT|REJECT|NEEDS_HUMAN)/i);
   const reasoningMatch = response.match(/REASONING:\s*(.+?)(?=\nQUESTIONS:|$)/is);
@@ -301,7 +317,7 @@ export function applyHeadVerdictSafety(
     (d) => hasActionableDiscussionLocation(d) && (d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL')
   );
   const criticalIssues = allCritical.filter(
-    (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
+    (d) => !isForcedTieBreak(d) && (d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
   );
   if (criticalIssues.length > 0) {
     if (verdict.decision === 'REJECT') return verdict;
@@ -315,7 +331,7 @@ export function applyHeadVerdictSafety(
   }
 
   const unverifiedCritical = allCritical.filter(
-    (d) => d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
+    (d) => isForcedTieBreak(d) || (d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
   );
   const escalatedIssues = report.discussions.filter((d) => hasActionableDiscussionLocation(d) && !d.consensusReached);
   if (unverifiedCritical.length > 0 || escalatedIssues.length > 0) {
@@ -357,10 +373,10 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
     (d) => hasActionableDiscussionLocation(d) && (d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL')
   );
   const criticalIssues = allCritical.filter(
-    (d) => d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
+    (d) => !isForcedTieBreak(d) && (d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
   );
   const unverifiedCritical = allCritical.filter(
-    (d) => d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD
+    (d) => isForcedTieBreak(d) || (d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
   );
 
   const escalatedIssues = report.discussions.filter((d) => hasActionableDiscussionLocation(d) && !d.consensusReached);

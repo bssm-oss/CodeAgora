@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-03-20 | Updated: 2026-03-20 -->
+<!-- Generated: 2026-03-20 | Updated: 2026-06-14 -->
 
 # core
 
@@ -56,6 +56,9 @@ Core review pipeline implementation for CodeAgora. Contains the full 10-stage re
 - L0-L3 execution flow: user → orchestrator → L1 (parallel) → L2 (debate) → L3 (verdict)
 - Session state is managed by SessionManager
 - Config is loaded via config/loader.ts and cached per session
+- Core owns verdict, finding, confidence, session, degraded/skipped, and config semantics. CLI, GitHub Action, MCP, and Desktop adapt transport only.
+- Keep backend schema/executor/detection parity across `types/config.ts`, config validation, `src/l1/backend.ts`, shared CLI backend detection, generated presets/templates, and tests.
+- Distinguish API-key providers from installed/authenticated CLI backends in validation, dry-run readiness, doctor output, and failure classification.
 
 **Key Entry Points:**
 - `src/index.ts` — public API exports
@@ -112,6 +115,7 @@ Core review pipeline implementation for CodeAgora. Contains the full 10-stage re
 - Mode presets (auto, conservative, aggressive) modify reviewer counts
 - Prompts injected at {{DIFF}} placeholder
 - Credentials from ~/.config/codeagora/credentials (0o600)
+- Provider credentials must never be embedded in config/session artifacts; load through environment or credentials helper and redact everywhere.
 
 **Async Patterns:**
 - Serial for ≤2 items, parallel with pLimit(3) for >2

@@ -8,7 +8,7 @@ import { isDeclarativeReviewers, loadConfig, loadConfigFile, normalizeConfig } f
 import { writeAllReviews } from '../l1/writer.js';
 import { applyThreshold } from '../l2/threshold.js';
 import { writeModeratorReport, writeSuggestions } from '../l2/writer.js';
-import { parseDiffFileRanges, readSurroundingContext } from '@codeagora/shared/utils/diff.js';
+import { classifyNoCodeDiffScope, parseDiffFileRanges, readSurroundingContext } from '@codeagora/shared/utils/diff.js';
 import { estimateTokens } from './chunker.js';
 import { createLogger } from '@codeagora/shared/utils/logger.js';
 import { writeHeadVerdict } from '../l3/writer.js';
@@ -150,6 +150,12 @@ async function persistTerminalResult(result: PipelineResult): Promise<PipelineRe
     await writeSessionResult(result.date, result.sessionId, result).catch(() => {});
   }
   return result;
+}
+
+function buildNoCodeReviewReason(scope: 'docs-only' | 'generated-only'): string {
+  return scope === 'docs-only'
+    ? 'No source code changes detected in latest diff: docs-only update.'
+    : 'No source code changes detected in latest diff: generated artifacts only.';
 }
 
 export function applyReviewerSelectionToConfig(
@@ -395,6 +401,72 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
     if (!input.noCache) {
       const cached = await checkAndLoadCache(cacheKey, session);
       if (cached) return cached;
+    }
+
+    const noCodeScope = classifyNoCodeDiffScope(diffContent);
+    if (noCodeScope === 'docs-only' || noCodeScope === 'generated-only') {
+      await session.setMetadata({
+        reviewScope: noCodeScope,
+        newDiffClassification: noCodeScope,
+        codeReviewRequired: false,
+        tsVerificationSkipped: true,
+      }).catch(() => {});
+      await session.setStatus('completed');
+      return persistTerminalResult({
+        sessionId,
+        date,
+        status: 'success',
+        summary: {
+          decision: 'ACCEPT',
+          reasoning: buildNoCodeReviewReason(noCodeScope),
+          totalReviewers: 0,
+          forfeitedReviewers: 0,
+          severityCounts: {},
+          topIssues: [],
+          totalDiscussions: 0,
+          resolved: 0,
+          escalated: 0,
+        },
+        evidenceDocs: [],
+        discussions: [],
+        reviewRun: {
+          l1: {
+            configured: 0,
+            completed: 0,
+            forfeited: 0,
+            errored: 0,
+            reviewers: [],
+            models: [],
+            providers: [],
+          },
+          l2: {
+            supporters: 0,
+            supporterModels: [],
+            discussions: 0,
+            skipped: true,
+          },
+          l3: {
+            skipped: true,
+          },
+          queues: {
+            activeFindings: 0,
+            suggestions: 0,
+            unconfirmed: 0,
+            suppressed: 0,
+            hallucinationRemoved: 0,
+            hallucinationUncertain: 0,
+          },
+          degraded: false,
+          degradedReasons: [],
+        },
+        reviewQueues: {
+          suggestions: [],
+          unconfirmed: [],
+          suppressed: [],
+          hallucinationRemoved: [],
+          hallucinationUncertain: [],
+        },
+      });
     }
 
     // === AUTO-APPROVE: Skip LLM pipeline for trivial diffs ===

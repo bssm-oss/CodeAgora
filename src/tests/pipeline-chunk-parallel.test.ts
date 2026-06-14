@@ -86,6 +86,7 @@ vi.mock('../../packages/core/src/l0/quality-tracker.js', () => ({
 }));
 
 vi.mock('../../packages/shared/src/utils/diff.js', () => ({
+  classifyNoCodeDiffScope: vi.fn().mockReturnValue('code-change'),
   extractMultipleSnippets: vi.fn(),
   extractFileListFromDiff: vi.fn().mockReturnValue([]),
   parseDiffFileRanges: vi.fn().mockReturnValue([]),

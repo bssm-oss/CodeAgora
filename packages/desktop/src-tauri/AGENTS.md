@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-06-05 | Updated: 2026-06-05 -->
+<!-- Generated: 2026-06-05 | Updated: 2026-06-14 -->
 
 # desktop/src-tauri/
 
@@ -17,9 +17,11 @@ Rust/Tauri backend for native filesystem, process, session/config, and desktop p
 
 ## Conventions
 - Spawn CLI/core behavior through the existing command boundary; desktop must not fork verdict/finding/session/config semantics.
+- Spawn processes safely with explicit args, timeouts, cancellation, and redacted stdout/stderr handling.
 - Normalize errors for the frontend; do not surface raw stack traces or secrets.
 - Keep path access bounded to selected/trusted repositories and known session/config locations.
 - Treat `target/` as build output, not source.
+- WebDriver/debug automation must remain debug-only and covered by desktop gate evidence.
 
 ## Verification
 - Rust, command, capability, or package changes require `pnpm rc:desktop-gate`.

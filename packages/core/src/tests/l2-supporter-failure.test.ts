@@ -62,6 +62,7 @@ describe('runModerator — supporter backend failure', () => {
         model: 'moderator',
         provider: 'openrouter',
         timeout: 30,
+        enabled: true,
       },
       supporterPoolConfig: {
         pool: [

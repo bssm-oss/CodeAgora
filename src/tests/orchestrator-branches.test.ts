@@ -86,6 +86,7 @@ vi.mock('../../packages/core/src/l0/quality-tracker.js', () => ({
 }));
 
 vi.mock('../../packages/shared/src/utils/diff.js', () => ({
+  classifyNoCodeDiffScope: vi.fn().mockReturnValue('code-change'),
   extractMultipleSnippets: vi.fn(),
   extractFileListFromDiff: vi.fn().mockReturnValue([]),
   parseDiffFileRanges: vi.fn().mockReturnValue([]),
@@ -124,7 +125,7 @@ import { makeHeadVerdict, scanUnconfirmedQueue } from '@codeagora/core/l3/verdic
 import { writeHeadVerdict } from '@codeagora/core/l3/writer.js';
 import { resolveReviewers, getBanditStore } from '@codeagora/core/l0/index.js';
 import { QualityTracker } from '@codeagora/core/l0/quality-tracker.js';
-import { extractMultipleSnippets } from '@codeagora/shared/utils/diff.js';
+import { classifyNoCodeDiffScope, extractMultipleSnippets } from '@codeagora/shared/utils/diff.js';
 import { createLogger } from '@codeagora/shared/utils/logger.js';
 import { chunkDiff } from '@codeagora/core/pipeline/chunker.js';
 import fs from 'fs/promises';
@@ -197,6 +198,7 @@ function setupDefaultMocks() {
   (writeAllReviews as Mock).mockResolvedValue([]);
   (applyThreshold as Mock).mockReturnValue({ discussions: [], unconfirmed: [], suggestions: [] });
   (deduplicateDiscussions as Mock).mockReturnValue({ deduplicated: [], mergedCount: 0 });
+  (classifyNoCodeDiffScope as Mock).mockReturnValue('code-change');
   (extractMultipleSnippets as Mock).mockReturnValue(new Map());
   (runModerator as Mock).mockResolvedValue({ ...mockModeratorReport });
   (writeModeratorReport as Mock).mockResolvedValue(undefined);
@@ -427,6 +429,41 @@ describe('Orchestrator Branches', () => {
     // Should have completed without calling executeReviewers
     expect(result.status).toBe('success');
     expect(executeReviewers).not.toHaveBeenCalled();
+  });
+
+  it('docs-only latest diff returns ACCEPT without calling reviewers', async () => {
+    (classifyNoCodeDiffScope as Mock).mockReturnValue('docs-only');
+
+    const result = await runPipeline({ diffPath: '/tmp/test.diff' });
+
+    expect(result.status).toBe('success');
+    expect(result.summary?.decision).toBe('ACCEPT');
+    expect(result.summary?.reasoning).toContain('docs-only');
+    expect(result.summary?.totalReviewers).toBe(0);
+    expect(executeReviewers).not.toHaveBeenCalled();
+    expect(chunkDiff).not.toHaveBeenCalled();
+    expect(mockSession.setMetadata).toHaveBeenCalledWith(expect.objectContaining({
+      reviewScope: 'docs-only',
+      newDiffClassification: 'docs-only',
+      codeReviewRequired: false,
+      tsVerificationSkipped: true,
+    }));
+  });
+
+  it('generated-only latest diff returns ACCEPT without L1, L2, or L3 calls', async () => {
+    (classifyNoCodeDiffScope as Mock).mockReturnValue('generated-only');
+
+    const result = await runPipeline({ diffPath: '/tmp/test.diff' });
+
+    expect(result.status).toBe('success');
+    expect(result.summary?.decision).toBe('ACCEPT');
+    expect(result.summary?.reasoning).toContain('generated artifacts only');
+    expect(result.reviewRun?.l1.completed).toBe(0);
+    expect(result.reviewRun?.l2.skipped).toBe(true);
+    expect(result.reviewRun?.l3.skipped).toBe(true);
+    expect(executeReviewers).not.toHaveBeenCalled();
+    expect(runModerator).not.toHaveBeenCalled();
+    expect(makeHeadVerdict).not.toHaveBeenCalled();
   });
 
   // --------------------------------------------------------------------------

@@ -105,8 +105,8 @@ describe('executeBackend() CLI backends – successful execution', () => {
     expect(writeSpy).toHaveBeenCalledWith('test prompt');
   });
 
-  it('writes prompt to stdin for all CLI backends (prompt not embedded in args)', async () => {
-    const stdinBackends = ['copilot', 'cursor', 'antigravity', 'pi'] as const;
+  it('writes prompt to stdin for stdin-based CLI backends', async () => {
+    const stdinBackends = ['cursor', 'antigravity', 'pi'] as const;
     for (const backend of stdinBackends) {
       const child = createMockChild('ok', '', 0);
       const writeSpy = vi.spyOn(child.stdin, 'write');
@@ -114,6 +114,20 @@ describe('executeBackend() CLI backends – successful execution', () => {
       await executeBackend(makeInput({ backend, provider: undefined, prompt: 'test' }));
       expect(writeSpy).toHaveBeenCalledWith('test');
     }
+  });
+
+  it('embeds the prompt as a direct arg for copilot because its CLI requires --prompt text', async () => {
+    const child = createMockChild('ok', '', 0);
+    const writeSpy = vi.spyOn(child.stdin, 'write');
+    mockSpawn.mockReturnValue(child);
+    await executeBackend(makeInput({ backend: 'copilot', provider: undefined, prompt: 'test prompt', model: 'auto' }));
+
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'copilot',
+      ['-s', '--allow-all', '-p', 'test prompt'],
+      expect.any(Object),
+    );
   });
 
   it('throws when exit code is non-zero and stdout is empty', async () => {
@@ -153,7 +167,16 @@ describe('executeBackend() dispatches correct CLI command per backend', () => {
     await executeBackend(makeInput({ backend: 'codex', model: 'o3', provider: undefined }));
     expect(mockSpawn).toHaveBeenCalledWith(
       'codex',
-      ['exec', '-m', 'o3', '-'],
+      ['exec', '--skip-git-repo-check', '-m', 'o3', '-'],
+      expect.any(Object)
+    );
+  });
+
+  it('spawns codex without -m when model is auto so the installed CLI can pick its default', async () => {
+    await executeBackend(makeInput({ backend: 'codex', model: 'auto', provider: undefined }));
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'codex',
+      ['exec', '--skip-git-repo-check', '-'],
       expect.any(Object)
     );
   });
@@ -176,20 +199,29 @@ describe('executeBackend() dispatches correct CLI command per backend', () => {
     );
   });
 
-  it('spawns copilot CLI for copilot backend (prompt via stdin, not args)', async () => {
-    await executeBackend(makeInput({ backend: 'copilot', model: 'gpt-4o', provider: undefined }));
+  it('spawns copilot CLI with direct prompt args', async () => {
+    await executeBackend(makeInput({ backend: 'copilot', model: 'gpt-4o', provider: undefined, prompt: 'Review this code' }));
     expect(mockSpawn).toHaveBeenCalledWith(
       'copilot',
-      ['-s', '--allow-all', '--model', 'gpt-4o'],
+      ['-s', '--allow-all', '--model', 'gpt-4o', '-p', 'Review this code'],
       expect.any(Object)
     );
   });
 
-  it('spawns agent binary for cursor backend (prompt via stdin)', async () => {
+  it('spawns copilot without --model when model is auto', async () => {
+    await executeBackend(makeInput({ backend: 'copilot', model: 'auto', provider: undefined, prompt: 'Review this code' }));
+    expect(mockSpawn).toHaveBeenCalledWith(
+      'copilot',
+      ['-s', '--allow-all', '-p', 'Review this code'],
+      expect.any(Object)
+    );
+  });
+
+  it('spawns agent binary for cursor backend in trusted print mode', async () => {
     await executeBackend(makeInput({ backend: 'cursor', model: 'gpt-4o', provider: undefined }));
     expect(mockSpawn).toHaveBeenCalledWith(
       'agent',
-      [],
+      ['-p', '--trust'],
       expect.any(Object)
     );
   });

@@ -55,7 +55,7 @@ interface AgentEntry { id: string; label?: string; model: string; backend: strin
 export interface GeneratedConfig {
   reviewers: AgentEntry[];
   supporters: { pool: AgentEntry[]; pickCount: number; pickStrategy: string; devilsAdvocate: AgentEntry; personaPool: string[]; personaAssignment: string };
-  moderator: { model: string; backend: string; provider: string };
+  moderator: { model: string; backend: string; provider?: string; enabled?: boolean };
   discussion: { enabled: boolean; maxRounds: number; registrationThreshold: Record<string, number | null>; codeSnippetRange: number };
   errorHandling: { maxRetries: number; forfeitThreshold: number };
   [key: string]: unknown;
@@ -73,6 +73,7 @@ export interface ProviderModelSelection {
   provider: string;
   model: string;
   backend: 'api' | 'cli';
+  runtimeProvider?: string;
   contextWindow?: number;
   isFree?: boolean;
 }
@@ -83,6 +84,12 @@ export interface MultiProviderConfigParams {
   discussion: boolean;
   mode?: ReviewMode;
   language?: Language;
+  maxRounds?: number;
+  supporterSelection?: ProviderModelSelection;
+  devilsAdvocateSelection?: ProviderModelSelection;
+  moderatorSelection?: ProviderModelSelection;
+  moderatorEnabled?: boolean;
+  headSelection?: ProviderModelSelection;
 }
 
 export interface DynamicPreset {
@@ -91,10 +98,19 @@ export interface DynamicPreset {
   labelKo: string;
   providers: string[];
   models: Record<string, string>;
+  runtimeProviders?: Record<string, string>;
   reviewerModels?: string[];
   reviewerCount: number;
   discussion: boolean;
+  maxRounds?: number;
   backend: 'api' | 'cli';
+  roleSelections?: {
+    supporter?: ProviderModelSelection;
+    devilsAdvocate?: ProviderModelSelection;
+    moderator?: ProviderModelSelection;
+    moderatorEnabled?: boolean;
+    head?: ProviderModelSelection;
+  };
 }
 
 const PRESET_ALIASES: Record<string, string> = {
@@ -104,6 +120,11 @@ const PRESET_ALIASES: Record<string, string> = {
   standard: 'free',
   premium: 'thorough',
   deep: 'thorough',
+  local: 'cli',
+  'local-cli': 'cli',
+  action: 'action',
+  gha: 'action',
+  'github-action': 'action',
 };
 
 export const PRESET_ALIAS_ENTRIES = Object.entries(PRESET_ALIASES).map(
@@ -286,7 +307,19 @@ export function buildCustomConfig(params: CustomConfigParams): GeneratedConfig {
  * - Moderator/Head: strongest model (highest context window from selections)
  */
 export function buildMultiProviderConfig(params: MultiProviderConfigParams): GeneratedConfig {
-  const { selections, reviewerCount, discussion, mode = 'pragmatic', language = 'en' } = params;
+  const {
+    selections,
+    reviewerCount,
+    discussion,
+    mode = 'pragmatic',
+    language = 'en',
+    maxRounds,
+    supporterSelection,
+    devilsAdvocateSelection,
+    moderatorSelection,
+    moderatorEnabled,
+    headSelection,
+  } = params;
 
   if (reviewerCount < 1 || reviewerCount > 10) {
     throw new Error(`reviewerCount must be between 1 and 10, got ${reviewerCount}`);
@@ -296,62 +329,67 @@ export function buildMultiProviderConfig(params: MultiProviderConfigParams): Gen
   }
 
   const preset = getModePreset(mode);
+  const selectionBackend = (sel: ProviderModelSelection): Backend => (
+    sel.backend === 'cli' ? sel.provider as Backend : 'api'
+  );
+  const selectionProvider = (sel: ProviderModelSelection): string | undefined => (
+    sel.backend === 'cli'
+      ? sel.runtimeProvider
+      : sel.provider
+  );
+  const agentFromSelection = (id: string, sel: ProviderModelSelection, label?: string): AgentEntry => ({
+    id,
+    ...(label ? { label } : {}),
+    model: sel.model,
+    backend: selectionBackend(sel),
+    provider: selectionProvider(sel),
+    enabled: true,
+    timeout: 120,
+  } as AgentEntry);
 
   // Distribute reviewers across providers evenly
   const reviewers: AgentEntry[] = [];
   for (let i = 0; i < reviewerCount; i++) {
     const sel = selections[i % selections.length]!;
-    const isCli = sel.backend === 'cli';
-    reviewers.push({
-      id: `r${i + 1}`,
-      label: `${sel.provider} ${sel.model} Reviewer ${i + 1}`,
-      model: sel.model,
-      backend: (isCli ? sel.provider : 'api') as Backend,
-      provider: isCli ? undefined : sel.provider,
-      enabled: true,
-      timeout: 120,
-    } as AgentEntry);
+    reviewers.push(agentFromSelection(`r${i + 1}`, sel, `${sel.provider} ${sel.model} Reviewer ${i + 1}`));
   }
 
   // Supporters: prefer a different provider than the first reviewer for diversity
-  const supporterSel = selections.length > 1 ? selections[1]! : selections[0]!;
-  const supporterBase = {
-    model: supporterSel.model,
-    backend: supporterSel.backend,
-    provider: supporterSel.provider,
-    enabled: true,
-    timeout: 120,
-  };
+  const supporterSel = supporterSelection ?? (selections.length > 1 ? selections[1]! : selections[0]!);
+  const devilsSel = devilsAdvocateSelection ?? supporterSel;
 
   // Moderator/Head: strongest model (highest context window, then first in list)
   const strongest = [...selections].sort((a, b) => (b.contextWindow ?? 0) - (a.contextWindow ?? 0))[0]!;
+  const moderatorSel = moderatorSelection ?? strongest;
+  const headSel = headSelection ?? moderatorSel;
 
   return {
     mode,
     language,
     reviewers,
     supporters: {
-      pool: [{ id: 's1', ...supporterBase }],
+      pool: [agentFromSelection('s1', supporterSel)],
       pickCount: 1,
       pickStrategy: 'random',
-      devilsAdvocate: { id: 'da', ...supporterBase },
+      devilsAdvocate: agentFromSelection('da', devilsSel),
       personaPool: preset.personaPool,
       personaAssignment: 'random',
     },
     moderator: {
-      model: strongest.model,
-      backend: strongest.backend,
-      provider: strongest.provider,
+      model: moderatorSel.model,
+      backend: selectionBackend(moderatorSel),
+      provider: selectionProvider(moderatorSel),
+      enabled: moderatorEnabled ?? true,
     },
     head: {
-      backend: strongest.backend,
-      model: strongest.model,
-      provider: strongest.provider,
+      backend: selectionBackend(headSel),
+      model: headSel.model,
+      provider: selectionProvider(headSel),
       enabled: true,
     },
     discussion: {
       enabled: discussion !== false,
-      maxRounds: preset.maxRounds,
+      maxRounds: maxRounds ?? preset.maxRounds,
       registrationThreshold: preset.registrationThreshold,
       codeSnippetRange: 10,
     },
@@ -382,16 +420,77 @@ const OPENROUTER_FAST_REVIEWERS = [
   'qwen/qwen3-coder-flash',
 ];
 
+const OPENROUTER_ACTION_CHEAP_REVIEWERS = [
+  'qwen/qwen3-235b-a22b-2507',
+  'deepseek/deepseek-v4-flash',
+  'qwen/qwen3.5-9b',
+  'z-ai/glm-4.7-flash',
+  'openai/gpt-oss-120b',
+];
+
+const OPENROUTER_ACTION_SUPPORTER = 'z-ai/glm-5.1';
+const OPENROUTER_ACTION_DEVILS_ADVOCATE = 'moonshotai/kimi-k2.5';
+const OPENROUTER_ACTION_HEAD = 'z-ai/glm-5.1';
+
 const OPENROUTER_STARTER_REVIEWERS = [
   'qwen/qwen3-coder-flash',
   'qwen/qwen3-next-80b-a3b-instruct',
 ];
+
+const CLI_BACKEND_DEFAULT_MODELS: Record<string, string> = {
+  antigravity: 'default',
+  claude: 'haiku',
+  codex: 'gpt-5.4-mini',
+  cursor: 'default',
+  gemini: 'gemini-2.5-pro',
+  opencode: 'deepseek-v4-flash',
+  pi: 'default',
+};
+
+const LOCAL_CLI_SUPPORTER_MODEL = 'gpt-5.3-codex-spark';
+const LOCAL_CLI_HEAD_MODEL = 'gpt-5.5';
+const LOCAL_CLI_DEVILS_ADVOCATE_MODEL = 'kimi-k2.7-code';
+
+const CLI_BACKEND_RUNTIME_PROVIDERS: Record<string, string> = {
+  opencode: 'opencode-go',
+};
+
+const CLI_PRESET_ORDER = [
+  'codex',
+  'claude',
+  'opencode',
+  'cursor',
+  'antigravity',
+  'gemini',
+  'pi',
+];
+
+const CLI_PRESET_EXCLUDED_BACKENDS = new Set(['copilot']);
 
 // ============================================================================
 // Static fallback presets (used when catalog/detection unavailable)
 // ============================================================================
 
 const FALLBACK_PRESETS: DynamicPreset[] = [
+  {
+    id: 'action',
+    label: 'GitHub Action review (OpenRouter cheap)',
+    labelKo: 'GitHub Action \uB9AC\uBDF0 (OpenRouter \uC800\uBE44\uC6A9)',
+    providers: ['openrouter'],
+    models: { openrouter: OPENROUTER_ACTION_CHEAP_REVIEWERS[0]! },
+    reviewerModels: OPENROUTER_ACTION_CHEAP_REVIEWERS,
+    reviewerCount: OPENROUTER_ACTION_CHEAP_REVIEWERS.length,
+    discussion: true,
+    maxRounds: 1,
+    backend: 'api',
+    roleSelections: {
+      supporter: { provider: 'openrouter', model: OPENROUTER_ACTION_SUPPORTER, backend: 'api' },
+      devilsAdvocate: { provider: 'openrouter', model: OPENROUTER_ACTION_DEVILS_ADVOCATE, backend: 'api' },
+      moderator: { provider: 'openrouter', model: OPENROUTER_ACTION_HEAD, backend: 'api' },
+      moderatorEnabled: false,
+      head: { provider: 'openrouter', model: OPENROUTER_ACTION_HEAD, backend: 'api' },
+    },
+  },
   {
     id: 'quick',
     label: 'Quick review (OpenRouter)',
@@ -465,6 +564,8 @@ export function generatePresets(
     }
     return PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5';
   }
+
+  presets.push(FALLBACK_PRESETS.find((preset) => preset.id === 'action')!);
 
   // 1. "Quick review" — fastest available provider, no discussion
   if (detected.length > 0) {
@@ -546,22 +647,62 @@ export function generatePresets(
   }
 
   // 4. "CLI review" — if CLI backends detected
-  const availableCli = cliBackends?.filter((c) => c.available) ?? [];
+  const availableCli = [...(cliBackends?.filter((c) => c.available && !CLI_PRESET_EXCLUDED_BACKENDS.has(c.backend)) ?? [])].sort((a, b) => {
+    const aIndex = CLI_PRESET_ORDER.indexOf(a.backend);
+    const bIndex = CLI_PRESET_ORDER.indexOf(b.backend);
+    const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+    const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+    return aRank - bRank || a.backend.localeCompare(b.backend);
+  });
   if (availableCli.length > 0) {
-    const cliProvider = availableCli[0]!;
-    const cliModel = cliProvider.backend === 'claude' ? 'opus'
-      : cliProvider.backend === 'codex' ? 'codex'
-      : cliProvider.backend === 'gemini' ? 'gemini'
-      : cliProvider.backend;
+    const selectedCli = availableCli.slice(0, 6);
+    const hasCliBackend = (backend: string) => selectedCli.some((cli) => cli.backend === backend);
+    const roleSelections: DynamicPreset['roleSelections'] = {};
+    if (hasCliBackend('codex')) {
+      roleSelections.supporter = {
+        provider: 'codex',
+        model: LOCAL_CLI_SUPPORTER_MODEL,
+        backend: 'cli',
+      };
+      roleSelections.moderator = {
+        provider: 'codex',
+        model: LOCAL_CLI_HEAD_MODEL,
+        backend: 'cli',
+      };
+      roleSelections.head = {
+        provider: 'codex',
+        model: LOCAL_CLI_HEAD_MODEL,
+        backend: 'cli',
+      };
+    }
+    if (hasCliBackend('opencode')) {
+      roleSelections.devilsAdvocate = {
+        provider: 'opencode',
+        model: LOCAL_CLI_DEVILS_ADVOCATE_MODEL,
+        backend: 'cli',
+        runtimeProvider: CLI_BACKEND_RUNTIME_PROVIDERS.opencode,
+      };
+    }
+    const models: Record<string, string> = {};
+    const runtimeProviders: Record<string, string> = {};
+    for (const cli of selectedCli) {
+      models[cli.backend] = CLI_BACKEND_DEFAULT_MODELS[cli.backend] ?? 'auto';
+      const runtimeProvider = CLI_BACKEND_RUNTIME_PROVIDERS[cli.backend];
+      if (runtimeProvider) {
+        runtimeProviders[cli.backend] = runtimeProvider;
+      }
+    }
     presets.push({
       id: 'cli',
-      label: `CLI review (${availableCli.map((c) => c.backend).join(', ')})`,
-      labelKo: `CLI \uB9AC\uBDF0 (${availableCli.map((c) => c.backend).join(', ')})`,
-      providers: availableCli.map((c) => c.backend),
-      models: { [cliProvider.backend]: cliModel },
-      reviewerCount: Math.min(availableCli.length, 3),
-      discussion: false,
+      label: `Local CLI ensemble (${selectedCli.map((c) => c.backend).join(', ')})`,
+      labelKo: `\uB85C\uCEEC CLI \uC559\uC0C1\uBE14 (${selectedCli.map((c) => c.backend).join(', ')})`,
+      providers: selectedCli.map((c) => c.backend),
+      models,
+      runtimeProviders,
+      reviewerCount: selectedCli.length,
+      discussion: true,
       backend: 'cli',
+      ...(Object.keys(roleSelections).length > 0 ? { roleSelections } : {}),
     });
   }
 
@@ -724,6 +865,24 @@ export async function writeGitHubWorkflow(
   return true;
 }
 
+function selectionsFromPreset(selected: DynamicPreset): ProviderModelSelection[] {
+  if (selected.reviewerModels?.length) {
+    return selected.reviewerModels.map((model) => ({
+      provider: selected.providers[0]!,
+      model,
+      backend: selected.backend,
+      runtimeProvider: selected.runtimeProviders?.[selected.providers[0]!],
+    }));
+  }
+
+  return selected.providers.map((provider) => ({
+    provider,
+    model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5',
+    backend: selected.backend,
+    runtimeProvider: selected.runtimeProviders?.[provider],
+  }));
+}
+
 export async function buildPresetConfig(preset: string): Promise<GeneratedConfig> {
   const canonicalPreset = resolvePresetAlias(preset);
   if (!canonicalPreset) {
@@ -745,17 +904,7 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
     );
   }
 
-  const selections: ProviderModelSelection[] = selected.reviewerModels?.length
-    ? selected.reviewerModels.map((model) => ({
-      provider: selected.providers[0]!,
-      model,
-      backend: selected.backend,
-    }))
-    : selected.providers.map((provider) => ({
-      provider,
-      model: selected.models[provider] ?? PROVIDER_DEFAULT_MODELS[provider] ?? 'xiaomi/mimo-v2.5',
-      backend: selected.backend,
-    }));
+  const selections = selectionsFromPreset(selected);
 
   if (selections.length === 0) {
     throw new Error(`Preset "${preset}" has no providers.`);
@@ -764,7 +913,7 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
   const primaryProvider = selections[0]!.provider;
   const primaryModel = selections[0]!.model;
 
-  if (selections.length === 1) {
+  if (selections.length === 1 && selected.backend === 'api') {
     return buildCustomConfig({
       provider: primaryProvider,
       model: primaryModel,
@@ -781,6 +930,12 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
     discussion: selected.discussion,
     language: 'en',
     mode: 'pragmatic',
+    maxRounds: selected.maxRounds,
+    supporterSelection: selected.roleSelections?.supporter,
+    devilsAdvocateSelection: selected.roleSelections?.devilsAdvocate,
+    moderatorSelection: selected.roleSelections?.moderator,
+    moderatorEnabled: selected.roleSelections?.moderatorEnabled,
+    headSelection: selected.roleSelections?.head,
   });
 }
 
@@ -899,11 +1054,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
   const selectedPreset = dynamicPresets.find((pr) => pr.id === setupMode);
   if (selectedPreset) {
     // Use preset defaults — build selections from preset
-    const selections: ProviderModelSelection[] = selectedPreset.providers.map((prov) => ({
-      provider: prov,
-      model: selectedPreset.models[prov] ?? PROVIDER_DEFAULT_MODELS[prov] ?? 'xiaomi/mimo-v2.5',
-      backend: selectedPreset.backend,
-    }));
+    const selections = selectionsFromPreset(selectedPreset);
 
     format = options.format === 'yaml' ? 'yaml' : 'json';
     primaryProvider = selections[0]!.provider;
@@ -924,7 +1075,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     }
     const language = languageSelection as Language;
 
-    if (selections.length === 1) {
+    if (selections.length === 1 && selectedPreset.backend === 'api') {
       configData = buildCustomConfig({
         provider: primaryProvider,
         model: primaryModel,
@@ -938,6 +1089,12 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
         reviewerCount: selectedPreset.reviewerCount,
         discussion: selectedPreset.discussion,
         language,
+        maxRounds: selectedPreset.maxRounds,
+        supporterSelection: selectedPreset.roleSelections?.supporter,
+        devilsAdvocateSelection: selectedPreset.roleSelections?.devilsAdvocate,
+        moderatorSelection: selectedPreset.roleSelections?.moderator,
+        moderatorEnabled: selectedPreset.roleSelections?.moderatorEnabled,
+        headSelection: selectedPreset.roleSelections?.head,
       });
     }
   } else {
@@ -1019,7 +1176,12 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
             const modelOptions = topModels.map((m) => formatModelOption(m));
             const msg = ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`;
             const modelSelection = await searchAndSelect(modelOptions, msg, false, ko) as string;
-            selections.push({ provider: backend, model: modelSelection, backend: 'cli' });
+            selections.push({
+              provider: backend,
+              model: modelSelection,
+              backend: 'cli',
+              runtimeProvider: CLI_BACKEND_RUNTIME_PROVIDERS[backend],
+            });
             continue;
           }
         }
@@ -1039,7 +1201,12 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
             });
             const msg = ko ? `${backend} CLI \uBAA8\uB378 \uC120\uD0DD` : `Model for ${backend} CLI`;
             const modelSelection = await searchAndSelect(modelOptions, msg, false, ko) as string;
-            selections.push({ provider: backend, model: modelSelection, backend: 'cli' });
+            selections.push({
+              provider: backend,
+              model: modelSelection,
+              backend: 'cli',
+              runtimeProvider: CLI_BACKEND_RUNTIME_PROVIDERS[backend],
+            });
             continue;
           }
         }
@@ -1053,7 +1220,12 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
           p.cancel(ko ? '\uC124\uC815\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.' : 'Setup cancelled.');
           throw new UserCancelledError();
         }
-        selections.push({ provider: backend, model: (cliModelInput as string) || backend, backend: 'cli' });
+        selections.push({
+          provider: backend,
+          model: (cliModelInput as string) || CLI_BACKEND_DEFAULT_MODELS[backend] || backend,
+          backend: 'cli',
+          runtimeProvider: CLI_BACKEND_RUNTIME_PROVIDERS[backend],
+        });
         continue;
       }
 

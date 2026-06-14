@@ -118,7 +118,7 @@ function makeCatalog(): ModelsCatalog {
 }
 
 function makeCli(available: string[]): DetectedCli[] {
-  const all = ['claude', 'codex', 'gemini', 'copilot', 'opencode'];
+  const all = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'antigravity', 'opencode'];
   return all.map((backend) => ({
     backend,
     bin: backend,
@@ -141,25 +141,33 @@ describe('generatePresets()', () => {
     'qwen/qwen3-coder-flash',
     'qwen/qwen3-next-80b-a3b-instruct',
   ];
+  const openrouterActionModels = [
+    'qwen/qwen3-235b-a22b-2507',
+    'deepseek/deepseek-v4-flash',
+    'qwen/qwen3.5-9b',
+    'z-ai/glm-4.7-flash',
+    'openai/gpt-oss-120b',
+  ];
 
   it('returns fallback presets when no providers or CLIs detected', () => {
     const presets = generatePresets(makeEmptyEnv(), null);
-    expect(presets).toHaveLength(3);
-    expect(presets[0]!.id).toBe('quick');
-    expect(presets[1]!.id).toBe('thorough');
-    expect(presets[2]!.id).toBe('free');
+    expect(presets).toHaveLength(4);
+    expect(presets[0]!.id).toBe('action');
+    expect(presets[1]!.id).toBe('quick');
+    expect(presets[2]!.id).toBe('thorough');
+    expect(presets[3]!.id).toBe('free');
     // Fallback presets use the OpenRouter starter lineup.
     for (const p of presets) {
       expect(p.providers).toContain('openrouter');
     }
-    expect(presets[0]!.reviewerCount).toBe(4);
-    expect(presets[0]!.reviewerModels).toEqual(openrouterFastModels);
+    expect(presets[1]!.reviewerCount).toBe(4);
+    expect(presets[1]!.reviewerModels).toEqual(openrouterFastModels);
   });
 
   it('returns fallback presets when no providers detected and no CLI available', () => {
     const presets = generatePresets(makeEmptyEnv(), null, makeCli([]));
-    expect(presets).toHaveLength(3);
-    expect(presets[0]!.id).toBe('quick');
+    expect(presets).toHaveLength(4);
+    expect(presets[0]!.id).toBe('action');
   });
 
   it('generates quick preset from first detected provider', () => {
@@ -187,6 +195,30 @@ describe('generatePresets()', () => {
     expect(starter!.providers).toEqual(['openrouter']);
     expect(starter!.reviewerCount).toBe(2);
     expect(starter!.reviewerModels).toEqual(openrouterStarterModels);
+  });
+
+  it('generates OpenRouter Action preset with cheap reviewers and direct head escalation', () => {
+    const presets = generatePresets(makeEnv(['openrouter']), null);
+    const action = presets.find((p) => p.id === 'action');
+    expect(action).toBeDefined();
+    expect(action!.providers).toEqual(['openrouter']);
+    expect(action!.backend).toBe('api');
+    expect(action!.reviewerCount).toBe(5);
+    expect(action!.reviewerModels).toEqual(openrouterActionModels);
+    expect(action!.discussion).toBe(true);
+    expect(action!.maxRounds).toBe(1);
+    expect(action!.roleSelections).toMatchObject({
+      supporter: { provider: 'openrouter', model: 'z-ai/glm-5.1', backend: 'api' },
+      devilsAdvocate: { provider: 'openrouter', model: 'moonshotai/kimi-k2.5', backend: 'api' },
+      moderator: { provider: 'openrouter', model: 'z-ai/glm-5.1', backend: 'api' },
+      moderatorEnabled: false,
+      head: { provider: 'openrouter', model: 'z-ai/glm-5.1', backend: 'api' },
+    });
+  });
+
+  it('keeps Action preset available even when OpenRouter is not detected in the shell', () => {
+    const presets = generatePresets(makeEnv(['openai']), null, makeCli(['codex']));
+    expect(presets.find((p) => p.id === 'action')).toBeDefined();
   });
 
   it('does not generate free preset when groq is detected', () => {
@@ -226,11 +258,33 @@ describe('generatePresets()', () => {
   });
 
   it('generates CLI preset when CLI backends available', () => {
-    const presets = generatePresets(makeEnv(['groq']), null, makeCli(['claude']));
+    const presets = generatePresets(makeEnv(['groq']), null, makeCli(['claude', 'codex', 'opencode']));
     const cli = presets.find((p) => p.id === 'cli');
     expect(cli).toBeDefined();
-    expect(cli!.providers).toContain('claude');
+    expect(cli!.label).toContain('Local CLI ensemble');
+    expect(cli!.providers).toEqual(['codex', 'claude', 'opencode']);
+    expect(cli!.models).toMatchObject({
+      codex: 'gpt-5.4-mini',
+      claude: 'haiku',
+      opencode: 'deepseek-v4-flash',
+    });
+    expect(cli!.runtimeProviders).toMatchObject({
+      opencode: 'opencode-go',
+    });
+    expect(cli!.reviewerCount).toBe(3);
+    expect(cli!.discussion).toBe(true);
     expect(cli!.backend).toBe('cli');
+    expect(cli!.roleSelections).toMatchObject({
+      supporter: { provider: 'codex', model: 'gpt-5.3-codex-spark', backend: 'cli' },
+      devilsAdvocate: {
+        provider: 'opencode',
+        model: 'kimi-k2.7-code',
+        backend: 'cli',
+        runtimeProvider: 'opencode-go',
+      },
+      moderator: { provider: 'codex', model: 'gpt-5.5', backend: 'cli' },
+      head: { provider: 'codex', model: 'gpt-5.5', backend: 'cli' },
+    });
   });
 
   it('does not generate CLI preset when no CLI backends available', () => {
@@ -490,7 +544,71 @@ describe('buildMultiProviderConfig()', () => {
     });
 
     expect(config.reviewers[0]!.backend).toBe('claude');
-    expect(config.moderator.backend).toBe('cli');
+    expect(config.reviewers[0]!.provider).toBeUndefined();
+    expect(config.moderator.backend).toBe('claude');
+    expect(config.moderator.provider).toBeUndefined();
+    expect((config.head as Record<string, unknown>)['backend']).toBe('claude');
+  });
+
+  it('supports opencode CLI runtime provider', () => {
+    const config = buildMultiProviderConfig({
+      selections: [
+        { provider: 'opencode', model: 'deepseek-v4-flash', backend: 'cli', runtimeProvider: 'opencode-go' },
+      ],
+      reviewerCount: 1,
+      discussion: false,
+    });
+
+    expect(config.reviewers[0]).toMatchObject({
+      backend: 'opencode',
+      provider: 'opencode-go',
+      model: 'deepseek-v4-flash',
+    });
+    expect(config.moderator).toMatchObject({
+      backend: 'opencode',
+      provider: 'opencode-go',
+      model: 'deepseek-v4-flash',
+    });
+  });
+
+  it('supports explicit local CLI role selections', () => {
+    const config = buildMultiProviderConfig({
+      selections: [
+        { provider: 'codex', model: 'gpt-5.4-mini', backend: 'cli' },
+        { provider: 'claude', model: 'haiku', backend: 'cli' },
+        { provider: 'opencode', model: 'deepseek-v4-flash', backend: 'cli', runtimeProvider: 'opencode-go' },
+      ],
+      reviewerCount: 3,
+      discussion: true,
+      supporterSelection: { provider: 'codex', model: 'gpt-5.3-codex-spark', backend: 'cli' },
+      devilsAdvocateSelection: {
+        provider: 'opencode',
+        model: 'kimi-k2.7-code',
+        backend: 'cli',
+        runtimeProvider: 'opencode-go',
+      },
+      moderatorSelection: { provider: 'codex', model: 'gpt-5.5', backend: 'cli' },
+      headSelection: { provider: 'codex', model: 'gpt-5.5', backend: 'cli' },
+    });
+
+    expect(config.supporters.pool[0]).toMatchObject({
+      backend: 'codex',
+      model: 'gpt-5.3-codex-spark',
+    });
+    expect(config.supporters.devilsAdvocate).toMatchObject({
+      backend: 'opencode',
+      provider: 'opencode-go',
+      model: 'kimi-k2.7-code',
+    });
+    expect(config.moderator).toMatchObject({
+      backend: 'codex',
+      model: 'gpt-5.5',
+    });
+    expect(config.head).toMatchObject({
+      backend: 'codex',
+      model: 'gpt-5.5',
+    });
+    expect(config.discussion.enabled).toBe(true);
   });
 
   it('passes mode and language through', () => {

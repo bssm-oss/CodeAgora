@@ -197,6 +197,43 @@ export function extractFileListFromDiff(diffContent: string): string[] {
   return files;
 }
 
+export type NoCodeDiffScope = 'docs-only' | 'generated-only' | 'code-change' | 'empty';
+
+const DOCS_PATH_RE = /(?:^|\/)(docs?|documentation|changelog|changesets?)\//i;
+const DOCS_FILE_RE = /(?:^|\/)(README|CHANGELOG|CONTRIBUTING|CODE_OF_CONDUCT|SECURITY|LICENSE)(?:\.[^/]*)?$/i;
+const DOCS_EXT_RE = /\.(md|mdx|txt|rst|adoc|rdoc)$/i;
+const GENERATED_PATH_RE = /(?:^|\/)(dist|build|coverage|generated|gen|vendor)\//i;
+const GENERATED_FILE_RE = /(?:^|\/)(action|bundle|index)\.(?:min\.)?js(?:\.map)?$/i;
+const GENERATED_EXT_RE = /\.(?:map|min\.js)$/i;
+
+export function isDocsOnlyDiffPath(filePath: string): boolean {
+  return DOCS_PATH_RE.test(filePath) || DOCS_FILE_RE.test(filePath) || DOCS_EXT_RE.test(filePath);
+}
+
+export function isGeneratedDiffPath(filePath: string): boolean {
+  return GENERATED_PATH_RE.test(filePath) ||
+    GENERATED_FILE_RE.test(filePath) ||
+    GENERATED_EXT_RE.test(filePath);
+}
+
+/**
+ * Classify whether a unified diff contains source changes that need LLM review.
+ * This is intentionally path based and conservative: mixed docs/generated/source
+ * diffs return code-change so the normal review pipeline still runs.
+ */
+export function classifyNoCodeDiffScope(diffContent: string): NoCodeDiffScope {
+  const files = extractFileListFromDiff(diffContent);
+  if (files.length === 0) return 'empty';
+
+  const allDocs = files.every(isDocsOnlyDiffPath);
+  if (allDocs) return 'docs-only';
+
+  const allGenerated = files.every(isGeneratedDiffPath);
+  if (allGenerated) return 'generated-only';
+
+  return 'code-change';
+}
+
 /**
  * Find best matching file path from a list using fuzzy matching
  */

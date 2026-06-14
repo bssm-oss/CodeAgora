@@ -168,6 +168,18 @@ describe('runDoctor()', () => {
     expect(result.summary).toHaveProperty('warn');
   });
 
+  it('shows copy-pasteable OpenRouter Action setup commands for a keyless new repo', async () => {
+    const result = await runDoctor(tmpDir);
+    const steps = result.nextSteps ?? [];
+    const joined = steps.join('\n');
+
+    expect(joined).toContain('agora env set openrouter');
+    expect(joined).toContain('agora init --preset action --ci');
+    expect(joined).toContain('gh secret set OPENROUTER_API_KEY');
+    expect(joined.indexOf('agora env set openrouter')).toBeLessThan(joined.indexOf('agora init --preset action --ci'));
+    expect(joined.indexOf('agora init --preset action --ci')).toBeLessThan(joined.indexOf('gh secret set OPENROUTER_API_KEY'));
+  });
+
   it('includes a Node.js version check', async () => {
     const result = await runDoctor(tmpDir);
     const nodeCheck = result.checks.find((c) => c.name === 'Node.js version');
@@ -374,8 +386,9 @@ describe('formatDoctorReport()', () => {
     };
 
     const report = stripAnsi(formatDoctorReport(result));
-    expect(report).toContain('agora env set openrouter <api-key>');
-    expect(report).toContain('agora doctor --live');
+    expect(report).toContain('agora env set openrouter');
+    expect(report).toContain('agora init --preset action --ci');
+    expect(report).toContain('gh secret set OPENROUTER_API_KEY');
   });
 });
 
