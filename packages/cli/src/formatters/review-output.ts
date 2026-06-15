@@ -12,7 +12,7 @@ import { formatAnnotated } from './annotated-output.js';
 import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
 import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
 import { lookupCwe } from '@codeagora/shared/data/cwe-mapping.js';
-import { formatAgentJson } from '../utils/agent-contract.js';
+import { formatAgentJson, getPublicDecision } from '../utils/agent-contract.js';
 
 export type OutputFormat = 'text' | 'json' | 'md' | 'github' | 'annotated' | 'html' | 'junit' | 'sarif';
 
@@ -86,6 +86,7 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
 
   const s = result.summary;
+  const publicDecision = getPublicDecision(result) ?? s.decision;
   const docs = result.evidenceDocs ?? [];
   const triage = triageDocs(docs);
   const reviewerMap = result.reviewerMap ?? {};
@@ -103,15 +104,15 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
 
   // ── Verdict Box ──────────────────────────────────────────
-  const decEmoji = s.decision === 'ACCEPT' ? '\u2705' : s.decision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
-  const colorFn = decisionColor[s.decision] ?? bold;
+  const decEmoji = publicDecision === 'ACCEPT' ? '\u2705' : publicDecision === 'REJECT' ? '\uD83D\uDD34' : '\uD83D\uDFE1';
+  const colorFn = decisionColor[publicDecision] ?? bold;
   const triageStr = formatTriageCounts(triage.counts);
   const completedReviewers = result.reviewRun?.l1.completed ?? Math.max(0, s.totalReviewers - s.forfeitedReviewers);
   const metaParts = formatRoleMeta(result);
 
   lines.push('');
   lines.push(`  \u250C${ '\u2500'.repeat(47) }\u2510`);
-  lines.push(`  \u2502  ${colorFn(`${decEmoji} ${s.decision}`)}  \u00B7  ${triageStr}${ ' '.repeat(Math.max(0, 30 - triageStr.length)) }\u2502`);
+  lines.push(`  \u2502  ${colorFn(`${decEmoji} ${publicDecision}`)}  \u00B7  ${triageStr}${ ' '.repeat(Math.max(0, 30 - triageStr.length)) }\u2502`);
   if (metaParts) {
     lines.push(`  \u2502  ${dim(metaParts)}${ ' '.repeat(Math.max(0, 45 - metaParts.length)) }\u2502`);
   }
@@ -217,7 +218,7 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
 
   // ── Zero issues celebration ──
-  if (docs.length === 0 && s.decision === 'ACCEPT') {
+  if (docs.length === 0 && publicDecision === 'ACCEPT') {
     lines.push(`  ${bold('No blocking findings remained after the full review pipeline.')}`);
     lines.push('');
   }
@@ -239,7 +240,7 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
 
   // ── Questions for Human ──
-  if (s.decision === 'NEEDS_HUMAN' && s.questionsForHuman && s.questionsForHuman.length > 0) {
+  if (publicDecision === 'NEEDS_HUMAN' && s.questionsForHuman && s.questionsForHuman.length > 0) {
     lines.push(`  \u2500\u2500 questions for human ${ '\u2500'.repeat(28) }`);
     lines.push('');
     for (const q of s.questionsForHuman) {
@@ -257,6 +258,9 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   }
 
   // ── Reasoning ──
+  if (publicDecision !== s.decision) {
+    lines.push(dim(`  Public decision adjusted from raw head verdict: ${s.decision} -> ${publicDecision}`));
+  }
   lines.push(dim(`  ${s.reasoning}`));
   lines.push('');
 
@@ -264,9 +268,9 @@ export function formatText(result: PipelineResult, options?: FormatOptions): str
   lines.push(dim(`  Session ${result.date}/${result.sessionId}`));
   lines.push('');
   const explainCommand = `agora explain ${result.date}/${result.sessionId}`;
-  if (s.decision === 'ACCEPT') {
+  if (publicDecision === 'ACCEPT') {
     lines.push('Next: run `agora sessions` to review history or start another review.');
-  } else if (s.decision === 'NEEDS_HUMAN') {
+  } else if (publicDecision === 'NEEDS_HUMAN') {
     lines.push(`Next: run \`${explainCommand}\`, answer the questions above, then rerun the review.`);
   } else {
     lines.push(`Next: fix the must-fix findings, then run \`${explainCommand}\` or rerun the review.`);
@@ -309,9 +313,14 @@ export function formatMarkdown(result: PipelineResult, options?: FormatOptions):
 
   if (result.summary) {
     const s = result.summary;
+    const publicDecision = getPublicDecision(result) ?? s.decision;
 
     // Decision
-    lines.push(`**Decision:** ${s.decision}`);
+    lines.push(`**Decision:** ${publicDecision}`);
+    if (publicDecision !== s.decision) {
+      lines.push('');
+      lines.push(`_Public decision adjusted from raw head verdict: ${s.decision} -> ${publicDecision}._`);
+    }
     lines.push('');
     lines.push(`> ${s.reasoning}`);
     lines.push('');
@@ -441,7 +450,12 @@ export function formatGithub(result: PipelineResult): string {
 
   // Decision + reasoning
   if (result.summary) {
-    lines.push(`**Decision:** ${result.summary.decision}`);
+    const publicDecision = getPublicDecision(result) ?? result.summary.decision;
+    lines.push(`**Decision:** ${publicDecision}`);
+    if (publicDecision !== result.summary.decision) {
+      lines.push('');
+      lines.push(`_Public decision adjusted from raw head verdict: ${result.summary.decision} -> ${publicDecision}._`);
+    }
     lines.push('');
     lines.push(`> ${result.summary.reasoning}`);
     lines.push('');
@@ -542,9 +556,13 @@ export function formatHtml(result: PipelineResult): string {
   }
 
   const s = result.summary;
-  const decColor = DECISION_HTML_COLORS[s.decision] ?? '#6b7280';
+  const publicDecision = getPublicDecision(result) ?? s.decision;
+  const decColor = DECISION_HTML_COLORS[publicDecision] ?? '#6b7280';
   lines.push('<div class="summary">');
-  lines.push(`<p><span class="badge" style="background:${decColor}">${escapeHtml(s.decision)}</span></p>`);
+  lines.push(`<p><span class="badge" style="background:${decColor}">${escapeHtml(publicDecision)}</span></p>`);
+  if (publicDecision !== s.decision) {
+    lines.push(`<p><em>Public decision adjusted from raw head verdict: ${escapeHtml(s.decision)} -&gt; ${escapeHtml(publicDecision)}.</em></p>`);
+  }
   lines.push(`<p>${escapeHtml(s.reasoning)}</p>`);
 
   const sevParts = SEVERITY_ORDER

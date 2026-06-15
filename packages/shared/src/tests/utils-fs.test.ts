@@ -13,6 +13,8 @@ import path from 'path';
 
 import {
   CA_ROOT,
+  getCaRoot,
+  withCaRoot,
   getSessionDir,
   getReviewsDir,
   getDiscussionsDir,
@@ -53,6 +55,28 @@ afterEach(async () => {
 describe('CA_ROOT', () => {
   it('is .ca', () => {
     expect(CA_ROOT).toBe('.ca');
+  });
+});
+
+describe('withCaRoot', () => {
+  it('scopes .ca path helpers without mutating process env', async () => {
+    const previousEnv = process.env['CODEAGORA_CA_ROOT'];
+    process.env['CODEAGORA_CA_ROOT'] = path.join(tmpDir, 'env-ca');
+    try {
+      await withCaRoot(path.join(tmpDir, 'scoped-ca'), async () => {
+        expect(getCaRoot()).toBe(path.join(tmpDir, 'scoped-ca'));
+        expect(getSessionDir('2026-03-21', '001')).toBe(
+          path.join(tmpDir, 'scoped-ca', 'sessions', '2026-03-21', '001'),
+        );
+      });
+      expect(getCaRoot()).toBe(path.join(tmpDir, 'env-ca'));
+    } finally {
+      if (previousEnv === undefined) {
+        delete process.env['CODEAGORA_CA_ROOT'];
+      } else {
+        process.env['CODEAGORA_CA_ROOT'] = previousEnv;
+      }
+    }
   });
 });
 

@@ -5,18 +5,30 @@
  * and the recoverStaleSessions() startup recovery function.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { rm, readFile, mkdir, writeFile } from 'fs/promises';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { rm, readFile, mkdir, writeFile, mkdtemp } from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { SessionManager, recoverStaleSessions } from '../session/manager.js';
 
 describe('SessionManager cleanup', () => {
-  const cwd = process.cwd();
-  const caRoot = path.join(cwd, '.ca');
+  const previousCaRoot = process.env['CODEAGORA_CA_ROOT'];
+  let tmpRoot: string;
+  let caRoot: string;
+
+  beforeEach(async () => {
+    tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'codeagora-session-cleanup-'));
+    caRoot = path.join(tmpRoot, '.ca');
+    process.env['CODEAGORA_CA_ROOT'] = caRoot;
+  });
 
   afterEach(async () => {
-    await rm(path.join(caRoot, 'sessions'), { recursive: true, force: true });
-    await rm(path.join(caRoot, 'logs'), { recursive: true, force: true });
+    if (previousCaRoot === undefined) {
+      delete process.env['CODEAGORA_CA_ROOT'];
+    } else {
+      process.env['CODEAGORA_CA_ROOT'] = previousCaRoot;
+    }
+    await rm(tmpRoot, { recursive: true, force: true });
   });
 
   it('registerCleanup() attaches signal listeners that can be unregistered', async () => {
@@ -81,12 +93,23 @@ describe('SessionManager cleanup', () => {
 });
 
 describe('recoverStaleSessions', () => {
-  const cwd = process.cwd();
-  const caRoot = path.join(cwd, '.ca');
+  const previousCaRoot = process.env['CODEAGORA_CA_ROOT'];
+  let tmpRoot: string;
+  let caRoot: string;
+
+  beforeEach(async () => {
+    tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'codeagora-stale-session-'));
+    caRoot = path.join(tmpRoot, '.ca');
+    process.env['CODEAGORA_CA_ROOT'] = caRoot;
+  });
 
   afterEach(async () => {
-    await rm(path.join(caRoot, 'sessions'), { recursive: true, force: true });
-    await rm(path.join(caRoot, 'logs'), { recursive: true, force: true });
+    if (previousCaRoot === undefined) {
+      delete process.env['CODEAGORA_CA_ROOT'];
+    } else {
+      process.env['CODEAGORA_CA_ROOT'] = previousCaRoot;
+    }
+    await rm(tmpRoot, { recursive: true, force: true });
   });
 
   it('returns 0 when no sessions directory exists', async () => {

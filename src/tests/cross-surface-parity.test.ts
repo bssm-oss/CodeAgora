@@ -129,10 +129,13 @@ describe('CLI/MCP/GitHub Action cross-surface parity', () => {
     });
 
     expect(githubReview.event).toBe('REQUEST_CHANGES');
+    expect(githubReview.verdict).toBe('REJECT');
     expect(githubReview.commit_id).toBe('abc123');
     expect(githubReview.body).toContain('parity-001');
-    expect(githubReview.comments).toHaveLength(expectedIdentities.length);
-    expect(githubReview.comments.map((comment) => comment.path)).toEqual(['src/auth.ts', 'src/auth.ts']);
+    expect(githubReview.comments).toHaveLength(1);
+    expect(githubReview.comments.map((comment) => comment.path)).toEqual(['src/auth.ts']);
+    expect(githubReview.comments[0]!.body).toContain('Hardcoded provider token');
+    expect(githubReview.comments[0]!.body).not.toContain('Missing rate limit');
     expect(JSON.stringify(githubReview)).not.toContain(RAW_SECRET);
     expect(JSON.stringify(githubReview)).toContain('[REDACTED]');
 
@@ -145,5 +148,60 @@ describe('CLI/MCP/GitHub Action cross-surface parity', () => {
     ]);
     expect(JSON.stringify(sarif)).not.toContain(RAW_SECRET);
     expect(JSON.stringify(sarif)).toContain('[REDACTED]');
+  });
+
+  it('uses the same public decision contract when a raw REJECT is demoted', async () => {
+    const result = {
+      ...makeResult(),
+      summary: {
+        ...makeResult().summary!,
+        decision: 'REJECT',
+        reasoning: 'Raw head verdict rejected, but no complete promotion evidence remained.',
+      },
+      decisionBrief: {
+        decision: 'ACCEPT',
+        reviewedScope: {
+          files: ['src/auth.ts'],
+          areas: ['logic changes'],
+          contracts: ['provider token contract'],
+          checks: ['evidence promotion'],
+          uncertainty: 'Non-promoted findings remain audit only.',
+        },
+        completedChecks: ['evidence promotion'],
+        evidenceCards: [],
+        requiredActions: [],
+        followUpCount: 2,
+        auditCount: 2,
+        demotedCount: 1,
+      },
+    } satisfies PipelineResult;
+
+    const cliText = formatOutput(result, 'text');
+    const cliMarkdown = formatOutput(result, 'md');
+    const cliGithub = formatOutput(result, 'github');
+    const cliJson = JSON.parse(formatOutput(result, 'json'));
+    const mcpJson = JSON.parse(await formatReviewResult(result, 'json'));
+    const githubReview = mapToGitHubReview({
+      summary: result.summary!,
+      evidenceDocs: result.evidenceDocs!,
+      discussions: [],
+      positionIndex: buildDiffPositionIndex(makeDiff()),
+      headSha: 'abc123',
+      sessionId: result.sessionId,
+      sessionDate: result.date,
+      reviewerMap: new Map(Object.entries(result.reviewerMap!)),
+      decisionBrief: result.decisionBrief,
+    });
+
+    expect(cliText).toContain('ACCEPT');
+    expect(cliText).toContain('REJECT -> ACCEPT');
+    expect(cliMarkdown).toContain('**Decision:** ACCEPT');
+    expect(cliGithub).toContain('**Decision:** ACCEPT');
+    expect(cliJson.publicDecision).toBe('ACCEPT');
+    expect(cliJson.summary.decision).toBe('REJECT');
+    expect(mcpJson.publicDecision).toBe('ACCEPT');
+    expect(githubReview.verdict).toBe('ACCEPT');
+    expect(githubReview.event).toBe('APPROVE');
+    expect(githubReview.comments).toHaveLength(0);
   });
 });

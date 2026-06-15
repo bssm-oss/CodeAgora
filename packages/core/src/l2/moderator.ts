@@ -39,16 +39,18 @@ export interface ModeratorInput {
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext;
   /** Records per-call backend telemetry for supporter/moderator API calls. */
   onBackendCall?: (call: BackendCallRecord) => void;
+  /** Abort signal propagated from the pipeline timeout controller. */
+  signal?: AbortSignal;
 }
 
 /**
  * Run all discussions and generate final report
  */
 export async function runModerator(input: ModeratorInput): Promise<ModeratorReport> {
-  const { config, supporterPoolConfig, discussions, settings, date, sessionId, language, emitter, enrichedContext, onBackendCall } = input;
+  const { config, supporterPoolConfig, discussions, settings, date, sessionId, language, emitter, enrichedContext, onBackendCall, signal } = input;
 
   const results = await Promise.allSettled(
-    discussions.map((d) => runDiscussion(d, config, supporterPoolConfig, settings, date, sessionId, language, emitter, enrichedContext, onBackendCall))
+    discussions.map((d) => runDiscussion(d, config, supporterPoolConfig, settings, date, sessionId, language, emitter, enrichedContext, onBackendCall, signal))
   );
 
   const verdicts: DiscussionVerdict[] = [];
@@ -109,6 +111,7 @@ async function runDiscussion(
   emitter?: DiscussionEmitter,
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<DiscussionResult> {
   const rounds: DiscussionRound[] = [];
 
@@ -160,6 +163,7 @@ async function runDiscussion(
       language,
       enrichedContext,
       onBackendCall,
+      signal,
     );
 
     // Emit supporter responses (2.1)
@@ -280,6 +284,7 @@ async function runDiscussion(
     rounds,
     moderatorConfig,
     onBackendCall,
+    signal,
   );
 
   const verdict: DiscussionVerdict = {
@@ -326,6 +331,7 @@ async function runRound(
   language?: 'en' | 'ko',
   enrichedContext?: import('../pipeline/pre-analysis.js').EnrichedDiffContext,
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<DiscussionRound> {
   // Moderator prompts the discussion
   const moderatorPrompt = buildModeratorPrompt(discussion, roundNum, language, enrichedContext);
@@ -333,7 +339,7 @@ async function runRound(
   // Supporters respond in parallel with graceful degradation
   const supporterResults = await Promise.allSettled(
     selectedSupporters.map((supporter) =>
-      executeSupporterResponse(supporter, discussion, moderatorPrompt, onBackendCall)
+      executeSupporterResponse(supporter, discussion, moderatorPrompt, onBackendCall, signal)
     )
   );
 
@@ -363,6 +369,7 @@ async function executeSupporterResponse(
   discussion: Discussion,
   moderatorPrompt: string,
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<{ supporterId: string; response: string; stance: 'agree' | 'disagree' | 'neutral' }> {
   // Load persona if assigned
   let personaContent = '';
@@ -422,6 +429,7 @@ If NEUTRAL:
           provider: supporter.provider,
           prompt,
           timeout: supporter.timeout,
+          signal,
           temperature: supporter.temperature,
           maxOutputTokens: supporter.maxOutputTokens,
           onUsage: (nextUsage) => { usage = nextUsage; },
@@ -587,6 +595,7 @@ async function moderatorForcedDecision(
   rounds: DiscussionRound[],
   config: ModeratorConfig,
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<{ severity: 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION' | 'DISMISSED'; reasoning: string }> {
   const useJsonFormat = config.outputFormat === 'json';
   const roundsBlock = rounds.map((r, i) => {
@@ -638,6 +647,7 @@ ${roundsBlock}
       provider: config.provider,
       prompt,
       timeout: config.timeout ?? 120,
+      signal,
       temperature: 0.2,
       maxOutputTokens: config.maxOutputTokens,
       onUsage: (nextUsage) => { usage = nextUsage; },

@@ -9,6 +9,7 @@ import { writeAllReviews } from '../l1/writer.js';
 import { applyThreshold } from '../l2/threshold.js';
 import { writeModeratorReport, writeSuggestions } from '../l2/writer.js';
 import { classifyNoCodeDiffScope, parseDiffFileRanges, readSurroundingContext } from '@codeagora/shared/utils/diff.js';
+import { withCaRoot } from '@codeagora/shared/utils/fs.js';
 import { estimateTokens } from './chunker.js';
 import { createLogger } from '@codeagora/shared/utils/logger.js';
 import { writeHeadVerdict } from '../l3/writer.js';
@@ -40,8 +41,9 @@ import {
 } from './pipeline-helpers.js';
 import type { ReviewRunSummary } from './pipeline-helpers.js';
 import { executeL1Reviews, executeL2Discussions, executeL3Verdict, recordTelemetry } from './stage-executors.js';
+import { buildReviewDecisionBrief } from './decision-brief.js';
 import fs from 'fs/promises';
-import type { ModeratorReport } from '../types/core.js';
+import type { ModeratorReport, ReviewDecisionBrief } from '../types/core.js';
 import { classifyError, type ErrorKind } from '../l1/error-classifier.js';
 import type { CacheMetadata } from '@codeagora/shared/utils/cache.js';
 import type { Config, ReviewerEntry } from '../types/config.js';
@@ -70,6 +72,8 @@ export interface PipelineInput {
   contextLines?: number;
   /** Explicit config file path. Defaults to process.cwd()/.ca/config.* */
   configPath?: string;
+  /** Optional session/cache root override scoped to this pipeline call. */
+  caRoot?: string;
 }
 
 export interface ReviewerSelection {
@@ -133,6 +137,8 @@ export interface PipelineResult {
   reviewRun?: ReviewRunSummary;
   /** Non-blocking and filtered queues retained for transparent reporting. */
   reviewQueues?: ReviewQueues;
+  /** Public decision brief for adapter UX. Contains no raw diff or provider secrets. */
+  decisionBrief?: ReviewDecisionBrief;
   /** True when the result was served from cache (#109) */
   cached?: boolean;
   /** Machine-readable cache metadata. Contains hashes/keys only, never raw provider or source context. */
@@ -144,6 +150,14 @@ export type { ReviewRunSummary };
 // ============================================================================
 // Session Result Artifacts
 // ============================================================================
+
+interface PipelineTimeoutContext {
+  session?: SessionManager;
+  timedOut?: boolean;
+  timeoutMessage?: string;
+  controller?: AbortController;
+  signal?: AbortSignal;
+}
 
 async function persistTerminalResult(result: PipelineResult): Promise<PipelineResult> {
   if (result.date !== 'unknown' && result.sessionId !== 'unknown') {
@@ -235,13 +249,30 @@ export function applyPipelineTimeouts(
   }
 }
 
-function pipelineTimeoutResult(timeoutMs: number): PipelineResult {
-  return {
-    sessionId: 'unknown',
-    date: 'unknown',
+function formatTimeoutSeconds(timeoutMs: number): number {
+  return Math.max(1, Math.ceil(timeoutMs / 1000));
+}
+
+async function pipelineTimeoutResult(timeoutMs: number, context: PipelineTimeoutContext): Promise<PipelineResult> {
+  context.timedOut = true;
+  const session = context.session;
+  const result: PipelineResult = {
+    sessionId: session?.getSessionId() ?? 'unknown',
+    date: session?.getDate() ?? 'unknown',
     status: 'error',
-    error: `Pipeline timed out after ${Math.round(timeoutMs / 1000)}s`,
+    error: `Pipeline timed out after ${formatTimeoutSeconds(timeoutMs)}s`,
   };
+  context.timeoutMessage = result.error;
+  if (session) {
+    await session.setStatus('failed').catch(() => {});
+  }
+  return persistTerminalResult(result);
+}
+
+function throwIfPipelineTimedOut(context?: PipelineTimeoutContext): void {
+  if (context?.timedOut) {
+    throw new Error(context.timeoutMessage ?? 'Pipeline timed out');
+  }
 }
 
 // ============================================================================
@@ -284,26 +315,36 @@ function classifyReviewerFailure(message: string): ErrorKind | 'circuit-open' {
  * Run complete V3 pipeline
  */
 export async function runPipeline(input: PipelineInput, progress?: ProgressEmitter): Promise<PipelineResult> {
+  if (input.caRoot) {
+    const { caRoot, ...scopedInput } = input;
+    return withCaRoot(caRoot, () => runPipeline(scopedInput, progress));
+  }
+
   if (!input.timeoutMs) {
     return runPipelineInternal(input, progress);
   }
 
+  const timeoutContext: PipelineTimeoutContext = {};
+  const controller = new AbortController();
+  timeoutContext.controller = controller;
+  timeoutContext.signal = controller.signal;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<PipelineResult>((resolve) => {
     timeoutId = setTimeout(() => {
-      progress?.stageError(progress.getCurrentStage(), `Pipeline timed out after ${Math.round(input.timeoutMs! / 1000)}s`);
-      resolve(pipelineTimeoutResult(input.timeoutMs!));
+      progress?.stageError(progress.getCurrentStage(), `Pipeline timed out after ${formatTimeoutSeconds(input.timeoutMs!)}s`);
+      controller.abort();
+      void pipelineTimeoutResult(input.timeoutMs!, timeoutContext).then(resolve);
     }, input.timeoutMs);
   });
 
   try {
-    return await Promise.race([runPipelineInternal(input, progress), timeout]);
+    return await Promise.race([runPipelineInternal(input, progress, timeoutContext), timeout]);
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
   }
 }
 
-async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmitter): Promise<PipelineResult> {
+async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmitter, timeoutContext?: PipelineTimeoutContext): Promise<PipelineResult> {
   let session: SessionManager | undefined;
   // D-3: basic pipeline timing telemetry
   const telemetry = new PipelineTelemetry();
@@ -340,12 +381,20 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
 
     // Create session and register signal handlers for graceful cleanup
     session = await SessionManager.create(input.diffPath);
+    if (timeoutContext) timeoutContext.session = session;
     session.registerCleanup();
+    throwIfPipelineTimedOut(timeoutContext);
     const date = session.getDate();
     const sessionId = session.getSessionId();
+    progress?.stageUpdate('init', 10, `Session ${date}/${sessionId} created`, {
+      sessionDate: date,
+      sessionId,
+      sessionPath: session.getDir(),
+    });
 
     // Read diff
     const diffContent = await fs.readFile(input.diffPath, 'utf-8');
+    throwIfPipelineTimedOut(timeoutContext);
     const diffComplexity = estimateDiffComplexity(diffContent);
 
     // === SURROUNDING CONTEXT: Read source files for context-aware review ===
@@ -359,18 +408,22 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
         let currentContextLines = contextLinesCount;
 
         while (currentContextLines > 0) {
+          throwIfPipelineTimedOut(timeoutContext);
           const contextParts: string[] = [];
           for (const { file, ranges } of fileRanges) {
+            throwIfPipelineTimedOut(timeoutContext);
             const ctx = await readSurroundingContext(
               input.repoPath,
               file,
               ranges,
               currentContextLines
             );
+            throwIfPipelineTimedOut(timeoutContext);
             if (ctx) contextParts.push(ctx);
           }
 
           const combined = contextParts.join('\n\n');
+          throwIfPipelineTimedOut(timeoutContext);
           if (estimateTokens(combined) <= contextBudget || currentContextLines <= 2) {
             if (combined) surroundingContext = combined;
             break;
@@ -515,23 +568,40 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
     // Guard: empty diff produces no chunks
     if (chunks.length === 0) {
       await session.setStatus('completed');
+      const noCodeSummary: PipelineSummary = {
+        decision: 'ACCEPT' as const,
+        reasoning: 'No code changes detected in diff. Nothing to review.',
+        severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 0, WARNING: 0, SUGGESTION: 0 },
+        topIssues: [],
+        totalDiscussions: 0,
+        resolved: 0,
+        escalated: 0,
+        totalReviewers: 0,
+        forfeitedReviewers: 0,
+      };
       return persistTerminalResult({
         sessionId,
         date,
         status: 'success',
-        summary: {
-          decision: 'ACCEPT' as const,
-          reasoning: 'No code changes detected in diff. Nothing to review.',
-          severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 0, WARNING: 0, SUGGESTION: 0 },
-          topIssues: [],
-          totalDiscussions: 0,
-          resolved: 0,
-          escalated: 0,
-          totalReviewers: 0,
-          forfeitedReviewers: 0,
-        },
+        summary: noCodeSummary,
         evidenceDocs: [],
         discussions: [],
+        decisionBrief: {
+          decision: 'ACCEPT',
+          reviewedScope: {
+            files: [],
+            areas: [noCodeScope === 'empty' ? 'empty diff' : 'no reviewable source changes'],
+            contracts: [],
+            checks: ['no-code diff classification'],
+            uncertainty: 'No source-code review was required for this diff.',
+          },
+          completedChecks: ['no-code diff classification'],
+          evidenceCards: [],
+          requiredActions: [],
+          followUpCount: 0,
+          auditCount: 0,
+          demotedCount: 0,
+        },
       });
     }
 
@@ -555,12 +625,14 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
       } catch {
         // Pre-analysis failed — continue without enrichment
       }
+      throwIfPipelineTimedOut(timeoutContext);
     }
 
     // === L1 REVIEWERS: Chunk Processing ===
     progress?.stageStart('review', `Running reviewers across ${chunks.length} chunk(s)...`);
     const l1Start = Date.now();
-    const { allReviewResults, allReviewerInputs, forfeitFailures } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress, input.reviewerTimeoutMs);
+    const { allReviewResults, allReviewerInputs, forfeitFailures } = await executeL1Reviews(config, chunks, surroundingContext, projectContext, enrichedContext, progress, input.reviewerTimeoutMs, timeoutContext?.signal);
+    throwIfPipelineTimedOut(timeoutContext);
     const l1Elapsed = Date.now() - l1Start;
     for (const r of allReviewResults) {
       telemetry.record({
@@ -681,6 +753,7 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
       } catch {
         // Verification failure is non-fatal
       }
+      throwIfPipelineTimedOut(timeoutContext);
     }
 
     const thresholdResult = applyThreshold(allEvidenceDocs, config.discussion);
@@ -700,7 +773,13 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
       };
     } else {
       // === L2 MODERATOR: Run Discussions ===
-      progress?.stageStart('discuss', 'Moderating discussions...');
+      progress?.stageStart('discuss', `Moderating ${thresholdResult.discussions.length} discussion(s)...`);
+      progress?.stageUpdate(
+        'discuss',
+        5,
+        'L2 debate is running; local CLI supporters and devil\'s advocate can take several minutes.',
+        { total: thresholdResult.discussions.length },
+      );
       const discussionEmitter = input.discussionEmitter ?? new DiscussionEmitter();
       moderatorReport = await executeL2Discussions(
         config,
@@ -714,7 +793,9 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
         logger,
         enrichedContext,
         (call) => telemetry.record(call),
+        timeoutContext?.signal,
       );
+      throwIfPipelineTimedOut(timeoutContext);
       progress?.stageComplete('discuss', 'Discussions complete');
     }
 
@@ -737,71 +818,95 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
     if (input.skipHead) {
       // No L3 promoted-issue mutation in lightweight mode — safe to write here
       await writeModeratorReport(date, sessionId, moderatorReport);
+      throwIfPipelineTimedOut(timeoutContext);
       await session.setStatus('completed');
+      throwIfPipelineTimedOut(timeoutContext);
       progress?.stageComplete('verdict', 'Skipped (lightweight mode)');
       const severityCounts: Record<string, number> = {};
       for (const doc of allEvidenceDocs) {
         severityCounts[doc.severity] = (severityCounts[doc.severity] ?? 0) + 1;
       }
-      return persistTerminalResult({
+      const lightweightSummary: PipelineSummary = {
+        decision: 'NEEDS_HUMAN', reasoning: 'Lightweight mode — no head verdict',
+        totalReviewers: allReviewerInputs.length,
+        forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
+        severityCounts,
+        topIssues: allEvidenceDocs.slice(0, 5).map(d => ({ severity: d.severity, filePath: d.filePath, lineRange: d.lineRange, title: d.issueTitle, confidence: d.confidenceTrace?.final ?? d.confidence })),
+        totalDiscussions: moderatorReport.summary.totalDiscussions,
+        resolved: moderatorReport.summary.resolved,
+        escalated: moderatorReport.summary.escalated,
+      };
+      const reviewRun = buildReviewRunSummary({
+        config,
+        reviewerInputs: allReviewerInputs,
+        reviewResults: allReviewResults,
+        moderatorReport,
+        evidenceDocs: allEvidenceDocs,
+        suppressedIssues,
+        hallucinationRemoved,
+        hallucinationUncertain,
+        skipHead: true,
+        l2Skipped: !!input.skipDiscussion || config.discussion?.enabled === false,
+      });
+      const reviewQueues: ReviewQueues = {
+        suggestions: moderatorReport.suggestions,
+        unconfirmed: moderatorReport.unconfirmedIssues,
+        suppressed: suppressedIssues,
+        hallucinationRemoved,
+        hallucinationUncertain,
+      };
+      const performanceText = await generatePerformanceText(telemetry);
+      throwIfPipelineTimedOut(timeoutContext);
+      const lightweightResult = await persistTerminalResult({
         sessionId, date, status: 'success',
-        summary: {
-          decision: 'NEEDS_HUMAN', reasoning: 'Lightweight mode — no head verdict',
-          totalReviewers: allReviewerInputs.length,
-          forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
-          severityCounts,
-          topIssues: allEvidenceDocs.slice(0, 5).map(d => ({ severity: d.severity, filePath: d.filePath, lineRange: d.lineRange, title: d.issueTitle, confidence: d.confidenceTrace?.final ?? d.confidence })),
-          totalDiscussions: moderatorReport.summary.totalDiscussions,
-          resolved: moderatorReport.summary.resolved,
-          escalated: moderatorReport.summary.escalated,
-        },
+        summary: lightweightSummary,
         evidenceDocs: allEvidenceDocs,
         discussions: moderatorReport.discussions,
         roundsPerDiscussion: moderatorReport.roundsPerDiscussion,
-        performanceText: await generatePerformanceText(telemetry),
+        performanceText,
         diffComplexity,
         reviewerMap: buildReviewerMap(allReviewResults),
         reviewerOpinions: buildReviewerOpinions(allReviewResults),
         devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
         supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
-        reviewRun: buildReviewRunSummary({
-          config,
-          reviewerInputs: allReviewerInputs,
-          reviewResults: allReviewResults,
-          moderatorReport,
+        reviewRun,
+        reviewQueues,
+        decisionBrief: buildReviewDecisionBrief({
+          summary: lightweightSummary,
           evidenceDocs: allEvidenceDocs,
-          suppressedIssues,
-          hallucinationRemoved,
-          hallucinationUncertain,
-          skipHead: true,
-          l2Skipped: !!input.skipDiscussion || config.discussion?.enabled === false,
+          moderatorReport,
+          reviewRun,
+          reviewQueues,
+          enrichedContext,
+          diffComplexity,
         }),
-        reviewQueues: {
-          suggestions: moderatorReport.suggestions,
-          unconfirmed: moderatorReport.unconfirmedIssues,
-          suppressed: suppressedIssues,
-          hallucinationRemoved,
-          hallucinationUncertain,
-        },
       });
+      throwIfPipelineTimedOut(timeoutContext);
+      return lightweightResult;
     }
 
     // === L3 HEAD: Final Verdict ===
     progress?.stageStart('verdict', 'Generating verdict...');
-    const headVerdict = await executeL3Verdict(config, moderatorReport, (call) => telemetry.record(call));
+    const headVerdict = await executeL3Verdict(config, moderatorReport, (call) => telemetry.record(call), timeoutContext?.signal);
+    throwIfPipelineTimedOut(timeoutContext);
     // Write moderator report AFTER L3 promoted-issue mutation (#299)
     await writeModeratorReport(date, sessionId, moderatorReport);
+    throwIfPipelineTimedOut(timeoutContext);
     await writeHeadVerdict(date, sessionId, headVerdict);
+    throwIfPipelineTimedOut(timeoutContext);
     progress?.stageComplete('verdict', 'Verdict complete');
 
     // === QUALITY TRACKING: Finalize rewards and persist bandit state ===
     await recordTelemetry(qualityTracker, sessionId, logger);
+    throwIfPipelineTimedOut(timeoutContext);
 
     // Flush logs
     await logger.flush();
+    throwIfPipelineTimedOut(timeoutContext);
 
     // Complete session
     await session.setStatus('completed');
+    throwIfPipelineTimedOut(timeoutContext);
 
     // Build summary from pipeline data
     const severityCounts: Record<string, number> = {};
@@ -822,50 +927,66 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
 
     progress?.pipelineComplete('Done!');
 
+    const summary: PipelineSummary = {
+      decision: headVerdict.decision,
+      reasoning: headVerdict.reasoning,
+      totalReviewers: allReviewerInputs.length,
+      forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
+      severityCounts,
+      topIssues,
+      totalDiscussions: moderatorReport.summary.totalDiscussions,
+      resolved: moderatorReport.summary.resolved,
+      escalated: moderatorReport.summary.escalated,
+      questionsForHuman: headVerdict.questionsForHuman,
+    };
+    const reviewRun = buildReviewRunSummary({
+      config,
+      reviewerInputs: allReviewerInputs,
+      reviewResults: allReviewResults,
+      moderatorReport,
+      evidenceDocs: allEvidenceDocs,
+      suppressedIssues,
+      hallucinationRemoved,
+      hallucinationUncertain,
+      l2Skipped: !!input.skipDiscussion || config.discussion?.enabled === false,
+    });
+    const reviewQueues: ReviewQueues = {
+      suggestions: moderatorReport.suggestions,
+      unconfirmed: moderatorReport.unconfirmedIssues,
+      suppressed: suppressedIssues,
+      hallucinationRemoved,
+      hallucinationUncertain,
+    };
+    const performanceText = await generatePerformanceText(telemetry);
+    throwIfPipelineTimedOut(timeoutContext);
+
     const pipelineResult: PipelineResult = {
       sessionId,
       date,
       status: 'success',
-      summary: {
-        decision: headVerdict.decision,
-        reasoning: headVerdict.reasoning,
-        totalReviewers: allReviewerInputs.length,
-        forfeitedReviewers: allReviewResults.filter(r => r.status === 'forfeit').length,
-        severityCounts,
-        topIssues,
-        totalDiscussions: moderatorReport.summary.totalDiscussions,
-        resolved: moderatorReport.summary.resolved,
-        escalated: moderatorReport.summary.escalated,
-        questionsForHuman: headVerdict.questionsForHuman,
-      },
+      summary,
       evidenceDocs: allEvidenceDocs,
       discussions: moderatorReport.discussions,
       roundsPerDiscussion: moderatorReport.roundsPerDiscussion,
-      performanceText: await generatePerformanceText(telemetry),
+      performanceText,
       diffComplexity,
       devilsAdvocateStats: trackDA(config, moderatorReport),
       reviewerMap: buildReviewerMap(allReviewResults),
       reviewerOpinions: buildReviewerOpinions(allReviewResults),
       devilsAdvocateId: config.supporters?.devilsAdvocate?.enabled ? config.supporters.devilsAdvocate.id : undefined,
       supporterModelMap: config.supporters ? buildSupporterModelMap(config.supporters) : undefined,
-      reviewRun: buildReviewRunSummary({
-        config,
-        reviewerInputs: allReviewerInputs,
-        reviewResults: allReviewResults,
-        moderatorReport,
+      reviewRun,
+      reviewQueues,
+      decisionBrief: buildReviewDecisionBrief({
+        summary,
+        headVerdict,
         evidenceDocs: allEvidenceDocs,
-        suppressedIssues,
-        hallucinationRemoved,
-        hallucinationUncertain,
-        l2Skipped: !!input.skipDiscussion || config.discussion?.enabled === false,
+        moderatorReport,
+        reviewRun,
+        reviewQueues,
+        enrichedContext,
+        diffComplexity,
       }),
-      reviewQueues: {
-        suggestions: moderatorReport.suggestions,
-        unconfirmed: moderatorReport.unconfirmedIssues,
-        suppressed: suppressedIssues,
-        hallucinationRemoved,
-        hallucinationUncertain,
-      },
       cache: {
         schemaVersion: cacheContext.schemaVersion,
         key: cacheKey,
@@ -875,6 +996,7 @@ async function runPipelineInternal(input: PipelineInput, progress?: ProgressEmit
 
     // === CACHE: Persist result and update cache index (#109) ===
     await persistResultCache(date, sessionId, cacheKey, pipelineResult, !!input.noCache);
+    throwIfPipelineTimedOut(timeoutContext);
 
     return pipelineResult;
   } catch (error) {

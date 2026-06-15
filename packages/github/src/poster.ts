@@ -292,20 +292,10 @@ export async function postReview(
     });
   }
 
-  // Determine verdict from event and body content
-  let verdict: PostResult['verdict'];
-  if (safeReview.event === 'REQUEST_CHANGES') {
-    verdict = 'REJECT';
-  } else if (safeReview.body.includes('NEEDS HUMAN REVIEW')) {
-    verdict = 'NEEDS_HUMAN';
-  } else {
-    verdict = 'ACCEPT';
-  }
-
   return {
     reviewId: data.id,
     reviewUrl: data.html_url,
-    verdict,
+    verdict: safeReview.verdict,
   };
 }
 

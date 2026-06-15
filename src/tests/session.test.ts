@@ -7,22 +7,26 @@ import { SessionManager } from '@codeagora/core/session/manager.js';
 import { readSessionMetadata, getSessionDir } from '@codeagora/shared/utils/fs.js';
 import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
 
 describe('SessionManager', () => {
   const testDiffPath = '/tmp/test-diff.txt';
+  const previousCaRoot = process.env['CODEAGORA_CA_ROOT'];
+  let tmpRoot: string;
 
   beforeEach(async () => {
-    // Cleanup before each test
-    try {
-      await fs.rm('.ca', { recursive: true, force: true });
-    } catch {}
+    tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codeagora-session-test-'));
+    process.env['CODEAGORA_CA_ROOT'] = path.join(tmpRoot, '.ca');
   });
 
   afterEach(async () => {
-    // Cleanup test sessions
-    try {
-      await fs.rm('.ca', { recursive: true, force: true });
-    } catch {}
+    if (previousCaRoot === undefined) {
+      delete process.env['CODEAGORA_CA_ROOT'];
+    } else {
+      process.env['CODEAGORA_CA_ROOT'] = previousCaRoot;
+    }
+    await fs.rm(tmpRoot, { recursive: true, force: true });
   });
 
   it('should create a new session', async () => {

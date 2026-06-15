@@ -26,4 +26,15 @@ describe('CLI help ↔ docs parity', () => {
     // If any flags are missing from the docs, surface them in a helpful message
     expect(missing, `The following review flags are not documented in docs/for-users/CLI_REFERENCE.md: ${missing.join(', ')}`).toHaveLength(0);
   });
+
+  it('documents both normal and quick review timeout defaults', () => {
+    const program = new Command();
+    registerReviewCommand(program);
+    const reviewCmd = program.commands.find((c) => c.name() === 'review');
+    expect(reviewCmd).toBeDefined();
+
+    const timeoutOption = reviewCmd!.options.find((option) => option.long === '--timeout');
+    expect(timeoutOption?.description).toContain('default 1800');
+    expect(timeoutOption?.description).toContain('600 with --quick');
+  });
 });

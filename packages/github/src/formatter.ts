@@ -4,7 +4,7 @@
  * Extracted from mapper.ts to separate formatting/rendering from mapping logic.
  */
 
-import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion, ReviewDecisionBrief, ReviewDecisionEvidenceCard } from '@codeagora/core/types/core.js';
 import type { PipelineSummary, ReviewQueues, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 import { triageDocs } from '@codeagora/shared/utils/triage.js';
@@ -178,11 +178,21 @@ function formatSummaryTriageCounts(triage: ReturnType<typeof triageDocs>, discus
 }
 
 function formatLocation(doc: EvidenceDocument): string {
+  if (!doc.filePath) return 'unknown';
+  if (!doc.lineRange || typeof doc.lineRange[0] !== 'number') return doc.filePath;
   return `${doc.filePath}:${doc.lineRange[0]}`;
 }
 
 function firstEvidence(doc: EvidenceDocument): string {
-  return doc.evidence.find((item) => item.trim().length > 0) ?? 'Inspect the referenced line and confirm the reported path.';
+  return Array.isArray(doc.evidence)
+    ? doc.evidence.find((item) => item.trim().length > 0) ?? 'Inspect the referenced line and confirm the reported path.'
+    : 'Inspect the referenced line and confirm the reported path.';
+}
+
+function rawFirstEvidence(doc: EvidenceDocument): string {
+  return Array.isArray(doc.evidence)
+    ? doc.evidence.find((item) => item.trim().length > 0)?.trim() ?? ''
+    : '';
 }
 
 function confidenceValueLabel(value: number | undefined): string {
@@ -341,21 +351,6 @@ function pushMergeDecisionContract(
   lines.push('');
 }
 
-function publicReviewDecision(
-  summary: PipelineSummary,
-  triage: ReturnType<typeof triageDocs>,
-  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
-  discussions: DiscussionVerdict[],
-): PipelineSummary['decision'] {
-  if (summary.decision === 'REJECT' || triage.mustFix.length > 0) {
-    return 'REJECT';
-  }
-  if (publicVerify.needsHuman.length > 0 || discussions.some(isNeedsHumanDiscussion)) {
-    return 'NEEDS_HUMAN';
-  }
-  return 'ACCEPT';
-}
-
 function pushTopMaintainerActionList(
   lines: string[],
   triage: ReturnType<typeof triageDocs>,
@@ -500,7 +495,226 @@ function pushDiscussionEvidenceCards(lines: string[], discussions: DiscussionVer
   }
 }
 
-function suggestedCommandForPath(filePath: string, issueTitle = ''): string | null {
+function cardMissingFields(card: Omit<ReviewDecisionEvidenceCard, 'complete' | 'missing'>): string[] {
+  const missing: string[] = [];
+  if (!card.filePath || card.filePath === 'unknown' || !card.lineRange || typeof card.lineRange[0] !== 'number' || card.lineRange[0] <= 0) {
+    missing.push('exact file/line');
+  }
+  if (!(card.diffFact ?? '').trim()) missing.push('concrete diff fact');
+  if (!(card.affectedContract ?? '').trim()) missing.push('affected contract/caller/invariant');
+  if (!(card.check ?? '').trim()) missing.push('deterministic check or repro command');
+  if (!(card.expectedActual ?? '').trim() && !(card.decisionRule ?? '').trim()) {
+    missing.push('expected/actual or decision rule');
+  }
+  return missing;
+}
+
+function briefCardFromDoc(doc: EvidenceDocument, kind: ReviewDecisionEvidenceCard['kind']): ReviewDecisionEvidenceCard {
+  const base = {
+    kind,
+    source: 'evidence' as const,
+    title: doc.issueTitle,
+    severity: doc.severity,
+    filePath: doc.filePath,
+    lineRange: doc.lineRange,
+    confidence: doc.confidenceTrace?.final ?? doc.confidence,
+    diffFact: rawFirstEvidence(doc),
+    affectedContract: doc.problem,
+    check: suggestedReproCommand(doc),
+    expectedActual: doc.suggestion
+      ? `Expected: ${truncateResponse(doc.suggestion, 160)}; actual: ${truncateResponse(rawFirstEvidence(doc), 160)}`
+      : undefined,
+    decisionRule: kind === 'must-fix'
+      ? 'Keep REJECT only if the focused check confirms this contract break.'
+      : 'Keep NEEDS_HUMAN only if the focused check cannot confirm the intended contract.',
+  };
+  const missing = cardMissingFields(base);
+  return { ...base, complete: missing.length === 0, missing };
+}
+
+function buildFallbackDecisionBrief(
+  summary: PipelineSummary,
+  triage: ReturnType<typeof triageDocs>,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+  evidenceDocs: EvidenceDocument[],
+  run?: ReviewRunSummary,
+): ReviewDecisionBrief {
+  const mustFixCards = triage.mustFix.map((doc) => briefCardFromDoc(doc, 'must-fix'));
+  const humanCards = [
+    ...publicVerify.needsHuman.map((doc) => briefCardFromDoc(doc, 'human-gate')),
+    ...discussions.filter(isNeedsHumanDiscussion).map((discussion) => {
+      const doc = findEvidenceForDiscussion(discussion, evidenceDocs);
+      const base = {
+        kind: 'human-gate' as const,
+        source: 'discussion' as const,
+        title: `${discussion.discussionId} human-gated discussion`,
+        severity: discussion.finalSeverity,
+        filePath: discussion.filePath,
+        lineRange: discussion.lineRange,
+        confidence: discussion.avgConfidence,
+        diffFact: doc ? rawFirstEvidence(doc) : discussion.reasoning,
+        affectedContract: doc?.problem ?? discussion.reasoning,
+        check: suggestedDiscussionCommand(discussion),
+        expectedActual: doc?.suggestion
+          ? `Expected: ${truncateResponse(doc.suggestion, 160)}; actual: ${truncateResponse(rawFirstEvidence(doc), 160)}`
+          : undefined,
+        decisionRule: 'Pass removes the human gate; fail keeps the pre-merge gate until fixed.',
+      };
+      const missing = cardMissingFields(base);
+      return { ...base, complete: missing.length === 0, missing };
+    }),
+  ];
+  const completeMustFix = mustFixCards.filter((card) => card.complete);
+  const completeHuman = humanCards.filter((card) => card.complete);
+  const decision: PipelineSummary['decision'] = completeMustFix.length > 0
+    ? 'REJECT'
+    : completeHuman.length > 0
+      ? 'NEEDS_HUMAN'
+      : 'ACCEPT';
+  const files = [...new Set(evidenceDocs.map((doc) => doc.filePath).filter((file) => file && file !== 'unknown'))].slice(0, 6);
+  const completedChecks = [
+    run ? `L1 reviewers completed ${run.l1.completed}/${run.l1.configured}` : `${summary.totalReviewers} reviewer(s) completed`,
+    run?.l2.skipped ? 'L2 discussion skipped by configuration' : `L2 discussions completed (${summary.totalDiscussions})`,
+    run?.l3.skipped ? 'L3 head verdict skipped' : 'L3 head verdict completed',
+    'hallucination filter applied',
+    'confidence and triage thresholds applied',
+  ];
+  const demotedCount = [...mustFixCards, ...humanCards].filter((card) => !card.complete).length;
+  return {
+    decision,
+    reviewedScope: {
+      files,
+      areas: files.length > 0 ? ['changed files with reviewer findings'] : ['reviewed PR diff'],
+      contracts: evidenceDocs.slice(0, 3).map((doc) => truncateResponse(doc.problem, 96)),
+      checks: completedChecks,
+      uncertainty: 'Non-promoted findings remain follow-up/audit only unless reproduced with complete evidence.',
+    },
+    completedChecks,
+    evidenceCards: decision === 'REJECT' ? completeMustFix : completeHuman,
+    requiredActions: (decision === 'REJECT' ? completeMustFix : completeHuman)
+      .map((card) => `${card.kind === 'must-fix' ? 'Fix' : 'Confirm'} ${card.filePath}:${card.lineRange[0]} ${card.title}`),
+    followUpCount: publicVerify.verify.length + publicVerify.needsRepro.length + publicVerify.speculative.length + triage.ignore.length + demotedCount,
+    auditCount: publicVerify.verify.length + publicVerify.needsRepro.length + publicVerify.speculative.length + triage.ignore.length + discussions.length + demotedCount,
+    demotedCount,
+  };
+}
+
+function cardMatchesDoc(card: ReviewDecisionEvidenceCard, doc: EvidenceDocument): boolean {
+  return card.filePath === doc.filePath &&
+    card.lineRange[0] <= doc.lineRange[1] &&
+    card.lineRange[1] >= doc.lineRange[0];
+}
+
+function cardMatchesActiveDiscussion(card: ReviewDecisionEvidenceCard, discussion: DiscussionVerdict): boolean {
+  return discussion.finalSeverity !== 'DISMISSED' &&
+    card.filePath === discussion.filePath &&
+    card.lineRange[0] <= discussion.lineRange[1] &&
+    card.lineRange[1] >= discussion.lineRange[0];
+}
+
+function requiredActionFromBriefCard(card: ReviewDecisionEvidenceCard): string {
+  const action = card.kind === 'must-fix' ? 'Fix' : 'Confirm';
+  return `${action} ${card.filePath}:${card.lineRange[0]} ${card.title}`;
+}
+
+function reconcileProvidedDecisionBrief(
+  brief: ReviewDecisionBrief,
+  evidenceDocs: EvidenceDocument[],
+  discussions: DiscussionVerdict[],
+): ReviewDecisionBrief {
+  const evidenceCards = brief.evidenceCards.filter((card) =>
+    card.source === 'discussion'
+      ? discussions.some((discussion) => cardMatchesActiveDiscussion(card, discussion))
+      : evidenceDocs.some((doc) => cardMatchesDoc(card, doc))
+  );
+  if (evidenceCards.length === brief.evidenceCards.length) return brief;
+
+  const decision: PipelineSummary['decision'] = evidenceCards.some((card) => card.kind === 'must-fix')
+    ? 'REJECT'
+    : evidenceCards.some((card) => card.kind === 'human-gate')
+      ? 'NEEDS_HUMAN'
+      : 'ACCEPT';
+  const removedCount = brief.evidenceCards.length - evidenceCards.length;
+  return {
+    ...brief,
+    decision,
+    evidenceCards,
+    requiredActions: evidenceCards.map(requiredActionFromBriefCard),
+    followUpCount: brief.followUpCount + removedCount,
+    auditCount: brief.auditCount + removedCount,
+    demotedCount: brief.demotedCount + removedCount,
+  };
+}
+
+export function resolveReviewDecisionBrief(params: {
+  summary: PipelineSummary;
+  evidenceDocs: EvidenceDocument[];
+  discussions: DiscussionVerdict[];
+  reviewRun?: ReviewRunSummary;
+  decisionBrief?: ReviewDecisionBrief;
+}): ReviewDecisionBrief {
+  if (params.decisionBrief) {
+    return reconcileProvidedDecisionBrief(params.decisionBrief, params.evidenceDocs, params.discussions);
+  }
+  const triage = triageDocs(params.evidenceDocs);
+  const publicVerify = splitPublicVerifyDocs(triage.verify);
+  return buildFallbackDecisionBrief(
+    params.summary,
+    triage,
+    publicVerify,
+    params.discussions,
+    params.evidenceDocs,
+    params.reviewRun,
+  );
+}
+
+function formatCompactList(items: string[], empty: string, maxItems = 3): string {
+  if (items.length === 0) return empty;
+  const visible = items.slice(0, maxItems).join('; ');
+  return items.length > maxItems ? `${visible}; +${items.length - maxItems} more` : visible;
+}
+
+function pushDecisionBriefTop(lines: string[], brief: ReviewDecisionBrief, summary: PipelineSummary): void {
+  const vb = VERDICT_BADGE[brief.decision] ?? { emoji: '\u2753', label: brief.decision };
+  lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
+  lines.push('');
+  lines.push(`**Decision:** ${brief.decision}`);
+  if (brief.decision !== summary.decision) {
+    lines.push(`**Head verdict adjusted for public gate:** ${summary.decision} -> ${brief.decision}; ${brief.demotedCount} item(s) lacked complete promotion evidence.`);
+  }
+  lines.push('');
+  lines.push('### Why This Verdict');
+  lines.push('');
+  lines.push(`- Scope reviewed: ${formatCompactList(brief.reviewedScope.areas, 'PR diff')} (${formatCompactList(brief.reviewedScope.files, 'no source files listed')}).`);
+  lines.push(`- Checks completed: ${formatCompactList(brief.completedChecks, 'review checks completed')}.`);
+  if (brief.decision === 'ACCEPT') {
+    lines.push(`- Gates: 0 promoted blockers, 0 promoted human gates; ${brief.followUpCount} follow-up/audit item(s) stay non-blocking.`);
+    lines.push(`- Uncertainty boundary: ${brief.reviewedScope.uncertainty}`);
+  } else {
+    for (const card of brief.evidenceCards.slice(0, 2)) {
+      lines.push(`- ${card.kind === 'must-fix' ? 'Must-fix' : 'Human gate'}: \`${card.filePath}:${card.lineRange[0]}\` ${card.title}`);
+      lines.push(`  - Diff: ${truncateResponse(card.diffFact, 140)}`);
+      lines.push(`  - Contract: ${truncateResponse(card.affectedContract, 140)}`);
+      lines.push(`  - Check: \`${card.check}\``);
+      lines.push(`  - Rule: ${truncateResponse(card.decisionRule, 140)}`);
+    }
+  }
+  lines.push('');
+  lines.push('### Required Action');
+  lines.push('');
+  if (brief.requiredActions.length === 0) {
+    lines.push('No pre-merge action required. Inspect the audit appendix only for optional follow-up or debugging.');
+  } else {
+    for (const action of brief.requiredActions.slice(0, 3)) {
+      lines.push(`- ${action}`);
+    }
+  }
+  lines.push('');
+}
+
+function suggestedCommandForPath(filePath?: string, issueTitle = ''): string | null {
+  if (!filePath) return null;
   if (/packages\/core\/src\/learning\/collector\.ts/.test(filePath)) {
     return 'pnpm vitest run packages/core/src/tests/learning-collector.test.ts';
   }
@@ -537,7 +751,8 @@ function commandLikeSnippet(text: string): string | null {
 function suggestedReproCommand(doc: EvidenceDocument): string {
   const pathCommand = suggestedCommandForPath(doc.filePath, doc.issueTitle);
   if (pathCommand) return pathCommand;
-  const haystack = [doc.problem, ...doc.evidence, doc.suggestion].join('\n');
+  const evidenceArray = Array.isArray(doc.evidence) ? doc.evidence : [];
+  const haystack = [doc.problem, ...evidenceArray, doc.suggestion].join('\n');
   const snippet = commandLikeSnippet(haystack);
   if (snippet) return snippet;
   return `Inspect ${formatLocation(doc)} and run the smallest command or test that exercises this path.`;
@@ -1000,6 +1215,8 @@ export function buildSummaryBody(params: {
   reviewRun?: ReviewRunSummary;
   /** Non-blocking and filtered queues retained for transparent reporting. */
   reviewQueues?: ReviewQueues;
+  /** Public decision brief with evidence-promotion results. */
+  decisionBrief?: ReviewDecisionBrief;
 }): string {
   const safeParams = redactDeep(params);
   const { summary, sessionId, sessionDate, evidenceDocs, discussions, questionsForHuman } = safeParams;
@@ -1007,17 +1224,28 @@ export function buildSummaryBody(params: {
 
   lines.push(MARKER);
   lines.push('');
-  // Unified header: verdict + triage
   const triage = triageDocs(evidenceDocs);
   const triageStr = formatSummaryTriageCounts(triage, discussions);
   const publicVerify = splitPublicVerifyDocs(triage.verify);
-  const publicDecision = publicReviewDecision(summary, triage, publicVerify, discussions);
-  const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
-  const vb = VERDICT_BADGE[publicDecision] ?? { emoji: '\u2753', label: publicDecision };
+  const decisionBrief = resolveReviewDecisionBrief({
+    summary,
+    evidenceDocs,
+    discussions,
+    reviewRun: safeParams.reviewRun,
+    decisionBrief: safeParams.decisionBrief,
+  });
+  const publicDecision = decisionBrief.decision;
 
-  lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
+  pushDecisionBriefTop(lines, decisionBrief, summary);
+  lines.push('<details>');
+  lines.push(`<summary>Review audit appendix (${triageStr})</summary>`);
   lines.push('');
-  lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
+  const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
+  if (metaParts) {
+    lines.push(`**Run:** ${metaParts}`);
+    lines.push('');
+  }
+  lines.push(`**${triageStr}**`);
   lines.push('');
   pushMergeDecisionContract(lines, publicDecision, triage, publicVerify, discussions);
   pushTopMaintainerActionList(lines, triage, publicVerify, discussions);
@@ -1235,6 +1463,9 @@ export function buildSummaryBody(params: {
     }
     lines.push('');
   }
+
+  lines.push('</details>');
+  lines.push('');
 
   // Footer
   lines.push('---');

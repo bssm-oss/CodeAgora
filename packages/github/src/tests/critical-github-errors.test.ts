@@ -26,6 +26,7 @@ function makeReview(overrides: Partial<GitHubReview> = {}): GitHubReview {
   return {
     commit_id: 'abc123',
     event: 'COMMENT',
+    verdict: 'ACCEPT',
     body: 'CodeAgora review.',
     comments: [],
     ...overrides,

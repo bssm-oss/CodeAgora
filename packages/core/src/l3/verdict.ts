@@ -26,6 +26,7 @@ export async function makeHeadVerdict(
   mode?: 'strict' | 'pragmatic',
   language?: 'en' | 'ko',
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<HeadVerdict> {
   if (isCleanModeratorReport(report)) {
     return ruleBasedVerdict(report, mode);
@@ -34,7 +35,7 @@ export async function makeHeadVerdict(
   // Try LLM-based verdict if configured
   if (headConfig?.enabled !== false && headConfig?.model) {
     try {
-      return applyHeadVerdictSafety(await llmVerdict(report, headConfig, language, onBackendCall), report);
+      return applyHeadVerdictSafety(await llmVerdict(report, headConfig, language, onBackendCall, signal), report);
     } catch {
       // Fallback to rule-based on any LLM failure
     }
@@ -48,6 +49,7 @@ async function llmVerdict(
   config: HeadConfig,
   language?: 'en' | 'ko',
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<HeadVerdict> {
   const { executeBackend } = await import('../l1/backend.js');
   const { retryOnError } = await import('@codeagora/shared/utils/recovery.js');
@@ -65,6 +67,7 @@ async function llmVerdict(
           provider: config.provider,
           prompt,
           timeout: config.timeout ?? 120,
+          signal,
           temperature: 0.2,
           maxOutputTokens: config.maxOutputTokens,
           onUsage: (nextUsage) => { usage = nextUsage; },

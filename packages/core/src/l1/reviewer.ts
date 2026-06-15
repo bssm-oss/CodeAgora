@@ -114,6 +114,35 @@ const _defaultHealthMonitor = new HealthMonitor();
 export interface ExecuteReviewersOptions {
   circuitBreaker?: CircuitBreaker;
   healthMonitor?: HealthMonitor;
+  signal?: AbortSignal;
+}
+
+function makeAbortError(): Error {
+  const error = new Error('Review execution aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw makeAbortError();
+  }
+}
+
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(makeAbortError());
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /**
@@ -137,7 +166,7 @@ export async function executeReviewers(
   for (let i = 0; i < inputs.length; i += concurrency) {
     const batch = inputs.slice(i, i + concurrency);
     const batchResults = await Promise.allSettled(
-      batch.map((input) => executeReviewerWithGuards(input, maxRetries, cb, hm))
+      batch.map((input) => executeReviewerWithGuards(input, maxRetries, cb, hm, options.signal))
     );
 
     for (let j = 0; j < batchResults.length; j++) {
@@ -182,7 +211,8 @@ async function executeReviewerWithGuards(
   input: ReviewerInput,
   retries: number,
   cb: CircuitBreaker,
-  hm: HealthMonitor
+  hm: HealthMonitor,
+  signal?: AbortSignal,
 ): Promise<ReviewOutput> {
   const { config, groupName, diffContent, prSummary, surroundingContext } = input;
   const startedAt = Date.now();
@@ -273,7 +303,10 @@ async function executeReviewerWithGuards(
   const diffFilePaths = extractFileListFromDiff(diffContent);
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    throwIfAborted(signal);
     const controller = new AbortController();
+    const abortAttempt = () => controller.abort();
+    signal?.addEventListener('abort', abortAttempt, { once: true });
     const timeoutId = setTimeout(() => controller.abort(), config.timeout * 1000);
 
     try {
@@ -316,6 +349,19 @@ async function executeReviewerWithGuards(
         usage,
       };
     } catch (error) {
+      if (signal?.aborted) {
+        return {
+          reviewerId: config.id,
+          model: config.model,
+          provider: config.provider ?? config.backend,
+          group: groupName,
+          evidenceDocs: [],
+          rawResponse: '',
+          status: 'forfeit',
+          error: 'Review execution aborted',
+          latencyMs: elapsed(),
+        };
+      }
       if (error instanceof CircuitOpenError) {
         return {
           reviewerId: config.id,
@@ -363,16 +409,18 @@ async function executeReviewerWithGuards(
         const delay = classification.kind === 'rate-limited'
           ? (classification.retryAfterMs ?? 5000)
           : 1000 * (attempt + 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await sleep(delay, signal);
       }
     } finally {
       clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', abortAttempt);
     }
   }
 
   // All retries failed — try fallback chain if configured
   const fallbacks = normalizeFallbacks(config.fallback);
   for (const fb of fallbacks) {
+    throwIfAborted(signal);
     const fallbackProvider = fb.provider;
     const useFallbackGuards = !!fallbackProvider;
 
@@ -390,6 +438,7 @@ async function executeReviewerWithGuards(
         provider: fb.provider,
         prompt: fullPrompt,
         timeout: config.timeout,
+        signal,
         temperature: config.temperature,
         maxOutputTokens: fb.maxOutputTokens ?? config.maxOutputTokens,
         onUsage: captureUsage,
@@ -419,6 +468,19 @@ async function executeReviewerWithGuards(
         usage,
       };
     } catch (fbError) {
+      if (signal?.aborted) {
+        return {
+          reviewerId: config.id,
+          model: fb.model,
+          provider: fb.provider ?? fb.backend,
+          group: groupName,
+          evidenceDocs: [],
+          rawResponse: '',
+          status: 'forfeit',
+          error: 'Review execution aborted',
+          latencyMs: elapsed(),
+        };
+      }
       // Only record transient errors as CB failures (not 429 rate limits)
       if (useFallbackGuards) {
         const fbClass = classifyError(fbError);

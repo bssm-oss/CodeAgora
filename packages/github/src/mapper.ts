@@ -6,13 +6,14 @@
  * This module handles structural mapping: evidence docs → review comments, pipeline → review payload.
  */
 
-import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion, ReviewDecisionBrief } from '@codeagora/core/types/core.js';
 import type { GitHubReview, GitHubReviewComment, DiffPositionIndex } from './types.js';
 import { resolveLineRange } from './diff-parser.js';
 import type { PipelineSummary, ReviewQueues, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import {
   mapToInlineCommentBody,
   buildSummaryBody,
+  resolveReviewDecisionBrief,
   truncateReviewBody,
   MAX_REVIEW_BODY_CHARS,
   MAX_COMMENT_BODY_CHARS,
@@ -31,6 +32,7 @@ export {
   buildTriageDigest,
   mapToInlineCommentBody,
   buildSummaryBody,
+  resolveReviewDecisionBrief,
   buildReviewBadgeUrl,
 } from './formatter.js';
 export type { MapperOptions } from './formatter.js';
@@ -49,6 +51,30 @@ function findDiscussionForDoc(
 
 function isDismissedByDiscussion(doc: EvidenceDocument, discussions: DiscussionVerdict[]): boolean {
   return findDiscussionForDoc(doc, discussions)?.finalSeverity === 'DISMISSED';
+}
+
+function rangesOverlap(a: [number, number], b: [number, number]): boolean {
+  return a[0] <= b[1] && a[1] >= b[0];
+}
+
+function docsForPublicDecision(
+  docs: EvidenceDocument[],
+  decisionBrief: ReviewDecisionBrief,
+): EvidenceDocument[] {
+  if (decisionBrief.decision === 'ACCEPT') return [];
+
+  const promotedCards = decisionBrief.evidenceCards.filter((card) =>
+    card.complete &&
+    (decisionBrief.decision === 'REJECT' ? card.kind === 'must-fix' : card.kind === 'human-gate')
+  );
+  if (promotedCards.length === 0) return [];
+
+  return docs.filter((doc) =>
+    promotedCards.some((card) =>
+      card.filePath === doc.filePath &&
+      rangesOverlap(card.lineRange, doc.lineRange)
+    )
+  );
 }
 
 // ============================================================================
@@ -157,14 +183,24 @@ export function mapToGitHubReview(params: {
   reviewRun?: ReviewRunSummary;
   /** Non-blocking and filtered queues retained for transparent reporting. */
   reviewQueues?: ReviewQueues;
+  /** Public decision brief with evidence-promotion results. */
+  decisionBrief?: ReviewDecisionBrief;
 }): GitHubReview {
-  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues } =
+  const { summary, evidenceDocs, discussions, positionIndex, headSha, sessionId, sessionDate, reviewerMap, questionsForHuman, options, performanceText, roundsPerDiscussion, suppressedIssues, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues, decisionBrief } =
     params;
 
   const activeDocs = evidenceDocs.filter((doc) => !isDismissedByDiscussion(doc, discussions));
+  const resolvedDecisionBrief = resolveReviewDecisionBrief({
+    summary,
+    evidenceDocs: activeDocs,
+    discussions,
+    reviewRun,
+    decisionBrief,
+  });
 
-  const comments = buildReviewComments(activeDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap);
-  let body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues });
+  const publicCommentDocs = docsForPublicDecision(activeDocs, resolvedDecisionBrief);
+  const comments = buildReviewComments(publicCommentDocs, discussions, positionIndex, reviewerMap, options, roundsPerDiscussion, minConfidence, reviewerOpinions, devilsAdvocateId, supporterModelMap);
+  let body = buildSummaryBody({ summary, sessionId, sessionDate, evidenceDocs: activeDocs, discussions, questionsForHuman, performanceText, roundsPerDiscussion, suppressedIssues, devilsAdvocateId, supporterModelMap, reviewRun, reviewQueues, decisionBrief: resolvedDecisionBrief });
 
   // Enforce GitHub char limits (#268)
   if (body.length > MAX_REVIEW_BODY_CHARS) {
@@ -178,13 +214,15 @@ export function mapToGitHubReview(params: {
 
   // Determine event from head verdict decision (#258)
   const event: GitHubReview['event'] =
-    summary.decision === 'REJECT' ? 'REQUEST_CHANGES' :
-    summary.decision === 'ACCEPT' ? 'APPROVE' :
+    resolvedDecisionBrief.decision === 'REJECT' ? 'REQUEST_CHANGES' :
+    resolvedDecisionBrief.decision === 'ACCEPT' ? 'APPROVE' :
     'COMMENT';
+  const verdict = resolvedDecisionBrief.decision;
 
   return {
     commit_id: headSha,
     event,
+    verdict,
     body,
     comments,
   };

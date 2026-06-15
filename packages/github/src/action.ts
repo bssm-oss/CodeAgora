@@ -35,6 +35,7 @@ import {
   writeDocumentedActionOutputs,
 } from './action-reporting.js';
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import type { GitHubCommitStatusVerdict } from './types.js';
 
 const DEFAULT_SARIF_OUTPUT_PATH = '/tmp/codeagora-results.sarif';
 
@@ -337,6 +338,7 @@ async function main(): Promise<void> {
       : undefined,
     reviewRun: result.reviewRun,
     reviewQueues: result.reviewQueues,
+    decisionBrief: result.decisionBrief,
     options: {
       postSuggestions: ghIntegration?.postSuggestions,
       collapseDiscussions: ghIntegration?.collapseDiscussions,
@@ -345,7 +347,8 @@ async function main(): Promise<void> {
   });
 
   let reviewUrl = '';
-  let postedVerdict = result.summary.decision;
+  let postedVerdict: GitHubCommitStatusVerdict = review.verdict;
+  let forceDegradedVerdict = false;
 
   if (githubWritesAllowed) {
     console.log('::group::Posting review to GitHub');
@@ -401,6 +404,7 @@ async function main(): Promise<void> {
         const message = err instanceof Error ? err.message : String(err);
         logActionDiagnostic('GitHub posting degraded', 'github-post-failed', message);
         markActionDegraded('github-post-failed');
+        forceDegradedVerdict = true;
         writeActionSummary('degraded', 'github-post-failed', message);
       }
       console.log('::endgroup::');
@@ -424,15 +428,18 @@ async function main(): Promise<void> {
   );
 
   // Set outputs
+  if (forceDegradedVerdict) {
+    postedVerdict = 'DEGRADED';
+  }
   writeDocumentedActionOutputs({
-    verdict: result.summary.decision,
+    verdict: postedVerdict,
     reviewUrl,
     sessionId: result.sessionId,
     sarifFile,
   });
 
   if (reviewUrl) console.log(`Review posted: ${reviewUrl}`);
-  console.log(`Verdict: ${result.summary.decision}`);
+  console.log(`Verdict: ${postedVerdict}`);
 
   // Exit with failure if REJECT and failOnReject is enabled
   if (postedVerdict === 'REJECT' && inputs.failOnReject) {

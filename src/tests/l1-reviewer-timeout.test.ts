@@ -148,6 +148,24 @@ describe('executeReviewers — timeout policy', () => {
     expect(signals[1]).not.toBe(signals[2]);
   });
 
+  it('should stop retrying when an external pipeline signal aborts', async () => {
+    const controller = new AbortController();
+    mockExecuteBackend.mockImplementationOnce(async () => {
+      controller.abort();
+      throw new DOMException('aborted by pipeline timeout', 'AbortError');
+    });
+
+    const results = await executeReviewers([makeInput()], 2, 5, {
+      ...freshOptions(),
+      signal: controller.signal,
+    });
+    const result = results[0];
+
+    expect(result.status).toBe('forfeit');
+    expect(result.error).toBe('Review execution aborted');
+    expect(mockExecuteBackend).toHaveBeenCalledTimes(1);
+  });
+
   it('should clear the timeout when backend resolves (no timer leak)', async () => {
     const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     mockExecuteBackend.mockResolvedValueOnce(MOCK_RESPONSE);

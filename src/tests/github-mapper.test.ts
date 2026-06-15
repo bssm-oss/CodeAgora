@@ -5,7 +5,7 @@ import {
   buildSummaryBody,
   mapToGitHubReview,
 } from '@codeagora/github/mapper.js';
-import type { EvidenceDocument, DiscussionVerdict } from '@codeagora/core/types/core.js';
+import type { EvidenceDocument, DiscussionVerdict, ReviewDecisionBrief } from '@codeagora/core/types/core.js';
 import type { DiffPositionIndex } from '@codeagora/github/types.js';
 import type { PipelineSummary, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 
@@ -85,6 +85,38 @@ const makeReviewRun = (overrides?: Partial<ReviewRunSummary>): ReviewRunSummary 
   degradedReasons: [],
   ...overrides,
 });
+
+const makeDecisionBrief = (overrides?: Partial<ReviewDecisionBrief>): ReviewDecisionBrief => ({
+  decision: 'ACCEPT',
+  reviewedScope: {
+    files: ['packages/github/src/formatter.ts'],
+    areas: ['logic changes'],
+    contracts: ['GitHub review body contract'],
+    checks: ['file classification', 'impact analysis', 'TypeScript diagnostics sweep'],
+    uncertainty: 'Non-promoted findings remain follow-up/audit only unless reproduced with complete evidence.',
+  },
+  completedChecks: [
+    'L1 reviewers completed 5/5',
+    'L2 discussions completed (0)',
+    'L3 head verdict completed',
+    'hallucination filter applied',
+    'confidence and triage thresholds applied',
+  ],
+  evidenceCards: [],
+  requiredActions: [],
+  followUpCount: 0,
+  auditCount: 0,
+  demotedCount: 0,
+  ...overrides,
+});
+
+function publicBodyBeforeAppendix(body: string): string {
+  return body.split('<details>')[0] ?? body;
+}
+
+function nonEmptyLineCount(text: string): number {
+  return text.split('\n').filter((line) => line.trim().length > 0).length;
+}
 
 describe('mapToInlineCommentBody', () => {
   it('includes severity badge, problem, evidence, and suggestion', () => {
@@ -210,6 +242,133 @@ describe('buildReviewComments', () => {
 });
 
 describe('buildSummaryBody', () => {
+  it('renders the first screen in Decision -> Why -> Action order within the line budget', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({
+        decision: 'ACCEPT',
+        reasoning: 'No promoted blockers remained.',
+        severityCounts: {},
+        totalDiscussions: 0,
+      }),
+      sessionId: '000-quality-accept',
+      sessionDate: '2026-06-15',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun(),
+      decisionBrief: makeDecisionBrief({
+        followUpCount: 2,
+        auditCount: 2,
+      }),
+    });
+
+    const publicBody = publicBodyBeforeAppendix(body);
+    expect(publicBody.indexOf('**Decision:** ACCEPT')).toBeLessThan(publicBody.indexOf('### Why This Verdict'));
+    expect(publicBody.indexOf('### Why This Verdict')).toBeLessThan(publicBody.indexOf('### Required Action'));
+    expect(nonEmptyLineCount(publicBody)).toBeLessThanOrEqual(25);
+    expect(nonEmptyLineCount(body.split('<summary>Review audit appendix')[0] ?? body)).toBeLessThanOrEqual(80);
+    expect(publicBody).toContain('0 promoted blockers, 0 promoted human gates');
+    expect(publicBody).not.toContain('no issues');
+  });
+
+  it('renders only complete decision-critical evidence cards in the public body', () => {
+    const card = {
+      kind: 'must-fix' as const,
+      source: 'evidence' as const,
+      title: 'GitHub review event requests changes without complete proof',
+      severity: 'CRITICAL' as const,
+      filePath: 'packages/github/src/mapper.ts',
+      lineRange: [151, 151] as [number, number],
+      confidence: 92,
+      diffFact: 'The review event is derived from the raw head verdict.',
+      affectedContract: 'GitHub Action must only request changes for promoted blockers.',
+      check: 'pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts',
+      expectedActual: 'Expected public decision controls event; actual raw verdict still controls event.',
+      decisionRule: 'Failing check keeps REJECT; passing check removes the blocker.',
+      complete: true,
+      missing: [],
+    };
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'REJECT', reasoning: 'A promoted blocker remains.' }),
+      sessionId: '000-quality-reject',
+      sessionDate: '2026-06-15',
+      evidenceDocs: [makeDoc({ filePath: card.filePath, lineRange: card.lineRange, confidence: 92 })],
+      discussions: [],
+      decisionBrief: makeDecisionBrief({
+        decision: 'REJECT',
+        evidenceCards: [card],
+        requiredActions: ['Fix packages/github/src/mapper.ts:151 GitHub review event requests changes without complete proof'],
+        followUpCount: 0,
+        auditCount: 0,
+      }),
+    });
+
+    const publicBody = publicBodyBeforeAppendix(body);
+    expect(publicBody).toContain('Must-fix: `packages/github/src/mapper.ts:151` GitHub review event requests changes without complete proof');
+    expect(publicBody).toContain('Diff: The review event is derived from the raw head verdict.');
+    expect(publicBody).toContain('Contract: GitHub Action must only request changes for promoted blockers.');
+    expect(publicBody).toContain('Check: `pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts`');
+    expect(publicBody).toContain('Rule: Failing check keeps REJECT; passing check removes the blocker.');
+    expect(nonEmptyLineCount(publicBody)).toBeLessThanOrEqual(25);
+  });
+
+  it('demotes evidence below the promotion standard out of the first-screen blocker decision', () => {
+    const weakDoc = makeDoc({
+      evidence: [],
+      confidence: 95,
+      issueTitle: 'Unbacked critical claim',
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'REJECT', reasoning: 'Head rejected, but evidence is incomplete.' }),
+      sessionId: '000-quality-demote',
+      sessionDate: '2026-06-15',
+      evidenceDocs: [weakDoc],
+      discussions: [],
+      reviewRun: makeReviewRun(),
+    });
+    const publicBody = publicBodyBeforeAppendix(body);
+
+    expect(publicBody).toContain('**Decision:** ACCEPT');
+    expect(publicBody).toContain('REJECT -> ACCEPT');
+    expect(publicBody).toContain('No pre-merge action required');
+    expect(publicBody).not.toContain('Must-fix:');
+    expect(body).toContain('### Must Fix');
+  });
+
+  it('keeps non-blocking queues and hallucination/audit detail out of the public decision area', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only diagnostics remain.' }),
+      sessionId: '000-quality-audit',
+      sessionDate: '2026-06-15',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 1,
+          unconfirmed: 0,
+          suppressed: 0,
+          hallucinationRemoved: 1,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [makeDoc({ severity: 'SUGGESTION', issueTitle: 'Optional rename' })],
+        unconfirmed: [],
+        suppressed: [],
+        hallucinationRemoved: [makeDoc({ issueTitle: 'Imaginary SQL injection' })],
+        hallucinationUncertain: [],
+      },
+      decisionBrief: makeDecisionBrief({ followUpCount: 2, auditCount: 2 }),
+    });
+    const publicBody = publicBodyBeforeAppendix(body);
+
+    expect(publicBody).not.toContain('Optional rename');
+    expect(publicBody).not.toContain('Imaginary SQL injection');
+    expect(publicBody).not.toContain('Non-blocking review queues');
+    expect(body).toContain('Non-blocking review queues (2)');
+    expect(body).toContain('Imaginary SQL injection');
+  });
+
   it('includes verdict and marker', () => {
     const body = buildSummaryBody({
       summary: makeSummary(),
@@ -693,6 +852,137 @@ describe('mapToGitHubReview', () => {
       sessionDate: '2026-03-16',
     });
     expect(review.event).toBe('APPROVE');
+  });
+
+  it('uses the promoted decision brief for the GitHub review event', () => {
+    const index: DiffPositionIndex = { 'src/db/queries.ts:42': 14 };
+    const review = mapToGitHubReview({
+      summary: makeSummary({ decision: 'REJECT', reasoning: 'Raw head verdict rejected.' }),
+      evidenceDocs: [makeDoc({ evidence: [] })],
+      discussions: [],
+      positionIndex: index,
+      headSha: 'event-contract',
+      sessionId: '002-event',
+      sessionDate: '2026-06-15',
+      decisionBrief: makeDecisionBrief({
+        decision: 'ACCEPT',
+        demotedCount: 1,
+        followUpCount: 1,
+        auditCount: 1,
+      }),
+    });
+
+    expect(review.event).toBe('APPROVE');
+    expect(review.verdict).toBe('ACCEPT');
+    expect(review.comments).toHaveLength(0);
+    expect(review.body).toContain('REJECT -> ACCEPT');
+  });
+
+  it('uses fallback public decision brief for the event when no decision brief is provided', () => {
+    const index: DiffPositionIndex = { 'src/db/queries.ts:42': 14 };
+    const review = mapToGitHubReview({
+      summary: makeSummary({ decision: 'REJECT', reasoning: 'Raw head verdict rejected.' }),
+      evidenceDocs: [makeDoc({ evidence: [] })],
+      discussions: [],
+      positionIndex: index,
+      headSha: 'fallback-event-contract',
+      sessionId: '002-fallback-event',
+      sessionDate: '2026-06-15',
+      reviewRun: makeReviewRun(),
+    });
+
+    expect(review.event).toBe('APPROVE');
+    expect(review.verdict).toBe('ACCEPT');
+    expect(review.comments).toHaveLength(0);
+    expect(review.body).toContain('REJECT -> ACCEPT');
+  });
+
+  it('keeps inline comments aligned to promoted decision-critical cards only', () => {
+    const critical = makeDoc();
+    const warning = makeDoc({
+      severity: 'WARNING',
+      issueTitle: 'Non-blocking logging cleanup',
+      problem: 'Logging could be clearer.',
+      evidence: ['console.log("debug") remains in the diff'],
+      suggestion: 'Consider structured logging later.',
+      filePath: 'src/db/queries.ts',
+      lineRange: [50, 50],
+      confidence: 72,
+    });
+    const review = mapToGitHubReview({
+      summary: makeSummary({ decision: 'REJECT', reasoning: 'Raw head verdict rejected.' }),
+      evidenceDocs: [critical, warning],
+      discussions: [],
+      positionIndex: {
+        'src/db/queries.ts:42': 14,
+        'src/db/queries.ts:50': 20,
+      },
+      headSha: 'decision-critical-comments',
+      sessionId: '002-comments',
+      sessionDate: '2026-06-15',
+      decisionBrief: makeDecisionBrief({
+        decision: 'REJECT',
+        evidenceCards: [{
+          kind: 'must-fix',
+          source: 'evidence',
+          title: critical.issueTitle,
+          severity: critical.severity,
+          filePath: critical.filePath,
+          lineRange: critical.lineRange,
+          confidence: critical.confidence,
+          diffFact: critical.evidence[0]!,
+          affectedContract: critical.problem,
+          check: 'pnpm typecheck',
+          decisionRule: 'Blocks only while this active finding remains promoted.',
+          complete: true,
+          missing: [],
+        }],
+        requiredActions: ['Fix before merge: src/db/queries.ts:42 SQL injection vulnerability'],
+      }),
+    });
+
+    expect(review.event).toBe('REQUEST_CHANGES');
+    expect(review.verdict).toBe('REJECT');
+    expect(review.comments).toHaveLength(1);
+    expect(review.comments[0]!.body).toContain('SQL injection vulnerability');
+    expect(review.comments[0]!.body).not.toContain('Non-blocking logging cleanup');
+  });
+
+  it('does not let provided decision brief re-promote dismissed findings', () => {
+    const index: DiffPositionIndex = { 'src/db/queries.ts:42': 14 };
+    const review = mapToGitHubReview({
+      summary: makeSummary({ decision: 'REJECT', reasoning: 'Raw head verdict rejected.' }),
+      evidenceDocs: [makeDoc()],
+      discussions: [makeDiscussion({ finalSeverity: 'DISMISSED' })],
+      positionIndex: index,
+      headSha: 'dismissed-brief-event',
+      sessionId: '002-dismissed-brief',
+      sessionDate: '2026-06-15',
+      reviewRun: makeReviewRun(),
+      decisionBrief: makeDecisionBrief({
+        decision: 'REJECT',
+        evidenceCards: [{
+          kind: 'must-fix',
+          source: 'evidence',
+          title: 'SQL injection vulnerability',
+          severity: 'CRITICAL',
+          filePath: 'src/db/queries.ts',
+          lineRange: [42, 45],
+          confidence: 90,
+          diffFact: 'query = "SELECT * FROM users WHERE id = " + userId',
+          affectedContract: 'Database queries must not concatenate user input.',
+          check: 'pnpm test',
+          decisionRule: 'Blocks only while this active finding remains promoted.',
+          complete: true,
+          missing: [],
+        }],
+        requiredActions: ['Fix src/db/queries.ts:42 SQL injection vulnerability'],
+      }),
+    });
+
+    expect(review.event).toBe('APPROVE');
+    expect(review.comments).toHaveLength(0);
+    expect(review.body).toContain('REJECT -> ACCEPT');
   });
 
   it('filters out dismissed documents', () => {

@@ -24,6 +24,7 @@ function makeReview(overrides: Partial<GitHubReview> = {}): GitHubReview {
   return {
     commit_id: 'abc123',
     event: 'REQUEST_CHANGES',
+    verdict: 'REJECT',
     body: 'CodeAgora found issues.',
     comments: [],
     ...overrides,
@@ -109,15 +110,15 @@ describe('postReview()', () => {
 
   it('returns verdict ACCEPT for APPROVE event', async () => {
     const octokit = makeOctokit();
-    const review = makeReview({ event: 'APPROVE', body: 'Looks good.' });
+    const review = makeReview({ event: 'APPROVE', verdict: 'ACCEPT', body: 'Looks good.' });
 
     const result = await postReview(makeConfig(), 1, review, octokit as never);
     expect(result.verdict).toBe('ACCEPT');
   });
 
-  it('returns verdict NEEDS_HUMAN when body contains "NEEDS HUMAN REVIEW"', async () => {
+  it('returns structured NEEDS_HUMAN verdict without parsing the body copy', async () => {
     const octokit = makeOctokit();
-    const review = makeReview({ event: 'COMMENT', body: 'NEEDS HUMAN REVIEW — escalated.' });
+    const review = makeReview({ event: 'COMMENT', verdict: 'NEEDS_HUMAN', body: 'Manual maintainer decision required.' });
 
     const result = await postReview(makeConfig(), 1, review, octokit as never);
     expect(result.verdict).toBe('NEEDS_HUMAN');
@@ -210,7 +211,7 @@ describe('postReview()', () => {
         },
       });
 
-    const review = makeReview({ event: 'APPROVE', body: 'Looks good.' });
+    const review = makeReview({ event: 'APPROVE', verdict: 'ACCEPT', body: 'Looks good.' });
     const result = await postReview(makeConfig(), 1, review, octokit as never);
 
     expect(result.reviewId).toBe(888);
@@ -244,6 +245,7 @@ describe('postReview()', () => {
 
     const review = makeReview({
       event: 'APPROVE',
+      verdict: 'ACCEPT',
       body: 'Looks good.',
       comments: [{ path: 'src/foo.ts', position: 1, side: 'RIGHT', body: 'issue' }],
     });

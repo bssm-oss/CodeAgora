@@ -24,6 +24,9 @@ export interface ProgressEvent {
   message: string;
   details?: {
     reviewerId?: string;
+    sessionId?: string;
+    sessionDate?: string;
+    sessionPath?: string;
     round?: number;
     totalRounds?: number;
     completed?: number;

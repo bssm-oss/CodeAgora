@@ -29,6 +29,12 @@ export interface BackendInput {
   onUsage?: (usage: TokenUsage) => void;
 }
 
+function makeAbortError(): Error {
+  const error = new Error('Backend execution aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
 /** Command definition: binary + args, no shell. */
 interface CliCommand {
   bin: string;
@@ -54,6 +60,11 @@ export async function executeBackend(input: BackendInput): Promise<string> {
   // CLI backends: pipe prompt via stdin to child process (no shell)
   const cmd = buildCommand(input);
   const timeoutMs = timeout * 1000;
+  const signal = input.signal;
+
+  if (signal?.aborted) {
+    throw makeAbortError();
+  }
 
   return new Promise<string>((resolve, reject) => {
     const child = spawn(cmd.bin, cmd.args, {
@@ -64,34 +75,58 @@ export async function executeBackend(input: BackendInput): Promise<string> {
     let stdout = '';
     let stderr = '';
     let killed = false;
+    let settled = false;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    const finish = (fn: typeof resolve | typeof reject, value: string | Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (fn === resolve) {
+        resolve(value as string);
+      } else {
+        reject(value);
+      }
+    };
+
+    const killChild = () => {
+      killed = true;
+      if (child.pid) {
+        gracefulKill(child.pid, 5000).catch(() => {});
+      }
+    };
+
+    const onAbort = () => {
+      killChild();
+    };
 
     child.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
     child.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
 
     // Manual timeout with SIGTERM → SIGKILL escalation (#91)
     const timer = setTimeout(() => {
-      killed = true;
-      if (child.pid) {
-        gracefulKill(child.pid, 5000).catch(() => {});
-      }
+      killChild();
     }, timeoutMs);
+    signal?.addEventListener('abort', onAbort, { once: true });
 
     child.on('error', (err) => {
-      clearTimeout(timer);
-      reject(new Error(`Backend execution failed: ${err.message}`));
+      finish(reject, new Error(`Backend execution failed: ${err.message}`));
     });
 
     child.on('close', (code) => {
-      clearTimeout(timer);
       if (killed) {
-        reject(new Error(`Backend timed out after ${timeout}s (SIGKILL escalation)`));
+        finish(reject, signal?.aborted ? makeAbortError() : new Error(`Backend timed out after ${timeout}s (SIGKILL escalation)`));
         return;
       }
       if (code !== 0 && !stdout) {
-        reject(new Error(`Backend error (exit ${code}): ${stderr}`));
+        finish(reject, new Error(`Backend error (exit ${code}): ${stderr}`));
         return;
       }
-      resolve(stdout.trim());
+      finish(resolve, stdout.trim());
     });
 
     // Write prompt to stdin and close (some backends embed prompt in args instead)

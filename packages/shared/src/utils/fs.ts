@@ -5,6 +5,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { AsyncLocalStorage } from 'async_hooks';
 import { z } from 'zod';
 import { SESSION_ARTIFACT_SCHEMA_VERSION } from '../contracts/stable.js';
 import type { SessionMetadata } from '../types/session.js';
@@ -14,9 +15,28 @@ import type { SessionMetadata } from '../types/session.js';
 // ============================================================================
 
 export const CA_ROOT = '.ca';
+export const CA_ROOT_ENV = 'CODEAGORA_CA_ROOT';
+
+const caRootStorage = new AsyncLocalStorage<string>();
+
+export function getCaRoot(): string {
+  const scopedRoot = caRootStorage.getStore();
+  if (scopedRoot?.trim()) return scopedRoot.trim();
+  const configuredRoot = process.env[CA_ROOT_ENV]?.trim();
+  return configuredRoot || CA_ROOT;
+}
+
+export function withCaRoot<T>(caRoot: string, fn: () => T): T {
+  return caRootStorage.run(caRoot, fn);
+}
+
+function resolveCaRoot(baseDir: string = '.'): string {
+  const root = getCaRoot();
+  return path.isAbsolute(root) ? root : path.join(baseDir, root);
+}
 
 export function getSessionDir(date: string, sessionId: string): string {
-  return path.join(CA_ROOT, 'sessions', date, sessionId);
+  return path.join(getCaRoot(), 'sessions', date, sessionId);
 }
 
 export function getReviewsDir(date: string, sessionId: string): string {
@@ -32,7 +52,7 @@ export function getUnconfirmedDir(date: string, sessionId: string): string {
 }
 
 export function getLogsDir(date: string, sessionId: string): string {
-  return path.join(CA_ROOT, 'logs', date, sessionId);
+  return path.join(getCaRoot(), 'logs', date, sessionId);
 }
 
 // ============================================================================
@@ -40,7 +60,7 @@ export function getLogsDir(date: string, sessionId: string): string {
 // ============================================================================
 
 export function getConfigPath(): string {
-  return path.join(CA_ROOT, 'config.json');
+  return path.join(getCaRoot(), 'config.json');
 }
 
 export function getSuggestionsPath(date: string, sessionId: string): string {
@@ -80,7 +100,7 @@ export async function ensureDir(dirPath: string): Promise<void> {
  * Skipped on Windows.
  */
 export async function ensureCaRoot(baseDir: string = '.'): Promise<void> {
-  const caDir = path.join(baseDir, CA_ROOT);
+  const caDir = resolveCaRoot(baseDir);
 
   await ensureDir(caDir);
 
@@ -160,7 +180,7 @@ export async function appendMarkdown(
 // ============================================================================
 
 export async function getNextSessionId(date: string): Promise<string> {
-  const sessionsDir = path.join(CA_ROOT, 'sessions', date);
+  const sessionsDir = path.join(getCaRoot(), 'sessions', date);
   await ensureDir(sessionsDir);
 
   const lockPath = path.join(sessionsDir, '.lock');

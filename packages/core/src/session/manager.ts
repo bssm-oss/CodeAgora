@@ -9,7 +9,7 @@ import path from 'path';
 import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 import { SessionMetadata } from '../types/core.js';
 import {
-  CA_ROOT,
+  getCaRoot,
   initSessionDirs,
   getNextSessionId,
   writeSessionMetadata,
@@ -26,13 +26,15 @@ export class SessionManager {
   private date: string;
   private sessionId: string;
   private metadata: SessionMetadata;
+  private sessionDir: string;
   private cleanupRegistered = false;
   private signalHandlers: Map<string, () => void> = new Map();
 
-  private constructor(date: string, sessionId: string, metadata: SessionMetadata) {
+  private constructor(date: string, sessionId: string, metadata: SessionMetadata, sessionDir: string) {
     this.date = date;
     this.sessionId = sessionId;
     this.metadata = metadata;
+    this.sessionDir = sessionDir;
   }
 
   /**
@@ -55,17 +57,19 @@ export class SessionManager {
     // Initialize directory structure
     await initSessionDirs(date, sessionId);
 
+    const sessionDir = getSessionDir(date, sessionId);
+
     // Write metadata
     await writeSessionMetadata(date, sessionId, metadata);
 
-    return new SessionManager(date, sessionId, metadata);
+    return new SessionManager(date, sessionId, metadata, sessionDir);
   }
 
   /**
    * Get session directory path
    */
   getDir(): string {
-    return getSessionDir(this.date, this.sessionId);
+    return this.sessionDir;
   }
 
   /**
@@ -138,7 +142,7 @@ export class SessionManager {
         // so we write the metadata file directly via writeFileSync.
         try {
           const metadataPath = path.join(
-            getSessionDir(this.date, this.sessionId),
+            this.sessionDir,
             'metadata.json'
           );
           const metadata: SessionMetadata = {
@@ -199,7 +203,7 @@ const STALE_SESSION_THRESHOLD_MS = 4 * 60 * 60 * 1000; // 4 hours
  * Errors are swallowed — stale session recovery is best-effort.
  */
 export async function recoverStaleSessions(): Promise<number> {
-  const sessionsDir = path.join(CA_ROOT, 'sessions');
+  const sessionsDir = path.join(getCaRoot(), 'sessions');
   let recovered = 0;
 
   let dateDirs: string[];

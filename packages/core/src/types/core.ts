@@ -178,6 +178,44 @@ export interface HeadVerdict {
 }
 
 // ============================================================================
+// Review Decision Brief
+// ============================================================================
+
+export interface ReviewDecisionEvidenceCard {
+  kind: 'must-fix' | 'human-gate';
+  source: 'evidence' | 'discussion';
+  title: string;
+  severity: Severity | 'DISMISSED';
+  filePath: string;
+  lineRange: [number, number];
+  confidence?: number;
+  diffFact: string;
+  affectedContract: string;
+  check: string;
+  expectedActual?: string;
+  decisionRule: string;
+  complete: boolean;
+  missing: string[];
+}
+
+export interface ReviewDecisionBrief {
+  decision: HeadVerdict['decision'];
+  reviewedScope: {
+    files: string[];
+    areas: string[];
+    contracts: string[];
+    checks: string[];
+    uncertainty: string;
+  };
+  completedChecks: string[];
+  evidenceCards: ReviewDecisionEvidenceCard[];
+  requiredActions: string[];
+  followUpCount: number;
+  auditCount: number;
+  demotedCount: number;
+}
+
+// ============================================================================
 // Session Metadata
 // ============================================================================
 
