@@ -106,11 +106,12 @@ function splitPublicVerifyDocs(docs: EvidenceDocument[]): {
 }
 
 function formatPublicTriageCounts(triage: ReturnType<typeof triageDocs>): string {
-  const { needsHuman, needsRepro, verify } = splitPublicVerifyDocs(triage.verify);
+  const { needsHuman, needsRepro, speculative, verify } = splitPublicVerifyDocs(triage.verify);
   const parts: string[] = [];
   if (triage.mustFix.length > 0) parts.push(`${triage.mustFix.length} must-fix`);
   if (needsHuman.length > 0) parts.push(`${needsHuman.length} needs-human`);
   if (needsRepro.length > 0) parts.push(`${needsRepro.length} needs-repro`);
+  if (speculative.length > 0) parts.push(`${speculative.length} speculative hidden`);
   if (verify.length > 0) parts.push(`${verify.length} verify`);
   if (triage.ignore.length > 0) parts.push(`${triage.ignore.length} ignore`);
   return parts.join(' \u00B7 ') || 'no issues';

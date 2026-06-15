@@ -540,10 +540,10 @@ describe('buildTriageDigest', () => {
     expect(result).not.toContain('must-fix');
   });
 
-  it('omits extremely low-confidence CRITICAL from public triage counts', () => {
+  it('counts extremely low-confidence CRITICAL as hidden speculative in public triage', () => {
     const docs = [makeDoc({ severity: 'CRITICAL', confidence: 0 })];
     const result = buildTriageDigest(docs);
-    expect(result).toBeNull();
+    expect(result).toContain('1 speculative hidden');
   });
 
   it('classifies WARNING with high confidence as verify', () => {
@@ -576,6 +576,7 @@ describe('buildTriageDigest', () => {
       makeDoc({ severity: 'CRITICAL', confidence: 90 }),     // must-fix
       makeDoc({ severity: 'CRITICAL', confidence: 45 }),     // needs-human
       makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // needs-repro
+      makeDoc({ severity: 'CRITICAL', confidence: 0 }),      // speculative hidden
       makeDoc({ severity: 'WARNING', confidence: 80 }),      // verify
       makeDoc({ severity: 'SUGGESTION', confidence: 50 }),   // ignore
       makeDoc({ severity: 'SUGGESTION', confidence: 90 }),   // ignore
@@ -584,6 +585,7 @@ describe('buildTriageDigest', () => {
     expect(result).toContain('1 must-fix');
     expect(result).toContain('1 needs-human');
     expect(result).toContain('1 needs-repro');
+    expect(result).toContain('1 speculative hidden');
     expect(result).toContain('1 verify');
     expect(result).toContain('2 ignore');
   });
