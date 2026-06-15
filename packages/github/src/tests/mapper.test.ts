@@ -369,7 +369,7 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('| Decision gate | Follow-up later | Ignored speculative |');
   });
 
-  it('includes the summary reasoning text', () => {
+  it('omits raw summary reasoning from the public decision surface', () => {
     const body = buildSummaryBody({
       summary: makeSummary({ reasoning: 'No issues found at all.' }),
       sessionId: 'sess-001',
@@ -377,7 +377,8 @@ describe('buildSummaryBody', () => {
       evidenceDocs: [],
       discussions: [],
     });
-    expect(body).toContain('No issues found at all.');
+    expect(body).not.toContain('No issues found at all.');
+    expect(body).not.toContain('Raw head rationale');
   });
 
   it('includes the session id in the footer', () => {
@@ -518,6 +519,8 @@ describe('buildSummaryBody', () => {
 
     expect(body).toContain('1 needs-human discussion');
     expect(body).toContain('| d001 — discussion verdict | 26% | CRITICAL | human gate |');
+    expect(body).toContain('### Maintainer Action Top-3');
+    expect(body).toContain('Run: `Inspect src/foo.ts:42 and run the nearest focused test.`');
     expect(body).toContain('| human review required | 1 | 0 |');
     expect(body).not.toContain('| 0 | 0 |');
   });

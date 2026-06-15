@@ -339,6 +339,28 @@ function pushFinalDecisionTable(
   lines.push('');
 }
 
+function suggestedCommandForPath(filePath: string, issueTitle = ''): string | null {
+  if (/packages\/core\/src\/learning\/collector\.ts/.test(filePath)) {
+    return 'pnpm vitest run packages/core/src/tests/learning-collector.test.ts';
+  }
+  if (/packages\/github\/src\/formatter\.ts/.test(filePath)) {
+    return 'pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts';
+  }
+  if (/packages\/shared\/src\/utils\/triage\.ts/.test(filePath)) {
+    return 'pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts';
+  }
+  if (/packages\/cli\/src\/commands\/init\.ts/.test(filePath)) {
+    return 'pnpm vitest run src/tests/cli-init-ci.test.ts src/tests/github-actions-runtime.test.ts';
+  }
+  if (/scripts\/evidence-manifest\.mjs/.test(filePath)) {
+    return 'pnpm vitest run src/tests/release-evidence-manifest.test.ts';
+  }
+  if (/\.github\/workflows|workflow/i.test(filePath) || /workflow/i.test(issueTitle)) {
+    return 'pnpm vitest run src/tests/github-actions-runtime.test.ts';
+  }
+  return null;
+}
+
 function commandLikeSnippet(text: string): string | null {
   const backtickMatches = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1]?.trim()).filter(Boolean);
   return backtickMatches.find((snippet) =>
@@ -351,13 +373,54 @@ function suggestedReproCommand(doc: EvidenceDocument): string {
   const haystack = [doc.problem, ...doc.evidence, doc.suggestion].join('\n');
   const snippet = commandLikeSnippet(haystack);
   if (snippet) return snippet;
-  if (/packages\/cli\/src\/commands\/init\.ts/.test(doc.filePath)) {
-    return 'pnpm dev init --preset action';
+  const pathCommand = suggestedCommandForPath(doc.filePath, doc.issueTitle);
+  if (pathCommand) return pathCommand;
+  return `Inspect ${formatLocation(doc)} and run the smallest command or test that exercises this path.`;
+}
+
+function suggestedDiscussionCommand(discussion: DiscussionVerdict): string {
+  return suggestedCommandForPath(discussion.filePath) ??
+    `Inspect ${discussion.filePath}:${discussion.lineRange[0]} and run the nearest focused test.`;
+}
+
+function pushMaintainerActionTop3(
+  lines: string[],
+  triage: ReturnType<typeof triageDocs>,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+): void {
+  const actions: Array<{ item: string; command: string; pass: string; fail: string }> = [];
+  for (const doc of [...triage.mustFix, ...publicVerify.needsHuman, ...publicVerify.needsRepro]) {
+    actions.push({
+      item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
+      command: suggestedReproCommand(doc),
+      pass: 'Referenced behavior is intentional or the focused test passes without reproducing the claim.',
+      fail: doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL'
+        ? 'Keep human gate or reject until fixed.'
+        : 'Track as non-blocking follow-up.',
+    });
   }
-  if (/\.github\/workflows|workflow/i.test(doc.issueTitle)) {
-    return 'Inspect the generated workflow YAML for the referenced secret/config path.';
+  for (const discussion of discussions.filter(isNeedsHumanDiscussion)) {
+    actions.push({
+      item: `${discussion.discussionId} — discussion verdict at \`${discussion.filePath}:${discussion.lineRange[0]}\``,
+      command: suggestedDiscussionCommand(discussion),
+      pass: 'The focused check does not reproduce the discussion claim.',
+      fail: 'Keep human gate until the contract or behavior is fixed.',
+    });
   }
-  return `Inspect \`${formatLocation(doc)}\` and run the smallest command or test that exercises this path.`;
+  if (actions.length === 0) {
+    return;
+  }
+
+  lines.push('### Maintainer Action Top-3');
+  lines.push('');
+  for (const action of actions.slice(0, 3)) {
+    lines.push(`- ${action.item}`);
+    lines.push(`  - Run: \`${action.command}\``);
+    lines.push(`  - Pass: ${action.pass}`);
+    lines.push(`  - Fail: ${action.fail}`);
+  }
+  lines.push('');
 }
 
 function pushReproCard(lines: string[], doc: EvidenceDocument): void {
@@ -767,14 +830,7 @@ export function buildSummaryBody(params: {
   lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
   pushFinalDecisionTable(lines, triage, publicVerify, discussions);
-  lines.push('<details>');
-  lines.push('<summary>Raw head rationale</summary>');
-  lines.push('');
-  lines.push(summary.reasoning);
-  lines.push('');
-  lines.push('</details>');
-  lines.push('');
-
+  pushMaintainerActionTop3(lines, triage, publicVerify, discussions);
   pushDecisionSnapshot(lines, summary, publicVerify, discussions);
   pushReviewCoverage(lines, summary, safeParams.reviewRun);
   pushNonBlockingQueues(lines, safeParams.reviewRun, safeParams.reviewQueues);

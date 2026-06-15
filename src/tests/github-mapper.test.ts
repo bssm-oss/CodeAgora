@@ -224,6 +224,7 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('### Final Decision Table');
     expect(body).toContain('### Decision Snapshot');
     expect(body).toContain('| Decision gate | Follow-up later | Ignored speculative |');
+    expect(body).not.toContain('Raw head rationale');
   });
 
   it('renders blocking issues table for critical docs', () => {
@@ -417,6 +418,8 @@ describe('buildSummaryBody', () => {
 
     expect(body).toContain('1 needs-human discussion');
     expect(body).toContain('| d001 — discussion verdict | 26% | CRITICAL | human gate |');
+    expect(body).toContain('### Maintainer Action Top-3');
+    expect(body).toContain('Run: `Inspect src/db/queries.ts:42 and run the nearest focused test.`');
     expect(body).toContain('| human review required | 1 | 0 |');
     expect(body).not.toContain('| 0 | 0 |');
   });
