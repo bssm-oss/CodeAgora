@@ -689,6 +689,52 @@ describe('applyHeadVerdictSafety()', () => {
     expect(verdict.questionsForHuman?.join('\n')).toContain('d-high-risk-speculative');
   });
 
+  it('preserves head NEEDS_HUMAN when Korean reasoning flags validation bypass risk', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-validation-bypass',
+          finalSeverity: 'CRITICAL',
+          consensusReached: true,
+          avgConfidence: 6,
+          reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'NEEDS_HUMAN',
+      reasoning: 'JSON 파싱 실패 시 검증 우회 가능성이 있어 재현 확인 대상으로 남겨야 합니다.',
+      questionsForHuman: ['d-validation-bypass 재현 여부 확인'],
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.reasoning).toContain('검증 우회');
+    expect(verdict.questionsForHuman?.[0]).toContain('d-validation-bypass');
+  });
+
+  it('lowers head REJECT to NEEDS_HUMAN for speculative validation-bypass claims', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-validation-bypass',
+          finalSeverity: 'CRITICAL',
+          consensusReached: true,
+          avgConfidence: 6,
+          reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'REJECT',
+      reasoning: 'Potential validation bypass in release gate evidence parsing.',
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.reasoning).toContain('high-risk verification path');
+  });
+
   it('does not override LLM verdicts for an empty moderator report', () => {
     const verdict = applyHeadVerdictSafety({
       decision: 'NEEDS_HUMAN',

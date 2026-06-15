@@ -9,6 +9,7 @@ import type { ModeratorReport, HeadVerdict, EvidenceDocument, DiscussionVerdict 
 import type { HeadConfig } from '../types/config.js';
 import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
 import { untrustedContentInstruction, wrapUntrustedBlock } from '../security/untrusted-content.js';
+import { containsHighRiskSpeculativeClaim } from '@codeagora/shared/utils/high-risk.js';
 
 // ============================================================================
 // LLM-Based Verdict
@@ -286,19 +287,9 @@ function isSpeculativeCriticalDiscussion(verdict: DiscussionVerdict): boolean {
     verdict.avgConfidence < SPECULATIVE_CRITICAL_CONFIDENCE_MIN;
 }
 
-const HIGH_RISK_SPECULATIVE_PATTERNS = [
-  /\bauth(?:entication|orization)? bypass\b/i,
-  /\bpermission boundary\b/i,
-  /\bprivilege escalation\b/i,
-  /\bdata loss\b/i,
-  /\bremote code execution\b|\brce\b/i,
-  /\bsql injection\b|\bxss\b|\bcsrf\b|\bssrf\b/i,
-  /\bsecret leak\b|\bcredential leak\b|\btoken leak\b/i,
-];
-
 function isHighRiskSpeculativeCriticalDiscussion(verdict: DiscussionVerdict): boolean {
   return isSpeculativeCriticalDiscussion(verdict) &&
-    HIGH_RISK_SPECULATIVE_PATTERNS.some((pattern) => pattern.test(verdict.reasoning));
+    containsHighRiskSpeculativeClaim(verdict.reasoning);
 }
 
 function isActiveNonSpeculativeDiscussion(verdict: DiscussionVerdict): boolean {
@@ -402,6 +393,22 @@ export function applyHeadVerdictSafety(
   const actionableDiscussions = report.discussions.filter(hasActionableDiscussionLocation);
   const onlySpeculativeOrDismissed = actionableDiscussions.length > 0 &&
     actionableDiscussions.every((d) => !isActiveNonSpeculativeDiscussion(d));
+  const headRequestsHighRiskVerification = containsHighRiskSpeculativeClaim([
+    verdict.reasoning,
+    ...(verdict.questionsForHuman ?? []),
+  ].join('\n'));
+  if (onlySpeculativeOrDismissed && headRequestsHighRiskVerification && verdict.decision === 'NEEDS_HUMAN') {
+    return verdict;
+  }
+  if (onlySpeculativeOrDismissed && headRequestsHighRiskVerification && verdict.decision === 'REJECT') {
+    return {
+      decision: 'NEEDS_HUMAN',
+      reasoning:
+        `Head safety guard: ${verdict.decision} was lowered to NEEDS_HUMAN because only speculative critical findings remain, ` +
+        `but the head reasoning identified a high-risk verification path. Original reasoning: ${verdict.reasoning}`,
+      questionsForHuman: verdict.questionsForHuman,
+    };
+  }
   if (onlySpeculativeOrDismissed && verdict.decision !== 'ACCEPT') {
     return {
       decision: 'ACCEPT',

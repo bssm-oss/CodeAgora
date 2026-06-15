@@ -366,6 +366,31 @@ describe('buildSummaryBody', () => {
     expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
 
+  it('keeps validation-bypass speculative docs visible for reproduction', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: '검증 우회 가능성은 재현 확인이 필요합니다.' }),
+      sessionId: '005-validation-bypass',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [makeDoc({
+        confidence: 6,
+        issueTitle: 'Data Integrity: Invalid JSON artifacts bypass release gate validation',
+        problem: 'Invalid JSON artifacts may bypass release gate validation.',
+        filePath: 'scripts/evidence-manifest.mjs',
+        lineRange: [165, 165],
+      })],
+      discussions: [makeDiscussion({
+        consensusReached: true,
+        avgConfidence: 6,
+        reasoning: '검증 우회 가능성이 있지만 현재 근거는 약합니다.',
+      })],
+    });
+
+    expect(body).toContain('1 needs-repro');
+    expect(body).toContain('Data Integrity: Invalid JSON artifacts bypass release gate validation');
+    expect(body).toContain('consensus → high-risk speculative CRITICAL (6%)');
+    expect(body).not.toContain('1 speculative hypothesis(es) hidden');
+  });
+
   it('redacts reviewRun and reviewQueues before rendering public summary', () => {
     const rawSecret = 'sk-testreviewsecret123456';
     const body = buildSummaryBody({

@@ -9,6 +9,7 @@ import type { PipelineSummary, ReviewQueues, ReviewRunSummary } from '@codeagora
 import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
 import { triageDocs } from '@codeagora/shared/utils/triage.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
+import { containsHighRiskSpeculativeClaim } from '@codeagora/shared/utils/high-risk.js';
 
 // ============================================================================
 // Constants
@@ -82,20 +83,6 @@ function isCriticalSeverity(doc: EvidenceDocument): boolean {
 
 function isCriticalDiscussion(discussion: DiscussionVerdict): boolean {
   return discussion.finalSeverity === 'CRITICAL' || discussion.finalSeverity === 'HARSHLY_CRITICAL';
-}
-
-const HIGH_RISK_SPECULATIVE_PATTERNS = [
-  /\bauth(?:entication|orization)? bypass\b/i,
-  /\bpermission boundary\b/i,
-  /\bprivilege escalation\b/i,
-  /\bdata loss\b/i,
-  /\bremote code execution\b|\brce\b/i,
-  /\bsql injection\b|\bxss\b|\bcsrf\b|\bssrf\b/i,
-  /\bsecret leak\b|\bcredential leak\b|\btoken leak\b/i,
-];
-
-function containsHighRiskSpeculativeClaim(text: string): boolean {
-  return HIGH_RISK_SPECULATIVE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function isHighRiskSpeculativeDoc(doc: EvidenceDocument): boolean {
