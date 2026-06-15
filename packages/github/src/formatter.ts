@@ -193,8 +193,12 @@ function formatDiscussionSeverityLabel(discussion: DiscussionVerdict): string {
   return discussion.finalSeverity;
 }
 
+function hasForcedDecisionTrace(discussion: DiscussionVerdict): boolean {
+  return !discussion.consensusReached || /\b(?:forced decision|forced-tie-break|tie broken)\b/i.test(discussion.reasoning);
+}
+
 function isForcedSpeculativeDiscussion(discussion: DiscussionVerdict): boolean {
-  return !discussion.consensusReached && isSpeculativeCriticalDiscussion(discussion);
+  return hasForcedDecisionTrace(discussion) && isSpeculativeCriticalDiscussion(discussion);
 }
 
 function pushDiscussionDisposition(lines: string[], discussion: DiscussionVerdict): void {
@@ -537,8 +541,9 @@ export function mapToInlineCommentBody(
   }
 
   if (discussion) {
-    const consensusIcon = discussion.consensusReached ? '\u2705' : '\u26A0\uFE0F';
-    const consensusText = discussion.consensusReached ? 'consensus' : 'forced decision';
+    const forcedDecision = hasForcedDecisionTrace(discussion);
+    const consensusIcon = forcedDecision ? '\u26A0\uFE0F' : '\u2705';
+    const consensusText = forcedDecision ? 'forced decision' : 'consensus';
     lines.push('');
     if (options?.collapseDiscussions !== false) {
       lines.push('<details>');
@@ -783,8 +788,9 @@ export function buildSummaryBody(params: {
     lines.push(`<summary>Agent consensus log (${discussions.length} discussion(s))</summary>`);
     lines.push('');
     for (const d of discussions) {
-      const consensusIcon = d.consensusReached ? '\u2705' : '\u26A0\uFE0F';
-      const consensusText = d.consensusReached ? 'consensus' : 'forced';
+      const forcedDecision = hasForcedDecisionTrace(d);
+      const consensusIcon = forcedDecision ? '\u26A0\uFE0F' : '\u2705';
+      const consensusText = forcedDecision ? 'forced' : 'consensus';
       lines.push(`<details>`);
       lines.push(`<summary>${consensusIcon} ${d.discussionId} \u2014 ${d.rounds} round(s), ${consensusText} \u2192 ${formatDiscussionSeverityLabel(d)}</summary>`);
       lines.push('');

@@ -479,6 +479,26 @@ describe('buildSummaryBody', () => {
     expect(body).not.toContain('forced → CRITICAL');
   });
 
+  it('treats tie-broken speculative discussions as forced even when consensusReached is true', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only speculative hypotheses remain.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [],
+      discussions: [makeVerdict({
+        consensusReached: true,
+        avgConfidence: 4,
+        reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
+      })],
+    });
+
+    expect(body).toContain('forced → speculative CRITICAL (4%)');
+    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Trace:** Tie broken by forced decision');
+    expect(body).not.toContain('consensus → speculative CRITICAL');
+    expect(body).not.toContain('**Verdict:** speculative CRITICAL');
+  });
+
   it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
     const body = buildSummaryBody({
       summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A weak security claim needs reproduction.' }),
