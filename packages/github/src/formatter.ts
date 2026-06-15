@@ -573,6 +573,15 @@ function formatQueueItem(doc: EvidenceDocument): string {
   return `- \`${doc.filePath}:${lineLabel}\` — ${doc.issueTitle}`;
 }
 
+function queueItemKey(doc: EvidenceDocument): string {
+  return [
+    doc.filePath,
+    doc.lineRange[0],
+    doc.lineRange[1],
+    doc.issueTitle.trim().toLowerCase(),
+  ].join(':');
+}
+
 function hiddenQueueMessage(title: string, count: number): string {
   if (title === 'Removed by hallucination filter') {
     return `- ${count} rejected item(s) hidden from the public summary.`;
@@ -593,11 +602,36 @@ function queueDispositionReason(title: string, doc: EvidenceDocument): string {
   return formatConfidenceBasis(doc);
 }
 
+function queueImpactIfTrue(title: string, doc: EvidenceDocument): string {
+  if (title === 'Removed by hallucination filter') {
+    return 'No maintainer action expected unless a fresh review reproduces the claim with concrete diff evidence.';
+  }
+  if (title === 'Uncertain after hallucination checks') {
+    return `Could matter if the observed signal is real: ${truncateResponse(doc.problem, 160)}`;
+  }
+  if (title === 'Unconfirmed') {
+    return `Potential follow-up only: ${truncateResponse(doc.problem, 160)}`;
+  }
+  if (title === 'Suggestions') {
+    return `Optional cleanup: ${truncateResponse(doc.problem, 160)}`;
+  }
+  return `Diagnostic context only: ${truncateResponse(doc.problem, 160)}`;
+}
+
 function formatHiddenQueueItem(title: string, doc: EvidenceDocument): string {
   const location = doc.filePath === 'unknown' || doc.lineRange[0] <= 0
     ? 'invalid location'
     : formatLocation(doc);
-  return `- \`${location}\` — ${doc.issueTitle}; ${queueDispositionReason(title, doc)}`;
+  return `- \`${location}\` — ${doc.issueTitle}; why non-blocking: ${queueDispositionReason(title, doc)}`;
+}
+
+function pushQueueTriageCard(lines: string[], title: string, doc: EvidenceDocument): void {
+  const item = formatQueueItem(doc).replace(/^- /, '');
+  lines.push(`- Claim: ${item}`);
+  lines.push(`  - Evidence snippet: ${truncateResponse(firstEvidence(doc), 160)}`);
+  lines.push(`  - User impact if true: ${queueImpactIfTrue(title, doc)}`);
+  lines.push(`  - Why non-blocking now: ${queueDispositionReason(title, doc)}`);
+  lines.push(`  - Repro/test to promote: \`${suggestedReproCommand(doc)}\``);
 }
 
 function visibleQueueDocs(title: string, docs: EvidenceDocument[]): EvidenceDocument[] {
@@ -626,6 +660,8 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
     lines.push('These queues did not meet the public blocking threshold; use them as follow-up context, not as merge blockers.');
     lines.push('');
   }
+  lines.push('Queue counts are internal diagnostics. Item cards below are deduped by location/title and are not added to the decision gate.');
+  lines.push('');
   lines.push('| Queue | Count | Meaning |');
   lines.push('|---|---:|---|');
   lines.push(`| Suggestions | ${queueCounts.suggestions} | Low-priority findings kept out of must-fix. |`);
@@ -642,6 +678,8 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
     ['Removed by hallucination filter', queues?.hallucinationRemoved],
     ['Uncertain after hallucination checks', queues?.hallucinationUncertain],
   ];
+  const seenItems = new Set<string>();
+  let duplicateItems = 0;
   for (const [title, docs] of sections) {
     if (!docs || docs.length === 0) continue;
     const visibleDocs = visibleQueueDocs(title, docs);
@@ -657,17 +695,36 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
       lines.push('');
       continue;
     }
-    for (const doc of visibleDocs.slice(0, 5)) {
-      lines.push(formatQueueItem(doc));
+    let rendered = 0;
+    for (const doc of visibleDocs) {
+      const key = queueItemKey(doc);
+      if (seenItems.has(key)) {
+        duplicateItems += 1;
+        continue;
+      }
+      seenItems.add(key);
+      if (rendered >= 3) {
+        continue;
+      }
+      pushQueueTriageCard(lines, title, doc);
+      rendered += 1;
+    }
+    if (rendered === 0 && visibleDocs.length > 0) {
+      lines.push('- All visible item(s) duplicate earlier queue cards.');
     }
     const hiddenInvalidCount = docs.length - visibleDocs.length;
-    const remainingVisibleCount = Math.max(0, visibleDocs.length - 5);
+    const uniqueVisibleCount = visibleDocs.filter((doc) => seenItems.has(queueItemKey(doc))).length;
+    const remainingVisibleCount = Math.max(0, uniqueVisibleCount - 3);
     if (remainingVisibleCount > 0) {
-      lines.push(`- ...and ${remainingVisibleCount} more`);
+      lines.push(`- ...and ${remainingVisibleCount} more deduped diagnostic item(s) hidden for brevity.`);
     }
     if (hiddenInvalidCount > 0) {
       lines.push(`- ${hiddenInvalidCount} invalid-location item(s) hidden.`);
     }
+    lines.push('');
+  }
+  if (duplicateItems > 0) {
+    lines.push(`${duplicateItems} duplicate queue item(s) omitted from the item cards; the first rendered disposition is authoritative.`);
     lines.push('');
   }
 

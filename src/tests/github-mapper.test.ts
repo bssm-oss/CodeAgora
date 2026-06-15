@@ -605,6 +605,52 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('.github/workflows/review.yml:32');
     expect(body).toContain('low-confidence class prior: provider-contract-flexibility');
   });
+
+  it('renders deduped non-blocking queue triage cards with promotion criteria', () => {
+    const duplicate = makeDoc({
+      severity: 'WARNING',
+      issueTitle: 'Broken regex prevents code-block detection',
+      problem: 'The formatter may fail to detect fenced code blocks in suggestions.',
+      evidence: ['The regex no longer matches multiline fenced suggestions.'],
+      filePath: 'packages/github/src/formatter.ts',
+      lineRange: [464, 470],
+      confidenceTrace: { raw: 72, filtered: 44, final: 44, evidence: 0.5 },
+    });
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only diagnostic queue items remain.' }),
+      sessionId: '008',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        queues: {
+          activeFindings: 0,
+          suggestions: 0,
+          unconfirmed: 1,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 1,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [],
+        unconfirmed: [duplicate],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [duplicate],
+      },
+    });
+
+    expect(body).toContain('Queue counts are internal diagnostics. Item cards below are deduped by location/title');
+    expect(body).toContain('- Claim: `packages/github/src/formatter.ts:464-470` — Broken regex prevents code-block detection');
+    expect(body).toContain('- Evidence snippet: The regex no longer matches multiline fenced suggestions.');
+    expect(body).toContain('- User impact if true: Potential follow-up only: The formatter may fail to detect fenced code blocks in suggestions.');
+    expect(body).toContain('- Why non-blocking now: raw 72% -> filtered 44%');
+    expect(body).toContain('- Repro/test to promote: `pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts`');
+    expect(body).toContain('- All visible item(s) duplicate earlier queue cards.');
+    expect(body).toContain('1 duplicate queue item(s) omitted from the item cards');
+    expect(body.split('Broken regex prevents code-block detection')).toHaveLength(2);
+  });
 });
 
 describe('mapToGitHubReview', () => {
