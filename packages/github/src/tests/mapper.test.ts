@@ -125,7 +125,8 @@ describe('mapToInlineCommentBody', () => {
     );
 
     expect(body).toContain('forced decision');
-    expect(body).toContain('**Verdict:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('retained for auditability');
     expect(body).not.toContain('**Verdict:** CRITICAL —');
   });
 
@@ -148,6 +149,25 @@ describe('mapToInlineCommentBody', () => {
     });
     expect(body).not.toContain('<details>');
     expect(body).toContain('All reviewers agreed this is critical.');
+  });
+
+  it('renders forced speculative disposition inline when collapseDiscussions is false', () => {
+    const body = mapToInlineCommentBody(
+      makeDoc(),
+      makeVerdict({
+        consensusReached: false,
+        avgConfidence: 4,
+        reasoning: 'Moderator disabled; unresolved discussion escalated directly to head verdict.',
+      }),
+      undefined,
+      { collapseDiscussions: false },
+    );
+
+    expect(body).not.toContain('<details>');
+    expect(body).toContain('forced decision');
+    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Trace:** Moderator disabled');
+    expect(body).not.toContain('> Moderator disabled');
   });
 
   it('shows consensus icon when consensus was reached', () => {
@@ -454,7 +474,8 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('forced → speculative CRITICAL (4%)');
-    expect(body).toContain('**Verdict:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Trace:**');
     expect(body).not.toContain('forced → CRITICAL');
   });
 

@@ -118,7 +118,8 @@ describe('mapToInlineCommentBody', () => {
     );
 
     expect(body).toContain('forced decision');
-    expect(body).toContain('**Verdict:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('retained for auditability');
     expect(body).not.toContain('**Verdict:** CRITICAL —');
   });
 
@@ -324,9 +325,43 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('Non-blocking review queues (2)');
+    expect(body).toContain('These queues did not meet the public blocking threshold');
     expect(body).toContain('Simplify branch');
     expect(body).toContain('Check nullable path');
     expect(body).not.toContain('<summary>2 suggestion(s)</summary>');
+  });
+
+  it('marks non-blocking queues as diagnostic context during degraded runs', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'Provider runtime degraded.' }),
+      sessionId: '005-degraded',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [],
+      reviewRun: makeReviewRun({
+        degraded: true,
+        degradedReasons: ['provider-runtime-failed'],
+        queues: {
+          activeFindings: 0,
+          suggestions: 0,
+          unconfirmed: 1,
+          suppressed: 0,
+          hallucinationRemoved: 0,
+          hallucinationUncertain: 0,
+        },
+      }),
+      reviewQueues: {
+        suggestions: [],
+        unconfirmed: [makeDoc({ severity: 'WARNING', issueTitle: 'Check nullable path' })],
+        suppressed: [],
+        hallucinationRemoved: [],
+        hallucinationUncertain: [],
+      },
+    });
+
+    expect(body).toContain('This run was degraded');
+    expect(body).toContain('diagnostic context');
+    expect(body).not.toContain('use them as follow-up context, not as merge blockers');
   });
 
   it('labels speculative critical discussions in the consensus log', () => {
@@ -339,7 +374,8 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('forced → speculative CRITICAL (4%)');
-    expect(body).toContain('**Verdict:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Trace:**');
     expect(body).not.toContain('forced → CRITICAL');
   });
 

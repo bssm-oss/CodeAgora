@@ -193,6 +193,20 @@ function formatDiscussionSeverityLabel(discussion: DiscussionVerdict): string {
   return discussion.finalSeverity;
 }
 
+function isForcedSpeculativeDiscussion(discussion: DiscussionVerdict): boolean {
+  return !discussion.consensusReached && isSpeculativeCriticalDiscussion(discussion);
+}
+
+function pushDiscussionDisposition(lines: string[], discussion: DiscussionVerdict): void {
+  const severityLabel = formatDiscussionSeverityLabel(discussion);
+  if (isForcedSpeculativeDiscussion(discussion)) {
+    lines.push(`**Disposition:** ${severityLabel} — retained for auditability, but not treated as blocking without reproduction.`);
+    lines.push(`**Trace:** ${discussion.reasoning}`);
+    return;
+  }
+  lines.push(`**Verdict:** ${severityLabel} \u2014 ${discussion.reasoning}`);
+}
+
 function commandLikeSnippet(text: string): string | null {
   const backtickMatches = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1]?.trim()).filter(Boolean);
   return backtickMatches.find((snippet) =>
@@ -365,6 +379,13 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
   lines.push('<details>');
   lines.push(`<summary>Non-blocking review queues (${total})</summary>`);
   lines.push('');
+  if (run?.degraded) {
+    lines.push('This run was degraded; treat these queues as diagnostic context until the degraded reason is resolved.');
+    lines.push('');
+  } else if (run?.l3.head) {
+    lines.push('These queues did not meet the public blocking threshold; use them as follow-up context, not as merge blockers.');
+    lines.push('');
+  }
   lines.push('| Queue | Count | Meaning |');
   lines.push('|---|---:|---|');
   lines.push(`| Suggestions | ${queueCounts.suggestions} | Low-priority findings kept out of must-fix. |`);
@@ -545,7 +566,7 @@ export function mapToInlineCommentBody(
         }
       }
 
-      lines.push(`**Verdict:** ${formatDiscussionSeverityLabel(discussion)} \u2014 ${discussion.reasoning}`);
+      pushDiscussionDisposition(lines, discussion);
       lines.push('');
       lines.push('</details>');
     } else {
@@ -553,7 +574,7 @@ export function mapToInlineCommentBody(
         `${consensusIcon} Discussion ${discussion.discussionId} \u2014 ${discussion.rounds} round(s), ${consensusText}`,
       );
       lines.push('');
-      lines.push(`> ${discussion.reasoning}`);
+      pushDiscussionDisposition(lines, discussion);
     }
   }
 
@@ -788,7 +809,7 @@ export function buildSummaryBody(params: {
         }
       }
 
-      lines.push(`**Verdict:** ${formatDiscussionSeverityLabel(d)} \u2014 ${d.reasoning}`);
+      pushDiscussionDisposition(lines, d);
       lines.push('');
       lines.push('</details>');
       lines.push('');
