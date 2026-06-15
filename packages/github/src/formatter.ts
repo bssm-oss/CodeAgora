@@ -260,6 +260,85 @@ function pushDecisionSnapshot(
   lines.push('');
 }
 
+function pushFinalDecisionTable(
+  lines: string[],
+  triage: ReturnType<typeof triageDocs>,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+): void {
+  const rows: Array<{ item: string; confidence: string; disposition: string; blocks: string; action: string }> = [];
+
+  for (const doc of triage.mustFix) {
+    rows.push({
+      item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
+      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
+      disposition: 'must-fix',
+      blocks: 'yes',
+      action: 'Fix before merge.',
+    });
+  }
+
+  for (const doc of publicVerify.needsHuman) {
+    rows.push({
+      item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
+      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
+      disposition: 'needs human judgment',
+      blocks: 'human gate',
+      action: 'Confirm the contract or intended behavior.',
+    });
+  }
+
+  for (const doc of publicVerify.needsRepro) {
+    rows.push({
+      item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
+      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
+      disposition: 'needs reproduction',
+      blocks: 'no',
+      action: 'Treat as non-blocking until reproduced.',
+    });
+  }
+
+  for (const discussion of discussions.filter(isNeedsHumanDiscussion)) {
+    rows.push({
+      item: `${discussion.discussionId} — discussion verdict`,
+      confidence: discussionConfidenceLabel(discussion),
+      disposition: formatDiscussionSeverityLabel(discussion),
+      blocks: 'human gate',
+      action: 'Inspect the consensus log and confirm whether the contract changed.',
+    });
+  }
+
+  for (const discussion of discussions.filter(isForcedSpeculativeDiscussion)) {
+    rows.push({
+      item: `${discussion.discussionId} — forced hypothesis`,
+      confidence: discussionConfidenceLabel(discussion),
+      disposition: formatDiscussionSeverityLabel(discussion),
+      blocks: 'no',
+      action: 'Ignore for merge unless independently reproduced.',
+    });
+  }
+
+  if (rows.length === 0) {
+    lines.push('### Final Decision Table');
+    lines.push('');
+    lines.push('No current blockers or human gates remain.');
+    lines.push('');
+    return;
+  }
+
+  lines.push('### Final Decision Table');
+  lines.push('');
+  lines.push('| Item | Confidence | Disposition | Blocks merge | Owner action |');
+  lines.push('|---|---:|---|---|---|');
+  for (const row of rows.slice(0, 8)) {
+    lines.push(`| ${row.item} | ${row.confidence} | ${row.disposition} | ${row.blocks} | ${row.action} |`);
+  }
+  if (rows.length > 8) {
+    lines.push(`| ${rows.length - 8} more item(s) | n/a | hidden for brevity | no | Inspect details below if needed. |`);
+  }
+  lines.push('');
+}
+
 function commandLikeSnippet(text: string): string | null {
   const backtickMatches = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1]?.trim()).filter(Boolean);
   return backtickMatches.find((snippet) =>
@@ -687,7 +766,13 @@ export function buildSummaryBody(params: {
   lines.push('');
   lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
-  lines.push(`> ${summary.reasoning}`);
+  pushFinalDecisionTable(lines, triage, publicVerify, discussions);
+  lines.push('<details>');
+  lines.push('<summary>Raw head rationale</summary>');
+  lines.push('');
+  lines.push(summary.reasoning);
+  lines.push('');
+  lines.push('</details>');
   lines.push('');
 
   pushDecisionSnapshot(lines, summary, publicVerify, discussions);

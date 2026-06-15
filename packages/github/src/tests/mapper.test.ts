@@ -363,6 +363,8 @@ describe('buildSummaryBody', () => {
       discussions: [],
     });
     expect(body).toContain('ACCEPT');
+    expect(body).toContain('### Final Decision Table');
+    expect(body).toContain('No current blockers or human gates remain.');
     expect(body).toContain('### Decision Snapshot');
     expect(body).toContain('| Decision gate | Follow-up later | Ignored speculative |');
   });
@@ -515,6 +517,7 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('1 needs-human discussion');
+    expect(body).toContain('| d001 — discussion verdict | 26% | CRITICAL | human gate |');
     expect(body).toContain('| human review required | 1 | 0 |');
     expect(body).not.toContain('| 0 | 0 |');
   });
