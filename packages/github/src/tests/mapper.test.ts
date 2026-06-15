@@ -519,10 +519,24 @@ describe('buildTriageDigest', () => {
   });
 
   it('classifies CRITICAL with low confidence as needs-human', () => {
-    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 30 })];
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 45 })];
     const result = buildTriageDigest(docs);
     expect(result).toContain('1 needs-human');
     expect(result).not.toContain('must-fix');
+  });
+
+  it('classifies very low-confidence CRITICAL as needs-repro', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 30 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 needs-repro');
+    expect(result).not.toContain('needs-human');
+    expect(result).not.toContain('must-fix');
+  });
+
+  it('omits extremely low-confidence CRITICAL from public triage counts', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 0 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toBeNull();
   });
 
   it('classifies WARNING with high confidence as verify', () => {
@@ -553,7 +567,8 @@ describe('buildTriageDigest', () => {
   it('classifies a mix of docs correctly', () => {
     const docs = [
       makeDoc({ severity: 'CRITICAL', confidence: 90 }),     // must-fix
-      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // needs-human
+      makeDoc({ severity: 'CRITICAL', confidence: 45 }),     // needs-human
+      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // needs-repro
       makeDoc({ severity: 'WARNING', confidence: 80 }),      // verify
       makeDoc({ severity: 'SUGGESTION', confidence: 50 }),   // ignore
       makeDoc({ severity: 'SUGGESTION', confidence: 90 }),   // ignore
@@ -561,6 +576,7 @@ describe('buildTriageDigest', () => {
     const result = buildTriageDigest(docs);
     expect(result).toContain('1 must-fix');
     expect(result).toContain('1 needs-human');
+    expect(result).toContain('1 needs-repro');
     expect(result).toContain('1 verify');
     expect(result).toContain('2 ignore');
   });
@@ -612,12 +628,54 @@ describe('buildSummaryBody triage digest', () => {
       summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
       sessionId: 'sess-001',
       sessionDate: '2026-03-21',
-      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 30 })],
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 45 })],
       discussions: [],
     });
     expect(body).toContain('1 needs-human');
     expect(body).toContain('### Needs Human');
     expect(body).not.toContain('### Verify');
+  });
+
+  it('renders very low-confidence CRITICAL docs as Needs Repro', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 30 })],
+      discussions: [],
+    });
+    expect(body).toContain('1 needs-repro');
+    expect(body).toContain('### Needs Repro');
+    expect(body).toContain('Confirm with a concrete reproduction');
+    expect(body).not.toContain('### Needs Human');
+  });
+
+  it('collapses extremely low-confidence CRITICAL docs as hidden hypotheses', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 0 })],
+      discussions: [],
+    });
+    expect(body).toContain('1 speculative hypothesis(es) hidden');
+    expect(body).toContain('These are not merge blockers');
+    expect(body).not.toContain('### Speculative');
+    expect(body).not.toContain('### Needs Human');
+  });
+
+  it('renders action details for public findings', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary(),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 90 })],
+      discussions: [],
+    });
+    expect(body).toContain('Must-fix action details');
+    expect(body).toContain('Why this matters: Value may be null at this point.');
+    expect(body).toContain('How to verify: Line 42 dereferences without null check');
+    expect(body).toContain('Suggested fix: Add a null check before use.');
   });
 
   it('places triage digest between heading and verdict', () => {

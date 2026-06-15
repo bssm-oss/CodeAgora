@@ -35,6 +35,8 @@ export const VERDICT_BADGE: Record<string, { emoji: string; label: string }> = {
 };
 
 const LOW_CONFIDENCE_CRITICAL_MAX = 50;
+const NEEDS_REPRO_CONFIDENCE_MAX = 40;
+const SPECULATIVE_CONFIDENCE_MAX = 20;
 
 // ============================================================================
 // Truncation Helpers
@@ -78,27 +80,67 @@ function isCriticalSeverity(doc: EvidenceDocument): boolean {
   return doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
 }
 
-function splitPublicVerifyDocs(docs: EvidenceDocument[]): { needsHuman: EvidenceDocument[]; verify: EvidenceDocument[] } {
+function splitPublicVerifyDocs(docs: EvidenceDocument[]): {
+  needsHuman: EvidenceDocument[];
+  needsRepro: EvidenceDocument[];
+  speculative: EvidenceDocument[];
+  verify: EvidenceDocument[];
+} {
   const needsHuman: EvidenceDocument[] = [];
+  const needsRepro: EvidenceDocument[] = [];
+  const speculative: EvidenceDocument[] = [];
   const verify: EvidenceDocument[] = [];
   for (const doc of docs) {
-    if (isCriticalSeverity(doc) && evidenceConfidence(doc) <= LOW_CONFIDENCE_CRITICAL_MAX) {
+    const confidence = evidenceConfidence(doc);
+    if (isCriticalSeverity(doc) && confidence < SPECULATIVE_CONFIDENCE_MAX) {
+      speculative.push(doc);
+    } else if (isCriticalSeverity(doc) && confidence < NEEDS_REPRO_CONFIDENCE_MAX) {
+      needsRepro.push(doc);
+    } else if (isCriticalSeverity(doc) && confidence <= LOW_CONFIDENCE_CRITICAL_MAX) {
       needsHuman.push(doc);
     } else {
       verify.push(doc);
     }
   }
-  return { needsHuman, verify };
+  return { needsHuman, needsRepro, speculative, verify };
 }
 
 function formatPublicTriageCounts(triage: ReturnType<typeof triageDocs>): string {
-  const { needsHuman, verify } = splitPublicVerifyDocs(triage.verify);
+  const { needsHuman, needsRepro, verify } = splitPublicVerifyDocs(triage.verify);
   const parts: string[] = [];
   if (triage.mustFix.length > 0) parts.push(`${triage.mustFix.length} must-fix`);
   if (needsHuman.length > 0) parts.push(`${needsHuman.length} needs-human`);
+  if (needsRepro.length > 0) parts.push(`${needsRepro.length} needs-repro`);
   if (verify.length > 0) parts.push(`${verify.length} verify`);
   if (triage.ignore.length > 0) parts.push(`${triage.ignore.length} ignore`);
   return parts.join(' \u00B7 ') || 'no issues';
+}
+
+function formatLocation(doc: EvidenceDocument): string {
+  return `${doc.filePath}:${doc.lineRange[0]}`;
+}
+
+function firstEvidence(doc: EvidenceDocument): string {
+  return doc.evidence.find((item) => item.trim().length > 0) ?? 'Inspect the referenced line and confirm the reported path.';
+}
+
+function pushIssueActionDetails(lines: string[], docs: EvidenceDocument[], label: string): void {
+  if (docs.length === 0) return;
+  lines.push('<details>');
+  lines.push(`<summary>${label} action details</summary>`);
+  lines.push('');
+  for (const doc of docs) {
+    lines.push(`**\`${formatLocation(doc)}\` — ${doc.issueTitle}**`);
+    lines.push('');
+    lines.push(`- Why this matters: ${truncateResponse(doc.problem, 220)}`);
+    lines.push(`- How to verify: ${truncateResponse(firstEvidence(doc), 220)}`);
+    if (doc.suggestion) {
+      lines.push(`- Suggested fix: ${truncateResponse(doc.suggestion, 220)}`);
+    }
+    lines.push('');
+  }
+  lines.push('</details>');
+  lines.push('');
 }
 
 /**
@@ -465,10 +507,11 @@ export function buildSummaryBody(params: {
       const confCell = getConfidenceBadge(conf) || '\u2014';
       const unverified = (conf ?? 100) <= 30 ? ' \u26A0\uFE0F' : '';
       lines.push(
-        `| ${badge.emoji}${unverified} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
+        `| ${badge.emoji}${unverified} | \`${formatLocation(doc)}\` | ${doc.issueTitle} | ${confCell} |`,
       );
     }
     lines.push('');
+    pushIssueActionDetails(lines, triage.mustFix, 'Must-fix');
   }
 
   // Needs-human section: low-confidence CRITICAL+ findings are not must-fix.
@@ -480,10 +523,30 @@ export function buildSummaryBody(params: {
     for (const doc of publicVerify.needsHuman) {
       const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
       lines.push(
-        `| \u{1F7E0} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
+        `| \u{1F7E0} | \`${formatLocation(doc)}\` | ${doc.issueTitle} | ${confCell} |`,
       );
     }
     lines.push('');
+    pushIssueActionDetails(lines, publicVerify.needsHuman, 'Needs-human');
+  }
+
+  // Needs-repro section: lower-confidence CRITICAL+ findings need a concrete
+  // reproduction before they should influence merge decisions.
+  if (publicVerify.needsRepro.length > 0) {
+    lines.push('### Needs Repro');
+    lines.push('');
+    lines.push('Confirm with a concrete reproduction before treating these as blockers.');
+    lines.push('');
+    lines.push('| | File | Issue | Confidence |');
+    lines.push('|--|------|-------|-----------|');
+    for (const doc of publicVerify.needsRepro) {
+      const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
+      lines.push(
+        `| \u{1F7E0} | \`${formatLocation(doc)}\` | ${doc.issueTitle} | ${confCell} |`,
+      );
+    }
+    lines.push('');
+    pushIssueActionDetails(lines, publicVerify.needsRepro, 'Needs-repro');
   }
 
   // Verify section: actionable non-blocking findings, typically warnings.
@@ -496,9 +559,27 @@ export function buildSummaryBody(params: {
       const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\uD83D\uDFE1' };
       const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
       lines.push(
-        `| ${badge.emoji} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
+        `| ${badge.emoji} | \`${formatLocation(doc)}\` | ${doc.issueTitle} | ${confCell} |`,
       );
     }
+    lines.push('');
+    pushIssueActionDetails(lines, publicVerify.verify, 'Verify');
+  }
+
+  // Speculative hypotheses stay collapsed so 0-19% confidence findings do not
+  // compete with actionable review signal.
+  if (publicVerify.speculative.length > 0) {
+    lines.push('<details>');
+    lines.push(`<summary>${publicVerify.speculative.length} speculative hypothesis(es) hidden</summary>`);
+    lines.push('');
+    lines.push('These are not merge blockers unless a human can reproduce them or add stronger evidence.');
+    lines.push('');
+    for (const doc of publicVerify.speculative) {
+      const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
+      lines.push(`- \`${formatLocation(doc)}\` — ${doc.issueTitle} (${confCell})`);
+    }
+    lines.push('');
+    lines.push('</details>');
     lines.push('');
   }
 
