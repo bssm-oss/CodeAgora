@@ -417,7 +417,9 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('1 needs-human discussion');
-    expect(body).toContain('| d001 — discussion verdict | 26% | CRITICAL | human gate |');
+    expect(body).toContain('| d001 — discussion verdict | 26% | human-gated critical-risk hypothesis (26%) | human gate |');
+    expect(body).toContain('### Human Gate Evidence Cards');
+    expect(body).toContain('Policy basis: 20-59% critical-risk discussions require human review');
     expect(body).toContain('### Maintainer Action Top-3');
     expect(body).toContain('Run: `Inspect src/db/queries.ts:42 and run the nearest focused test.`');
     expect(body).toContain('| human review required | 1 | 0 |');

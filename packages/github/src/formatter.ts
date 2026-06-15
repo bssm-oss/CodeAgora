@@ -220,6 +220,13 @@ function isForcedSpeculativeDiscussion(discussion: DiscussionVerdict): boolean {
   return hasForcedDecisionTrace(discussion) && isSpeculativeCriticalDiscussion(discussion);
 }
 
+function formatDiscussionDecisionDisposition(discussion: DiscussionVerdict): string {
+  if (isNeedsHumanDiscussion(discussion)) {
+    return `human-gated critical-risk hypothesis (${discussionConfidenceLabel(discussion)})`;
+  }
+  return formatDiscussionSeverityLabel(discussion);
+}
+
 function pushDiscussionDisposition(lines: string[], discussion: DiscussionVerdict): void {
   const severityLabel = formatDiscussionSeverityLabel(discussion);
   if (isForcedSpeculativeDiscussion(discussion)) {
@@ -302,9 +309,9 @@ function pushFinalDecisionTable(
     rows.push({
       item: `${discussion.discussionId} — discussion verdict`,
       confidence: discussionConfidenceLabel(discussion),
-      disposition: formatDiscussionSeverityLabel(discussion),
+      disposition: formatDiscussionDecisionDisposition(discussion),
       blocks: 'human gate',
-      action: 'Inspect the consensus log and confirm whether the contract changed.',
+      action: 'Run the evidence card below and confirm the contract.',
     });
   }
 
@@ -337,6 +344,26 @@ function pushFinalDecisionTable(
     lines.push(`| ${rows.length - 8} more item(s) | n/a | hidden for brevity | no | Inspect details below if needed. |`);
   }
   lines.push('');
+}
+
+function pushDiscussionEvidenceCards(lines: string[], discussions: DiscussionVerdict[]): void {
+  const humanGateDiscussions = discussions.filter(isNeedsHumanDiscussion);
+  if (humanGateDiscussions.length === 0) return;
+
+  lines.push('### Human Gate Evidence Cards');
+  lines.push('');
+  for (const discussion of humanGateDiscussions.slice(0, 3)) {
+    const location = `${discussion.filePath}:${discussion.lineRange[0]}`;
+    lines.push(`**${discussion.discussionId} — \`${location}\`**`);
+    lines.push('');
+    lines.push(`- Observed signal: L2 kept a critical-risk discussion at ${discussionConfidenceLabel(discussion)} confidence.`);
+    lines.push(`- Policy basis: 20-59% critical-risk discussions require human review instead of automatic reject or accept.`);
+    lines.push(`- Reproduce: \`${suggestedDiscussionCommand(discussion)}\``);
+    lines.push(`- Pass: focused check or code inspection shows the reported contract did not regress.`);
+    lines.push(`- Fail: the reported behavior changed unintentionally; keep the gate until fixed.`);
+    lines.push(`- Trace: ${truncateResponse(discussion.reasoning, 180)}`);
+    lines.push('');
+  }
 }
 
 function suggestedCommandForPath(filePath: string, issueTitle = ''): string | null {
@@ -848,6 +875,7 @@ export function buildSummaryBody(params: {
   lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
   pushFinalDecisionTable(lines, triage, publicVerify, discussions);
+  pushDiscussionEvidenceCards(lines, discussions);
   pushMaintainerActionTop3(lines, triage, publicVerify, discussions);
   pushDecisionSnapshot(lines, summary, publicVerify, discussions);
   pushReviewCoverage(lines, summary, safeParams.reviewRun);
