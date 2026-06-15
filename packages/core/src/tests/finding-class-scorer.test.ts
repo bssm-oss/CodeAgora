@@ -44,6 +44,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.2);
   });
 
+  it('catches provider-specific env var loss claims as provider-contract flexibility', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Generated GitHub Actions workflow loses provider-specific environment variables for non-OpenRouter providers',
+        problem:
+          'The workflow uses the shared OpenRouter action template and no longer emits provider-specific secrets for non-OpenRouter providers.',
+      }),
+    )!;
+    expect(match.id).toBe('provider-contract-flexibility');
+    expect(match.multiplier).toBe(0.2);
+  });
+
   it('catches review-run summary merge policy claims', () => {
     const match = matchFindingClass(
       doc({
