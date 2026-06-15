@@ -7,7 +7,7 @@
 import type { EvidenceDocument, DiscussionVerdict, DiscussionRound, ReviewerOpinion } from '@codeagora/core/types/core.js';
 import type { PipelineSummary, ReviewQueues, ReviewRunSummary } from '@codeagora/core/pipeline/orchestrator.js';
 import { getConfidenceBadge } from '@codeagora/core/pipeline/confidence.js';
-import { triageDocs, formatTriageCounts } from '@codeagora/shared/utils/triage.js';
+import { triageDocs } from '@codeagora/shared/utils/triage.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 
 // ============================================================================
@@ -33,6 +33,8 @@ export const VERDICT_BADGE: Record<string, { emoji: string; label: string }> = {
   REJECT: { emoji: '\u{1F534}', label: 'REJECT' },
   NEEDS_HUMAN: { emoji: '\u{1F7E0}', label: 'NEEDS HUMAN REVIEW' },
 };
+
+const LOW_CONFIDENCE_CRITICAL_MAX = 50;
 
 // ============================================================================
 // Truncation Helpers
@@ -68,17 +70,44 @@ export function truncateReviewBody(body: string, maxLen: number): string {
 // Triage Digest
 // ============================================================================
 
+function evidenceConfidence(doc: EvidenceDocument): number {
+  return doc.confidenceTrace?.final ?? doc.confidence ?? 50;
+}
+
+function isCriticalSeverity(doc: EvidenceDocument): boolean {
+  return doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
+}
+
+function splitPublicVerifyDocs(docs: EvidenceDocument[]): { needsHuman: EvidenceDocument[]; verify: EvidenceDocument[] } {
+  const needsHuman: EvidenceDocument[] = [];
+  const verify: EvidenceDocument[] = [];
+  for (const doc of docs) {
+    if (isCriticalSeverity(doc) && evidenceConfidence(doc) <= LOW_CONFIDENCE_CRITICAL_MAX) {
+      needsHuman.push(doc);
+    } else {
+      verify.push(doc);
+    }
+  }
+  return { needsHuman, verify };
+}
+
+function formatPublicTriageCounts(triage: ReturnType<typeof triageDocs>): string {
+  const { needsHuman, verify } = splitPublicVerifyDocs(triage.verify);
+  const parts: string[] = [];
+  if (triage.mustFix.length > 0) parts.push(`${triage.mustFix.length} must-fix`);
+  if (needsHuman.length > 0) parts.push(`${needsHuman.length} needs-human`);
+  if (verify.length > 0) parts.push(`${verify.length} verify`);
+  if (triage.ignore.length > 0) parts.push(`${triage.ignore.length} ignore`);
+  return parts.join(' \u00B7 ') || 'no issues';
+}
+
 /**
  * Build a one-line triage summary for quick developer orientation (#410).
- * Classification:
- * - must-fix: CRITICAL+ with confidence >50%
- * - verify: CRITICAL+ with confidence ≤50%, or WARNING with confidence >50%
- * - ignore: SUGGESTION, non-critical confidence <20%, or class-prior findings below must-fix confidence
  */
 export function buildTriageDigest(docs: EvidenceDocument[]): string | null {
   if (docs.length === 0) return null;
-  const { counts } = triageDocs(docs);
-  const formatted = formatTriageCounts(counts);
+  const triage = triageDocs(docs);
+  const formatted = formatPublicTriageCounts(triage);
   return formatted === 'no issues' ? null : `\u{1F4CB} **Triage:** ${formatted}`;
 }
 
@@ -410,7 +439,8 @@ export function buildSummaryBody(params: {
   // Unified header: verdict + triage
   const vb = VERDICT_BADGE[summary.decision] ?? { emoji: '\u2753', label: summary.decision };
   const triage = triageDocs(evidenceDocs);
-  const triageStr = formatTriageCounts(triage.counts);
+  const triageStr = formatPublicTriageCounts(triage);
+  const publicVerify = splitPublicVerifyDocs(triage.verify);
   const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
 
   lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
@@ -441,13 +471,28 @@ export function buildSummaryBody(params: {
     lines.push('');
   }
 
-  // Verify section
-  if (triage.verify.length > 0) {
+  // Needs-human section: low-confidence CRITICAL+ findings are not must-fix.
+  if (publicVerify.needsHuman.length > 0) {
+    lines.push('### Needs Human');
+    lines.push('');
+    lines.push('| | File | Issue | Confidence |');
+    lines.push('|--|------|-------|-----------|');
+    for (const doc of publicVerify.needsHuman) {
+      const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
+      lines.push(
+        `| \u{1F7E0} | \`${doc.filePath}:${doc.lineRange[0]}\` | ${doc.issueTitle} | ${confCell} |`,
+      );
+    }
+    lines.push('');
+  }
+
+  // Verify section: actionable non-blocking findings, typically warnings.
+  if (publicVerify.verify.length > 0) {
     lines.push('### Verify');
     lines.push('');
     lines.push('| | File | Issue | Confidence |');
     lines.push('|--|------|-------|-----------|');
-    for (const doc of triage.verify) {
+    for (const doc of publicVerify.verify) {
       const badge = SEVERITY_BADGE[doc.severity] ?? { emoji: '\uD83D\uDFE1' };
       const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
       lines.push(

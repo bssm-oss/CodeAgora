@@ -37,6 +37,7 @@ export function buildEvidenceEntry(result, options = {}) {
     command: result.command,
     exitCode: result.exitCode,
     passed: result.exitCode === 0,
+    evidenceMode: result.evidenceMode ?? 'real',
     timestamp,
     startedAt: result.startedAt,
     finishedAt: result.finishedAt,

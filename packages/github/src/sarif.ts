@@ -57,7 +57,7 @@ interface SarifResult {
       region: { startLine: number; endLine: number };
     };
   }>;
-  fixes?: Array<{ description: { text: string } }>;
+  fixes?: Array<{ description: { text: string }; artifactChanges: unknown[] }>;
   partialFingerprints?: Record<string, string>;
   properties?: Record<string, unknown>;
 }
@@ -103,6 +103,7 @@ const SARIF_RULES: SarifRule[] = REVIEW_SEVERITIES.map((severity) => {
 });
 
 const SARIF_RULE_INDEX = new Map(SARIF_RULES.map((rule, index) => [rule.id, index]));
+const ACTIONABLE_SARIF_MIN_CONFIDENCE = 60;
 
 function sarifRuleForSeverity(
   severity: string,
@@ -139,6 +140,23 @@ function normalizeArtifactUri(filePath: string): string {
 
 function stableFingerprint(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex').slice(0, 32);
+}
+
+function finalConfidence(doc: EvidenceDocument): number | undefined {
+  return doc.confidenceTrace?.final ?? doc.confidenceTrace?.verified ?? doc.confidenceTrace?.filtered ?? doc.confidence;
+}
+
+export function isSarifPublishableEvidenceDoc(doc: EvidenceDocument): boolean {
+  if (doc.severity === 'SUGGESTION') return false;
+  if (doc.source === 'rule') return true;
+  if (doc.suggestionVerified === 'failed') return false;
+  if (doc.confidenceTrace?.classPrior) return false;
+  const confidence = finalConfidence(doc);
+  return confidence !== undefined && confidence >= ACTIONABLE_SARIF_MIN_CONFIDENCE;
+}
+
+export function filterSarifPublishableEvidenceDocs(evidenceDocs: EvidenceDocument[]): EvidenceDocument[] {
+  return evidenceDocs.filter(isSarifPublishableEvidenceDoc);
 }
 
 // ============================================================================
@@ -203,13 +221,13 @@ export function buildSarifReport(
         ...(doc.reviewerId ? { reviewerId: doc.reviewerId } : {}),
         ...(doc.source ? { source: doc.source } : {}),
         ...(doc.confidence !== undefined ? { confidence: doc.confidence } : {}),
+        ...(doc.confidenceTrace ? { confidenceTrace: doc.confidenceTrace } : {}),
         ...(doc.suggestionVerified ? { suggestionVerified: doc.suggestionVerified } : {}),
       },
     };
 
-    if (doc.suggestion) {
-      result.fixes = [{ description: { text: doc.suggestion } }];
-    }
+    // Free-form review suggestions stay in the markdown body above. SARIF fixes
+    // require concrete artifactChanges, and GitHub rejects description-only fixes.
 
     // Attach discussion metadata (1.7)
     const locKey = `${doc.filePath}:${doc.lineRange[0]}`;

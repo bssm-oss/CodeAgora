@@ -14,21 +14,36 @@ function requiredEvidenceEntries(entries, requiredTier) {
 export function summarizeReleaseGates({ entries, gateExitStatus, requiredTier }) {
   const requiredEntries = requiredEvidenceEntries(entries ?? [], requiredTier);
   const missingEvidence = requiredEntries.filter((entry) => !entry.exists);
+  const invalidEvidence = requiredEntries.filter((entry) => (
+    entry.exists
+    && entry.releaseValidity !== undefined
+    && entry.releaseValidity.validForRelease !== true
+  ));
   const evidenceComplete = missingEvidence.length === 0;
+  const evidenceValid = invalidEvidence.length === 0;
   const gateExitStatusPassed = gateExitStatus?.passed === true;
 
   return {
     schemaVersion: 'codeagora.release-gate-summary.v1',
     requiredTier: requiredTier ?? null,
-    passed: gateExitStatusPassed && evidenceComplete,
+    passed: gateExitStatusPassed && evidenceComplete && evidenceValid,
     gateExitStatusPassed,
     evidenceComplete,
+    evidenceValid,
     requiredEvidenceCount: requiredEntries.length,
     missingEvidence: missingEvidence.map((entry) => ({
       name: entry.name,
       filename: entry.filename,
       tier: entry.tier,
       path: entry.path ?? null,
+    })),
+    invalidEvidence: invalidEvidence.map((entry) => ({
+      name: entry.name,
+      filename: entry.filename,
+      tier: entry.tier,
+      path: entry.path ?? null,
+      evidenceMode: entry.releaseValidity?.evidenceMode ?? null,
+      reason: entry.releaseValidity?.reason ?? 'invalid',
     })),
     failedGates: gateExitStatus?.failed ?? [],
     missingGateEvidence: gateExitStatus?.missing ?? [],
@@ -44,6 +59,7 @@ export function assertReleaseGateSummaryPass(summary) {
   const reasons = [
     summary.gateExitStatusPassed ? '' : 'gate exit status failed',
     summary.evidenceComplete ? '' : `missing evidence: ${summary.missingEvidence.map((entry) => entry.filename).join(', ')}`,
+    summary.evidenceValid ? '' : `invalid evidence: ${summary.invalidEvidence.map((entry) => `${entry.filename} (${entry.reason})`).join(', ')}`,
   ].filter(Boolean);
 
   throw new Error(`Release gate summary did not pass: ${reasons.join('; ')}`);

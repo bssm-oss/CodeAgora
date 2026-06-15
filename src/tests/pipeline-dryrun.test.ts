@@ -203,6 +203,76 @@ describe('dryRun', () => {
     expect(openrouterHealth!.status).toBe('no-api-key');
   });
 
+  it('does not require API keys for CLI-backed configs', async () => {
+    delete process.env.GROQ_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
+
+    const result = await dryRun(makeConfig({
+      reviewers: [
+        {
+          id: 'r1',
+          model: 'gpt-5.4-mini',
+          backend: 'codex',
+          enabled: true,
+          timeout: 120,
+        },
+        {
+          id: 'r2',
+          model: 'haiku',
+          backend: 'claude',
+          enabled: true,
+          timeout: 120,
+        },
+        {
+          id: 'r3',
+          model: 'deepseek-v4-flash',
+          backend: 'opencode',
+          provider: 'opencode-go',
+          enabled: true,
+          timeout: 120,
+        },
+      ],
+      supporters: {
+        pool: [
+          {
+            id: 's1',
+            model: 'gpt-5.3-codex-spark',
+            backend: 'codex',
+            enabled: true,
+            timeout: 120,
+          },
+        ],
+        pickCount: 1,
+        pickStrategy: 'random',
+        devilsAdvocate: {
+          id: 'da',
+          model: 'kimi-k2.7-code',
+          backend: 'opencode',
+          provider: 'opencode-go',
+          enabled: true,
+          timeout: 120,
+        },
+        personaPool: ['skeptic'],
+        personaAssignment: 'random',
+      },
+      moderator: {
+        backend: 'codex',
+        model: 'gpt-5.5',
+      },
+      head: {
+        backend: 'codex',
+        model: 'gpt-5.5',
+        enabled: true,
+      },
+    }), SAMPLE_DIFF);
+
+    expect(result.health).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    expect(formatDryRunText(result)).toContain('Readiness: READY');
+  });
+
   it('missing API key adds warning message', async () => {
     delete process.env.GROQ_API_KEY;
     delete process.env.OPENROUTER_API_KEY;

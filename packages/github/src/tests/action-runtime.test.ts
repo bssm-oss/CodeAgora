@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   runPipeline: vi.fn(),
   setCommitStatus: vi.fn(),
   serializeSarif: vi.fn(() => '{"runs":[]}' ),
+  filterSarifPublishableEvidenceDocs: vi.fn((docs: unknown[]) => docs),
   writeFile: vi.fn(),
   validateActionDiffPath: vi.fn(),
   validateActionOutputPath: vi.fn(),
@@ -78,6 +79,7 @@ vi.mock('../diff-parser.js', () => ({
 
 vi.mock('../sarif.js', () => ({
   buildSarifReport: mocks.buildSarifReport,
+  filterSarifPublishableEvidenceDocs: mocks.filterSarifPublishableEvidenceDocs,
   serializeSarif: mocks.serializeSarif,
 }));
 
@@ -323,6 +325,92 @@ describe('GitHub Action runtime', () => {
     expect(summary).toContain('CodeAgora review degraded');
     expect(summary).toContain('Reason: `posting-disabled`');
     expect(summary).toContain('Step for posting-disabled');
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('filters unverified findings before writing Action SARIF output', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const summaryFile = path.join(tempDir, 'summary.md');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const sarifFile = path.join(tempDir, 'results.sarif');
+    const eventFile = path.join(tempDir, 'event.json');
+
+    const lowConfidenceDoc = {
+      issueTitle: 'low confidence',
+      problem: 'may be wrong',
+      evidence: ['weak evidence'],
+      severity: 'CRITICAL',
+      suggestion: 'check manually',
+      filePath: 'src/app.ts',
+      lineRange: [7, 7],
+      confidence: 24,
+    };
+    const publishableDoc = {
+      issueTitle: 'verified issue',
+      problem: 'definite bug',
+      evidence: ['strong evidence'],
+      severity: 'CRITICAL',
+      suggestion: 'fix it',
+      filePath: 'src/app.ts',
+      lineRange: [9, 9],
+      confidence: 91,
+    };
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_STEP_SUMMARY = summaryFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      repo: 'owner/repo',
+      sha: inputSha,
+      pr: 42,
+      diff: diffFile,
+      token: 'ghp_test',
+      configPath: '.ca/config.json',
+      baseSha: undefined,
+      maxDiffLines: 0,
+      failOnReject: false,
+      postResults: false,
+      reporterMode: 'check-run',
+      checkRunName: 'CodeAgora Review',
+    } as never);
+
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: true,
+      degradedReason: 'posting-disabled',
+      shouldRunReview: true,
+      shouldPostResults: false,
+      verdictOverride: undefined,
+    } as never);
+
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.validateActionOutputPath).mockResolvedValue(sarifFile);
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue(null as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'success',
+      summary: { decision: 'NEEDS_HUMAN' },
+      sessionId: 'session-001',
+      date: '2026-06-08',
+      evidenceDocs: [lowConfidenceDoc, publishableDoc],
+      discussions: [],
+    } as never);
+    vi.mocked(mocks.filterSarifPublishableEvidenceDocs).mockReturnValue([publishableDoc]);
+    vi.mocked(mocks.writeFile).mockResolvedValue(undefined);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.filterSarifPublishableEvidenceDocs).toHaveBeenCalledWith([lowConfidenceDoc, publishableDoc]);
+    expect(mocks.buildSarifReport).toHaveBeenCalledWith([publishableDoc], 'session-001', '2026-06-08');
+    expect(mocks.serializeSarif).toHaveBeenCalledWith({ runs: [] });
+    expect(mocks.writeFile).toHaveBeenCalledWith(sarifFile, '{"runs":[]}');
+    expect(await readFile(outputFile, 'utf-8')).toContain(`sarif-file=${sarifFile}`);
 
     await rm(tempDir, { recursive: true, force: true });
   });

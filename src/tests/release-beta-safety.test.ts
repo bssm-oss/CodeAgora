@@ -43,7 +43,7 @@ describe('prerelease safety', () => {
     const actionRef = `bssm-oss/CodeAgora@v${rootVersion}`;
     const files = [
       'README.md',
-      'packages/cli/src/commands/init.ts',
+      'packages/shared/src/action-preset.ts',
       'packages/shared/src/data/github-actions-template.yml',
       'docs/for-users/GITHUB_ACTIONS_SETUP.md',
     ];

@@ -518,10 +518,10 @@ describe('buildTriageDigest', () => {
     expect(result).toContain('1 must-fix');
   });
 
-  it('classifies CRITICAL with low confidence as verify', () => {
+  it('classifies CRITICAL with low confidence as needs-human', () => {
     const docs = [makeDoc({ severity: 'CRITICAL', confidence: 30 })];
     const result = buildTriageDigest(docs);
-    expect(result).toContain('1 verify');
+    expect(result).toContain('1 needs-human');
     expect(result).not.toContain('must-fix');
   });
 
@@ -544,23 +544,24 @@ describe('buildTriageDigest', () => {
   });
 
   it('defaults confidence to 50 when not set', () => {
-    // CRITICAL with default 50 → conf ≤ 50 → verify
+    // CRITICAL with default 50 → conf ≤ 50 → needs-human
     const docs = [makeDoc({ severity: 'CRITICAL', confidence: undefined })];
     const result = buildTriageDigest(docs);
-    expect(result).toContain('1 verify');
+    expect(result).toContain('1 needs-human');
   });
 
   it('classifies a mix of docs correctly', () => {
     const docs = [
       makeDoc({ severity: 'CRITICAL', confidence: 90 }),     // must-fix
-      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // verify
+      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // needs-human
       makeDoc({ severity: 'WARNING', confidence: 80 }),      // verify
       makeDoc({ severity: 'SUGGESTION', confidence: 50 }),   // ignore
       makeDoc({ severity: 'SUGGESTION', confidence: 90 }),   // ignore
     ];
     const result = buildTriageDigest(docs);
     expect(result).toContain('1 must-fix');
-    expect(result).toContain('2 verify');
+    expect(result).toContain('1 needs-human');
+    expect(result).toContain('1 verify');
     expect(result).toContain('2 ignore');
   });
 
@@ -604,6 +605,19 @@ describe('buildSummaryBody triage digest', () => {
     expect(body).toContain('1 must-fix');
     expect(body).toContain('1 verify');
     expect(body).toContain('1 ignore');
+  });
+
+  it('renders low-confidence CRITICAL docs as Needs Human instead of Verify', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 30 })],
+      discussions: [],
+    });
+    expect(body).toContain('1 needs-human');
+    expect(body).toContain('### Needs Human');
+    expect(body).not.toContain('### Verify');
   });
 
   it('places triage digest between heading and verdict', () => {

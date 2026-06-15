@@ -88,6 +88,9 @@ function evidenceEntriesForSurface(surface) {
 }
 
 function deterministicLocalGatesForManifest(entries, requiredTier) {
+  if (!requiredTier) {
+    return [];
+  }
   return entries.filter((entry) => {
     if (entry.execution !== RELEASE_GATE_EXECUTIONS.LOCAL_COMMAND) {
       return false;
@@ -149,12 +152,50 @@ function publicGateCommandEvidence(entry) {
     command: entry.command ?? null,
     exitCode: Number.isInteger(entry.exitCode) ? entry.exitCode : null,
     passed: typeof entry.passed === 'boolean' ? entry.passed : null,
+    evidenceMode: entry.evidenceMode ?? 'real',
     timestamp: entry.timestamp ?? null,
     startedAt: entry.startedAt ?? null,
     finishedAt: entry.finishedAt ?? null,
     logPath: entry.logPath ?? null,
     logLink: entry.logLink ?? null,
     ledgerLine: entry.ledgerLine ?? null,
+  };
+}
+
+function artifactEvidenceMode(entry, artifactPath, latestCommandEvidence) {
+  if (!fs.existsSync(artifactPath)) {
+    return null;
+  }
+
+  if (entry.execution === RELEASE_GATE_EXECUTIONS.LOCAL_COMMAND) {
+    return latestCommandEvidence?.evidenceMode ?? 'real';
+  }
+
+  if (entry.execution === RELEASE_GATE_EXECUTIONS.COVERED_LOCAL_COMMAND) {
+    return 'real';
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
+    return typeof parsed?.evidenceMode === 'string' ? parsed.evidenceMode : 'real';
+  } catch {
+    return entry.execution === RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT ? 'unknown' : 'real';
+  }
+}
+
+function releaseValidityForEntry(entry, artifactPath, latestCommandEvidence) {
+  const evidenceMode = artifactEvidenceMode(entry, artifactPath, latestCommandEvidence);
+  const validForRelease = evidenceMode === null ? false : evidenceMode === 'real';
+  const reason = evidenceMode === null
+    ? 'missing'
+    : validForRelease
+      ? 'real evidence'
+      : `invalid evidence mode: ${evidenceMode}`;
+
+  return {
+    evidenceMode,
+    validForRelease,
+    reason,
   };
 }
 
@@ -171,6 +212,7 @@ function buildManifest(options) {
     const stat = exists ? fs.statSync(artifactPath) : undefined;
     const latestMetadata = metadataByName.get(entry.name) ?? null;
     const latestCommandEvidence = publicGateCommandEvidence(gateCommandEvidenceByName.get(entry.name));
+    const releaseValidity = releaseValidityForEntry(entry, artifactPath, latestCommandEvidence);
     return {
       ...entry,
       path: path.relative(process.cwd(), artifactPath),
@@ -179,6 +221,8 @@ function buildManifest(options) {
       sha256: exists ? sha256(artifactPath) : null,
       latestMetadata,
       latestCommandEvidence,
+      releaseValidity,
+      evidenceMode: releaseValidity.evidenceMode,
       artifactLinks: latestMetadata?.artifactLinks ?? [],
       outputLinks: latestMetadata?.outputLinks ?? [],
     };
@@ -210,9 +254,21 @@ function buildManifest(options) {
 function enforceRequired(manifest, requiredTier) {
   if (!requiredTier) return;
   const missing = manifest.entries.filter((entry) => entry.requiredForRelease !== false && tierIncluded(entry.tier, requiredTier) && !entry.exists);
-  if (missing.length === 0) return;
-  const names = missing.map((entry) => `${entry.filename} (${entry.tier})`).join(', ');
-  throw new Error(`Missing required ${requiredTier} evidence: ${names}`);
+  const invalid = manifest.entries.filter((entry) => (
+    entry.requiredForRelease !== false
+    && tierIncluded(entry.tier, requiredTier)
+    && entry.exists
+    && entry.releaseValidity?.validForRelease !== true
+  ));
+  if (missing.length === 0 && invalid.length === 0) return;
+  const messages = [];
+  if (missing.length > 0) {
+    messages.push(`missing: ${missing.map((entry) => `${entry.filename} (${entry.tier})`).join(', ')}`);
+  }
+  if (invalid.length > 0) {
+    messages.push(`invalid: ${invalid.map((entry) => `${entry.filename} (${entry.releaseValidity?.reason ?? 'invalid'})`).join(', ')}`);
+  }
+  throw new Error(`Missing or invalid required ${requiredTier} evidence: ${messages.join('; ')}`);
 }
 
 function enforceGateExitStatuses(manifest, requiredTier) {

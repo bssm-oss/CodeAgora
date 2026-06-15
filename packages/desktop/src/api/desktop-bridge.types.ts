@@ -27,6 +27,12 @@ export interface RunReviewResult {
   sessionId?: string;
 }
 
+export type DesktopBridgeErrorCode = 'DESKTOP_PREVIEW_DISABLED';
+
+export interface DesktopBridgeError extends Error {
+  code: DesktopBridgeErrorCode;
+}
+
 export type ReviewRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'cancelling';
 
 export interface ReviewRunEvent {

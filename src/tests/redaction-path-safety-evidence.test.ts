@@ -40,6 +40,7 @@ describe('redaction and path-safety evidence', () => {
       }]);
       expect(result.evidence).toMatchObject({
         schemaVersion: REDACTION_PATH_SAFETY_EVIDENCE_SCHEMA_VERSION,
+        evidenceMode: 'real',
         redactionStatus: 'safe-to-publish',
         releaseTier: 'rc',
         outputPath: path.relative(process.cwd(), output),
@@ -107,5 +108,26 @@ describe('redaction and path-safety evidence', () => {
     expect(evidence.tests.stdoutExcerpt).not.toContain('test-secret');
     expect(evidence.tests.stderrExcerpt).not.toContain('ghp_testsecret');
     expect(Object.values(evidence.checks).every((value) => value === false)).toBe(true);
+  });
+
+  it('marks skipped test evidence as non-real', async () => {
+    const dir = makeTmpDir();
+    try {
+      const result = await runRedactionPathSafetyEvidence({
+        cwd: process.cwd(),
+        evidenceDir: dir,
+        skipTests: true,
+      });
+
+      expect(result.evidence).toMatchObject({
+        evidenceMode: 'skipped',
+        tests: {
+          skipped: true,
+          passed: true,
+        },
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

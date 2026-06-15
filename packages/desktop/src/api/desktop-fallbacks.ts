@@ -8,7 +8,6 @@ import type {
   GitHubActionStatus,
   EvidenceStatus,
   DesktopCommandContract,
-  ReviewRunSnapshot,
 } from './desktop-bridge.types.js';
 
 /** Stub session data used when running outside Tauri context. */
@@ -75,19 +74,6 @@ export function fallbackSessionExport(id: string, format: string, detail: Sessio
     format,
     fileName: `codeagora-session-${id.replace('/', '-')}.${ext}`,
     content,
-  };
-}
-
-export function fallbackReviewRun(staged: boolean, status: 'completed' | 'running' = 'completed'): ReviewRunSnapshot {
-  return {
-    runId: `preview-${Date.now()}`,
-    staged,
-    status,
-    message: staged ? 'Preview mode: staged review would start.' : 'Preview mode: working tree review would start.',
-    sessionId: 'preview',
-    startedAt: String(Date.now()),
-    completedAt: status === 'completed' ? String(Date.now()) : undefined,
-    events: [],
   };
 }
 

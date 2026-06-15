@@ -11,6 +11,10 @@ import { parse as parseYaml } from 'yaml';
 
 import { writeGitHubWorkflow, runInit } from '@codeagora/cli/commands/init.js';
 import { validateConfig } from '@codeagora/core/types/config.js';
+import {
+  buildActionPresetConfig,
+  renderCodeAgoraWorkflowTemplate,
+} from '@codeagora/shared/action-preset.js';
 
 // ============================================================================
 // writeGitHubWorkflow
@@ -105,7 +109,29 @@ describe('writeGitHubWorkflow()', () => {
     expect(content).not.toBe('existing content');
     expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0-rc.6');
   });
+
+  it('writes the shared Action workflow template', async () => {
+    await writeGitHubWorkflow(tmpDir);
+
+    const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
+    const content = await fs.readFile(filePath, 'utf-8');
+
+    expect(content).toBe(renderCodeAgoraWorkflowTemplate());
+    expect(extractConfigFromWorkflow(content)).toEqual(buildActionPresetConfig({ language: 'en' }));
+  });
 });
+
+function extractConfigFromWorkflow(content: string): unknown {
+  const match = content.match(/cat > \.ca\/config\.json << 'CONF'\n([\s\S]*?)\n\s*CONF/);
+  if (!match) {
+    throw new Error('workflow config heredoc not found');
+  }
+  const json = match[1]!
+    .split('\n')
+    .map((line) => line.replace(/^ {10}/, ''))
+    .join('\n');
+  return JSON.parse(json);
+}
 
 // ============================================================================
 // runInit with --ci flag

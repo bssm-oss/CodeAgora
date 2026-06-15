@@ -38,6 +38,17 @@ function writeGateLedger(dir: string, requiredTier: string, overrides: Record<st
   fs.writeFileSync(path.join(dir, 'gate-command-evidence.jsonl'), entries.map((entry) => JSON.stringify(entry)).join('\n'));
 }
 
+function writeRealArtifact(dir: string, file: string): void {
+  fs.writeFileSync(path.join(dir, file), `${JSON.stringify({
+    schemaVersion: `test.${file}.v1`,
+    evidenceMode: 'real',
+    tests: {
+      skipped: false,
+      passed: true,
+    },
+  }, null, 2)}\n`);
+}
+
 describe('release evidence manifest', () => {
   it('writes manifest entries with hashes for present evidence files', () => {
     const dir = makeTmpDir();
@@ -134,7 +145,7 @@ describe('release evidence manifest', () => {
       });
 
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('Missing required beta evidence');
+      expect(result.stderr).toContain('Missing or invalid required beta evidence');
       expect(result.stderr).toContain('build.log');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -167,7 +178,15 @@ describe('release evidence manifest', () => {
         'github-security-evidence.json',
       ];
       for (const file of rcFiles) {
-        fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        if ([
+          'desktop-security-evidence.json',
+          'redaction-path-safety-evidence.json',
+          'github-security-evidence.json',
+        ].includes(file)) {
+          writeRealArtifact(dir, file);
+        } else {
+          fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        }
       }
       writeGateLedger(dir, 'rc');
 
@@ -203,6 +222,9 @@ describe('release evidence manifest', () => {
         tier: 'rc',
         exists: true,
       });
+      expect(desktopSecurity.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
+      expect(redactionPathSafety.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
+      expect(githubSecurity.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
       expect(manifest.gateExitStatus.passed).toBe(true);
       expect(manifest.gateSummary.passed).toBe(true);
       expect(manifest.gateExitStatus.failed).toEqual([]);
@@ -231,7 +253,14 @@ describe('release evidence manifest', () => {
         'github-security-evidence.json',
       ];
       for (const file of rcFiles) {
-        fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        if ([
+          'redaction-path-safety-evidence.json',
+          'github-security-evidence.json',
+        ].includes(file)) {
+          writeRealArtifact(dir, file);
+        } else {
+          fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        }
       }
       writeGateLedger(dir, 'rc');
 
@@ -301,6 +330,7 @@ describe('release evidence manifest', () => {
       );
       expect(redactionPathSafetyArtifact).toMatchObject({
         schemaVersion: 'codeagora.redaction-path-safety-evidence.v1',
+        evidenceMode: 'skipped',
         releaseTier: 'rc',
         tests: {
           skipped: true,
@@ -322,6 +352,7 @@ describe('release evidence manifest', () => {
       );
       expect(desktopSecurityArtifact).toMatchObject({
         schemaVersion: 'codeagora.desktop-security-evidence.v1',
+        evidenceMode: 'skipped',
         releaseTier: 'rc',
         tests: {
           skipped: true,
@@ -338,6 +369,10 @@ describe('release evidence manifest', () => {
         command: 'pnpm evidence:github-security',
         tier: 'rc',
         exists: true,
+        releaseValidity: {
+          evidenceMode: 'placeholder',
+          validForRelease: false,
+        },
       });
       expect(manifest.gateSummary.passed).toBe(true);
     } finally {
@@ -395,6 +430,57 @@ describe('release evidence manifest', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Deterministic release gates did not all record complete passing evidence');
       expect(result.stderr).toContain('missing: typecheck, lint, build, test, bench-ci, beta-smoke');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects skipped or placeholder artifacts for required rc manifests', () => {
+    const dir = makeTmpDir();
+    try {
+      const rcFiles = [
+        'typecheck.log',
+        'lint.log',
+        'build.log',
+        'test.log',
+        'bench-ci.log',
+        'beta-smoke.log',
+        'cross-surface-parity.log',
+        'package-root-dry-run.log',
+        'package-mcp-dry-run.log',
+        'action-smoke.log',
+        'mcp-smoke.log',
+        'desktop-app-e2e.log',
+        'desktop-macos-webdriver-e2e.log',
+        'desktop-visual-qa.json',
+        'desktop-gate.log',
+        'desktop-evidence-manifest.json',
+        'desktop-security-evidence.json',
+        'security-regression.log',
+        'redaction-path-safety-evidence.json',
+        'github-security-evidence.json',
+      ];
+      for (const file of rcFiles) {
+        if (file === 'desktop-security-evidence.json') {
+          fs.writeFileSync(path.join(dir, file), `${JSON.stringify({ evidenceMode: 'skipped' })}\n`);
+        } else if (file === 'github-security-evidence.json') {
+          fs.writeFileSync(path.join(dir, file), `${JSON.stringify({ evidenceMode: 'placeholder' })}\n`);
+        } else if (file === 'redaction-path-safety-evidence.json') {
+          writeRealArtifact(dir, file);
+        } else {
+          fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        }
+      }
+      writeGateLedger(dir, 'rc');
+
+      const result = spawnSync(process.execPath, [scriptPath, '--evidence-dir', dir, '--require=rc'], {
+        encoding: 'utf-8',
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Missing or invalid required rc evidence');
+      expect(result.stderr).toContain('desktop-security-evidence.json (invalid evidence mode: skipped)');
+      expect(result.stderr).toContain('github-security-evidence.json (invalid evidence mode: placeholder)');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

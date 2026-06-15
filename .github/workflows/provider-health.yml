@@ -2,10 +2,11 @@ name: Provider Health Check
 
 on:
   schedule:
-    - cron: '0 9 * * 1'  # Every Monday 9:00 UTC
-  workflow_dispatch:       # Manual trigger
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
 
 permissions:
+  contents: read
   issues: write
 
 jobs:
@@ -24,93 +25,129 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-      # doctor --live runs its base environment checks first (.ca/ dir,
-      # config file, API keys, CLIs). Those checks are meaningful for
-      # user environments but not in CI — the workspace is intentionally
-      # missing .ca/ (gitignored) and most CLIs. Write a minimal config
-      # so the env checks pass and the run's exit code reflects only the
-      # live provider pings we actually care about.
-      - name: Generate stub config for doctor
+      - name: Generate shared Action config for doctor
         run: |
           mkdir -p .ca
-          cat > .ca/config.json << 'CONF'
-          {
-            "mode": "pragmatic",
-            "language": "en",
-            "reviewers": [
-              {
-                "id": "r1",
-                "model": "xiaomi/mimo-v2.5",
-                "backend": "api",
-                "provider": "openrouter",
-                "enabled": true,
-                "timeout": 120
-              }
-            ],
-            "moderator": { "model": "openai/gpt-5.3-codex", "backend": "api", "provider": "openrouter" },
-            "head": { "backend": "api", "model": "qwen/qwen3.7-max", "provider": "openrouter", "enabled": true },
-            "supporters": {
-              "pool": [
-                {
-                  "id": "s1",
-                  "model": "z-ai/glm-5.1",
-                  "backend": "api",
-                  "provider": "openrouter",
-                  "enabled": true,
-                  "timeout": 120
-                }
-              ],
-              "pickCount": 1,
-              "pickStrategy": "random",
-              "devilsAdvocate": {
-                "id": "da",
-                "model": "x-ai/grok-4.3",
-                "backend": "api",
-                "provider": "openrouter",
-                "enabled": true,
-                "timeout": 120
-              },
-              "personaPool": ["safety", "security", "maintainer"],
-              "personaAssignment": "random"
-            },
-            "discussion": {
-              "enabled": true,
-              "maxRounds": 3,
-              "registrationThreshold": {
-                "HARSHLY_CRITICAL": 1,
-                "CRITICAL": 1,
-                "WARNING": 2,
-                "SUGGESTION": null
-              },
-              "codeSnippetRange": 10,
-              "objectionTimeout": 60,
-              "maxObjectionRounds": 1
-            },
-            "errorHandling": {
-              "maxRetries": 1,
-              "forfeitThreshold": 0.7
-            }
-          }
-          CONF
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          import { renderActionPresetConfigJson } from './packages/shared/dist/action-preset.js';
+          writeFileSync('.ca/config.json', renderActionPresetConfigJson({ language: 'en' }));
+          NODE
 
-      - name: Ping Tier 1 providers
+      - name: Run live doctor
         id: health
         continue-on-error: true
-        run: node packages/cli/dist/index.js doctor --live
+        run: |
+          set +e
+          node packages/cli/dist/index.js doctor --live --json > doctor-output.json
+          status=$?
+          echo "exit-code=$status" >> "$GITHUB_OUTPUT"
+          node --input-type=module <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          import { readFileSync } from 'node:fs';
+
+          function readDoctorOutput() {
+            try {
+              return JSON.parse(readFileSync('doctor-output.json', 'utf8'));
+            } catch (error) {
+              return { parseError: error instanceof Error ? error.message : String(error) };
+            }
+          }
+
+          const output = readDoctorOutput();
+          const liveChecks = Array.isArray(output.liveChecks) ? output.liveChecks : [];
+          const failures = liveChecks.filter((check) => check.status !== 'pass' && check.status !== 'ok');
+
+          console.log('## Provider health');
+          console.log('');
+          if (failures.length === 0 && !output.parseError) {
+            console.log('All shared Action preset live checks passed.');
+          } else {
+            console.log('| Provider | Model | Role | Error |');
+            console.log('| --- | --- | --- | --- |');
+            if (output.parseError) {
+              console.log(`| unknown | unknown | doctor-json | ${output.parseError.replaceAll('|', '\\|')} |`);
+            }
+            for (const failure of failures) {
+              const provider = failure.provider ?? 'unknown';
+              const model = failure.model ?? 'unknown';
+              const role = failure.role ?? failure.name ?? 'unknown';
+              const error = failure.error ?? failure.message ?? failure.status ?? 'failed';
+              console.log(`| ${provider} | ${model} | ${role} | ${String(error).replaceAll('|', '\\|')} |`);
+            }
+          }
+          NODE
+          exit "$status"
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
-      - name: Create issue on failure
+      - name: Upsert provider health issue
         if: steps.health.outcome == 'failure'
         uses: actions/github-script@v9
         with:
           script: |
+            const fs = require('node:fs');
             const date = new Date().toISOString().slice(0, 10);
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            await github.rest.issues.create({
+            let output = {};
+            try {
+              output = JSON.parse(fs.readFileSync('doctor-output.json', 'utf8'));
+            } catch (error) {
+              output = { parseError: error instanceof Error ? error.message : String(error) };
+            }
+            const liveChecks = Array.isArray(output.liveChecks) ? output.liveChecks : [];
+            const failures = liveChecks.filter((check) => check.status !== 'pass' && check.status !== 'ok');
+            const rows = failures.map((failure) => ({
+              provider: failure.provider ?? 'unknown',
+              model: failure.model ?? 'unknown',
+              role: failure.role ?? failure.name ?? 'unknown',
+              error: failure.error ?? failure.message ?? failure.status ?? 'failed',
+            }));
+            if (output.parseError) {
+              rows.unshift({
+                provider: 'unknown',
+                model: 'unknown',
+                role: 'doctor-json',
+                error: output.parseError,
+              });
+            }
+            const failureTable = rows.length === 0
+              ? 'Doctor exited nonzero but did not report structured live check failures.'
+              : [
+                  '| Provider | Model | Role | Error |',
+                  '| --- | --- | --- | --- |',
+                  ...rows.map((row) => `| ${row.provider} | ${row.model} | ${row.role} | ${String(row.error).replaceAll('|', '\\|')} |`),
+                ].join('\n');
+            const marker = '<!-- codeagora-provider-health -->';
+            const title = 'Provider health check failed';
+            const body = `${marker}\nWeekly provider health check detected failures on ${date}.\n\n${failureTable}\n\nWorkflow run: ${runUrl}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Provider health check failed (${date})`,
-              body: `Weekly provider health check detected failures.\n\nSee [workflow run](${runUrl}) for details.`,
-              labels: ['bug', 'provider']
+              state: 'open',
+              labels: 'provider',
+              per_page: 100,
             });
+            const existing = issues.find((issue) => issue.title === title || issue.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Provider health check still failing on ${date}: ${runUrl}`,
+              });
+            } else {
+              const issue = {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['bug', 'provider'],
+              };
+              await github.rest.issues.create(issue);
+            }

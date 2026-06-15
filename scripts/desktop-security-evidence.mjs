@@ -118,6 +118,7 @@ export function parseDesktopSecurityEvidenceArgs(argv) {
     evidenceDir: path.join('.sisyphus', 'evidence'),
     output: undefined,
     skipTests: false,
+    release: false,
   };
 
   for (let index = 0; index < argv.length; index++) {
@@ -136,9 +137,14 @@ export function parseDesktopSecurityEvidenceArgs(argv) {
       options.output = arg.slice('--output='.length);
     } else if (arg === '--skip-tests') {
       options.skipTests = true;
+    } else if (arg === '--release') {
+      options.release = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
+  }
+  if (options.release && options.skipTests) {
+    throw new Error('Release desktop security evidence requires real focused tests; --skip-tests is not allowed with --release');
   }
 
   return options;
@@ -189,6 +195,7 @@ export function buildDesktopSecurityEvidence({
   testResults,
   outputPath,
   cwd = process.cwd(),
+  evidenceMode,
 }) {
   const normalizedResults = (testResults ?? DESKTOP_SECURITY_TEST_COMMANDS.map((command) =>
     normalizeTestResult(command, { stdout: '', stderr: '', exitCode: 0, signal: null }, true),
@@ -197,6 +204,7 @@ export function buildDesktopSecurityEvidence({
 
   return {
     schemaVersion: DESKTOP_SECURITY_EVIDENCE_SCHEMA_VERSION,
+    evidenceMode: evidenceMode ?? (normalizedResults.every((result) => result.skipped === true) ? 'skipped' : 'real'),
     capturedAt: new Date().toISOString(),
     redactionStatus: 'safe-to-publish',
     releaseTier: 'rc',
@@ -227,6 +235,9 @@ export function buildDesktopSecurityEvidence({
 }
 
 export async function runDesktopSecurityEvidence(options = {}) {
+  if (options.release && options.skipTests) {
+    throw new Error('Release desktop security evidence requires real focused tests; --skip-tests is not allowed with --release');
+  }
   const cwd = options.cwd ?? process.cwd();
   const evidenceDir = path.resolve(cwd, options.evidenceDir ?? path.join('.sisyphus', 'evidence'));
   const outputPath = path.resolve(cwd, options.output ?? path.join(evidenceDir, 'desktop-security-evidence.json'));
@@ -250,7 +261,12 @@ export async function runDesktopSecurityEvidence(options = {}) {
     }
   }
 
-  const evidence = buildDesktopSecurityEvidence({ testResults, outputPath, cwd });
+  const evidence = buildDesktopSecurityEvidence({
+    testResults,
+    outputPath,
+    cwd,
+    evidenceMode: options.skipTests ? 'skipped' : 'real',
+  });
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
 

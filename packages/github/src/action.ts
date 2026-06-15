@@ -14,7 +14,7 @@ import { mapToGitHubReview } from './mapper.js';
 import { postReview, setCommitStatus, handleNeedsHuman } from './poster.js';
 import { createAppOctokit } from './client.js';
 import { fetchPrMetadata } from './pr-diff.js';
-import { buildSarifReport, serializeSarif } from './sarif.js';
+import { buildSarifReport, filterSarifPublishableEvidenceDocs, serializeSarif } from './sarif.js';
 import { resolveReviewedPrCommitSha } from './action-event.js';
 import { loadConfigFile } from '@codeagora/core/config/loader.js';
 import {
@@ -53,7 +53,11 @@ async function writeSarifOutput(
 ): Promise<string> {
   try {
     const safeSarifPath = await validateActionOutputPath(rawSarifPath ?? DEFAULT_SARIF_OUTPUT_PATH, process.cwd());
-    const sarifReport = buildSarifReport(evidenceDocs, sessionId, sessionDate);
+    const publishableDocs = filterSarifPublishableEvidenceDocs(evidenceDocs);
+    if (publishableDocs.length !== evidenceDocs.length) {
+      console.log(`SARIF publishing filtered ${evidenceDocs.length - publishableDocs.length} unverified finding(s)`);
+    }
+    const sarifReport = buildSarifReport(publishableDocs, sessionId, sessionDate);
     await fs.writeFile(safeSarifPath, serializeSarif(sarifReport));
     console.log(`SARIF report written to ${safeSarifPath}`);
     return safeSarifPath;

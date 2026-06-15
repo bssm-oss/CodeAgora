@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildSarifReport, serializeSarif } from '../sarif.js';
+import {
+  buildSarifReport,
+  filterSarifPublishableEvidenceDocs,
+  isSarifPublishableEvidenceDoc,
+  serializeSarif,
+} from '../sarif.js';
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 import type { SarifDiscussionMeta } from '../sarif.js';
 
@@ -170,10 +175,10 @@ describe('buildSarifReport — result content', () => {
     expect(region.endLine).toBe(20);
   });
 
-  it('sets fixes when suggestion is present', () => {
+  it('keeps suggestion in markdown without emitting an invalid SARIF fix', () => {
     const report = buildSarifReport([makeDoc({ suggestion: 'Use parameterized queries.' })], 's', 'd');
-    expect(report.runs[0]!.results[0]!.fixes).toBeDefined();
-    expect(report.runs[0]!.results[0]!.fixes![0]!.description.text).toContain('parameterized');
+    expect(report.runs[0]!.results[0]!.fixes).toBeUndefined();
+    expect(report.runs[0]!.results[0]!.message.markdown).toContain('Use parameterized queries.');
   });
 
   it('omits fixes when suggestion is empty string', () => {
@@ -217,6 +222,47 @@ describe('buildSarifReport — result content', () => {
       confidence: 91,
       suggestionVerified: 'passed',
     });
+  });
+});
+
+// ============================================================================
+// SARIF publishing gate
+// ============================================================================
+
+describe('SARIF publishing gate', () => {
+  it('keeps deterministic rule findings even without confidence', () => {
+    expect(isSarifPublishableEvidenceDoc(makeDoc({ source: 'rule', confidence: undefined }))).toBe(true);
+  });
+
+  it('keeps high-confidence actionable LLM findings', () => {
+    expect(isSarifPublishableEvidenceDoc(makeDoc({ confidence: 88 }))).toBe(true);
+  });
+
+  it('drops low-confidence LLM findings from Code Scanning publication', () => {
+    expect(isSarifPublishableEvidenceDoc(makeDoc({ confidence: 25 }))).toBe(false);
+  });
+
+  it('drops hallucination-filter class-prior findings from Code Scanning publication', () => {
+    expect(isSarifPublishableEvidenceDoc(makeDoc({
+      confidence: 92,
+      confidenceTrace: { raw: 92, classPrior: 'undeclared-type' },
+    }))).toBe(false);
+  });
+
+  it('drops suggestions and failed suggestion-verification findings', () => {
+    expect(isSarifPublishableEvidenceDoc(makeDoc({ severity: 'SUGGESTION', confidence: 99 }))).toBe(false);
+    expect(isSarifPublishableEvidenceDoc(makeDoc({ confidence: 99, suggestionVerified: 'failed' }))).toBe(false);
+  });
+
+  it('filters to publishable findings while preserving input order', () => {
+    const publishableRule = makeDoc({ issueTitle: 'rule', source: 'rule', confidence: undefined });
+    const lowConfidence = makeDoc({ issueTitle: 'low', confidence: 12 });
+    const publishableLlm = makeDoc({ issueTitle: 'llm', confidenceTrace: { final: 73 } });
+
+    expect(filterSarifPublishableEvidenceDocs([publishableRule, lowConfidence, publishableLlm])).toEqual([
+      publishableRule,
+      publishableLlm,
+    ]);
   });
 });
 
