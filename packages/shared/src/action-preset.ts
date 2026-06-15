@@ -10,7 +10,7 @@ export interface WorkflowTemplateOptions extends ActionPresetOptions {
 }
 
 export const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-rc.6';
-export const CODEAGORA_WORKFLOW_MAX_DIFF_LINES = 6000;
+export const CODEAGORA_WORKFLOW_MAX_DIFF_LINES = 10000;
 
 export const ACTION_CHEAP_PRESET = {
   provider: 'openrouter',
