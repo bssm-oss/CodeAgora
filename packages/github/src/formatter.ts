@@ -80,6 +80,15 @@ function isCriticalSeverity(doc: EvidenceDocument): boolean {
   return doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
 }
 
+const PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS = new Set([
+  'provider-contract-flexibility',
+  'review-run-summary-policy',
+]);
+
+function isHiddenClassPrior(doc: EvidenceDocument): boolean {
+  return PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS.has(doc.confidenceTrace?.classPrior ?? '');
+}
+
 function splitPublicVerifyDocs(docs: EvidenceDocument[]): {
   needsHuman: EvidenceDocument[];
   needsRepro: EvidenceDocument[];
@@ -92,7 +101,7 @@ function splitPublicVerifyDocs(docs: EvidenceDocument[]): {
   const verify: EvidenceDocument[] = [];
   for (const doc of docs) {
     const confidence = evidenceConfidence(doc);
-    if (isCriticalSeverity(doc) && confidence < SPECULATIVE_CONFIDENCE_MAX) {
+    if (isCriticalSeverity(doc) && (confidence < SPECULATIVE_CONFIDENCE_MAX || isHiddenClassPrior(doc))) {
       speculative.push(doc);
     } else if (isCriticalSeverity(doc) && confidence < NEEDS_REPRO_CONFIDENCE_MAX) {
       needsRepro.push(doc);
@@ -125,6 +134,55 @@ function firstEvidence(doc: EvidenceDocument): string {
   return doc.evidence.find((item) => item.trim().length > 0) ?? 'Inspect the referenced line and confirm the reported path.';
 }
 
+function confidenceValueLabel(value: number | undefined): string {
+  return value === undefined ? 'n/a' : `${value}%`;
+}
+
+function formatConfidenceBasis(doc: EvidenceDocument): string {
+  const trace = doc.confidenceTrace;
+  const final = doc.confidenceTrace?.final ?? doc.confidence;
+  if (!trace) return `final ${confidenceValueLabel(final)}; no stage trace was recorded`;
+  const parts = [
+    `raw ${confidenceValueLabel(trace.raw)}`,
+    `filtered ${confidenceValueLabel(trace.filtered)}`,
+    `corroborated ${confidenceValueLabel(trace.corroborated)}`,
+    trace.verified !== undefined ? `verified ${confidenceValueLabel(trace.verified)}` : undefined,
+    `final ${confidenceValueLabel(trace.final ?? doc.confidence)}`,
+    trace.evidence !== undefined ? `evidence ${Math.round(trace.evidence * 100)}%` : undefined,
+    trace.classPrior ? `class prior ${trace.classPrior}` : undefined,
+  ].filter(Boolean);
+  return parts.join(' -> ');
+}
+
+function commandLikeSnippet(text: string): string | null {
+  const backtickMatches = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1]?.trim()).filter(Boolean);
+  return backtickMatches.find((snippet) =>
+    /^(?:pnpm|npm|yarn|node|agora|codeagora|gh|git)\b/.test(snippet!) ||
+    /\b(?:init|review|test|build|evidence|workflow)\b/.test(snippet!)
+  ) ?? null;
+}
+
+function suggestedReproCommand(doc: EvidenceDocument): string {
+  const haystack = [doc.problem, ...doc.evidence, doc.suggestion].join('\n');
+  const snippet = commandLikeSnippet(haystack);
+  if (snippet) return snippet;
+  if (/packages\/cli\/src\/commands\/init\.ts/.test(doc.filePath)) {
+    return 'pnpm dev init --preset action';
+  }
+  if (/\.github\/workflows|workflow/i.test(doc.issueTitle)) {
+    return 'Inspect the generated workflow YAML for the referenced secret/config path.';
+  }
+  return `Inspect \`${formatLocation(doc)}\` and run the smallest command or test that exercises this path.`;
+}
+
+function pushReproCard(lines: string[], doc: EvidenceDocument): void {
+  lines.push('- Repro card:');
+  lines.push(`  - Try: ${suggestedReproCommand(doc)}`);
+  lines.push(`  - Expected if valid: ${truncateResponse(doc.problem, 180)}`);
+  lines.push(`  - Actual to check: ${truncateResponse(firstEvidence(doc), 180)}`);
+  lines.push(`  - Pass condition: the expected and actual behavior match without relying on reviewer speculation.`);
+}
+
 function pushIssueActionDetails(lines: string[], docs: EvidenceDocument[], label: string): void {
   if (docs.length === 0) return;
   lines.push('<details>');
@@ -138,6 +196,10 @@ function pushIssueActionDetails(lines: string[], docs: EvidenceDocument[], label
     if (doc.suggestion) {
       lines.push(`- Suggested fix: ${truncateResponse(doc.suggestion, 220)}`);
     }
+    if (label === 'Needs-repro') {
+      pushReproCard(lines, doc);
+    }
+    lines.push(`- Confidence basis: ${formatConfidenceBasis(doc)}`);
     lines.push('');
   }
   lines.push('</details>');
@@ -218,16 +280,31 @@ function formatQueueItem(doc: EvidenceDocument): string {
   return `- \`${doc.filePath}:${lineLabel}\` — ${doc.issueTitle}`;
 }
 
-const PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS = new Set([
-  'provider-contract-flexibility',
-  'review-run-summary-policy',
-]);
-
 function hiddenQueueMessage(title: string, count: number): string {
   if (title === 'Removed by hallucination filter') {
     return `- ${count} rejected item(s) hidden from the public summary.`;
   }
   return `- ${count} low-confidence item(s) hidden from the public summary.`;
+}
+
+function queueDispositionReason(title: string, doc: EvidenceDocument): string {
+  if (title === 'Removed by hallucination filter') {
+    return `rejected by hallucination checks; ${formatConfidenceBasis(doc)}`;
+  }
+  if (title === 'Uncertain after hallucination checks') {
+    return `retained as uncertain after penalties; ${formatConfidenceBasis(doc)}`;
+  }
+  if (doc.confidenceTrace?.classPrior) {
+    return `low-confidence class prior: ${doc.confidenceTrace.classPrior}`;
+  }
+  return formatConfidenceBasis(doc);
+}
+
+function formatHiddenQueueItem(title: string, doc: EvidenceDocument): string {
+  const location = doc.filePath === 'unknown' || doc.lineRange[0] <= 0
+    ? 'invalid location'
+    : formatLocation(doc);
+  return `- \`${location}\` — ${doc.issueTitle}; ${queueDispositionReason(title, doc)}`;
 }
 
 function visibleQueueDocs(title: string, docs: EvidenceDocument[]): EvidenceDocument[] {
@@ -271,6 +348,12 @@ function pushNonBlockingQueues(lines: string[], run?: ReviewRunSummary, queues?:
     lines.push(`**${title}**`);
     if (visibleDocs.length === 0) {
       lines.push(hiddenQueueMessage(title, docs.length));
+      for (const doc of docs.slice(0, 3)) {
+        lines.push(formatHiddenQueueItem(title, doc));
+      }
+      if (docs.length > 3) {
+        lines.push(`- ...and ${docs.length - 3} more hidden item(s)`);
+      }
       lines.push('');
       continue;
     }

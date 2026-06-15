@@ -32,6 +32,18 @@ describe('matchFindingClass — positive matches', () => {
     expect(match.multiplier).toBe(0.2);
   });
 
+  it('catches hardcoded OpenRouter-only workflow claims as provider-contract flexibility', () => {
+    const match = matchFindingClass(
+      doc({
+        issueTitle: 'Hardcoded OpenRouter-only API key in generated workflow breaks non-OpenRouter provider setups',
+        problem:
+          'The generated GitHub Actions workflow now only includes the OPENROUTER_API_KEY secret, regardless of which providers the user actually configured during interactive setup.',
+      }),
+    )!;
+    expect(match.id).toBe('provider-contract-flexibility');
+    expect(match.multiplier).toBe(0.2);
+  });
+
   it('catches review-run summary merge policy claims', () => {
     const match = matchFindingClass(
       doc({

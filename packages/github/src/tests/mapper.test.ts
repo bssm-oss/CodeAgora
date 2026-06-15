@@ -546,6 +546,20 @@ describe('buildTriageDigest', () => {
     expect(result).toContain('1 speculative hidden');
   });
 
+  it('routes FP-heavy provider-contract CRITICAL findings to hidden speculative', () => {
+    const docs = [makeDoc({
+      severity: 'CRITICAL',
+      confidence: 27,
+      confidenceTrace: {
+        final: 27,
+        classPrior: 'provider-contract-flexibility',
+      },
+    })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 speculative hidden');
+    expect(result).not.toContain('needs-repro');
+  });
+
   it('classifies WARNING with high confidence as verify', () => {
     const docs = [makeDoc({ severity: 'WARNING', confidence: 80 })];
     const result = buildTriageDigest(docs);
@@ -577,6 +591,7 @@ describe('buildTriageDigest', () => {
       makeDoc({ severity: 'CRITICAL', confidence: 45 }),     // needs-human
       makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // needs-repro
       makeDoc({ severity: 'CRITICAL', confidence: 0 }),      // speculative hidden
+      makeDoc({ severity: 'CRITICAL', confidenceTrace: { final: 27, classPrior: 'provider-contract-flexibility' } }),
       makeDoc({ severity: 'WARNING', confidence: 80 }),      // verify
       makeDoc({ severity: 'SUGGESTION', confidence: 50 }),   // ignore
       makeDoc({ severity: 'SUGGESTION', confidence: 90 }),   // ignore
@@ -585,7 +600,7 @@ describe('buildTriageDigest', () => {
     expect(result).toContain('1 must-fix');
     expect(result).toContain('1 needs-human');
     expect(result).toContain('1 needs-repro');
-    expect(result).toContain('1 speculative hidden');
+    expect(result).toContain('2 speculative hidden');
     expect(result).toContain('1 verify');
     expect(result).toContain('2 ignore');
   });
@@ -650,12 +665,27 @@ describe('buildSummaryBody triage digest', () => {
       summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
       sessionId: 'sess-001',
       sessionDate: '2026-03-21',
-      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 30 })],
+      evidenceDocs: [makeDoc({
+        severity: 'CRITICAL',
+        confidence: 30,
+        confidenceTrace: {
+          raw: 80,
+          filtered: 40,
+          corroborated: 30,
+          final: 30,
+          evidence: 0.6,
+          classPrior: 'generic-potential',
+        },
+      })],
       discussions: [],
     });
     expect(body).toContain('1 needs-repro');
     expect(body).toContain('### Needs Repro');
     expect(body).toContain('Confirm with a concrete reproduction');
+    expect(body).toContain('Repro card');
+    expect(body).toContain('Expected if valid: Value may be null at this point.');
+    expect(body).toContain('Actual to check: Line 42 dereferences without null check');
+    expect(body).toContain('Confidence basis: raw 80% -> filtered 40% -> corroborated 30% -> final 30% -> evidence 60% -> class prior generic-potential');
     expect(body).not.toContain('### Needs Human');
   });
 
@@ -685,6 +715,7 @@ describe('buildSummaryBody triage digest', () => {
     expect(body).toContain('Why this matters: Value may be null at this point.');
     expect(body).toContain('How to verify: Line 42 dereferences without null check');
     expect(body).toContain('Suggested fix: Add a null check before use.');
+    expect(body).toContain('Confidence basis: final 90%; no stage trace was recorded');
   });
 
   it('places triage digest between heading and verdict', () => {

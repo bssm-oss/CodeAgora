@@ -340,11 +340,12 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('[REDACTED]');
   });
 
-  it('hides hallucination-filter details from public queue output', () => {
+  it('renders one-line reasons for hallucination-filtered queue items', () => {
     const removed = makeDoc({
       issueTitle: 'Imaginary SQL injection',
       filePath: 'src/auth.ts',
       lineRange: [42, 42],
+      confidenceTrace: { raw: 80, filtered: 20, final: 20, evidence: 0.2 },
     });
     const body = buildSummaryBody({
       summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only filtered findings remain.' }),
@@ -373,17 +374,19 @@ describe('buildSummaryBody', () => {
 
     expect(body).toContain('Removed by hallucination filter');
     expect(body).toContain('1 rejected item(s) hidden from the public summary.');
-    expect(body).not.toContain('src/auth.ts:42');
-    expect(body).not.toContain('Imaginary SQL injection');
+    expect(body).toContain('src/auth.ts:42');
+    expect(body).toContain('Imaginary SQL injection');
+    expect(body).toContain('rejected by hallucination checks');
+    expect(body).toContain('raw 80% -> filtered 20%');
   });
 
-  it('hides low-confidence FP-heavy queue details from public output', () => {
+  it('renders one-line reasons for hidden low-confidence queue items', () => {
     const unconfirmed = makeDoc({
       severity: 'WARNING',
       issueTitle: 'Removal of Groq Provider Support in GitHub Actions Workflows',
       filePath: '.github/workflows/review.yml',
       lineRange: [32, 38],
-      confidenceTrace: { classPrior: 'provider-contract-flexibility' },
+      confidenceTrace: { final: 40, classPrior: 'provider-contract-flexibility' },
     });
     const body = buildSummaryBody({
       summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only low-confidence findings remain.' }),
@@ -412,8 +415,9 @@ describe('buildSummaryBody', () => {
 
     expect(body).toContain('Unconfirmed');
     expect(body).toContain('1 low-confidence item(s) hidden from the public summary.');
-    expect(body).not.toContain('Removal of Groq Provider Support');
-    expect(body).not.toContain('.github/workflows/review.yml:32-38');
+    expect(body).toContain('Removal of Groq Provider Support');
+    expect(body).toContain('.github/workflows/review.yml:32');
+    expect(body).toContain('low-confidence class prior: provider-contract-flexibility');
   });
 });
 
