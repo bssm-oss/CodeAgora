@@ -118,7 +118,7 @@ describe('mapToInlineCommentBody', () => {
     );
 
     expect(body).toContain('forced decision');
-    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
     expect(body).toContain('retained for auditability');
     expect(body).not.toContain('**Verdict:** CRITICAL —');
   });
@@ -133,7 +133,7 @@ describe('mapToInlineCommentBody', () => {
       }),
     );
 
-    expect(body).toContain('**Verdict:** high-risk speculative CRITICAL (4%)');
+    expect(body).toContain('**Verdict:** high-risk hypothesis (4%)');
   });
 
   it('includes reviewer IDs when provided', () => {
@@ -221,6 +221,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('<!-- codeagora-v3 -->');
     expect(body).toContain('REJECT');
     expect(body).toContain('CodeAgora');
+    expect(body).toContain('### Decision Snapshot');
+    expect(body).toContain('| Blockers now | Follow-up later | Ignored speculative |');
   });
 
   it('renders blocking issues table for critical docs', () => {
@@ -373,8 +375,8 @@ describe('buildSummaryBody', () => {
       discussions: [makeDiscussion({ consensusReached: false, avgConfidence: 4 })],
     });
 
-    expect(body).toContain('forced → speculative CRITICAL (4%)');
-    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('forced → speculative hypothesis (4%)');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
     expect(body).toContain('**Trace:**');
     expect(body).not.toContain('forced → CRITICAL');
   });
@@ -392,11 +394,11 @@ describe('buildSummaryBody', () => {
       })],
     });
 
-    expect(body).toContain('forced → speculative CRITICAL (4%)');
-    expect(body).toContain('**Disposition:** speculative CRITICAL (4%)');
+    expect(body).toContain('forced → speculative hypothesis (4%)');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
     expect(body).toContain('**Trace:** Tie broken by forced decision');
-    expect(body).not.toContain('consensus → speculative CRITICAL');
-    expect(body).not.toContain('**Verdict:** speculative CRITICAL');
+    expect(body).not.toContain('consensus → speculative hypothesis');
+    expect(body).not.toContain('**Verdict:** speculative hypothesis');
   });
 
   it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
@@ -418,7 +420,7 @@ describe('buildSummaryBody', () => {
 
     expect(body).toContain('1 needs-repro');
     expect(body).toContain('### Needs Repro');
-    expect(body).toContain('forced → high-risk speculative CRITICAL (4%)');
+    expect(body).toContain('forced → high-risk hypothesis (4%)');
     expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
 
@@ -443,7 +445,7 @@ describe('buildSummaryBody', () => {
 
     expect(body).toContain('1 needs-repro');
     expect(body).toContain('Data Integrity: Invalid JSON artifacts bypass release gate validation');
-    expect(body).toContain('consensus → high-risk speculative CRITICAL (6%)');
+    expect(body).toContain('consensus → high-risk hypothesis (6%)');
     expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
 

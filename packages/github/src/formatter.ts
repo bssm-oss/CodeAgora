@@ -185,10 +185,10 @@ function discussionConfidenceLabel(discussion: DiscussionVerdict): string {
 
 function formatDiscussionSeverityLabel(discussion: DiscussionVerdict): string {
   if (isHighRiskSpeculativeDiscussion(discussion)) {
-    return `high-risk speculative ${discussion.finalSeverity} (${discussionConfidenceLabel(discussion)})`;
+    return `high-risk hypothesis (${discussionConfidenceLabel(discussion)})`;
   }
   if (isSpeculativeCriticalDiscussion(discussion)) {
-    return `speculative ${discussion.finalSeverity} (${discussionConfidenceLabel(discussion)})`;
+    return `speculative hypothesis (${discussionConfidenceLabel(discussion)})`;
   }
   return discussion.finalSeverity;
 }
@@ -209,6 +209,29 @@ function pushDiscussionDisposition(lines: string[], discussion: DiscussionVerdic
     return;
   }
   lines.push(`**Verdict:** ${severityLabel} \u2014 ${discussion.reasoning}`);
+}
+
+function countForcedSpeculativeDiscussions(discussions: DiscussionVerdict[]): number {
+  return discussions.filter(isForcedSpeculativeDiscussion).length;
+}
+
+function pushDecisionSnapshot(
+  lines: string[],
+  summary: PipelineSummary,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+): void {
+  const blockersNow = summary.decision === 'REJECT' ? 'review rejected' : '0';
+  const followUpLater = publicVerify.needsHuman.length + publicVerify.needsRepro.length + publicVerify.verify.length;
+  const hiddenSpeculative = publicVerify.speculative.length + countForcedSpeculativeDiscussions(discussions);
+  lines.push('### Decision Snapshot');
+  lines.push('');
+  lines.push('| Blockers now | Follow-up later | Ignored speculative |');
+  lines.push('|---:|---:|---:|');
+  lines.push(`| ${blockersNow} | ${followUpLater} | ${hiddenSpeculative} |`);
+  lines.push('');
+  lines.push('Verdict is based on current blockers. Follow-up and speculative items are non-blocking until reproduced or backed by stronger evidence.');
+  lines.push('');
 }
 
 function commandLikeSnippet(text: string): string | null {
@@ -641,6 +664,7 @@ export function buildSummaryBody(params: {
   lines.push(`> ${summary.reasoning}`);
   lines.push('');
 
+  pushDecisionSnapshot(lines, summary, publicVerify, discussions);
   pushReviewCoverage(lines, summary, safeParams.reviewRun);
   pushNonBlockingQueues(lines, safeParams.reviewRun, safeParams.reviewQueues);
 
