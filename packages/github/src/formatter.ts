@@ -182,20 +182,16 @@ function confidenceValueLabel(value: number | undefined): string {
   return value === undefined ? 'n/a' : `${value}%`;
 }
 
-function formatConfidenceBasis(doc: EvidenceDocument): string {
-  const trace = doc.confidenceTrace;
+function formatPublicConfidenceBasis(doc: EvidenceDocument): string {
   const final = doc.confidenceTrace?.final ?? doc.confidence;
-  if (!trace) return `final ${confidenceValueLabel(final)}; no stage trace was recorded`;
-  const parts = [
-    `raw ${confidenceValueLabel(trace.raw)}`,
-    `filtered ${confidenceValueLabel(trace.filtered)}`,
-    `corroborated ${confidenceValueLabel(trace.corroborated)}`,
-    trace.verified !== undefined ? `verified ${confidenceValueLabel(trace.verified)}` : undefined,
-    `final ${confidenceValueLabel(trace.final ?? doc.confidence)}`,
-    trace.evidence !== undefined ? `evidence ${Math.round(trace.evidence * 100)}%` : undefined,
-    trace.classPrior ? `class prior ${trace.classPrior}` : undefined,
-  ].filter(Boolean);
-  return parts.join(' -> ');
+  const parts = [`final confidence ${confidenceValueLabel(final)}`];
+  if (doc.confidenceTrace?.classPrior) {
+    parts.push(`class prior ${doc.confidenceTrace.classPrior}`);
+  }
+  if (doc.confidenceTrace) {
+    parts.push('stage trace hidden from summary');
+  }
+  return parts.join('; ');
 }
 
 function discussionConfidenceLabel(discussion: DiscussionVerdict): string {
@@ -282,6 +278,11 @@ function formatContractItems(items: string[], empty = 'none'): string {
   return items.length > 3 ? `${visible}<br>+${items.length - 3} more` : visible;
 }
 
+function formatFollowUpContract(count: number): string {
+  if (count === 0) return 'none';
+  return `${count} non-blocking follow-up item(s); inspect collapsed audit sections only if needed.`;
+}
+
 function pushMergeDecisionContract(
   lines: string[],
   summary: PipelineSummary,
@@ -320,10 +321,69 @@ function pushMergeDecisionContract(
   lines.push(`| Merge now? | ${mergeNow} |`);
   lines.push(`| Blocking items to fix before merge | ${blockingLabel} |`);
   lines.push(`| Human checks required before merge | ${formatContractItems(humanItems)} |`);
-  lines.push(`| Follow-up only | ${formatContractItems(followUpItems)} |`);
+  lines.push(`| Follow-up only | ${formatFollowUpContract(followUpItems.length)} |`);
   lines.push('| Confidence rule | CRITICAL/HARSHLY_CRITICAL at >=60% blocks merge; 20-59% is a human gate; <20% is speculative unless reproduced. |');
   lines.push('');
 }
+
+function pushTopMaintainerActionList(
+  lines: string[],
+  triage: ReturnType<typeof triageDocs>,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+): void {
+  const actions: Array<{ item: string; impact: string; confidence: string; action: string }> = [];
+  for (const doc of triage.mustFix) {
+    actions.push({
+      item: `\`${formatLocation(doc)}\` ${doc.issueTitle}`,
+      impact: truncateResponse(doc.problem, 120),
+      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
+      action: 'Fix before merge.',
+    });
+  }
+  for (const doc of publicVerify.needsHuman) {
+    actions.push({
+      item: `\`${formatLocation(doc)}\` ${doc.issueTitle}`,
+      impact: truncateResponse(doc.problem, 120),
+      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
+      action: `Confirm contract with \`${suggestedReproCommand(doc)}\`.`,
+    });
+  }
+  for (const discussion of discussions.filter(isNeedsHumanDiscussion)) {
+    actions.push({
+      item: `${discussion.discussionId} \`${discussion.filePath}:${discussion.lineRange[0]}\``,
+      impact: 'Human-gated discussion needs maintainer confirmation before merge.',
+      confidence: discussionConfidenceLabel(discussion),
+      action: `Run \`${suggestedDiscussionCommand(discussion)}\`.`,
+    });
+  }
+  for (const doc of publicVerify.needsRepro) {
+    actions.push({
+      item: `\`${formatLocation(doc)}\` ${doc.issueTitle}`,
+      impact: truncateResponse(doc.problem, 120),
+      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
+      action: `Promote only if \`${suggestedReproCommand(doc)}\` reproduces it.`,
+    });
+  }
+
+  lines.push('### Maintainer Action List');
+  lines.push('');
+  if (actions.length === 0) {
+    const followUpCount = publicVerify.speculative.length +
+      publicVerify.verify.length +
+      countForcedSpeculativeDiscussions(discussions);
+    lines.push(`No pre-merge maintainer action required. ${formatFollowUpContract(followUpCount)}`);
+    lines.push('');
+    return;
+  }
+  lines.push('| Item | Why it matters | Confidence | Required action |');
+  lines.push('|---|---|---:|---|');
+  for (const action of actions.slice(0, 3)) {
+    lines.push(`| ${action.item} | ${action.impact} | ${action.confidence} | ${action.action} |`);
+  }
+  lines.push('');
+}
+
 
 function pushFinalDecisionTable(
   lines: string[],
@@ -550,7 +610,7 @@ function pushIssueActionDetails(lines: string[], docs: EvidenceDocument[], label
     if (label === 'Needs-repro') {
       pushReproCard(lines, doc);
     }
-    lines.push(`- Confidence basis: ${formatConfidenceBasis(doc)}`);
+    lines.push(`- Confidence: ${formatPublicConfidenceBasis(doc)}`);
     lines.push('');
   }
   lines.push('</details>');
@@ -649,15 +709,15 @@ function hiddenQueueMessage(title: string, count: number): string {
 
 function queueDispositionReason(title: string, doc: EvidenceDocument): string {
   if (title === 'Removed by hallucination filter') {
-    return `rejected by hallucination checks; ${formatConfidenceBasis(doc)}`;
+    return `rejected by hallucination checks; ${formatPublicConfidenceBasis(doc)}`;
   }
   if (title === 'Uncertain after hallucination checks') {
-    return `retained as uncertain after penalties; ${formatConfidenceBasis(doc)}`;
+    return `retained as uncertain after penalties; ${formatPublicConfidenceBasis(doc)}`;
   }
   if (doc.confidenceTrace?.classPrior) {
     return `low-confidence class prior: ${doc.confidenceTrace.classPrior}`;
   }
-  return formatConfidenceBasis(doc);
+  return formatPublicConfidenceBasis(doc);
 }
 
 function queueImpactIfTrue(title: string, doc: EvidenceDocument): string {
@@ -990,6 +1050,7 @@ export function buildSummaryBody(params: {
   lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
   pushMergeDecisionContract(lines, summary, triage, publicVerify, discussions);
+  pushTopMaintainerActionList(lines, triage, publicVerify, discussions);
   pushFinalDecisionTable(lines, triage, publicVerify, discussions);
   pushDiscussionEvidenceCards(lines, discussions);
   pushMaintainerActionTop3(lines, triage, publicVerify, discussions);
@@ -1077,8 +1138,8 @@ export function buildSummaryBody(params: {
     lines.push('These are not merge blockers unless a human can reproduce them or add stronger evidence.');
     lines.push('');
     for (const doc of publicVerify.speculative) {
-      const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
-      lines.push(`- \`${formatLocation(doc)}\` — ${doc.issueTitle} (${confCell})`);
+      const confCell = confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence);
+      lines.push(`- \`${formatLocation(doc)}\` — ${doc.issueTitle} (speculative, final ${confCell})`);
     }
     lines.push('');
     lines.push('</details>');

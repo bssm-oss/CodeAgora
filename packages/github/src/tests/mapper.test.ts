@@ -366,6 +366,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('### Merge Decision Contract');
     expect(body).toContain('| Merge now? | yes |');
     expect(body).toContain('| Blocking items to fix before merge | none |');
+    expect(body).toContain('### Maintainer Action List');
+    expect(body).toContain('No pre-merge maintainer action required.');
     expect(body).toContain('### Final Decision Table');
     expect(body).toContain('No current blockers or human gates remain.');
     expect(body).toContain('### Decision Snapshot');
@@ -524,6 +526,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('### Merge Decision Contract');
     expect(body).toContain('| Merge now? | no |');
     expect(body).toContain('| Human checks required before merge | d001 `src/foo.ts:42` human-gated critical-risk hypothesis (26%) |');
+    expect(body).toContain('### Maintainer Action List');
+    expect(body).toContain('| d001 `src/foo.ts:42` | Human-gated discussion needs maintainer confirmation before merge. | 26% | Run `Inspect src/foo.ts:42 and run the nearest focused test.`. |');
     expect(body).toContain('| d001 — discussion verdict | 26% | human-gated critical-risk hypothesis (26%) | human gate |');
     expect(body).toContain('### Human Gate Evidence Cards');
     expect(body).toContain('Policy basis: 20-59% critical-risk discussions require human review');
@@ -870,7 +874,7 @@ describe('buildSummaryBody triage digest', () => {
     expect(body).toContain('Repro card');
     expect(body).toContain('Expected if valid: Value may be null at this point.');
     expect(body).toContain('Actual to check: Line 42 dereferences without null check');
-    expect(body).toContain('Confidence basis: raw 80% -> filtered 40% -> corroborated 30% -> final 30% -> evidence 60% -> class prior generic-potential');
+    expect(body).toContain('Confidence: final confidence 30%; class prior generic-potential; stage trace hidden from summary');
     expect(body).not.toContain('### Needs Human');
   });
 
@@ -884,6 +888,9 @@ describe('buildSummaryBody triage digest', () => {
     });
     expect(body).toContain('1 speculative hypothesis(es) hidden');
     expect(body).toContain('These are not merge blockers');
+    expect(body).toContain('(speculative, final 0%)');
+    expect(body).toContain('| Follow-up only | 1 non-blocking follow-up item(s); inspect collapsed audit sections only if needed. |');
+    expect(body).not.toContain('🔴 0%');
     expect(body).not.toContain('### Speculative');
     expect(body).not.toContain('### Needs Human');
   });
@@ -900,7 +907,7 @@ describe('buildSummaryBody triage digest', () => {
     expect(body).toContain('Why this matters: Value may be null at this point.');
     expect(body).toContain('How to verify: Line 42 dereferences without null check');
     expect(body).toContain('Suggested fix: Add a null check before use.');
-    expect(body).toContain('Confidence basis: final 90%; no stage trace was recorded');
+    expect(body).toContain('Confidence: final confidence 90%');
   });
 
   it('places triage digest between heading and verdict', () => {

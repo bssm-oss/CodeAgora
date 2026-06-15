@@ -224,6 +224,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('### Merge Decision Contract');
     expect(body).toContain('| Merge now? | no |');
     expect(body).toContain('| Blocking items to fix before merge | `src/db/queries.ts:42` SQL injection vulnerability |');
+    expect(body).toContain('### Maintainer Action List');
+    expect(body).toContain('| `src/db/queries.ts:42` SQL injection vulnerability | User input concatenated into SQL query | 90% | Fix before merge. |');
     expect(body).toContain('### Final Decision Table');
     expect(body).toContain('### Decision Snapshot');
     expect(body).toContain('| Decision gate | Follow-up later | Ignored speculative |');
@@ -423,6 +425,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('### Merge Decision Contract');
     expect(body).toContain('| Merge now? | no |');
     expect(body).toContain('| Human checks required before merge | d001 `src/db/queries.ts:42` human-gated critical-risk hypothesis (26%) |');
+    expect(body).toContain('### Maintainer Action List');
+    expect(body).toContain('| d001 `src/db/queries.ts:42` | Human-gated discussion needs maintainer confirmation before merge. | 26% | Run `Inspect src/db/queries.ts:42 and run the nearest focused test.`. |');
     expect(body).toContain('| d001 — discussion verdict | 26% | human-gated critical-risk hypothesis (26%) | human gate |');
     expect(body).toContain('### Human Gate Evidence Cards');
     expect(body).toContain('Policy basis: 20-59% critical-risk discussions require human review');
@@ -573,7 +577,7 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('src/auth.ts:42');
     expect(body).toContain('Imaginary SQL injection');
     expect(body).toContain('rejected by hallucination checks');
-    expect(body).toContain('raw 80% -> filtered 20%');
+    expect(body).toContain('final confidence 20%; stage trace hidden from summary');
   });
 
   it('renders one-line reasons for hidden low-confidence queue items', () => {
@@ -655,7 +659,7 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('- Claim: `packages/github/src/formatter.ts:464-470` — Broken regex prevents code-block detection');
     expect(body).toContain('- Evidence snippet: The regex no longer matches multiline fenced suggestions.');
     expect(body).toContain('- User impact if true: Potential follow-up only: The formatter may fail to detect fenced code blocks in suggestions.');
-    expect(body).toContain('- Why non-blocking now: raw 72% -> filtered 44%');
+    expect(body).toContain('- Why non-blocking now: final confidence 44%; stage trace hidden from summary');
     expect(body).toContain('- Repro/test to promote: `pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts`');
     expect(body).toContain('- All visible item(s) duplicate earlier queue cards.');
     expect(body).toContain('1 duplicate queue item(s) omitted from the item cards');
