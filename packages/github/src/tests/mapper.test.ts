@@ -512,6 +512,13 @@ describe('buildTriageDigest', () => {
     expect(result).not.toContain('ignore');
   });
 
+  it('classifies borderline CRITICAL confidence below 60 as needs-human', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 51 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 needs-human');
+    expect(result).not.toContain('must-fix');
+  });
+
   it('classifies HARSHLY_CRITICAL with high confidence as must-fix', () => {
     const docs = [makeDoc({ severity: 'HARSHLY_CRITICAL', confidence: 80 })];
     const result = buildTriageDigest(docs);

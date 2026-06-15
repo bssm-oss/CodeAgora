@@ -34,7 +34,7 @@ export const VERDICT_BADGE: Record<string, { emoji: string; label: string }> = {
   NEEDS_HUMAN: { emoji: '\u{1F7E0}', label: 'NEEDS HUMAN REVIEW' },
 };
 
-const LOW_CONFIDENCE_CRITICAL_MAX = 50;
+const LOW_CONFIDENCE_CRITICAL_MAX = 60;
 const NEEDS_REPRO_CONFIDENCE_MAX = 40;
 const SPECULATIVE_CONFIDENCE_MAX = 20;
 
@@ -96,7 +96,7 @@ function splitPublicVerifyDocs(docs: EvidenceDocument[]): {
       speculative.push(doc);
     } else if (isCriticalSeverity(doc) && confidence < NEEDS_REPRO_CONFIDENCE_MAX) {
       needsRepro.push(doc);
-    } else if (isCriticalSeverity(doc) && confidence <= LOW_CONFIDENCE_CRITICAL_MAX) {
+    } else if (isCriticalSeverity(doc) && confidence < LOW_CONFIDENCE_CRITICAL_MAX) {
       needsHuman.push(doc);
     } else {
       verify.push(doc);

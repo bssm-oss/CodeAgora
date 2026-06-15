@@ -167,7 +167,7 @@ describe('makeHeadVerdict()', () => {
     it('rejects high-confidence critical issues before strict-mode warning routing', async () => {
       const report = makeReport({
         discussions: [
-          makeVerdict({ discussionId: 'd-critical', finalSeverity: 'CRITICAL', consensusReached: true, avgConfidence: 51 }),
+          makeVerdict({ discussionId: 'd-critical', finalSeverity: 'CRITICAL', consensusReached: true, avgConfidence: 60 }),
           makeVerdict({ discussionId: 'd-warning-1', finalSeverity: 'WARNING', consensusReached: true }),
           makeVerdict({ discussionId: 'd-warning-2', finalSeverity: 'WARNING', consensusReached: true }),
           makeVerdict({ discussionId: 'd-warning-3', finalSeverity: 'WARNING', consensusReached: true }),
@@ -277,14 +277,14 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
     });
 
-    it('routes critical confidence 50 to human review at the blocking boundary', async () => {
+    it('routes critical confidence below 60 to human review at the blocking boundary', async () => {
       const report = makeReport({
         discussions: [
           makeVerdict({
             discussionId: 'd-boundary-critical',
             finalSeverity: 'CRITICAL',
             consensusReached: true,
-            avgConfidence: 50,
+            avgConfidence: 51,
           }),
         ],
       });
@@ -295,14 +295,14 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.questionsForHuman?.[0]).toContain('d-boundary-critical');
     });
 
-    it('routes harshly critical confidence 50 to human review at the blocking boundary', async () => {
+    it('routes harshly critical confidence below 60 to human review at the blocking boundary', async () => {
       const report = makeReport({
         discussions: [
           makeVerdict({
             discussionId: 'd-boundary-harshly-critical',
             finalSeverity: 'HARSHLY_CRITICAL',
             consensusReached: true,
-            avgConfidence: 50,
+            avgConfidence: 59,
           }),
         ],
       });
@@ -313,14 +313,14 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.questionsForHuman?.[0]).toContain('d-boundary-harshly-critical');
     });
 
-    it('rejects critical confidence 51 as blocking', async () => {
+    it('rejects critical confidence 60 as blocking', async () => {
       const report = makeReport({
         discussions: [
           makeVerdict({
             discussionId: 'd-blocking-critical',
             finalSeverity: 'CRITICAL',
             consensusReached: true,
-            avgConfidence: 51,
+            avgConfidence: 60,
           }),
         ],
       });
@@ -503,6 +503,27 @@ describe('applyHeadVerdictSafety()', () => {
 
     expect(verdict.decision).toBe('REJECT');
     expect(verdict.reasoning).toContain('Head safety guard');
+  });
+
+  it('overrides REJECT to NEEDS_HUMAN for borderline critical confidence below 60', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-borderline-critical',
+          finalSeverity: 'CRITICAL',
+          consensusReached: true,
+          avgConfidence: 51,
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'REJECT',
+      reasoning: 'LLM rejected a borderline critical finding.',
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.questionsForHuman?.[0]).toContain('d-borderline-critical');
   });
 
   it('overrides ACCEPT to NEEDS_HUMAN when discussions are unresolved', () => {
