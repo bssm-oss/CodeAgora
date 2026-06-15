@@ -363,9 +363,9 @@ describe('buildSummaryBody', () => {
       discussions: [],
     });
     expect(body).toContain('ACCEPT');
-    expect(body).toContain('### Merge Decision Contract');
+    expect(body).toContain('### Maintainer Decision Box');
     expect(body).toContain('| Merge now? | yes |');
-    expect(body).toContain('| Blocking items to fix before merge | none |');
+    expect(body).toContain('| Pre-merge required | none |');
     expect(body).toContain('### Maintainer Action List');
     expect(body).toContain('No pre-merge maintainer action required.');
     expect(body).toContain('### Final Decision Table');
@@ -522,23 +522,18 @@ describe('buildSummaryBody', () => {
       })],
     });
 
-    expect(body).toContain('1 needs-human discussion');
-    expect(body).toContain('### Merge Decision Contract');
-    expect(body).toContain('| Merge now? | no |');
-    expect(body).toContain('| Human checks required before merge | d001 `src/foo.ts:42` human-gated critical-risk hypothesis (26%) |');
+    expect(body).not.toContain('1 needs-human discussion');
+    expect(body).toContain('### Maintainer Decision Box');
+    expect(body).toContain('| Merge now? | yes |');
+    expect(body).toContain('| Pre-merge required | none |');
     expect(body).toContain('### Maintainer Action List');
-    expect(body).toContain('| d001 `src/foo.ts:42` | Human-gated discussion needs maintainer confirmation before merge. | 26% | Run `Inspect src/foo.ts:42 and run the nearest focused test.`. |');
-    expect(body).toContain('| d001 — discussion verdict | 26% | human-gated critical-risk hypothesis (26%) | human gate |');
-    expect(body).toContain('### Human Gate Evidence Cards');
-    expect(body).toContain('Policy basis: 20-59% critical-risk discussions require human review');
-    expect(body).toContain('### Maintainer Action Top-3');
-    expect(body).toContain('Run: `Inspect src/foo.ts:42 and run the nearest focused test.`');
-    expect(body).toContain('consensus → human-gated critical-risk hypothesis (26%)');
-    expect(body).toContain('**Disposition:** human-gated critical-risk hypothesis (26%) — human check required before merge.');
+    expect(body).toContain('No pre-merge maintainer action required. 1 non-blocking follow-up item(s)');
+    expect(body).toContain('consensus → needs-repro critical hypothesis (26%)');
+    expect(body).toContain('**Disposition:** needs-repro critical hypothesis (26%) — non-blocking unless reproduced by the listed focused check.');
+    expect(body).not.toContain('### Human Gate Evidence Cards');
     expect(body).not.toContain('consensus → CRITICAL');
     expect(body).not.toContain('**Verdict:** CRITICAL — All supporters agreed');
-    expect(body).toContain('| human review required | 1 | 0 |');
-    expect(body).not.toContain('| 0 | 0 |');
+    expect(body).toContain('| 0 | 1 | 0 |');
   });
 
   it('uses focused path commands instead of long suggestion code blocks in maintainer actions', () => {
@@ -556,8 +551,9 @@ describe('buildSummaryBody', () => {
       discussions: [],
     });
 
-    expect(body).toContain('### Maintainer Action Top-3');
-    expect(body).toContain('Run: `pnpm vitest run src/tests/release-evidence-manifest.test.ts`');
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('`pnpm vitest run src/tests/release-evidence-manifest.test.ts`');
+    expect(body).not.toContain('### Maintainer Action Top-3');
     expect(body).not.toContain('export async function run');
   });
 
@@ -579,7 +575,8 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('1 needs-repro');
-    expect(body).toContain('### Needs Repro');
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('These low-confidence items are not pre-merge gates.');
     expect(body).toContain('forced → high-risk hypothesis (4%)');
     expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
@@ -869,8 +866,8 @@ describe('buildSummaryBody triage digest', () => {
       discussions: [],
     });
     expect(body).toContain('1 needs-repro');
-    expect(body).toContain('### Needs Repro');
-    expect(body).toContain('Confirm with a concrete reproduction');
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('These low-confidence items are not pre-merge gates.');
     expect(body).toContain('Repro card');
     expect(body).toContain('Expected if valid: Value may be null at this point.');
     expect(body).toContain('Actual to check: Line 42 dereferences without null check');

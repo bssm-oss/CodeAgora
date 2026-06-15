@@ -154,8 +154,15 @@ function formatPublicTriageCounts(triage: ReturnType<typeof triageDocs>): string
 function isNeedsHumanDiscussion(discussion: DiscussionVerdict): boolean {
   return isCriticalDiscussion(discussion) &&
     discussion.avgConfidence != null &&
-    discussion.avgConfidence >= SPECULATIVE_CONFIDENCE_MAX &&
+    discussion.avgConfidence >= NEEDS_REPRO_CONFIDENCE_MAX &&
     discussion.avgConfidence < LOW_CONFIDENCE_CRITICAL_MAX;
+}
+
+function isNeedsReproDiscussion(discussion: DiscussionVerdict): boolean {
+  return isCriticalDiscussion(discussion) &&
+    discussion.avgConfidence != null &&
+    discussion.avgConfidence >= SPECULATIVE_CONFIDENCE_MAX &&
+    discussion.avgConfidence < NEEDS_REPRO_CONFIDENCE_MAX;
 }
 
 function formatSummaryTriageCounts(triage: ReturnType<typeof triageDocs>, discussions: DiscussionVerdict[]): string {
@@ -220,6 +227,9 @@ function formatDiscussionDecisionDisposition(discussion: DiscussionVerdict): str
   if (isNeedsHumanDiscussion(discussion)) {
     return `human-gated critical-risk hypothesis (${discussionConfidenceLabel(discussion)})`;
   }
+  if (isNeedsReproDiscussion(discussion)) {
+    return `needs-repro critical hypothesis (${discussionConfidenceLabel(discussion)})`;
+  }
   return formatDiscussionSeverityLabel(discussion);
 }
 
@@ -235,6 +245,11 @@ function pushDiscussionDisposition(lines: string[], discussion: DiscussionVerdic
     lines.push(`**Trace:** ${discussion.reasoning}`);
     return;
   }
+  if (isNeedsReproDiscussion(discussion)) {
+    lines.push(`**Disposition:** ${formatDiscussionDecisionDisposition(discussion)} — non-blocking unless reproduced by the listed focused check.`);
+    lines.push(`**Trace:** ${discussion.reasoning}`);
+    return;
+  }
   lines.push(`**Verdict:** ${severityLabel} \u2014 ${discussion.reasoning}`);
 }
 
@@ -244,19 +259,19 @@ function countForcedSpeculativeDiscussions(discussions: DiscussionVerdict[]): nu
 
 function pushDecisionSnapshot(
   lines: string[],
-  summary: PipelineSummary,
+  publicDecision: PipelineSummary['decision'],
   publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
   discussions: DiscussionVerdict[],
 ): void {
-  const decisionGate = summary.decision === 'REJECT'
+  const decisionGate = publicDecision === 'REJECT'
     ? 'merge blocked'
-    : summary.decision === 'NEEDS_HUMAN'
+    : publicDecision === 'NEEDS_HUMAN'
       ? 'human review required'
       : '0';
   const followUpLater = publicVerify.needsHuman.length +
     publicVerify.needsRepro.length +
     publicVerify.verify.length +
-    discussions.filter(isNeedsHumanDiscussion).length;
+    discussions.filter((discussion) => isNeedsHumanDiscussion(discussion) || isNeedsReproDiscussion(discussion)).length;
   const hiddenSpeculative = publicVerify.speculative.length + countForcedSpeculativeDiscussions(discussions);
   lines.push('### Decision Snapshot');
   lines.push('');
@@ -264,7 +279,7 @@ function pushDecisionSnapshot(
   lines.push('|---:|---:|---:|');
   lines.push(`| ${decisionGate} | ${followUpLater} | ${hiddenSpeculative} |`);
   lines.push('');
-  if (summary.decision === 'NEEDS_HUMAN') {
+  if (publicDecision === 'NEEDS_HUMAN') {
     lines.push('Human-gated items require maintainer confirmation before merge. Needs-repro and speculative items remain non-blocking until reproduced or backed by stronger evidence.');
   } else {
     lines.push('Verdict is based on current blockers. Follow-up and speculative items are non-blocking until reproduced or backed by stronger evidence.');
@@ -285,7 +300,7 @@ function formatFollowUpContract(count: number): string {
 
 function pushMergeDecisionContract(
   lines: string[],
-  summary: PipelineSummary,
+  publicDecision: PipelineSummary['decision'],
   triage: ReturnType<typeof triageDocs>,
   publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
   discussions: DiscussionVerdict[],
@@ -305,25 +320,40 @@ function pushMergeDecisionContract(
       `${discussion.discussionId} \`${discussion.filePath}:${discussion.lineRange[0]}\` ${formatDiscussionSeverityLabel(discussion)}`,
     ),
   ];
-  const mergeNow = summary.decision === 'ACCEPT' && mustFixItems.length === 0 && humanItems.length === 0
+  const mergeNow = publicDecision === 'ACCEPT' && mustFixItems.length === 0 && humanItems.length === 0
     ? 'yes'
     : 'no';
   const blockingLabel = mustFixItems.length > 0
     ? formatContractItems(mustFixItems)
-    : summary.decision === 'REJECT'
+    : publicDecision === 'REJECT'
       ? 'reject verdict; inspect final decision table'
       : 'none';
 
-  lines.push('### Merge Decision Contract');
+  lines.push('### Maintainer Decision Box');
   lines.push('');
   lines.push('| Question | Answer |');
   lines.push('|---|---|');
   lines.push(`| Merge now? | ${mergeNow} |`);
-  lines.push(`| Blocking items to fix before merge | ${blockingLabel} |`);
-  lines.push(`| Human checks required before merge | ${formatContractItems(humanItems)} |`);
+  lines.push(`| Pre-merge required | ${formatContractItems([...mustFixItems, ...humanItems], 'none')} |`);
+  lines.push(`| Risk if skipped | ${blockingLabel === 'none' && humanItems.length === 0 ? 'No public pre-merge risk above the human-gate threshold.' : 'A listed pre-merge condition may still be unresolved.'} |`);
   lines.push(`| Follow-up only | ${formatFollowUpContract(followUpItems.length)} |`);
-  lines.push('| Confidence rule | CRITICAL/HARSHLY_CRITICAL at >=60% blocks merge; 20-59% is a human gate; <20% is speculative unless reproduced. |');
+  lines.push('| Confidence rule | CRITICAL/HARSHLY_CRITICAL at >=60% blocks merge; 40-59% is a human gate; 20-39% is needs-repro appendix; <20% is speculative unless reproduced. |');
   lines.push('');
+}
+
+function publicReviewDecision(
+  summary: PipelineSummary,
+  triage: ReturnType<typeof triageDocs>,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+): PipelineSummary['decision'] {
+  if (summary.decision === 'REJECT' || triage.mustFix.length > 0) {
+    return 'REJECT';
+  }
+  if (publicVerify.needsHuman.length > 0 || discussions.some(isNeedsHumanDiscussion)) {
+    return 'NEEDS_HUMAN';
+  }
+  return 'ACCEPT';
 }
 
 function pushTopMaintainerActionList(
@@ -357,20 +387,13 @@ function pushTopMaintainerActionList(
       action: `Run \`${suggestedDiscussionCommand(discussion)}\`.`,
     });
   }
-  for (const doc of publicVerify.needsRepro) {
-    actions.push({
-      item: `\`${formatLocation(doc)}\` ${doc.issueTitle}`,
-      impact: truncateResponse(doc.problem, 120),
-      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
-      action: `Promote only if \`${suggestedReproCommand(doc)}\` reproduces it.`,
-    });
-  }
-
   lines.push('### Maintainer Action List');
   lines.push('');
   if (actions.length === 0) {
     const followUpCount = publicVerify.speculative.length +
       publicVerify.verify.length +
+      publicVerify.needsRepro.length +
+      discussions.filter(isNeedsReproDiscussion).length +
       countForcedSpeculativeDiscussions(discussions);
     lines.push(`No pre-merge maintainer action required. ${formatFollowUpContract(followUpCount)}`);
     lines.push('');
@@ -413,16 +436,6 @@ function pushFinalDecisionTable(
     });
   }
 
-  for (const doc of publicVerify.needsRepro) {
-    rows.push({
-      item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
-      confidence: confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence),
-      disposition: 'needs reproduction',
-      blocks: 'no',
-      action: 'Treat as non-blocking until reproduced.',
-    });
-  }
-
   for (const discussion of discussions.filter(isNeedsHumanDiscussion)) {
     rows.push({
       item: `${discussion.discussionId} — discussion verdict`,
@@ -430,16 +443,6 @@ function pushFinalDecisionTable(
       disposition: formatDiscussionDecisionDisposition(discussion),
       blocks: 'human gate',
       action: 'Run the evidence card below and confirm the contract.',
-    });
-  }
-
-  for (const discussion of discussions.filter(isForcedSpeculativeDiscussion)) {
-    rows.push({
-      item: `${discussion.discussionId} — forced hypothesis`,
-      confidence: discussionConfidenceLabel(discussion),
-      disposition: formatDiscussionSeverityLabel(discussion),
-      blocks: 'no',
-      action: 'Ignore for merge unless independently reproduced.',
     });
   }
 
@@ -530,53 +533,6 @@ function suggestedReproCommand(doc: EvidenceDocument): string {
 function suggestedDiscussionCommand(discussion: DiscussionVerdict): string {
   return suggestedCommandForPath(discussion.filePath) ??
     `Inspect ${discussion.filePath}:${discussion.lineRange[0]} and run the nearest focused test.`;
-}
-
-function pushMaintainerActionTop3(
-  lines: string[],
-  triage: ReturnType<typeof triageDocs>,
-  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
-  discussions: DiscussionVerdict[],
-): void {
-  const actions: Array<{ item: string; command: string; pass: string; fail: string }> = [];
-  const seenLocations = new Set<string>();
-  for (const doc of [...triage.mustFix, ...publicVerify.needsHuman, ...publicVerify.needsRepro]) {
-    seenLocations.add(formatLocation(doc));
-    actions.push({
-      item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
-      command: suggestedReproCommand(doc),
-      pass: 'Referenced behavior is intentional or the focused test passes without reproducing the claim.',
-      fail: doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL'
-        ? 'Keep human gate or reject until fixed.'
-        : 'Track as non-blocking follow-up.',
-    });
-  }
-  for (const discussion of discussions.filter(isNeedsHumanDiscussion)) {
-    const location = `${discussion.filePath}:${discussion.lineRange[0]}`;
-    if (seenLocations.has(location)) {
-      continue;
-    }
-    seenLocations.add(location);
-    actions.push({
-      item: `${discussion.discussionId} — discussion verdict at \`${location}\``,
-      command: suggestedDiscussionCommand(discussion),
-      pass: 'The focused check does not reproduce the discussion claim.',
-      fail: 'Keep human gate until the contract or behavior is fixed.',
-    });
-  }
-  if (actions.length === 0) {
-    return;
-  }
-
-  lines.push('### Maintainer Action Top-3');
-  lines.push('');
-  for (const action of actions.slice(0, 3)) {
-    lines.push(`- ${action.item}`);
-    lines.push(`  - Run: \`${action.command}\``);
-    lines.push(`  - Pass: ${action.pass}`);
-    lines.push(`  - Fail: ${action.fail}`);
-  }
-  lines.push('');
 }
 
 function pushReproCard(lines: string[], doc: EvidenceDocument): void {
@@ -1039,22 +995,22 @@ export function buildSummaryBody(params: {
   lines.push(MARKER);
   lines.push('');
   // Unified header: verdict + triage
-  const vb = VERDICT_BADGE[summary.decision] ?? { emoji: '\u2753', label: summary.decision };
   const triage = triageDocs(evidenceDocs);
   const triageStr = formatSummaryTriageCounts(triage, discussions);
   const publicVerify = splitPublicVerifyDocs(triage.verify);
+  const publicDecision = publicReviewDecision(summary, triage, publicVerify, discussions);
   const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
+  const vb = VERDICT_BADGE[publicDecision] ?? { emoji: '\u2753', label: publicDecision };
 
   lines.push(`## ${vb.emoji} CodeAgora: ${vb.label}`);
   lines.push('');
   lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
-  pushMergeDecisionContract(lines, summary, triage, publicVerify, discussions);
+  pushMergeDecisionContract(lines, publicDecision, triage, publicVerify, discussions);
   pushTopMaintainerActionList(lines, triage, publicVerify, discussions);
   pushFinalDecisionTable(lines, triage, publicVerify, discussions);
   pushDiscussionEvidenceCards(lines, discussions);
-  pushMaintainerActionTop3(lines, triage, publicVerify, discussions);
-  pushDecisionSnapshot(lines, summary, publicVerify, discussions);
+  pushDecisionSnapshot(lines, publicDecision, publicVerify, discussions);
   pushReviewCoverage(lines, summary, safeParams.reviewRun);
   pushNonBlockingQueues(lines, safeParams.reviewRun, safeParams.reviewQueues);
 
@@ -1096,20 +1052,23 @@ export function buildSummaryBody(params: {
   // Needs-repro section: lower-confidence CRITICAL+ findings need a concrete
   // reproduction before they should influence merge decisions.
   if (publicVerify.needsRepro.length > 0) {
-    lines.push('### Needs Repro');
+    lines.push('<details>');
+    lines.push(`<summary>Needs reproduction appendix (${publicVerify.needsRepro.length})</summary>`);
     lines.push('');
-    lines.push('Confirm with a concrete reproduction before treating these as blockers.');
+    lines.push('These low-confidence items are not pre-merge gates. Promote one only after the listed focused check reproduces it.');
     lines.push('');
-    lines.push('| | File | Issue | Confidence |');
-    lines.push('|--|------|-------|-----------|');
+    lines.push('| File | Issue | Final confidence | Repro command |');
+    lines.push('|---|---|---:|---|');
     for (const doc of publicVerify.needsRepro) {
-      const confCell = getConfidenceBadge(doc.confidenceTrace?.final ?? doc.confidence) || '\u2014';
+      const confCell = confidenceValueLabel(doc.confidenceTrace?.final ?? doc.confidence);
       lines.push(
-        `| \u{1F7E0} | \`${formatLocation(doc)}\` | ${doc.issueTitle} | ${confCell} |`,
+        `| \`${formatLocation(doc)}\` | ${doc.issueTitle} | ${confCell} | \`${suggestedReproCommand(doc)}\` |`,
       );
     }
     lines.push('');
     pushIssueActionDetails(lines, publicVerify.needsRepro, 'Needs-repro');
+    lines.push('</details>');
+    lines.push('');
   }
 
   // Verify section: actionable non-blocking findings, typically warnings.

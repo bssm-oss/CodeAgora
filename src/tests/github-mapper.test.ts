@@ -221,9 +221,9 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('<!-- codeagora-v3 -->');
     expect(body).toContain('REJECT');
     expect(body).toContain('CodeAgora');
-    expect(body).toContain('### Merge Decision Contract');
+    expect(body).toContain('### Maintainer Decision Box');
     expect(body).toContain('| Merge now? | no |');
-    expect(body).toContain('| Blocking items to fix before merge | `src/db/queries.ts:42` SQL injection vulnerability |');
+    expect(body).toContain('| Pre-merge required | `src/db/queries.ts:42` SQL injection vulnerability |');
     expect(body).toContain('### Maintainer Action List');
     expect(body).toContain('| `src/db/queries.ts:42` SQL injection vulnerability | User input concatenated into SQL query | 90% | Fix before merge. |');
     expect(body).toContain('### Final Decision Table');
@@ -421,23 +421,18 @@ describe('buildSummaryBody', () => {
       })],
     });
 
-    expect(body).toContain('1 needs-human discussion');
-    expect(body).toContain('### Merge Decision Contract');
-    expect(body).toContain('| Merge now? | no |');
-    expect(body).toContain('| Human checks required before merge | d001 `src/db/queries.ts:42` human-gated critical-risk hypothesis (26%) |');
+    expect(body).not.toContain('1 needs-human discussion');
+    expect(body).toContain('### Maintainer Decision Box');
+    expect(body).toContain('| Merge now? | yes |');
+    expect(body).toContain('| Pre-merge required | none |');
     expect(body).toContain('### Maintainer Action List');
-    expect(body).toContain('| d001 `src/db/queries.ts:42` | Human-gated discussion needs maintainer confirmation before merge. | 26% | Run `Inspect src/db/queries.ts:42 and run the nearest focused test.`. |');
-    expect(body).toContain('| d001 — discussion verdict | 26% | human-gated critical-risk hypothesis (26%) | human gate |');
-    expect(body).toContain('### Human Gate Evidence Cards');
-    expect(body).toContain('Policy basis: 20-59% critical-risk discussions require human review');
-    expect(body).toContain('### Maintainer Action Top-3');
-    expect(body).toContain('Run: `Inspect src/db/queries.ts:42 and run the nearest focused test.`');
-    expect(body).toContain('consensus → human-gated critical-risk hypothesis (26%)');
-    expect(body).toContain('**Disposition:** human-gated critical-risk hypothesis (26%) — human check required before merge.');
+    expect(body).toContain('No pre-merge maintainer action required. 1 non-blocking follow-up item(s)');
+    expect(body).toContain('consensus → needs-repro critical hypothesis (26%)');
+    expect(body).toContain('**Disposition:** needs-repro critical hypothesis (26%) — non-blocking unless reproduced by the listed focused check.');
+    expect(body).not.toContain('### Human Gate Evidence Cards');
     expect(body).not.toContain('consensus → CRITICAL');
     expect(body).not.toContain('**Verdict:** CRITICAL — All supporters agreed');
-    expect(body).toContain('| human review required | 1 | 0 |');
-    expect(body).not.toContain('| 0 | 0 |');
+    expect(body).toContain('| 0 | 1 | 0 |');
   });
 
   it('uses focused desktop bridge command in maintainer actions', () => {
@@ -454,7 +449,7 @@ describe('buildSummaryBody', () => {
       discussions: [],
     });
 
-    expect(body).toContain('Run: `pnpm vitest run src/tests/desktop-bridge.test.ts`');
+    expect(body).toContain('Confirm contract with `pnpm vitest run src/tests/desktop-bridge.test.ts`.');
   });
 
   it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
@@ -475,7 +470,8 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('1 needs-repro');
-    expect(body).toContain('### Needs Repro');
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('These low-confidence items are not pre-merge gates.');
     expect(body).toContain('forced → high-risk hypothesis (4%)');
     expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
