@@ -346,6 +346,9 @@ function suggestedCommandForPath(filePath: string, issueTitle = ''): string | nu
   if (/packages\/github\/src\/formatter\.ts/.test(filePath)) {
     return 'pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts';
   }
+  if (/packages\/desktop\/src\/api\/desktop-bridge\.ts/.test(filePath)) {
+    return 'pnpm vitest run src/tests/desktop-bridge.test.ts';
+  }
   if (/packages\/shared\/src\/utils\/triage\.ts/.test(filePath)) {
     return 'pnpm vitest run packages/github/src/tests/mapper.test.ts src/tests/github-mapper.test.ts';
   }
@@ -364,17 +367,18 @@ function suggestedCommandForPath(filePath: string, issueTitle = ''): string | nu
 function commandLikeSnippet(text: string): string | null {
   const backtickMatches = [...text.matchAll(/`([^`]+)`/g)].map((match) => match[1]?.trim()).filter(Boolean);
   return backtickMatches.find((snippet) =>
-    /^(?:pnpm|npm|yarn|node|agora|codeagora|gh|git)\b/.test(snippet!) ||
-    /\b(?:init|review|test|build|evidence|workflow)\b/.test(snippet!)
+    snippet!.length <= 160 &&
+    !snippet!.includes('\n') &&
+    /^(?:pnpm|npm|yarn|node|agora|codeagora|gh|git)\b/.test(snippet!)
   ) ?? null;
 }
 
 function suggestedReproCommand(doc: EvidenceDocument): string {
+  const pathCommand = suggestedCommandForPath(doc.filePath, doc.issueTitle);
+  if (pathCommand) return pathCommand;
   const haystack = [doc.problem, ...doc.evidence, doc.suggestion].join('\n');
   const snippet = commandLikeSnippet(haystack);
   if (snippet) return snippet;
-  const pathCommand = suggestedCommandForPath(doc.filePath, doc.issueTitle);
-  if (pathCommand) return pathCommand;
   return `Inspect ${formatLocation(doc)} and run the smallest command or test that exercises this path.`;
 }
 
@@ -390,7 +394,9 @@ function pushMaintainerActionTop3(
   discussions: DiscussionVerdict[],
 ): void {
   const actions: Array<{ item: string; command: string; pass: string; fail: string }> = [];
+  const seenLocations = new Set<string>();
   for (const doc of [...triage.mustFix, ...publicVerify.needsHuman, ...publicVerify.needsRepro]) {
+    seenLocations.add(formatLocation(doc));
     actions.push({
       item: `\`${formatLocation(doc)}\` — ${doc.issueTitle}`,
       command: suggestedReproCommand(doc),
@@ -401,8 +407,13 @@ function pushMaintainerActionTop3(
     });
   }
   for (const discussion of discussions.filter(isNeedsHumanDiscussion)) {
+    const location = `${discussion.filePath}:${discussion.lineRange[0]}`;
+    if (seenLocations.has(location)) {
+      continue;
+    }
+    seenLocations.add(location);
     actions.push({
-      item: `${discussion.discussionId} — discussion verdict at \`${discussion.filePath}:${discussion.lineRange[0]}\``,
+      item: `${discussion.discussionId} — discussion verdict at \`${location}\``,
       command: suggestedDiscussionCommand(discussion),
       pass: 'The focused check does not reproduce the discussion claim.',
       fail: 'Keep human gate until the contract or behavior is fixed.',
@@ -431,6 +442,13 @@ function pushReproCard(lines: string[], doc: EvidenceDocument): void {
   lines.push(`  - Pass condition: the expected and actual behavior match without relying on reviewer speculation.`);
 }
 
+function formatSummarySuggestion(suggestion: string): string {
+  if (/```[\s\S]*```/.test(suggestion) || suggestion.length > 240) {
+    return 'Code-level suggestion omitted from summary; verify the issue first, then inspect inline suggestions if needed.';
+  }
+  return truncateResponse(suggestion, 220);
+}
+
 function pushIssueActionDetails(lines: string[], docs: EvidenceDocument[], label: string): void {
   if (docs.length === 0) return;
   lines.push('<details>');
@@ -442,7 +460,7 @@ function pushIssueActionDetails(lines: string[], docs: EvidenceDocument[], label
     lines.push(`- Why this matters: ${truncateResponse(doc.problem, 220)}`);
     lines.push(`- How to verify: ${truncateResponse(firstEvidence(doc), 220)}`);
     if (doc.suggestion) {
-      lines.push(`- Suggested fix: ${truncateResponse(doc.suggestion, 220)}`);
+      lines.push(`- Suggested fix: ${formatSummarySuggestion(doc.suggestion)}`);
     }
     if (label === 'Needs-repro') {
       pushReproCard(lines, doc);

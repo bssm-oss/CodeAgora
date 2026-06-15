@@ -525,6 +525,26 @@ describe('buildSummaryBody', () => {
     expect(body).not.toContain('| 0 | 0 |');
   });
 
+  it('uses focused path commands instead of long suggestion code blocks in maintainer actions', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A manifest issue needs reproduction.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        filePath: 'scripts/evidence-manifest.mjs',
+        lineRange: [257, 257],
+        confidence: 24,
+        issueTitle: 'Manifest parsing can throw',
+        suggestion: '```javascript\nexport async function run() { return command.raw; }\n```',
+      })],
+      discussions: [],
+    });
+
+    expect(body).toContain('### Maintainer Action Top-3');
+    expect(body).toContain('Run: `pnpm vitest run src/tests/release-evidence-manifest.test.ts`');
+    expect(body).not.toContain('export async function run');
+  });
+
   it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
     const body = buildSummaryBody({
       summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A weak security claim needs reproduction.' }),

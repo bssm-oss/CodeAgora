@@ -424,6 +424,23 @@ describe('buildSummaryBody', () => {
     expect(body).not.toContain('| 0 | 0 |');
   });
 
+  it('uses focused desktop bridge command in maintainer actions', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'Desktop bridge contract needs review.' }),
+      sessionId: '005-desktop-action',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [makeDoc({
+        filePath: 'packages/desktop/src/api/desktop-bridge.ts',
+        lineRange: [217, 217],
+        confidence: 42,
+        issueTitle: 'Desktop bridge mutation behavior changed',
+      })],
+      discussions: [],
+    });
+
+    expect(body).toContain('Run: `pnpm vitest run src/tests/desktop-bridge.test.ts`');
+  });
+
   it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
     const body = buildSummaryBody({
       summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A weak security claim needs reproduction.' }),
