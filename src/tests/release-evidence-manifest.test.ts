@@ -5,8 +5,13 @@ import { execFileSync, spawnSync } from 'child_process';
 import { describe, expect, it } from 'vitest';
 import {
   RELEASE_TIERS,
+  RELEASE_GATE_EXECUTIONS,
   deterministicLocalReleaseGates,
 } from '../../scripts/release-gates.mjs';
+import {
+  artifactEvidenceMode,
+  resolveEvidenceArtifactPath,
+} from '../../scripts/evidence-manifest.mjs';
 
 const scriptPath = path.resolve('scripts/evidence-manifest.mjs');
 const securitySmokeScriptPath = path.resolve('scripts/security-evidence-smoke.mjs');
@@ -106,6 +111,7 @@ describe('release evidence manifest', () => {
       expect(liveBenchmark.tier).toBe('stable');
       expect(liveBenchmark.path).toBe('docs/archived/live-benchmark-report.md');
       expect(liveBenchmark.exists).toBe(true);
+      expect(liveBenchmark.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
 
       const liveActionSmoke = manifest.entries.find((entry: { name: string }) => entry.name === 'live-github-action-pr-smoke');
       expect(manifest.evidenceMetadataStore).toBe(
@@ -481,6 +487,57 @@ describe('release evidence manifest', () => {
       expect(result.stderr).toContain('Missing or invalid required rc evidence');
       expect(result.stderr).toContain('desktop-security-evidence.json (invalid evidence mode: skipped)');
       expect(result.stderr).toContain('github-security-evidence.json (invalid evidence mode: placeholder)');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps sourcePath evidence inside the repository and generated evidence inside the evidence directory', () => {
+    const repoRoot = path.resolve('/tmp/codeagora-repo');
+    const evidenceDir = path.join(repoRoot, '.sisyphus', 'evidence');
+
+    expect(resolveEvidenceArtifactPath({
+      name: 'live-doc',
+      sourcePath: 'docs/archived/live.md',
+      filename: 'live.md',
+    }, evidenceDir, repoRoot)).toBe(path.join(repoRoot, 'docs/archived/live.md'));
+
+    expect(resolveEvidenceArtifactPath({
+      name: 'local-log',
+      filename: 'typecheck.log',
+    }, evidenceDir, repoRoot)).toBe(path.join(evidenceDir, 'typecheck.log'));
+
+    expect(() => resolveEvidenceArtifactPath({
+      name: 'escaped-source',
+      sourcePath: '../outside.md',
+      filename: 'outside.md',
+    }, evidenceDir, repoRoot)).toThrow('must stay inside repository');
+
+    expect(() => resolveEvidenceArtifactPath({
+      name: 'escaped-file',
+      filename: '../outside.log',
+    }, evidenceDir, repoRoot)).toThrow('must stay inside evidence directory');
+  });
+
+  it('treats non-json live evidence as real but malformed json artifacts as unknown', () => {
+    const dir = makeTmpDir();
+    try {
+      const markdownPath = path.join(dir, 'live.md');
+      const jsonPath = path.join(dir, 'live.json');
+      const localArtifactPath = path.join(dir, 'security.json');
+      fs.writeFileSync(markdownPath, '# live evidence\n');
+      fs.writeFileSync(jsonPath, '{not-json');
+      fs.writeFileSync(localArtifactPath, '{not-json');
+
+      expect(artifactEvidenceMode({
+        execution: RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
+      }, markdownPath, null)).toBe('real');
+      expect(artifactEvidenceMode({
+        execution: RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
+      }, jsonPath, null)).toBe('unknown');
+      expect(artifactEvidenceMode({
+        execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+      }, localArtifactPath, null)).toBe('unknown');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

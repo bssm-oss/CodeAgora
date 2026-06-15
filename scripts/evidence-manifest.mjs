@@ -141,6 +141,30 @@ function latestGateCommandEvidenceByName(gateEvidenceEntries) {
   return latest;
 }
 
+function isPathInside(parentDir, candidatePath) {
+  const relative = path.relative(parentDir, candidatePath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+export function resolveEvidenceArtifactPath(entry, evidenceDir, repoRoot = process.cwd()) {
+  const repoRootPath = path.resolve(repoRoot);
+  const evidenceRoot = path.resolve(evidenceDir);
+
+  if (entry.sourcePath) {
+    const artifactPath = path.resolve(repoRootPath, entry.sourcePath);
+    if (!isPathInside(repoRootPath, artifactPath)) {
+      throw new Error(`Evidence sourcePath for ${entry.name} must stay inside repository: ${entry.sourcePath}`);
+    }
+    return artifactPath;
+  }
+
+  const artifactPath = path.resolve(evidenceRoot, entry.filename);
+  if (!isPathInside(evidenceRoot, artifactPath)) {
+    throw new Error(`Evidence filename for ${entry.name} must stay inside evidence directory: ${entry.filename}`);
+  }
+  return artifactPath;
+}
+
 function publicGateCommandEvidence(entry) {
   if (!entry) {
     return null;
@@ -162,7 +186,7 @@ function publicGateCommandEvidence(entry) {
   };
 }
 
-function artifactEvidenceMode(entry, artifactPath, latestCommandEvidence) {
+export function artifactEvidenceMode(entry, artifactPath, latestCommandEvidence) {
   if (!fs.existsSync(artifactPath)) {
     return null;
   }
@@ -175,11 +199,17 @@ function artifactEvidenceMode(entry, artifactPath, latestCommandEvidence) {
     return 'real';
   }
 
+  const extension = path.extname(artifactPath).toLowerCase();
+  const shouldParseEvidenceMode = entry.execution === RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT || extension === '.json';
+  if (!shouldParseEvidenceMode) {
+    return 'real';
+  }
+
   try {
     const parsed = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
     return typeof parsed?.evidenceMode === 'string' ? parsed.evidenceMode : 'real';
   } catch {
-    return entry.execution === RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT ? 'unknown' : 'real';
+    return 'unknown';
   }
 }
 
@@ -207,7 +237,7 @@ function buildManifest(options) {
   const gateCommandEvidenceByName = latestGateCommandEvidenceByName(gateCommandEvidence);
   const expectedEvidence = evidenceEntriesForSurface(options.surface);
   const entries = expectedEvidence.map((entry) => {
-    const artifactPath = entry.sourcePath ? path.resolve(entry.sourcePath) : path.join(evidenceDir, entry.filename);
+    const artifactPath = resolveEvidenceArtifactPath(entry, evidenceDir);
     const exists = fs.existsSync(artifactPath);
     const stat = exists ? fs.statSync(artifactPath) : undefined;
     const latestMetadata = metadataByName.get(entry.name) ?? null;
