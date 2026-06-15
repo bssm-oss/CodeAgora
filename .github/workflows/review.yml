@@ -8,6 +8,7 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  security-events: write
 
 jobs:
   review:
@@ -15,14 +16,14 @@ jobs:
       github.event.pull_request.draft == false &&
       !contains(github.event.pull_request.labels.*.name, 'review:skip')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Check fork PR secrets
         id: fork-check
         if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
-          echo "::warning::Fork PR detected — secrets are unavailable. Skipping review."
+          echo "::warning::Fork PR detected - secrets are unavailable. Skipping review."
           echo "skip=true" >> "$GITHUB_OUTPUT"
 
       - name: Check API key
@@ -50,26 +51,110 @@ jobs:
             "mode": "pragmatic",
             "language": "ko",
             "reviewers": [
-              { "id": "r-qwen235", "model": "qwen/qwen3-235b-a22b-2507", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" },
-              { "id": "r-deepseek", "model": "deepseek/deepseek-v4-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:api-contract" },
-              { "id": "r-qwen9", "model": "qwen/qwen3.5-9b", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:general" },
-              { "id": "r-glm-flash", "model": "z-ai/glm-4.7-flash", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:security" },
-              { "id": "r-gpt-oss", "model": "openai/gpt-oss-120b", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180, "persona": "builtin:logic" }
+              {
+                "id": "r-qwen235",
+                "model": "qwen/qwen3-235b-a22b-2507",
+                "backend": "api",
+                "provider": "openrouter",
+                "enabled": true,
+                "timeout": 180,
+                "persona": "builtin:logic"
+              },
+              {
+                "id": "r-deepseek",
+                "model": "deepseek/deepseek-v4-flash",
+                "backend": "api",
+                "provider": "openrouter",
+                "enabled": true,
+                "timeout": 180,
+                "persona": "builtin:api-contract"
+              },
+              {
+                "id": "r-qwen9",
+                "model": "qwen/qwen3.5-9b",
+                "backend": "api",
+                "provider": "openrouter",
+                "enabled": true,
+                "timeout": 180,
+                "persona": "builtin:general"
+              },
+              {
+                "id": "r-glm-flash",
+                "model": "z-ai/glm-4.7-flash",
+                "backend": "api",
+                "provider": "openrouter",
+                "enabled": true,
+                "timeout": 180,
+                "persona": "builtin:security"
+              },
+              {
+                "id": "r-gpt-oss",
+                "model": "openai/gpt-oss-120b",
+                "backend": "api",
+                "provider": "openrouter",
+                "enabled": true,
+                "timeout": 180,
+                "persona": "builtin:logic"
+              }
             ],
             "supporters": {
               "pool": [
-                { "id": "s-glm", "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 }
+                {
+                  "id": "s-glm",
+                  "model": "z-ai/glm-5.1",
+                  "backend": "api",
+                  "provider": "openrouter",
+                  "enabled": true,
+                  "timeout": 180
+                }
               ],
               "pickCount": 1,
               "pickStrategy": "random",
-              "devilsAdvocate": { "id": "da-kimi", "model": "moonshotai/kimi-k2.5", "backend": "api", "provider": "openrouter", "enabled": true, "timeout": 180 },
-              "personaPool": ["builtin:security", "builtin:logic", "builtin:api-contract", "builtin:general"],
+              "devilsAdvocate": {
+                "id": "da-kimi",
+                "model": "moonshotai/kimi-k2.5",
+                "backend": "api",
+                "provider": "openrouter",
+                "enabled": true,
+                "timeout": 180
+              },
+              "personaPool": [
+                "builtin:security",
+                "builtin:logic",
+                "builtin:api-contract",
+                "builtin:general"
+              ],
               "personaAssignment": "random"
             },
-            "moderator": { "model": "z-ai/glm-5.1", "backend": "api", "provider": "openrouter", "enabled": false, "timeout": 180 },
-            "discussion": { "maxRounds": 1, "registrationThreshold": { "HARSHLY_CRITICAL": 1, "CRITICAL": 1, "WARNING": 2, "SUGGESTION": null }, "codeSnippetRange": 10 },
-            "head": { "backend": "api", "model": "z-ai/glm-5.1", "provider": "openrouter", "enabled": true, "timeout": 180 },
-            "errorHandling": { "maxRetries": 1, "forfeitThreshold": 0.7 }
+            "moderator": {
+              "model": "z-ai/glm-5.1",
+              "backend": "api",
+              "provider": "openrouter",
+              "enabled": false,
+              "timeout": 180
+            },
+            "discussion": {
+              "enabled": true,
+              "maxRounds": 1,
+              "registrationThreshold": {
+                "HARSHLY_CRITICAL": 1,
+                "CRITICAL": 1,
+                "WARNING": 2,
+                "SUGGESTION": null
+              },
+              "codeSnippetRange": 10
+            },
+            "head": {
+              "backend": "api",
+              "model": "z-ai/glm-5.1",
+              "provider": "openrouter",
+              "enabled": true,
+              "timeout": 180
+            },
+            "errorHandling": {
+              "maxRetries": 1,
+              "forfeitThreshold": 0.7
+            }
           }
           CONF
 
@@ -79,7 +164,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '5000'
+          max-diff-lines: '10000'
+          reporter-mode: check-run
+          upload-sarif: 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CODEAGORA_APP_ID: ${{ secrets.CODEAGORA_APP_ID }}

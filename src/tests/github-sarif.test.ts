@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSarifReport, serializeSarif } from '@codeagora/github/sarif.js';
+import { buildSarifReport, filterSarifPublishableEvidenceDocs, serializeSarif } from '@codeagora/github/sarif.js';
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
 import { SARIF_SEVERITY_RULES } from '@codeagora/shared/contracts/stable.js';
 
@@ -69,10 +69,10 @@ describe('buildSarifReport', () => {
     expect(loc.region.endLine).toBe(45);
   });
 
-  it('includes fix suggestion when available', () => {
+  it('keeps suggestion in markdown without emitting an invalid SARIF fix', () => {
     const report = buildSarifReport([makeDoc()], '001', '2026-03-16');
-    expect(report.runs[0].results[0].fixes).toHaveLength(1);
-    expect(report.runs[0].results[0].fixes![0].description.text).toBe('Use parameterized queries');
+    expect(report.runs[0].results[0].fixes).toBeUndefined();
+    expect(report.runs[0].results[0].message.markdown).toContain('Use parameterized queries');
   });
 
   it('omits fixes when no suggestion', () => {
@@ -102,6 +102,18 @@ describe('buildSarifReport', () => {
   it('sets automationDetails with session info', () => {
     const report = buildSarifReport([], '003', '2026-03-16');
     expect(report.runs[0].automationDetails.id).toBe('codeagora/2026-03-16/003');
+  });
+
+  it('filters low-confidence and suggestion findings for Code Scanning publication', () => {
+    const docs = [
+      makeDoc({ issueTitle: 'low-confidence critical', confidence: 25 }),
+      makeDoc({ issueTitle: 'verified critical', confidenceTrace: { final: 82 } }),
+      makeDoc({ issueTitle: 'style suggestion', severity: 'SUGGESTION', confidence: 99 }),
+    ];
+
+    expect(filterSarifPublishableEvidenceDocs(docs).map((doc) => doc.issueTitle)).toEqual([
+      'verified critical',
+    ]);
   });
 });
 

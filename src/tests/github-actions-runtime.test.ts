@@ -3,6 +3,11 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
+import {
+  buildActionPresetConfig,
+  CODEAGORA_WORKFLOW_MAX_DIFF_LINES,
+  renderCodeAgoraWorkflowTemplate,
+} from '@codeagora/shared/action-preset.js';
 
 const repoRoot = process.cwd();
 
@@ -26,6 +31,18 @@ const deprecatedNode20ActionPins = [
 
 function readText(relativePath: string): string {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf-8');
+}
+
+function extractConfigFromWorkflow(content: string): unknown {
+  const match = content.match(/cat > \.ca\/config\.json << 'CONF'\n([\s\S]*?)\n\s*CONF/);
+  if (!match) {
+    throw new Error('workflow config heredoc not found');
+  }
+  const json = match[1]!
+    .split('\n')
+    .map((line) => line.replace(/^ {10}/, ''))
+    .join('\n');
+  return JSON.parse(json);
 }
 
 describe('GitHub Actions runtime readiness', () => {
@@ -115,6 +132,41 @@ describe('GitHub Actions runtime readiness', () => {
     expect(bench).toContain('OPENROUTER_API_KEY');
     expect(bench).toContain('BENCH_DELAY_MS');
     expect(bench).toContain('--delay-ms "$BENCH_DELAY_MS"');
+  });
+
+  it('keeps the dogfood workflow aligned with the shared cheap Action preset', () => {
+    const review = readText('.github/workflows/review.yml');
+
+    expect(extractConfigFromWorkflow(review)).toEqual(buildActionPresetConfig({ language: 'ko' }));
+    expect(review).toBe(renderCodeAgoraWorkflowTemplate({ language: 'ko', localAction: true }));
+    expect(review).toContain(`max-diff-lines: '${CODEAGORA_WORKFLOW_MAX_DIFF_LINES}'`);
+  });
+
+  it('keeps the generated workflow template aligned with the shared renderer', () => {
+    const template = readText('packages/shared/src/data/github-actions-template.yml');
+
+    expect(extractConfigFromWorkflow(template)).toEqual(buildActionPresetConfig({ language: 'en' }));
+    expect(template).toBe(renderCodeAgoraWorkflowTemplate({ language: 'en' }));
+    expect(template).toContain(`max-diff-lines: '${CODEAGORA_WORKFLOW_MAX_DIFF_LINES}'`);
+  });
+
+  it('keeps provider health workflow generated from shared Action config with issue dedupe', () => {
+    const providerHealth = readText('.github/workflows/provider-health.yml');
+    const parsed = parseYaml(providerHealth);
+    const steps = parsed.jobs['health-check'].steps as Array<Record<string, unknown>>;
+    const generateStep = steps.find((step) => step.name === 'Generate shared Action config for doctor');
+    const doctorStep = steps.find((step) => step.name === 'Run live doctor');
+    const issueStep = steps.find((step) => step.name === 'Upsert provider health issue');
+
+    expect(providerHealth).toContain('renderActionPresetConfigJson');
+    expect(providerHealth).toContain('doctor --live --json');
+    expect(providerHealth).not.toContain('"xiaomi/mimo-v2.5"');
+    expect(providerHealth).not.toContain('github.rest.issues.create({');
+    expect(generateStep).toBeDefined();
+    expect(doctorStep).toBeDefined();
+    expect(issueStep).toBeDefined();
+    expect(String(issueStep?.with?.script)).toContain('github.rest.issues.listForRepo');
+    expect(String(issueStep?.with?.script)).toContain('github.rest.issues.createComment');
   });
 
   it('rebuilds the action bundle when the action contract changes', () => {

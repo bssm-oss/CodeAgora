@@ -88,15 +88,26 @@ describe('desktop bridge browser fallback contract', () => {
 
     expect(await bridge.readConfig()).toMatchObject({ path: '.ca/config.json', raw: '{"language":"en"}' });
 
-    expect(await bridge.writeConfig(raw)).toMatchObject({ path: '.ca/config.json', raw });
-    expect(window.localStorage.getItem('codeagora.desktop.config')).toBe(raw);
-
     expect(await bridge.getRepoInfo()).toMatchObject({
       isGitRepo: false,
       trusted: false,
       trustReason: expect.any(String),
       sessionsRoot: '.ca/sessions',
     });
+  });
+
+  it('fails closed for mutating and process browser preview calls', async () => {
+    installBrowserWindow('{"language":"en"}');
+    const bridge = await importBridge();
+    const raw = '{"reviewers":[]}';
+
+    await expect(bridge.runReview(true)).rejects.toMatchObject({ code: 'DESKTOP_PREVIEW_DISABLED' });
+    await expect(bridge.startReviewRun(true)).rejects.toMatchObject({ code: 'DESKTOP_PREVIEW_DISABLED' });
+    await expect(bridge.getReviewRun('preview')).rejects.toMatchObject({ code: 'DESKTOP_PREVIEW_DISABLED' });
+    await expect(bridge.cancelReviewRun('preview')).rejects.toMatchObject({ code: 'DESKTOP_PREVIEW_DISABLED' });
+    await expect(bridge.writeConfig(raw)).rejects.toMatchObject({ code: 'DESKTOP_PREVIEW_DISABLED' });
+    await expect(bridge.openRepository('/tmp/repo')).rejects.toMatchObject({ code: 'DESKTOP_PREVIEW_DISABLED' });
+    expect(window.localStorage.getItem('codeagora.desktop.config')).toBe('{"language":"en"}');
   });
 });
 

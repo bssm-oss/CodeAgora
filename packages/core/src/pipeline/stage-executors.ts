@@ -33,6 +33,7 @@ export async function executeL1Reviews(
   enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
   progress?: import('./progress.js').ProgressEmitter,
   reviewerTimeoutMs?: number,
+  signal?: AbortSignal,
 ): Promise<{ allReviewResults: ReviewOutput[]; allReviewerInputs: ReviewerInput[]; forfeitFailures: ReviewOutput[] }> {
   const allReviewResults: ReviewOutput[] = [];
   const allReviewerInputs: ReviewerInput[] = [];
@@ -87,7 +88,7 @@ export async function executeL1Reviews(
       reviewerInputs,
       config.errorHandling.maxRetries,
       undefined, // concurrency (default 5)
-      undefined, // options (default)
+      { signal },
       (reviewerId, issueCount, _elapsed, total, completed) => {
         progress?.stageUpdate(
           'review',
@@ -170,6 +171,7 @@ export async function executeL2Discussions(
   logger: ReturnType<typeof createLogger>,
   enrichedContext?: import('./pre-analysis.js').EnrichedDiffContext,
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<ModeratorReport> {
   const { deduplicated, mergedCount } = deduplicateDiscussions(thresholdResult.discussions);
   logger.info(`Deduplicated discussions: ${mergedCount} merged`);
@@ -210,6 +212,7 @@ export async function executeL2Discussions(
     emitter: discussionEmitter,
     enrichedContext,
     onBackendCall,
+    signal,
   });
 
   // === QUALITY TRACKING: Record L2 discussion results ===
@@ -268,6 +271,7 @@ export async function executeL3Verdict(
   config: Config,
   moderatorReport: ModeratorReport,
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<ReturnType<typeof makeHeadVerdict>> {
   // === L3 HEAD: Scan Unconfirmed Queue ===
   const { promoted, dismissed: _dismissed } = scanUnconfirmedQueue(
@@ -292,7 +296,7 @@ export async function executeL3Verdict(
     moderatorReport.summary.totalDiscussions += promoted.length;
   }
 
-  return makeHeadVerdict(moderatorReport, config.head, config.mode, config.language, onBackendCall);
+  return makeHeadVerdict(moderatorReport, config.head, config.mode, config.language, onBackendCall, signal);
 }
 
 /**

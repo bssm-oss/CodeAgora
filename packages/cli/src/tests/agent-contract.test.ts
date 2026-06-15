@@ -69,6 +69,39 @@ describe('agent contract helpers', () => {
     }));
   });
 
+  it('exposes publicDecision from the decision brief without mutating raw summary', () => {
+    const demoted = makeResult({
+      summary: {
+        ...makeResult().summary!,
+        decision: 'REJECT',
+        reasoning: 'Raw head verdict rejected.',
+      },
+      decisionBrief: {
+        decision: 'ACCEPT',
+        reviewedScope: {
+          files: ['src/app.ts'],
+          areas: ['logic changes'],
+          contracts: ['public decision contract'],
+          checks: ['evidence promotion'],
+          uncertainty: 'Non-promoted findings remain audit only.',
+        },
+        completedChecks: ['evidence promotion'],
+        evidenceCards: [],
+        requiredActions: [],
+        followUpCount: 1,
+        auditCount: 1,
+        demotedCount: 1,
+      },
+    });
+
+    const json = JSON.parse(formatAgentJson(demoted)) as Record<string, unknown>;
+    const ndjson = JSON.parse(formatResultNdjsonEvent(demoted)) as Record<string, unknown>;
+    expect(json['publicDecision']).toBe('ACCEPT');
+    expect((json['summary'] as { decision: string }).decision).toBe('REJECT');
+    expect(ndjson['publicDecision']).toBe('ACCEPT');
+    expect(getAgentReviewExitCode(demoted, { failOnReject: true })).toBe(0);
+  });
+
   it('formats progress NDJSON events with type=progress', () => {
     const event: ProgressEvent = {
       stage: 'review',

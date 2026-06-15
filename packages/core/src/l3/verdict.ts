@@ -9,6 +9,7 @@ import type { ModeratorReport, HeadVerdict, EvidenceDocument, DiscussionVerdict 
 import type { HeadConfig } from '../types/config.js';
 import type { BackendCallRecord, TokenUsage } from '../pipeline/telemetry.js';
 import { untrustedContentInstruction, wrapUntrustedBlock } from '../security/untrusted-content.js';
+import { containsHighRiskSpeculativeClaim } from '@codeagora/shared/utils/high-risk.js';
 
 // ============================================================================
 // LLM-Based Verdict
@@ -25,6 +26,7 @@ export async function makeHeadVerdict(
   mode?: 'strict' | 'pragmatic',
   language?: 'en' | 'ko',
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<HeadVerdict> {
   if (isCleanModeratorReport(report)) {
     return ruleBasedVerdict(report, mode);
@@ -33,7 +35,7 @@ export async function makeHeadVerdict(
   // Try LLM-based verdict if configured
   if (headConfig?.enabled !== false && headConfig?.model) {
     try {
-      return applyHeadVerdictSafety(await llmVerdict(report, headConfig, language, onBackendCall), report);
+      return applyHeadVerdictSafety(await llmVerdict(report, headConfig, language, onBackendCall, signal), report);
     } catch {
       // Fallback to rule-based on any LLM failure
     }
@@ -47,6 +49,7 @@ async function llmVerdict(
   config: HeadConfig,
   language?: 'en' | 'ko',
   onBackendCall?: (call: BackendCallRecord) => void,
+  signal?: AbortSignal,
 ): Promise<HeadVerdict> {
   const { executeBackend } = await import('../l1/backend.js');
   const { retryOnError } = await import('@codeagora/shared/utils/recovery.js');
@@ -64,6 +67,7 @@ async function llmVerdict(
           provider: config.provider,
           prompt,
           timeout: config.timeout ?? 120,
+          signal,
           temperature: 0.2,
           maxOutputTokens: config.maxOutputTokens,
           onUsage: (nextUsage) => { usage = nextUsage; },
@@ -167,11 +171,13 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 
 ## 판단 지침 (신뢰도 기반 분류 필수)
 - CRITICAL+ 이슈를 신뢰도 구간별로 분류할 것
-- 신뢰도 >50% CRITICAL+: 실제 문제 가능성 높음 — REJECT 고려
-- 신뢰도 ≤50% CRITICAL+: 미검증 — NEEDS_HUMAN으로 라우팅, REJECT 금지
+- 신뢰도 ≥60% CRITICAL+: 실제 문제 가능성 높음 — REJECT 고려
+- 신뢰도 20~59% CRITICAL+: 미검증 — NEEDS_HUMAN으로 라우팅, REJECT 금지
+- 신뢰도 <20% CRITICAL+: 추측성 — 차단/인간검토 판정으로 승격하지 말 것
+- 단, <20%라도 인증 우회/권한 경계/데이터 손실/코드 실행/인젝션/비밀 유출 계열이면 재현 확인 대상으로 남길 것
 - 미해결 토론이 남아있으면: NEEDS_HUMAN 고려
 - 0% 신뢰도 이슈를 "차단 이슈"로 표시할 경우 반드시 "미검증" 표기 필요
-- 모든 CRITICAL+ 이슈가 저신뢰도라면: REJECT 대신 NEEDS_HUMAN + 트리아지 가이드 반환`
+- 모든 CRITICAL+ 이슈가 20~59% 저신뢰도라면: REJECT 대신 NEEDS_HUMAN + 트리아지 가이드 반환`
     : `## Quantitative Summary
 - HARSHLY_CRITICAL: ${harshlyCount} issues
 - CRITICAL: ${criticalCount} issues
@@ -181,10 +187,12 @@ function buildHeadPrompt(report: ModeratorReport, language?: 'en' | 'ko'): strin
 
 ## Triage Guidance (#236)
 - Group findings by confidence tier before deciding
-- CRITICAL+ with confidence >50%: likely real — consider REJECT
-- CRITICAL+ with confidence ≤50%: unverified — route to NEEDS_HUMAN, NOT REJECT
+- CRITICAL+ with confidence ≥60%: likely real — consider REJECT
+- CRITICAL+ with confidence 20-59%: unverified — route to NEEDS_HUMAN, NOT REJECT
+- CRITICAL+ with confidence <20%: speculative — do not escalate to blocking or human-review verdicts by itself
+- Exception: keep <20% authentication bypass, permission boundary, data loss, code execution, injection, or secret leak claims in a repro/verification path
 - Do NOT mark zero-confidence findings as "Blocking Issues" without flagging them as unverified
-- If all critical findings are low-confidence, return NEEDS_HUMAN with triage guidance`;
+- If all critical findings are 20-59% low-confidence, return NEEDS_HUMAN with triage guidance`;
 
   if (isKo) {
     return `당신은 멀티 에이전트 코드 리뷰 시스템의 최종 판관입니다. 여러 AI 리뷰어가 독립적으로 코드 변경을 검토한 후 토론을 진행했습니다. 최종 판결을 내려주세요.
@@ -272,6 +280,26 @@ function isForcedTieBreak(verdict: DiscussionVerdict): boolean {
     /tie broken by forced decision/i.test(verdict.reasoning);
 }
 
+function isCriticalSeverity(severity: DiscussionVerdict['finalSeverity']): boolean {
+  return severity === 'CRITICAL' || severity === 'HARSHLY_CRITICAL';
+}
+
+function isSpeculativeCriticalDiscussion(verdict: DiscussionVerdict): boolean {
+  return isCriticalSeverity(verdict.finalSeverity) &&
+    verdict.avgConfidence != null &&
+    verdict.avgConfidence < SPECULATIVE_CRITICAL_CONFIDENCE_MIN;
+}
+
+function isHighRiskSpeculativeCriticalDiscussion(verdict: DiscussionVerdict): boolean {
+  return isSpeculativeCriticalDiscussion(verdict) &&
+    containsHighRiskSpeculativeClaim(verdict.reasoning);
+}
+
+function isActiveNonSpeculativeDiscussion(verdict: DiscussionVerdict): boolean {
+  return verdict.finalSeverity !== 'DISMISSED' &&
+    (!isSpeculativeCriticalDiscussion(verdict) || isHighRiskSpeculativeCriticalDiscussion(verdict));
+}
+
 function isCleanModeratorReport(report: ModeratorReport): boolean {
   return (
     !report.discussions.some(hasActionableDiscussionLocation) &&
@@ -318,10 +346,12 @@ export function applyHeadVerdictSafety(
   report: ModeratorReport,
 ): HeadVerdict {
   const allCritical = report.discussions.filter(
-    (d) => hasActionableDiscussionLocation(d) && (d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL')
+    (d) => hasActionableDiscussionLocation(d) && isCriticalSeverity(d.finalSeverity)
   );
   const criticalIssues = allCritical.filter(
-    (d) => !isForcedTieBreak(d) && (d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
+    (d) => !isSpeculativeCriticalDiscussion(d) &&
+      !isForcedTieBreak(d) &&
+      (d.avgConfidence == null || d.avgConfidence >= CRITICAL_BLOCKING_CONFIDENCE_MIN)
   );
   if (criticalIssues.length > 0) {
     if (verdict.decision === 'REJECT') return verdict;
@@ -335,9 +365,14 @@ export function applyHeadVerdictSafety(
   }
 
   const unverifiedCritical = allCritical.filter(
-    (d) => isForcedTieBreak(d) || (d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
+    (d) => (!isSpeculativeCriticalDiscussion(d) || isHighRiskSpeculativeCriticalDiscussion(d)) &&
+      (isForcedTieBreak(d) || (d.avgConfidence != null && d.avgConfidence < CRITICAL_BLOCKING_CONFIDENCE_MIN))
   );
-  const escalatedIssues = report.discussions.filter((d) => hasActionableDiscussionLocation(d) && !d.consensusReached);
+  const escalatedIssues = report.discussions.filter(
+    (d) => hasActionableDiscussionLocation(d) &&
+      !d.consensusReached &&
+      (!isSpeculativeCriticalDiscussion(d) || isHighRiskSpeculativeCriticalDiscussion(d))
+  );
   if (unverifiedCritical.length > 0 || escalatedIssues.length > 0) {
     const questions = [
       ...(verdict.questionsForHuman ?? []),
@@ -358,6 +393,35 @@ export function applyHeadVerdictSafety(
     };
   }
 
+  const actionableDiscussions = report.discussions.filter(hasActionableDiscussionLocation);
+  const onlySpeculativeOrDismissed = actionableDiscussions.length > 0 &&
+    actionableDiscussions.every((d) => !isActiveNonSpeculativeDiscussion(d));
+  const headRequestsHighRiskVerification = containsHighRiskSpeculativeClaim([
+    verdict.reasoning,
+    ...(verdict.questionsForHuman ?? []),
+  ].join('\n'));
+  if (onlySpeculativeOrDismissed && headRequestsHighRiskVerification && verdict.decision === 'NEEDS_HUMAN') {
+    return verdict;
+  }
+  if (onlySpeculativeOrDismissed && headRequestsHighRiskVerification && verdict.decision === 'REJECT') {
+    return {
+      decision: 'NEEDS_HUMAN',
+      reasoning:
+        `Head safety guard: ${verdict.decision} was lowered to NEEDS_HUMAN because only speculative critical findings remain, ` +
+        `but the head reasoning identified a high-risk verification path. Original reasoning: ${verdict.reasoning}`,
+      questionsForHuman: verdict.questionsForHuman,
+    };
+  }
+  if (onlySpeculativeOrDismissed && verdict.decision !== 'ACCEPT') {
+    return {
+      decision: 'ACCEPT',
+      reasoning:
+        `Head safety guard: ${verdict.decision} was overridden because only dismissed or <${SPECULATIVE_CRITICAL_CONFIDENCE_MIN}% ` +
+        `speculative critical findings remain. Original reasoning: ${verdict.reasoning}`,
+      questionsForHuman: undefined,
+    };
+  }
+
   return verdict;
 }
 
@@ -366,24 +430,32 @@ export function applyHeadVerdictSafety(
 // ============================================================================
 
 /**
- * CRITICAL+ issues at or below this confidence (%) are treated as unverified —
+ * CRITICAL+ issues below this confidence (%) are treated as unverified —
  * routed to NEEDS_HUMAN instead of REJECT.
  */
-const CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD = 50;
+const CRITICAL_BLOCKING_CONFIDENCE_MIN = 60;
+const SPECULATIVE_CRITICAL_CONFIDENCE_MIN = 20;
 
 function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'): HeadVerdict {
   // Separate high-confidence critical issues from unverified low-confidence ones.
   const allCritical = report.discussions.filter(
-    (d) => hasActionableDiscussionLocation(d) && (d.finalSeverity === 'CRITICAL' || d.finalSeverity === 'HARSHLY_CRITICAL')
+    (d) => hasActionableDiscussionLocation(d) && isCriticalSeverity(d.finalSeverity)
   );
   const criticalIssues = allCritical.filter(
-    (d) => !isForcedTieBreak(d) && (d.avgConfidence == null || d.avgConfidence > CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
+    (d) => !isSpeculativeCriticalDiscussion(d) &&
+      !isForcedTieBreak(d) &&
+      (d.avgConfidence == null || d.avgConfidence >= CRITICAL_BLOCKING_CONFIDENCE_MIN)
   );
   const unverifiedCritical = allCritical.filter(
-    (d) => isForcedTieBreak(d) || (d.avgConfidence != null && d.avgConfidence <= CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD)
+    (d) => (!isSpeculativeCriticalDiscussion(d) || isHighRiskSpeculativeCriticalDiscussion(d)) &&
+      (isForcedTieBreak(d) || (d.avgConfidence != null && d.avgConfidence < CRITICAL_BLOCKING_CONFIDENCE_MIN))
   );
 
-  const escalatedIssues = report.discussions.filter((d) => hasActionableDiscussionLocation(d) && !d.consensusReached);
+  const escalatedIssues = report.discussions.filter(
+    (d) => hasActionableDiscussionLocation(d) &&
+      !d.consensusReached &&
+      (!isSpeculativeCriticalDiscussion(d) || isHighRiskSpeculativeCriticalDiscussion(d))
+  );
 
   if (criticalIssues.length > 0) {
     const unverifiedNote = unverifiedCritical.length > 0
@@ -406,7 +478,7 @@ function ruleBasedVerdict(report: ModeratorReport, mode?: 'strict' | 'pragmatic'
   if (unverifiedCritical.length > 0) {
     return {
       decision: 'NEEDS_HUMAN',
-      reasoning: `Found ${unverifiedCritical.length} critical finding(s) with low confidence (≤${CRITICAL_BLOCKING_CONFIDENCE_THRESHOLD}%). These may be false positives — human verification required before rejecting.`,
+      reasoning: `Found ${unverifiedCritical.length} critical finding(s) with low confidence (<${CRITICAL_BLOCKING_CONFIDENCE_MIN}%). These may be false positives — human verification required before rejecting.`,
       questionsForHuman: unverifiedCritical.map(
         (d) => `Verify: ${d.discussionId} (${d.filePath}:${d.lineRange[0]}) — ${d.finalSeverity}, ${d.avgConfidence}% confidence`
       ),

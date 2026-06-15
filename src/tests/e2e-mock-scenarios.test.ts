@@ -565,6 +565,7 @@ describe('P1: Integration scenarios (mock)', () => {
         filePath: 'auth.ts',
         lineRange: [10, 10] as [number, number],
         source: 'review' as const,
+        confidence: 90,
       },
     ];
 

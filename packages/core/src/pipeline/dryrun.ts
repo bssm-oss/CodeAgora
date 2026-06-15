@@ -14,6 +14,7 @@ import {
 } from '../config/loader.js';
 import { PROVIDER_ENV_VARS, getProviderEnvVar } from '@codeagora/shared/providers/env-vars.js';
 import { chunkDiffWithMetadata, type ChunkMetadata } from './chunker.js';
+import type { AgentConfig, ModeratorConfig } from '../types/config.js';
 
 export type { TokenUsage };
 
@@ -107,6 +108,13 @@ export function formatDryRunNextSteps(result: DryRunResult): string[] {
   return [
     'Run `agora review --staged` or repeat the same review command with this diff.',
   ];
+}
+
+function addApiProvider(seenProviders: Set<string>, agent?: AgentConfig | ModeratorConfig): void {
+  if (!agent || agent.backend !== 'api' || !agent.provider) {
+    return;
+  }
+  seenProviders.add(agent.provider);
 }
 
 // ============================================================================
@@ -218,14 +226,19 @@ export async function dryRun(config: Config, diffContent: string): Promise<DryRu
   const seenProviders = new Set<string>();
   const health: DryRunResult['health'] = [];
 
-  // Collect all unique non-auto providers from reviewers + moderator + supporters
-  for (const r of reviewers) {
-    if (!r.isAuto && r.provider !== 'unknown') seenProviders.add(r.provider);
+  // Collect only API-backed providers. CLI backends such as codex, claude,
+  // opencode, cursor, and antigravity are validated by doctor through local
+  // binary detection/auth, not provider API key environment variables.
+  for (const entry of reviewerEntries) {
+    if (!('auto' in entry && entry.auto === true)) {
+      addApiProvider(seenProviders, entry as AgentConfig);
+    }
   }
-  seenProviders.add(modProvider);
+  addApiProvider(seenProviders, config.moderator);
   for (const s of enabledSupporters) {
-    if (s.provider) seenProviders.add(s.provider);
+    addApiProvider(seenProviders, s);
   }
+  addApiProvider(seenProviders, config.supporters.devilsAdvocate);
 
   for (const provider of seenProviders) {
     const envVar =

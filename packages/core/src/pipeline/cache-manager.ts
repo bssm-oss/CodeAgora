@@ -6,7 +6,7 @@
 import type { SessionManager } from '../session/manager.js';
 import type { PipelineResult } from './orchestrator.js';
 import { lookupCache, addToCache, type CacheMetadata } from '@codeagora/shared/utils/cache.js';
-import { CA_ROOT } from '@codeagora/shared/utils/fs.js';
+import { getCaRoot } from '@codeagora/shared/utils/fs.js';
 import { computeHash } from '@codeagora/shared/utils/hash.js';
 import { redactDeep } from '@codeagora/shared/utils/redaction.js';
 import { CACHE_METADATA_SCHEMA_VERSION, SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
@@ -187,7 +187,8 @@ export async function writeSessionResult(
   sessionId: string,
   pipelineResult: PipelineResult,
 ): Promise<void> {
-  const resultJsonPath = `${CA_ROOT}/sessions/${date}/${sessionId}/result.json`;
+  const caRoot = getCaRoot();
+  const resultJsonPath = path.join(caRoot, 'sessions', date, sessionId, 'result.json');
   await fs.writeFile(
     resultJsonPath,
     JSON.stringify(redactDeep({ ...pipelineResult, schemaVersion: SESSION_ARTIFACT_SCHEMA_VERSION }), null, 2),
@@ -212,11 +213,12 @@ export async function checkAndLoadCache(
   session: CacheSession,
 ): Promise<PipelineResult | null> {
   try {
-    const cachedSessionPath = await lookupCache(CA_ROOT, cacheKey);
+    const caRoot = getCaRoot();
+    const cachedSessionPath = await lookupCache(caRoot, cacheKey);
     if (cachedSessionPath) {
       const [cachedDate, cachedId] = cachedSessionPath.split('/');
       if (cachedDate && cachedId) {
-        const cachedResultPath = `${CA_ROOT}/sessions/${cachedDate}/${cachedId}/result.json`;
+        const cachedResultPath = path.join(caRoot, 'sessions', cachedDate, cachedId, 'result.json');
         const cachedRaw = await fs.readFile(cachedResultPath, 'utf-8');
         const cachedResult = JSON.parse(cachedRaw) as PipelineResult;
         const cache = buildCacheMetadata(cacheKey, cachedSessionPath);
@@ -251,10 +253,11 @@ export async function persistResultCache(
   noCache: boolean,
 ): Promise<void> {
   try {
+    const caRoot = getCaRoot();
     const cache = buildCacheMetadata(cacheKey);
     await writeSessionResult(date, sessionId, { ...pipelineResult, cache });
     if (!noCache) {
-      await addToCache(CA_ROOT, cacheKey, `${date}/${sessionId}`);
+      await addToCache(caRoot, cacheKey, `${date}/${sessionId}`);
     }
   } catch {
     // Cache write failure is non-fatal — pipeline result is still valid

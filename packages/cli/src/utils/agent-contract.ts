@@ -13,6 +13,8 @@ export type AgentReviewExitCode = 0 | 1 | 3;
 
 export type AgentJsonResult = PipelineResult & {
   schemaVersion: AgentContractVersion;
+  /** Public merge decision after evidence-promotion gates. */
+  publicDecision?: NonNullable<PipelineResult['summary']>['decision'];
 };
 
 export type AgentProgressNdjsonEvent = ProgressEvent & {
@@ -36,11 +38,16 @@ export const REVIEW_SEVERITY_ORDER = [
   'HARSHLY_CRITICAL',
 ] as const;
 
+export function getPublicDecision(result: PipelineResult): NonNullable<PipelineResult['summary']>['decision'] | undefined {
+  return result.decisionBrief?.decision ?? result.summary?.decision;
+}
+
 export function withAgentContract(result: PipelineResult): AgentJsonResult {
   const redactedResult = redactDeep(result);
   return {
     ...redactedResult,
     schemaVersion: AGENT_CONTRACT_VERSION,
+    publicDecision: getPublicDecision(result),
   };
 }
 
@@ -62,6 +69,7 @@ export function formatResultNdjsonEvent(result: PipelineResult): string {
   return JSON.stringify({
     ...redactedResult,
     schemaVersion: AGENT_CONTRACT_VERSION,
+    publicDecision: getPublicDecision(result),
     type: 'result',
   } satisfies AgentResultNdjsonEvent);
 }
@@ -88,7 +96,7 @@ export function getAgentReviewExitCode(
 ): AgentReviewExitCode {
   if (result.status !== 'success') return 3;
 
-  if (options.failOnReject && result.summary?.decision === 'REJECT') {
+  if (options.failOnReject && getPublicDecision(result) === 'REJECT') {
     return 1;
   }
 

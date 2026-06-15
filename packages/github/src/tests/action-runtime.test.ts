@@ -15,13 +15,20 @@ const mocks = vi.hoisted(() => ({
   handleNeedsHuman: vi.fn(),
   isStaleHead: vi.fn(),
   loadConfigFile: vi.fn(),
-  mapToGitHubReview: vi.fn(() => ({ comments: [], body: 'review' })),
+  mapToGitHubReview: vi.fn(() => ({
+    commit_id: '0123456789abcdef0123456789abcdef01234567',
+    event: 'APPROVE',
+    verdict: 'ACCEPT',
+    body: 'review',
+    comments: [],
+  })),
   parseActionInputs: vi.fn(),
   postReview: vi.fn(),
   readFile: vi.fn(),
   runPipeline: vi.fn(),
   setCommitStatus: vi.fn(),
   serializeSarif: vi.fn(() => '{"runs":[]}' ),
+  filterSarifPublishableEvidenceDocs: vi.fn((docs: unknown[]) => docs),
   writeFile: vi.fn(),
   validateActionDiffPath: vi.fn(),
   validateActionOutputPath: vi.fn(),
@@ -78,6 +85,7 @@ vi.mock('../diff-parser.js', () => ({
 
 vi.mock('../sarif.js', () => ({
   buildSarifReport: mocks.buildSarifReport,
+  filterSarifPublishableEvidenceDocs: mocks.filterSarifPublishableEvidenceDocs,
   serializeSarif: mocks.serializeSarif,
 }));
 
@@ -327,6 +335,92 @@ describe('GitHub Action runtime', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  it('filters unverified findings before writing Action SARIF output', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const summaryFile = path.join(tempDir, 'summary.md');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const sarifFile = path.join(tempDir, 'results.sarif');
+    const eventFile = path.join(tempDir, 'event.json');
+
+    const lowConfidenceDoc = {
+      issueTitle: 'low confidence',
+      problem: 'may be wrong',
+      evidence: ['weak evidence'],
+      severity: 'CRITICAL',
+      suggestion: 'check manually',
+      filePath: 'src/app.ts',
+      lineRange: [7, 7],
+      confidence: 24,
+    };
+    const publishableDoc = {
+      issueTitle: 'verified issue',
+      problem: 'definite bug',
+      evidence: ['strong evidence'],
+      severity: 'CRITICAL',
+      suggestion: 'fix it',
+      filePath: 'src/app.ts',
+      lineRange: [9, 9],
+      confidence: 91,
+    };
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_STEP_SUMMARY = summaryFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      repo: 'owner/repo',
+      sha: inputSha,
+      pr: 42,
+      diff: diffFile,
+      token: 'ghp_test',
+      configPath: '.ca/config.json',
+      baseSha: undefined,
+      maxDiffLines: 0,
+      failOnReject: false,
+      postResults: false,
+      reporterMode: 'check-run',
+      checkRunName: 'CodeAgora Review',
+    } as never);
+
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: true,
+      degradedReason: 'posting-disabled',
+      shouldRunReview: true,
+      shouldPostResults: false,
+      verdictOverride: undefined,
+    } as never);
+
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.validateActionOutputPath).mockResolvedValue(sarifFile);
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue(null as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'success',
+      summary: { decision: 'NEEDS_HUMAN' },
+      sessionId: 'session-001',
+      date: '2026-06-08',
+      evidenceDocs: [lowConfidenceDoc, publishableDoc],
+      discussions: [],
+    } as never);
+    vi.mocked(mocks.filterSarifPublishableEvidenceDocs).mockReturnValue([publishableDoc]);
+    vi.mocked(mocks.writeFile).mockResolvedValue(undefined);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.filterSarifPublishableEvidenceDocs).toHaveBeenCalledWith([lowConfidenceDoc, publishableDoc]);
+    expect(mocks.buildSarifReport).toHaveBeenCalledWith([publishableDoc], 'session-001', '2026-06-08');
+    expect(mocks.serializeSarif).toHaveBeenCalledWith({ runs: [] });
+    expect(mocks.writeFile).toHaveBeenCalledWith(sarifFile, '{"runs":[]}');
+    expect(await readFile(outputFile, 'utf-8')).toContain(`sarif-file=${sarifFile}`);
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
   it('suppresses GitHub writes when the diff limit degrades the run', async () => {
     const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
@@ -465,6 +559,7 @@ describe('GitHub Action runtime', () => {
     vi.mocked(mocks.mapToGitHubReview).mockReturnValue({
       commit_id: eventHeadSha,
       event: 'COMMENT',
+      verdict: 'NEEDS_HUMAN',
       body: 'NEEDS HUMAN REVIEW',
       comments: [{ path: 'src/app.ts', position: 7, side: 'RIGHT', body: 'manual check' }],
     } as never);
@@ -500,6 +595,176 @@ describe('GitHub Action runtime', () => {
     expect(summary).toContain('CodeAgora review degraded');
     expect(summary).toContain('Reason: `config-load-failed`');
     expect(summary).not.toContain('posting-disabled');
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('writes the mapped public review verdict to Action outputs when it differs from the raw head decision', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const sarifFile = path.join(tempDir, 'results.sarif');
+    const eventFile = path.join(tempDir, 'event.json');
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.OPENROUTER_API_KEY = 'provider-secret';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      repo: 'owner/repo',
+      sha: inputSha,
+      pr: 42,
+      diff: diffFile,
+      token: 'ghp_test',
+      configPath: '.ca/config.json',
+      baseSha: 'base123',
+      maxDiffLines: 0,
+      failOnReject: false,
+      postResults: false,
+      reporterMode: 'review-comment',
+      baseRepo: 'owner/repo',
+      headRepo: 'owner/repo',
+      checkRunName: 'CodeAgora Review',
+    } as never);
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: false,
+      shouldRunReview: true,
+      shouldPostResults: false,
+      verdictOverride: undefined,
+    } as never);
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: false,
+      shouldRunReview: true,
+      shouldPostResults: false,
+      degradedReason: 'posting-disabled',
+      verdictOverride: undefined,
+    } as never);
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.validateActionOutputPath).mockResolvedValue(sarifFile);
+    vi.mocked(mocks.readFile).mockResolvedValue('diff --git a/src/app.ts b/src/app.ts\n+changed');
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue({ github: {} } as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'success',
+      summary: {
+        decision: 'REJECT',
+        reasoning: 'raw verdict rejected',
+        totalReviewers: 3,
+        forfeitedReviewers: 0,
+        severityCounts: { CRITICAL: 1 },
+        topIssues: [],
+        totalDiscussions: 0,
+        resolved: 0,
+        escalated: 0,
+      },
+      sessionId: 'session-public',
+      date: '2026-06-08',
+      evidenceDocs: [],
+      discussions: [],
+    } as never);
+    vi.mocked(mocks.mapToGitHubReview).mockReturnValue({
+      commit_id: eventHeadSha,
+      event: 'APPROVE',
+      verdict: 'ACCEPT',
+      body: 'Decision: ACCEPT',
+      comments: [],
+    } as never);
+    vi.mocked(mocks.writeFile).mockResolvedValue(undefined);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.mapToGitHubReview).toHaveBeenCalled();
+    expect(mocks.postReview).not.toHaveBeenCalled();
+
+    const output = await readFile(outputFile, 'utf-8');
+    expect(output).toContain('verdict=ACCEPT');
+    expect(output).not.toContain('verdict=REJECT');
+    expect(output).toContain('session-id=session-public');
+    expect(output).toContain(`sarif-file=${sarifFile}`);
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('writes structured NEEDS_HUMAN Action output without parsing review body copy', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const summaryFile = path.join(tempDir, 'summary.md');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const sarifFile = path.join(tempDir, 'results.sarif');
+    const eventFile = path.join(tempDir, 'event.json');
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_STEP_SUMMARY = summaryFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      token: '',
+      repo: 'owner/repo',
+      pr: 7,
+      diff: 'changes.diff',
+      configPath: '.ca/config.json',
+      postResults: false,
+      failOnReject: true,
+      baseSha: inputSha,
+      maxDiffLines: 0,
+      reporterMode: 'check-run',
+      checkRunName: 'CodeAgora Review',
+      baseRepo: 'owner/repo',
+      headRepo: 'owner/repo',
+      verdictOverride: undefined,
+    } as never);
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: false,
+      shouldRunReview: true,
+      shouldPostResults: false,
+      degradedReason: 'posting-disabled',
+      verdictOverride: undefined,
+    } as never);
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.validateActionOutputPath).mockResolvedValue(sarifFile);
+    vi.mocked(mocks.readFile).mockResolvedValue('diff --git a/src/app.ts b/src/app.ts\n+changed');
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue({ github: {} } as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'success',
+      summary: {
+        decision: 'NEEDS_HUMAN',
+        reasoning: 'raw verdict needs human',
+        totalReviewers: 3,
+        forfeitedReviewers: 0,
+        severityCounts: { CRITICAL: 1 },
+        topIssues: [],
+        totalDiscussions: 1,
+        resolved: 0,
+        escalated: 1,
+      },
+      sessionId: 'session-human',
+      date: '2026-06-08',
+      evidenceDocs: [],
+      discussions: [],
+    } as never);
+    vi.mocked(mocks.mapToGitHubReview).mockReturnValue({
+      commit_id: eventHeadSha,
+      event: 'COMMENT',
+      verdict: 'NEEDS_HUMAN',
+      body: 'Manual maintainer decision required.',
+      comments: [],
+    } as never);
+    vi.mocked(mocks.writeFile).mockResolvedValue(undefined);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const output = await readFile(outputFile, 'utf-8');
+    expect(output).toContain('verdict=NEEDS_HUMAN');
+    expect(output).not.toContain('verdict=ACCEPT');
 
     await rm(tempDir, { recursive: true, force: true });
   });
@@ -659,6 +924,7 @@ describe('GitHub Action runtime', () => {
     vi.mocked(mocks.mapToGitHubReview).mockReturnValue({
       commit_id: eventHeadSha,
       event: 'COMMENT',
+      verdict: 'NEEDS_HUMAN',
       body: 'NEEDS HUMAN REVIEW',
       comments: [{ path: 'src/app.ts', position: 7, side: 'RIGHT', body: 'manual check' }],
     } as never);
@@ -715,6 +981,7 @@ describe('GitHub Action runtime', () => {
     const mappedReview = {
       commit_id: 'head123',
       event: 'REQUEST_CHANGES',
+      verdict: 'REJECT',
       body: 'configured PR-facing review',
       comments: [
         { path: 'src/app.ts', position: 7, side: 'RIGHT', body: 'configured inline result' },
@@ -854,6 +1121,93 @@ describe('GitHub Action runtime', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  it('writes DEGRADED verdict when GitHub review posting fails after the public decision is mapped', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const summaryFile = path.join(tempDir, 'summary.md');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const sarifFile = path.join(tempDir, 'results.sarif');
+    const eventFile = path.join(tempDir, 'event.json');
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_STEP_SUMMARY = summaryFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      repo: 'owner/repo',
+      sha: inputSha,
+      pr: 42,
+      diff: diffFile,
+      token: 'ghp_test',
+      configPath: '.ca/config.json',
+      baseSha: 'base123',
+      maxDiffLines: 0,
+      failOnReject: true,
+      postResults: true,
+      reporterMode: 'check-run',
+      baseRepo: 'owner/repo',
+      headRepo: 'owner/repo',
+      checkRunName: 'CodeAgora Review',
+    } as never);
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: false,
+      shouldRunReview: true,
+      shouldPostResults: true,
+      verdictOverride: undefined,
+    } as never);
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.validateActionOutputPath).mockResolvedValue(sarifFile);
+    vi.mocked(mocks.readFile).mockResolvedValue('diff --git a/src/app.ts b/src/app.ts\n+changed');
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue({ github: { sarifOutputPath: sarifFile } } as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'success',
+      summary: {
+        decision: 'REJECT',
+        reasoning: 'blocking issue',
+        totalReviewers: 3,
+        forfeitedReviewers: 0,
+        severityCounts: { CRITICAL: 1 },
+        topIssues: [],
+        totalDiscussions: 0,
+        resolved: 0,
+        escalated: 0,
+      },
+      sessionId: 'session-post-failed',
+      date: '2026-06-08',
+      evidenceDocs: [],
+      discussions: [],
+    } as never);
+    vi.mocked(mocks.createAppOctokit).mockResolvedValue(undefined);
+    vi.mocked(mocks.fetchPrMetadata).mockResolvedValue({ headSha: eventHeadSha } as never);
+    vi.mocked(mocks.isStaleHead).mockReturnValue(false);
+    vi.mocked(mocks.mapToGitHubReview).mockReturnValue({
+      commit_id: eventHeadSha,
+      event: 'REQUEST_CHANGES',
+      verdict: 'REJECT',
+      body: 'configured PR-facing review',
+      comments: [],
+    } as never);
+    vi.mocked(mocks.postReview).mockRejectedValue(new Error('GitHub createReview failed'));
+    vi.mocked(mocks.writeFile).mockResolvedValue(undefined);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const output = await readFile(outputFile, 'utf-8');
+    expect(output).toContain('degraded=true');
+    expect(output).toContain('degraded-reason=github-post-failed');
+    expect(output).toContain('verdict=DEGRADED');
+    expect(output).toContain('review-url=');
+    expect(output).toContain('session-id=session-post-failed');
+    expect(mocks.postReview).toHaveBeenCalled();
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
   it('posts only the commit-status reporter when configured', async () => {
     const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
@@ -873,6 +1227,7 @@ describe('GitHub Action runtime', () => {
     const mappedReview = {
       commit_id: 'head123',
       event: 'COMMENT',
+      verdict: 'ACCEPT',
       body: 'configured PR-facing review',
       comments: [],
     } as const;

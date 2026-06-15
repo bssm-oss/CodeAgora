@@ -15,6 +15,7 @@ import type {
   RepoInfo,
   DesktopCommandContract,
   NotificationPreferences,
+  DesktopBridgeError,
   SeverityCounts,
   TopIssue,
   SessionCostSummary,
@@ -24,7 +25,6 @@ import {
   fallbackSessions,
   fallbackSessionDetail,
   fallbackSessionExport,
-  fallbackReviewRun,
   fallbackConfig,
   fallbackConfigValidation,
   fallbackProviderStatus,
@@ -40,6 +40,16 @@ import {
 
 /** Whether the app is running inside a Tauri shell. */
 export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+export const DESKTOP_PREVIEW_DISABLED = 'DESKTOP_PREVIEW_DISABLED';
+
+export class DesktopPreviewDisabledError extends Error implements DesktopBridgeError {
+  code: 'DESKTOP_PREVIEW_DISABLED' = DESKTOP_PREVIEW_DISABLED;
+
+  constructor(operation: string) {
+    super(`${operation} requires the CodeAgora Desktop shell. Browser preview is read-only.`);
+    this.name = 'DesktopPreviewDisabledError';
+  }
+}
 
 /**
  * Call a Tauri IPC command, returning `null` if not in a Tauri context.
@@ -49,6 +59,10 @@ export const IS_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' i
 async function tauriCall<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!IS_TAURI) return null;
   return invoke<T>(cmd, args);
+}
+
+function previewDisabled(operation: string): never {
+  throw new DesktopPreviewDisabledError(operation);
 }
 
 // ── JSON normalisation helpers ───────────────────────────────────
@@ -203,30 +217,25 @@ export async function exportSession(id: string, format: 'markdown' | 'json' | 's
 export async function runReview(staged: boolean): Promise<RunReviewResult> {
   const result = await tauriCall<RunReviewResult>('run_review', { staged });
   if (result) return result;
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    ok: true,
-    message: staged ? 'Preview mode: staged review would start.' : 'Preview mode: working tree review would start.',
-    sessionId: 'preview',
-  };
+  return previewDisabled('runReview');
 }
 
 export async function startReviewRun(staged: boolean): Promise<ReviewRunSnapshot> {
   const result = await tauriCall<ReviewRunSnapshot>('start_review_run', { staged });
   if (result) return result;
-  return fallbackReviewRun(staged);
+  return previewDisabled('startReviewRun');
 }
 
 export async function getReviewRun(runId: string): Promise<ReviewRunSnapshot> {
   const result = await tauriCall<ReviewRunSnapshot>('get_review_run', { runId });
   if (result) return result;
-  return fallbackReviewRun(true);
+  return previewDisabled('getReviewRun');
 }
 
 export async function cancelReviewRun(runId: string): Promise<ReviewRunSnapshot> {
   const result = await tauriCall<ReviewRunSnapshot>('cancel_review_run', { runId });
   if (result) return result;
-  return { ...fallbackReviewRun(true), status: 'cancelled' };
+  return previewDisabled('cancelReviewRun');
 }
 
 export async function readConfig(): Promise<DesktopConfig> {
@@ -238,8 +247,7 @@ export async function readConfig(): Promise<DesktopConfig> {
 export async function writeConfig(raw: string): Promise<DesktopConfig> {
   const result = await tauriCall<DesktopConfig>('write_config', { raw });
   if (result) return result;
-  window.localStorage.setItem('codeagora.desktop.config', raw);
-  return { path: '.ca/config.json', raw };
+  return previewDisabled('writeConfig');
 }
 
 export async function validateConfig(raw: string, configPath?: string): Promise<ConfigValidation> {
@@ -287,7 +295,7 @@ export async function getRepoInfo(): Promise<RepoInfo> {
 export async function openRepository(path: string): Promise<RepoInfo> {
   const result = await tauriCall<RepoInfo>('open_repository', { path });
   if (result) return result;
-  return { ...fallbackRepoInfo(), path };
+  return previewDisabled('openRepository');
 }
 
 export function isApprovedExternalUrl(raw: string): boolean {

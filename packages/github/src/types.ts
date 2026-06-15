@@ -10,9 +10,13 @@ export interface GitHubReviewComment {
   body: string;
 }
 
+export type GitHubReviewVerdict = 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
+
 export interface GitHubReview {
   commit_id: string;
   event: 'REQUEST_CHANGES' | 'COMMENT' | 'APPROVE';
+  /** Structured public verdict used by Action outputs, reporters, and post results. */
+  verdict: GitHubReviewVerdict;
   body: string; // summary comment; contains <!-- codeagora-v3 -->
   comments: GitHubReviewComment[];
 }
@@ -25,7 +29,7 @@ export interface DiffPositionIndex {
 export interface PostResult {
   reviewId: number;
   reviewUrl: string;
-  verdict: 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
+  verdict: GitHubReviewVerdict;
 }
 
 export type GitHubCommitStatusState = 'success' | 'failure' | 'pending';

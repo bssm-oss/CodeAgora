@@ -5,7 +5,6 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import * as p from '@clack/prompts';
 import { generateMinimalTemplate } from '@codeagora/core/config/templates.js';
 import { getModePreset } from '@codeagora/core/config/mode-presets.js';
@@ -17,11 +16,14 @@ import { detectEnvironment } from '@codeagora/shared/utils/env-detect.js';
 import type { EnvironmentReport, ApiProviderStatus } from '@codeagora/shared/utils/env-detect.js';
 import { detectCliBackends } from '@codeagora/shared/utils/cli-detect.js';
 import type { DetectedCli } from '@codeagora/shared/utils/cli-detect.js';
+import {
+  ACTION_CHEAP_PRESET,
+  buildActionPresetConfig,
+  renderCodeAgoraWorkflowTemplate,
+} from '@codeagora/shared/action-preset.js';
 import { stringify as yamlStringify } from 'yaml';
 import { t, detectLocale } from '@codeagora/shared/i18n/index.js';
 import type { ReviewMode, Language, Backend } from '@codeagora/core/types/config.js';
-
-const _dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ============================================================================
 // Types
@@ -59,6 +61,10 @@ export interface GeneratedConfig {
   discussion: { enabled: boolean; maxRounds: number; registrationThreshold: Record<string, number | null>; codeSnippetRange: number };
   errorHandling: { maxRetries: number; forfeitThreshold: number };
   [key: string]: unknown;
+}
+
+interface BuildCliPresetConfigOptions {
+  language?: Language;
 }
 
 export class UserCancelledError extends Error {
@@ -420,18 +426,6 @@ const OPENROUTER_FAST_REVIEWERS = [
   'qwen/qwen3-coder-flash',
 ];
 
-const OPENROUTER_ACTION_CHEAP_REVIEWERS = [
-  'qwen/qwen3-235b-a22b-2507',
-  'deepseek/deepseek-v4-flash',
-  'qwen/qwen3.5-9b',
-  'z-ai/glm-4.7-flash',
-  'openai/gpt-oss-120b',
-];
-
-const OPENROUTER_ACTION_SUPPORTER = 'z-ai/glm-5.1';
-const OPENROUTER_ACTION_DEVILS_ADVOCATE = 'moonshotai/kimi-k2.5';
-const OPENROUTER_ACTION_HEAD = 'z-ai/glm-5.1';
-
 const OPENROUTER_STARTER_REVIEWERS = [
   'qwen/qwen3-coder-flash',
   'qwen/qwen3-next-80b-a3b-instruct',
@@ -477,18 +471,18 @@ const FALLBACK_PRESETS: DynamicPreset[] = [
     label: 'GitHub Action review (OpenRouter cheap)',
     labelKo: 'GitHub Action \uB9AC\uBDF0 (OpenRouter \uC800\uBE44\uC6A9)',
     providers: ['openrouter'],
-    models: { openrouter: OPENROUTER_ACTION_CHEAP_REVIEWERS[0]! },
-    reviewerModels: OPENROUTER_ACTION_CHEAP_REVIEWERS,
-    reviewerCount: OPENROUTER_ACTION_CHEAP_REVIEWERS.length,
+    models: { openrouter: ACTION_CHEAP_PRESET.reviewers[0]!.model },
+    reviewerModels: ACTION_CHEAP_PRESET.reviewers.map((reviewer) => reviewer.model),
+    reviewerCount: ACTION_CHEAP_PRESET.reviewers.length,
     discussion: true,
-    maxRounds: 1,
+    maxRounds: ACTION_CHEAP_PRESET.maxRounds,
     backend: 'api',
     roleSelections: {
-      supporter: { provider: 'openrouter', model: OPENROUTER_ACTION_SUPPORTER, backend: 'api' },
-      devilsAdvocate: { provider: 'openrouter', model: OPENROUTER_ACTION_DEVILS_ADVOCATE, backend: 'api' },
-      moderator: { provider: 'openrouter', model: OPENROUTER_ACTION_HEAD, backend: 'api' },
+      supporter: { provider: 'openrouter', model: ACTION_CHEAP_PRESET.supporter.model, backend: 'api' },
+      devilsAdvocate: { provider: 'openrouter', model: ACTION_CHEAP_PRESET.devilsAdvocate.model, backend: 'api' },
+      moderator: { provider: 'openrouter', model: ACTION_CHEAP_PRESET.moderator.model, backend: 'api' },
       moderatorEnabled: false,
-      head: { provider: 'openrouter', model: OPENROUTER_ACTION_HEAD, backend: 'api' },
+      head: { provider: 'openrouter', model: ACTION_CHEAP_PRESET.head.model, backend: 'api' },
     },
   },
   {
@@ -822,8 +816,6 @@ function isKorean(): boolean {
 // GitHub Actions workflow
 // ============================================================================
 
-const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-rc.6';
-
 /**
  * Write the GitHub Actions workflow template to {baseDir}/.github/workflows/codeagora-review.yml.
  * Creates .github/workflows/ if it does not exist.
@@ -832,7 +824,8 @@ const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-rc.6';
  */
 export async function writeGitHubWorkflow(
   baseDir: string,
-  force = false
+  force = false,
+  language: Language = 'en',
 ): Promise<boolean> {
   const workflowDir = path.join(baseDir, '.github', 'workflows');
   const workflowPath = path.join(workflowDir, 'codeagora-review.yml');
@@ -842,26 +835,8 @@ export async function writeGitHubWorkflow(
     return false;
   }
 
-  // built: _dirname = cli/dist/ → 3 up to repo root
-  // dev:   _dirname = cli/src/commands/ → 4 up to repo root
-  const rel = 'packages/shared/src/data/github-actions-template.yml';
-  const candidates = [
-    path.resolve(_dirname, '../../..', rel),
-    path.resolve(_dirname, '../../../..', rel),
-  ];
-  let templatePath = '';
-  for (const c of candidates) {
-    if (await fileExists(c)) { templatePath = c; break; }
-  }
-  if (!templatePath) {
-    throw new Error(
-      `GitHub Actions template not found. Searched:\n${candidates.map(p => `  ${p}`).join('\n')}`
-    );
-  }
-  const templateContent = await fs.readFile(templatePath, 'utf-8');
-
   await fs.mkdir(workflowDir, { recursive: true });
-  await fs.writeFile(workflowPath, templateContent, 'utf-8');
+  await fs.writeFile(workflowPath, renderCodeAgoraWorkflowTemplate({ language }), 'utf-8');
   return true;
 }
 
@@ -883,10 +858,17 @@ function selectionsFromPreset(selected: DynamicPreset): ProviderModelSelection[]
   }));
 }
 
-export async function buildPresetConfig(preset: string): Promise<GeneratedConfig> {
+export async function buildPresetConfig(
+  preset: string,
+  options: BuildCliPresetConfigOptions = {},
+): Promise<GeneratedConfig> {
   const canonicalPreset = resolvePresetAlias(preset);
   if (!canonicalPreset) {
     throw new Error('Preset must be specified.');
+  }
+  const language = options.language ?? 'en';
+  if (canonicalPreset === 'action') {
+    return buildActionPresetConfig({ language }) as GeneratedConfig;
   }
 
   const [env, catalog, cliBackends] = await Promise.all([
@@ -928,7 +910,7 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
     selections,
     reviewerCount: selected.reviewerCount,
     discussion: selected.discussion,
-    language: 'en',
+    language,
     mode: 'pragmatic',
     maxRounds: selected.maxRounds,
     supporterSelection: selected.roleSelections?.supporter,
@@ -956,8 +938,9 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   // Config file
   const configFileName = format === 'yaml' ? 'config.yaml' : 'config.json';
   const configPath = path.join(caDir, configFileName);
+  const language = detectLocale();
   const configContent = preset
-    ? JSON.stringify(await buildPresetConfig(preset), null, 2)
+    ? JSON.stringify(await buildPresetConfig(preset, { language }), null, 2)
     : generateMinimalTemplate(format);
   await writeFile(configPath, configContent, force, created, skipped);
 
@@ -972,7 +955,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   // GitHub Actions workflow
   if (ci) {
     const workflowPath = path.join(baseDir, '.github', 'workflows', 'codeagora-review.yml');
-    const written = await writeGitHubWorkflow(baseDir, force);
+    const written = await writeGitHubWorkflow(baseDir, force, language);
     if (written) {
       created.push(workflowPath);
     } else {
@@ -1050,6 +1033,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
   let format: 'json' | 'yaml';
   let primaryProvider: string;
   let primaryModel: string;
+  let selectedLanguage: Language = ko ? 'ko' : 'en';
 
   const selectedPreset = dynamicPresets.find((pr) => pr.id === setupMode);
   if (selectedPreset) {
@@ -1074,8 +1058,11 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
       throw new UserCancelledError();
     }
     const language = languageSelection as Language;
+    selectedLanguage = language;
 
-    if (selections.length === 1 && selectedPreset.backend === 'api') {
+    if (selectedPreset.id === 'action') {
+      configData = buildActionPresetConfig({ language }) as GeneratedConfig;
+    } else if (selections.length === 1 && selectedPreset.backend === 'api') {
       configData = buildCustomConfig({
         provider: primaryProvider,
         model: primaryModel,
@@ -1329,6 +1316,7 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
       throw new UserCancelledError();
     }
     const language = languageSelection as Language;
+    selectedLanguage = language;
 
     // Build config from selections
     if (selections.length === 1) {
@@ -1413,61 +1401,13 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     const workflowDir = path.join(baseDir, '.github', 'workflows');
     await fs.mkdir(workflowDir, { recursive: true });
 
-    // Collect unique env vars from configured providers
-    const configProviders = new Set<string>();
-    if ('reviewers' in configData && Array.isArray(configData.reviewers)) {
-      for (const r of configData.reviewers) {
-        if ('provider' in r && r.provider) configProviders.add(r.provider);
-      }
-    }
-    if (configData.supporters?.pool) {
-      for (const s of configData.supporters.pool) {
-        if ('provider' in s && s.provider) configProviders.add(s.provider);
-      }
-    }
-    if (configData.moderator?.provider) configProviders.add(configData.moderator.provider);
-
-    const envLines = [...configProviders]
-      .map((prov) => {
-        const envVar = getProviderEnvVar(prov);
-        return `          ${envVar}: \${{ secrets.${envVar} }}`;
-      })
-      .join('\n');
-
-    const workflowContent = `name: CodeAgora Review
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  contents: read
-  pull-requests: write
-  statuses: write
-
-jobs:
-  review:
-    if: "!contains(github.event.pull_request.labels.*.name, 'review:skip')"
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: CodeAgora Review
-        uses: ${CODEAGORA_ACTION_REF}
-        with:
-          github-token: \${{ secrets.GITHUB_TOKEN }}
-          fail-on-reject: 'true'
-          max-diff-lines: '5000'
-        env:
-${envLines}
-`;
+    const workflowContent = renderCodeAgoraWorkflowTemplate({ language: selectedLanguage });
 
     const workflowPath = path.join(workflowDir, 'codeagora-review.yml');
     await writeFile(workflowPath, workflowContent, force, created, skipped);
 
     // Show secrets setup instructions
-    const secretNames = [...configProviders].map((prov) => getProviderEnvVar(prov));
+    const secretNames = [getProviderEnvVar('openrouter')];
     const secretsList = secretNames.map((s) => `  • ${s}`).join('\n');
     p.note(
       ko

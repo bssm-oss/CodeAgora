@@ -40,6 +40,7 @@ describe('GitHub security evidence', () => {
       }]);
       expect(result.evidence).toMatchObject({
         schemaVersion: GITHUB_SECURITY_EVIDENCE_SCHEMA_VERSION,
+        evidenceMode: 'real',
         redactionStatus: 'safe-to-publish',
         releaseTier: 'rc',
         outputPath: path.relative(process.cwd(), output),
@@ -99,5 +100,12 @@ describe('GitHub security evidence', () => {
       stderrExcerpt: 'expected failure\n',
     });
     expect(Object.values(evidence.checks).every((value) => value === false)).toBe(true);
+  });
+
+  it('rejects skipped tests in release mode', async () => {
+    await expect(runGithubSecurityEvidence({
+      skipTests: true,
+      release: true,
+    })).rejects.toThrow('Release GitHub security evidence requires real focused tests');
   });
 });

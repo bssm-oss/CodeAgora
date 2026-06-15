@@ -50,6 +50,8 @@ export const FINDING_CLASS_PRIORS: FindingClassPrior[] = [
     patterns: [
       /\b(?:remov(?:al|e|ed|ing)|drops?|dropped)\b[\s\S]{0,160}\b(?:groq|github\s+models?|provider|api\s+key|model|fallback|workflow)\b/i,
       /\b(?:groq|github\s+models?|provider|api\s+key|model|fallback|workflow)\b[\s\S]{0,160}\b(?:remov(?:al|e|ed|ing)|unsupported|breaks?\s+existing|existing\s+user\s+setups?)\b/i,
+      /\b(?:loses?|missing|omits?|excludes?)\b[\s\S]{0,180}\b(?:provider[-\s]?specific|non[-\s]?openrouter|openrouter[-\s]?only|github\s+actions?|workflow)\b/i,
+      /\b(?:provider[-\s]?specific|non[-\s]?openrouter|openrouter[-\s]?only|github\s+actions?|workflow)\b[\s\S]{0,180}\b(?:loses?|missing|omits?|excludes?)\b/i,
       /\b(?:hardcoded|fixed)\b[\s\S]{0,160}\b(?:config|provider|model|github\s+actions?|workflow|template)\b/i,
       /\b(?:limits?|reduc(?:e|ed|es|ing))\s+(?:user\s+)?flexibility\b/i,
     ],

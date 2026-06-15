@@ -19,11 +19,13 @@ import { buildDiffPositionIndex } from '@codeagora/github/diff-parser.js';
 import { mapToGitHubReview } from '@codeagora/github/mapper.js';
 import { postReview, setCommitStatus } from '@codeagora/github/poster.js';
 import { t } from '@codeagora/shared/i18n/index.js';
+import { getCaRoot } from '@codeagora/shared/utils/fs.js';
 import { formatOutput, type OutputFormat } from '../formatters/review-output.js';
 import { parseReviewerOption, readStdin } from '../options/review-options.js';
 import { classifyCliErrorExitCode, formatError } from '../utils/errors.js';
 import { dim } from '../utils/colors.js';
 import { formatProgressNdjsonEvent, formatResultNdjsonEvent, getAgentReviewExitCode } from '../utils/agent-contract.js';
+import type { ProgressEvent, PipelineStage } from '@codeagora/core/pipeline/progress.js';
 
 // ============================================================================
 // Types
@@ -61,6 +63,58 @@ interface ReviewStartupDiagnostics {
   discussion: boolean;
   repoPath?: string;
   contextLines: number;
+}
+
+const DEFAULT_PIPELINE_TIMEOUT_SECONDS = 30 * 60;
+const DEFAULT_QUICK_TIMEOUT_SECONDS = 10 * 60;
+
+const STAGE_LABELS: Record<PipelineStage, string> = {
+  init: 'Loading config',
+  review: 'Running reviewers',
+  discuss: 'Moderating discussions',
+  verdict: 'Generating verdict',
+  complete: 'Done',
+};
+
+function parsePositiveSeconds(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`Expected a positive integer number of seconds, got "${value}"`);
+  }
+  return parsed;
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  if (minutes === 0) return `${remainder}s`;
+  const hours = Math.floor(minutes / 60);
+  const minuteRemainder = minutes % 60;
+  if (hours === 0) return `${minutes}m ${remainder}s`;
+  return `${hours}h ${minuteRemainder}m ${remainder}s`;
+}
+
+function summarizeProgress(event: ProgressEvent, reviewStart: number, stageStart: number): string {
+  const label = STAGE_LABELS[event.stage] ?? event.stage;
+  const totalElapsed = formatDuration(Date.now() - reviewStart);
+  const stageElapsed = formatDuration(Date.now() - stageStart);
+  return `${label} (${stageElapsed}, total ${totalElapsed}) — ${event.message}`;
+}
+
+function emitPostRunDiagnostics(result: Awaited<ReturnType<typeof runPipeline>>, elapsedSeconds: string): void {
+  const failed = result.status === 'error';
+  const verb = failed ? 'failed' : 'completed';
+  console.error(`Review ${verb} in ${elapsedSeconds}s`);
+
+  if (result.date !== 'unknown' && result.sessionId !== 'unknown') {
+    console.error(dim(`Session: ${path.join(getCaRoot(), 'sessions', result.date, result.sessionId)}`));
+    console.error(dim(`Inspect: agora sessions show ${result.date}/${result.sessionId}`));
+  }
+
+  if (failed && /pipeline timed out/i.test(result.error ?? '')) {
+    console.error(dim('Timeout hint: retry with `--timeout 3600`, or use `--no-discussion` / `--quick` for a faster local pass.'));
+  }
 }
 
 export function hasGitHubAppAuth(): boolean {
@@ -115,6 +169,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
   // Hoist stdinTmpPath so finally block can clean it up (#77)
   let stdinTmpPath: string | undefined;
   let resolvedDiffContent: string | undefined;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   try {
     if (options.quiet && options.verbose) {
       options.verbose = false; // --quiet takes precedence
@@ -358,6 +413,8 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       reviewerSelection = parseReviewerOption(options.reviewers);
     }
 
+    const effectiveTimeoutSeconds = options.timeout ?? (options.quick ? DEFAULT_QUICK_TIMEOUT_SECONDS : DEFAULT_PIPELINE_TIMEOUT_SECONDS);
+
     // Auto-detect git repo root for context-aware review
     let repoPath: string | undefined;
     const contextLines = options.contextLines ?? 20;
@@ -378,7 +435,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       diffPath: resolvedPath,
       ...(options.provider && { providerOverride: options.provider }),
       ...(options.model && { modelOverride: options.model }),
-      ...(options.timeout && { timeoutMs: options.timeout * 1000 }),
+      timeoutMs: effectiveTimeoutSeconds * 1000,
       ...(options.reviewerTimeout && { reviewerTimeoutMs: options.reviewerTimeout * 1000 }),
       ...(!options.discussion && { skipDiscussion: true }),
       ...(options.quick && { skipDiscussion: true, skipHead: true }),
@@ -394,7 +451,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
           resolvedPath,
           provider: options.provider,
           model: options.model,
-          timeout: options.timeout,
+          timeout: effectiveTimeoutSeconds,
           reviewerTimeout: options.reviewerTimeout,
           discussion: options.discussion,
           repoPath,
@@ -407,6 +464,9 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
     // Setup progress spinner (stderr so stdout remains clean for results)
     let progress: ProgressEmitter | undefined;
     let spinner: ReturnType<typeof ora> | undefined;
+    let lastProgressEvent: ProgressEvent | undefined;
+    let stageStartedAt = Date.now();
+    const reviewStart = Date.now();
 
     if (options.jsonStream) {
       progress = progress ?? new ProgressEmitter();
@@ -427,13 +487,23 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
         complete: 'Done!',
       };
 
+      const updateSpinnerText = () => {
+        if (!spinner || !lastProgressEvent || !spinner.isSpinning) return;
+        spinner.text = summarizeProgress(lastProgressEvent, reviewStart, stageStartedAt);
+      };
+
       progress.onProgress((event) => {
+        lastProgressEvent = event;
+        if (event.event === 'stage-start') {
+          stageStartedAt = event.timestamp;
+        }
         switch (event.event) {
           case 'stage-start':
             spinner!.start(stageLabels[event.stage] ?? event.stage);
+            updateSpinnerText();
             break;
           case 'stage-update':
-            spinner!.text = event.message;
+            updateSpinnerText();
             break;
           case 'stage-complete':
             spinner!.succeed(stageLabels[event.stage] ?? event.stage);
@@ -446,15 +516,17 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
             break;
         }
       });
+      heartbeat = setInterval(updateSpinnerText, 1000);
+      heartbeat.unref?.();
     }
 
-    const reviewStart = Date.now();
     const result = await runPipeline(pipelineOptions, progress);
     const reviewDuration = ((Date.now() - reviewStart) / 1000).toFixed(1);
+    if (heartbeat) clearInterval(heartbeat);
     spinner?.stop();
 
     if (!options.quiet) {
-      console.error(`Review completed in ${reviewDuration}s`);
+      emitPostRunDiagnostics(result, reviewDuration);
     }
 
     if (result.cached && !options.quiet) {
@@ -503,6 +575,7 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
           : undefined,
         reviewRun: result.reviewRun,
         reviewQueues: result.reviewQueues,
+        decisionBrief: result.decisionBrief,
       });
       if (prOctokit && !options.quiet) console.error(t('cli.info.usingAppAuth'));
       const postResult = await postReview(ghConfig, prContext.prNumber, review, prOctokit);
@@ -520,10 +593,12 @@ async function reviewAction(diffPath: string | undefined, options: ReviewOptions
       process.exit(exitCode);
     }
   } catch (err) {
+    if (heartbeat) clearInterval(heartbeat);
     const error = err instanceof Error ? err : new Error(String(err));
     console.error(formatError(error, options.verbose));
     process.exit(classifyCliErrorExitCode(error));
   } finally {
+    if (heartbeat) clearInterval(heartbeat);
     // Clean up stdin/PR temp file — guaranteed even on error (#77)
     if (stdinTmpPath) {
       try { await fs.unlink(stdinTmpPath); } catch { /* ignore */ }
@@ -546,8 +621,8 @@ export function registerReviewCommand(program: Command): void {
     .option('--model <name>', 'Override model for auto reviewers')
     .option('-v, --verbose', 'Show detailed issue info and fix suggestions', false)
     .option('--reviewers <value>', 'Number of reviewers or comma-separated names')
-    .option('--timeout <seconds>', 'Pipeline timeout in seconds', parseInt)
-    .option('--reviewer-timeout <seconds>', 'Per-reviewer timeout in seconds', parseInt)
+    .option('--timeout <seconds>', `Pipeline timeout in seconds (default ${DEFAULT_PIPELINE_TIMEOUT_SECONDS}; ${DEFAULT_QUICK_TIMEOUT_SECONDS} with --quick)`, parsePositiveSeconds)
+    .option('--reviewer-timeout <seconds>', 'Per-reviewer timeout in seconds', parsePositiveSeconds)
     .option('--no-discussion', 'Skip L2 discussion phase')
     .option('--quiet', 'Suppress progress output', false)
     .option('--pr <url-or-number>', 'GitHub PR URL or number (fetches diff from GitHub)')
@@ -557,7 +632,7 @@ export function registerReviewCommand(program: Command): void {
     .option('--context-lines <n>', 'Surrounding code context lines (default 20, 0 = disabled)', parseInt)
     .option('--json-stream', 'Stream NDJSON events during review (for CI/pipelines)')
     .option('--no-cache', 'Skip result caching — always run a fresh review')
-    .option('--fail-on-reject', 'Exit 1 on REJECT verdict (default: false)', false)
+    .option('--fail-on-reject', 'Exit 1 on REJECT verdict', false)
     .option('--fail-on-severity <level>', 'Exit 1 if any issue at or above this severity (SUGGESTION|WARNING|CRITICAL|HARSHLY_CRITICAL)')
     .option('--scope <paths>', 'Only review changes in these paths (comma-separated, e.g. "packages/github,packages/core")')
     .action(reviewAction);

@@ -5,8 +5,13 @@ import { execFileSync, spawnSync } from 'child_process';
 import { describe, expect, it } from 'vitest';
 import {
   RELEASE_TIERS,
+  RELEASE_GATE_EXECUTIONS,
   deterministicLocalReleaseGates,
 } from '../../scripts/release-gates.mjs';
+import {
+  artifactEvidenceMode,
+  resolveEvidenceArtifactPath,
+} from '../../scripts/evidence-manifest.mjs';
 
 const scriptPath = path.resolve('scripts/evidence-manifest.mjs');
 const securitySmokeScriptPath = path.resolve('scripts/security-evidence-smoke.mjs');
@@ -36,6 +41,17 @@ function writeGateLedger(dir: string, requiredTier: string, overrides: Record<st
     }));
 
   fs.writeFileSync(path.join(dir, 'gate-command-evidence.jsonl'), entries.map((entry) => JSON.stringify(entry)).join('\n'));
+}
+
+function writeRealArtifact(dir: string, file: string): void {
+  fs.writeFileSync(path.join(dir, file), `${JSON.stringify({
+    schemaVersion: `test.${file}.v1`,
+    evidenceMode: 'real',
+    tests: {
+      skipped: false,
+      passed: true,
+    },
+  }, null, 2)}\n`);
 }
 
 describe('release evidence manifest', () => {
@@ -95,6 +111,7 @@ describe('release evidence manifest', () => {
       expect(liveBenchmark.tier).toBe('stable');
       expect(liveBenchmark.path).toBe('docs/archived/live-benchmark-report.md');
       expect(liveBenchmark.exists).toBe(true);
+      expect(liveBenchmark.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
 
       const liveActionSmoke = manifest.entries.find((entry: { name: string }) => entry.name === 'live-github-action-pr-smoke');
       expect(manifest.evidenceMetadataStore).toBe(
@@ -134,7 +151,7 @@ describe('release evidence manifest', () => {
       });
 
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('Missing required beta evidence');
+      expect(result.stderr).toContain('Missing or invalid required beta evidence');
       expect(result.stderr).toContain('build.log');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -167,7 +184,15 @@ describe('release evidence manifest', () => {
         'github-security-evidence.json',
       ];
       for (const file of rcFiles) {
-        fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        if ([
+          'desktop-security-evidence.json',
+          'redaction-path-safety-evidence.json',
+          'github-security-evidence.json',
+        ].includes(file)) {
+          writeRealArtifact(dir, file);
+        } else {
+          fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        }
       }
       writeGateLedger(dir, 'rc');
 
@@ -203,6 +228,9 @@ describe('release evidence manifest', () => {
         tier: 'rc',
         exists: true,
       });
+      expect(desktopSecurity.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
+      expect(redactionPathSafety.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
+      expect(githubSecurity.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
       expect(manifest.gateExitStatus.passed).toBe(true);
       expect(manifest.gateSummary.passed).toBe(true);
       expect(manifest.gateExitStatus.failed).toEqual([]);
@@ -231,7 +259,14 @@ describe('release evidence manifest', () => {
         'github-security-evidence.json',
       ];
       for (const file of rcFiles) {
-        fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        if ([
+          'redaction-path-safety-evidence.json',
+          'github-security-evidence.json',
+        ].includes(file)) {
+          writeRealArtifact(dir, file);
+        } else {
+          fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        }
       }
       writeGateLedger(dir, 'rc');
 
@@ -301,6 +336,7 @@ describe('release evidence manifest', () => {
       );
       expect(redactionPathSafetyArtifact).toMatchObject({
         schemaVersion: 'codeagora.redaction-path-safety-evidence.v1',
+        evidenceMode: 'skipped',
         releaseTier: 'rc',
         tests: {
           skipped: true,
@@ -322,6 +358,7 @@ describe('release evidence manifest', () => {
       );
       expect(desktopSecurityArtifact).toMatchObject({
         schemaVersion: 'codeagora.desktop-security-evidence.v1',
+        evidenceMode: 'skipped',
         releaseTier: 'rc',
         tests: {
           skipped: true,
@@ -338,6 +375,10 @@ describe('release evidence manifest', () => {
         command: 'pnpm evidence:github-security',
         tier: 'rc',
         exists: true,
+        releaseValidity: {
+          evidenceMode: 'placeholder',
+          validForRelease: false,
+        },
       });
       expect(manifest.gateSummary.passed).toBe(true);
     } finally {
@@ -395,6 +436,108 @@ describe('release evidence manifest', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Deterministic release gates did not all record complete passing evidence');
       expect(result.stderr).toContain('missing: typecheck, lint, build, test, bench-ci, beta-smoke');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects skipped or placeholder artifacts for required rc manifests', () => {
+    const dir = makeTmpDir();
+    try {
+      const rcFiles = [
+        'typecheck.log',
+        'lint.log',
+        'build.log',
+        'test.log',
+        'bench-ci.log',
+        'beta-smoke.log',
+        'cross-surface-parity.log',
+        'package-root-dry-run.log',
+        'package-mcp-dry-run.log',
+        'action-smoke.log',
+        'mcp-smoke.log',
+        'desktop-app-e2e.log',
+        'desktop-macos-webdriver-e2e.log',
+        'desktop-visual-qa.json',
+        'desktop-gate.log',
+        'desktop-evidence-manifest.json',
+        'desktop-security-evidence.json',
+        'security-regression.log',
+        'redaction-path-safety-evidence.json',
+        'github-security-evidence.json',
+      ];
+      for (const file of rcFiles) {
+        if (file === 'desktop-security-evidence.json') {
+          fs.writeFileSync(path.join(dir, file), `${JSON.stringify({ evidenceMode: 'skipped' })}\n`);
+        } else if (file === 'github-security-evidence.json') {
+          fs.writeFileSync(path.join(dir, file), `${JSON.stringify({ evidenceMode: 'placeholder' })}\n`);
+        } else if (file === 'redaction-path-safety-evidence.json') {
+          writeRealArtifact(dir, file);
+        } else {
+          fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
+        }
+      }
+      writeGateLedger(dir, 'rc');
+
+      const result = spawnSync(process.execPath, [scriptPath, '--evidence-dir', dir, '--require=rc'], {
+        encoding: 'utf-8',
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Missing or invalid required rc evidence');
+      expect(result.stderr).toContain('desktop-security-evidence.json (invalid evidence mode: skipped)');
+      expect(result.stderr).toContain('github-security-evidence.json (invalid evidence mode: placeholder)');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps sourcePath evidence inside the repository and generated evidence inside the evidence directory', () => {
+    const repoRoot = path.resolve('/tmp/codeagora-repo');
+    const evidenceDir = path.join(repoRoot, '.sisyphus', 'evidence');
+
+    expect(resolveEvidenceArtifactPath({
+      name: 'live-doc',
+      sourcePath: 'docs/archived/live.md',
+      filename: 'live.md',
+    }, evidenceDir, repoRoot)).toBe(path.join(repoRoot, 'docs/archived/live.md'));
+
+    expect(resolveEvidenceArtifactPath({
+      name: 'local-log',
+      filename: 'typecheck.log',
+    }, evidenceDir, repoRoot)).toBe(path.join(evidenceDir, 'typecheck.log'));
+
+    expect(() => resolveEvidenceArtifactPath({
+      name: 'escaped-source',
+      sourcePath: '../outside.md',
+      filename: 'outside.md',
+    }, evidenceDir, repoRoot)).toThrow('must stay inside repository');
+
+    expect(() => resolveEvidenceArtifactPath({
+      name: 'escaped-file',
+      filename: '../outside.log',
+    }, evidenceDir, repoRoot)).toThrow('must stay inside evidence directory');
+  });
+
+  it('treats non-json live evidence as real but malformed json artifacts as unknown', () => {
+    const dir = makeTmpDir();
+    try {
+      const markdownPath = path.join(dir, 'live.md');
+      const jsonPath = path.join(dir, 'live.json');
+      const localArtifactPath = path.join(dir, 'security.json');
+      fs.writeFileSync(markdownPath, '# live evidence\n');
+      fs.writeFileSync(jsonPath, '{not-json');
+      fs.writeFileSync(localArtifactPath, '{not-json');
+
+      expect(artifactEvidenceMode({
+        execution: RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
+      }, markdownPath, null)).toBe('real');
+      expect(artifactEvidenceMode({
+        execution: RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
+      }, jsonPath, null)).toBe('unknown');
+      expect(artifactEvidenceMode({
+        execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+      }, localArtifactPath, null)).toBe('unknown');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

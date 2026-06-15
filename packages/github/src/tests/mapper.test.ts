@@ -118,12 +118,56 @@ describe('mapToInlineCommentBody', () => {
     expect(body).toContain('All reviewers agreed this is critical.');
   });
 
+  it('labels speculative critical inline discussions without presenting them as blocking criticals', () => {
+    const body = mapToInlineCommentBody(
+      makeDoc(),
+      makeVerdict({ consensusReached: false, avgConfidence: 4 }),
+    );
+
+    expect(body).toContain('forced decision');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
+    expect(body).toContain('retained for auditability');
+    expect(body).not.toContain('**Verdict:** CRITICAL —');
+  });
+
+  it('labels high-risk speculative critical inline discussions as high-risk', () => {
+    const body = mapToInlineCommentBody(
+      makeDoc(),
+      makeVerdict({
+        consensusReached: false,
+        avgConfidence: 4,
+        reasoning: 'Possible authorization bypass across a permission boundary, but evidence is weak.',
+      }),
+    );
+
+    expect(body).toContain('**Verdict:** high-risk hypothesis (4%)');
+  });
+
   it('renders discussion inline when collapseDiscussions is false', () => {
     const body = mapToInlineCommentBody(makeDoc(), makeVerdict(), undefined, {
       collapseDiscussions: false,
     });
     expect(body).not.toContain('<details>');
     expect(body).toContain('All reviewers agreed this is critical.');
+  });
+
+  it('renders forced speculative disposition inline when collapseDiscussions is false', () => {
+    const body = mapToInlineCommentBody(
+      makeDoc(),
+      makeVerdict({
+        consensusReached: false,
+        avgConfidence: 4,
+        reasoning: 'Moderator disabled; unresolved discussion escalated directly to head verdict.',
+      }),
+      undefined,
+      { collapseDiscussions: false },
+    );
+
+    expect(body).not.toContain('<details>');
+    expect(body).toContain('forced decision');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
+    expect(body).toContain('**Trace:** Moderator disabled');
+    expect(body).not.toContain('> Moderator disabled');
   });
 
   it('shows consensus icon when consensus was reached', () => {
@@ -319,9 +363,18 @@ describe('buildSummaryBody', () => {
       discussions: [],
     });
     expect(body).toContain('ACCEPT');
+    expect(body).toContain('### Maintainer Decision Box');
+    expect(body).toContain('| Merge now? | yes |');
+    expect(body).toContain('| Pre-merge required | none |');
+    expect(body).toContain('### Maintainer Action List');
+    expect(body).toContain('No pre-merge maintainer action required.');
+    expect(body).toContain('### Final Decision Table');
+    expect(body).toContain('No current blockers or human gates remain.');
+    expect(body).toContain('### Decision Snapshot');
+    expect(body).toContain('| Decision gate | Follow-up later | Ignored speculative |');
   });
 
-  it('includes the summary reasoning text', () => {
+  it('omits raw summary reasoning from the public decision surface', () => {
     const body = buildSummaryBody({
       summary: makeSummary({ reasoning: 'No issues found at all.' }),
       sessionId: 'sess-001',
@@ -329,7 +382,8 @@ describe('buildSummaryBody', () => {
       evidenceDocs: [],
       discussions: [],
     });
-    expect(body).toContain('No issues found at all.');
+    expect(body).not.toContain('No issues found at all.');
+    expect(body).not.toContain('Raw head rationale');
   });
 
   it('includes the session id in the footer', () => {
@@ -418,6 +472,170 @@ describe('buildSummaryBody', () => {
     });
     expect(body).toContain('Agent consensus log');
     expect(body).toContain('d001');
+  });
+
+  it('labels speculative critical discussions in the consensus log', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only speculative hypotheses remain.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [],
+      discussions: [makeVerdict({ consensusReached: false, avgConfidence: 4 })],
+    });
+
+    expect(body).toContain('forced → speculative hypothesis (4%)');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
+    expect(body).toContain('**Trace:**');
+    expect(body).not.toContain('forced → CRITICAL');
+  });
+
+  it('treats tie-broken speculative discussions as forced even when consensusReached is true', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only speculative hypotheses remain.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [],
+      discussions: [makeVerdict({
+        consensusReached: true,
+        avgConfidence: 4,
+        reasoning: 'Tie broken by forced decision on last round (1 agree, 1 disagree)',
+      })],
+    });
+
+    expect(body).toContain('forced → speculative hypothesis (4%)');
+    expect(body).toContain('**Disposition:** speculative hypothesis (4%)');
+    expect(body).toContain('**Trace:** Tie broken by forced decision');
+    expect(body).not.toContain('consensus → speculative hypothesis');
+    expect(body).not.toContain('**Verdict:** speculative hypothesis');
+  });
+
+  it('counts needs-human discussion verdicts in the summary snapshot', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A low-confidence critical discussion needs human judgment.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [],
+      discussions: [makeVerdict({
+        consensusReached: true,
+        avgConfidence: 26,
+        reasoning: 'All supporters agreed on the issue',
+      })],
+    });
+
+    expect(body).not.toContain('1 needs-human discussion');
+    expect(body).toContain('### Maintainer Decision Box');
+    expect(body).toContain('| Merge now? | yes |');
+    expect(body).toContain('| Pre-merge required | none |');
+    expect(body).toContain('### Maintainer Action List');
+    expect(body).toContain('No pre-merge maintainer action required. 1 non-blocking follow-up item(s)');
+    expect(body).toContain('consensus → needs-repro critical hypothesis (26%)');
+    expect(body).toContain('**Disposition:** needs-repro critical hypothesis (26%) — non-blocking unless reproduced by the listed focused check.');
+    expect(body).not.toContain('### Human Gate Evidence Cards');
+    expect(body).not.toContain('consensus → CRITICAL');
+    expect(body).not.toContain('**Verdict:** CRITICAL — All supporters agreed');
+    expect(body).toContain('| 0 | 1 | 0 |');
+  });
+
+  it('renders concrete verification cards for human-gated discussions', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A contract change needs human judgment.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        filePath: 'scripts/release-gate-summary.mjs',
+        lineRange: [14, 73],
+        confidence: 44,
+        issueTitle: 'Changed return type and error message format',
+        problem: 'Callers expecting the old release gate summary shape may mis-handle the new evidence validity fields.',
+        evidence: ['summarizeReleaseGates now returns evidenceValid and invalidEvidence fields alongside passed.'],
+      })],
+      discussions: [makeVerdict({
+        discussionId: 'd004',
+        filePath: 'scripts/release-gate-summary.mjs',
+        lineRange: [14, 73],
+        consensusReached: true,
+        avgConfidence: 44,
+        reasoning: 'All supporters agreed on the issue',
+      })],
+    });
+
+    expect(body).toContain('### Human Gate Evidence Cards');
+    expect(body).toContain('Exact change to inspect: summarizeReleaseGates now returns evidenceValid and invalidEvidence fields alongside passed.');
+    expect(body).toContain('Affected contract/callers: Callers expecting the old release gate summary shape may mis-handle the new evidence validity fields.');
+    expect(body).toContain('Reproduce command: `Inspect scripts/release-gate-summary.mjs:14 and run the nearest focused test.`');
+    expect(body).toContain('Expected result: the referenced contract remains compatible and the focused check passes.');
+    expect(body).toContain('Actual result to check: the focused command or code inspection reproduces the reported contract break.');
+    expect(body).toContain('Decision rule: pass removes the human gate; fail keeps the pre-merge gate until fixed.');
+  });
+
+  it('uses focused path commands instead of long suggestion code blocks in maintainer actions', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A manifest issue needs reproduction.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        filePath: 'scripts/evidence-manifest.mjs',
+        lineRange: [257, 257],
+        confidence: 24,
+        issueTitle: 'Manifest parsing can throw',
+        suggestion: '```javascript\nexport async function run() { return command.raw; }\n```',
+      })],
+      discussions: [],
+    });
+
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('`pnpm vitest run src/tests/release-evidence-manifest.test.ts`');
+    expect(body).not.toContain('### Maintainer Action Top-3');
+    expect(body).not.toContain('export async function run');
+  });
+
+  it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A weak security claim needs reproduction.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        confidence: 4,
+        issueTitle: 'Possible SQL injection',
+        problem: 'Possible SQL injection if the query builder does not escape this branch.',
+      })],
+      discussions: [makeVerdict({
+        consensusReached: false,
+        avgConfidence: 4,
+        reasoning: 'Possible SQL injection, but the current trace is weak.',
+      })],
+    });
+
+    expect(body).toContain('1 needs-repro');
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('These low-confidence items are not pre-merge gates.');
+    expect(body).toContain('forced → high-risk hypothesis (4%)');
+    expect(body).not.toContain('1 speculative hypothesis(es) hidden');
+  });
+
+  it('keeps validation-bypass speculative docs visible for reproduction', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: '검증 우회 가능성은 재현 확인이 필요합니다.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        confidence: 6,
+        issueTitle: 'Data Integrity: Invalid JSON artifacts bypass release gate validation',
+        problem: 'Invalid JSON artifacts may bypass release gate validation.',
+        filePath: 'scripts/evidence-manifest.mjs',
+        lineRange: [165, 165],
+      })],
+      discussions: [makeVerdict({
+        consensusReached: true,
+        avgConfidence: 6,
+        reasoning: '검증 우회 가능성이 있지만 현재 근거는 약합니다.',
+      })],
+    });
+
+    expect(body).toContain('1 needs-repro');
+    expect(body).toContain('Data Integrity: Invalid JSON artifacts bypass release gate validation');
+    expect(body).toContain('consensus → high-risk hypothesis (6%)');
+    expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
 
   it('renders suppressed issues section when suppressedIssues is provided', () => {
@@ -512,17 +730,52 @@ describe('buildTriageDigest', () => {
     expect(result).not.toContain('ignore');
   });
 
+  it('classifies borderline CRITICAL confidence below 60 as needs-human', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 51 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 needs-human');
+    expect(result).not.toContain('must-fix');
+  });
+
   it('classifies HARSHLY_CRITICAL with high confidence as must-fix', () => {
     const docs = [makeDoc({ severity: 'HARSHLY_CRITICAL', confidence: 80 })];
     const result = buildTriageDigest(docs);
     expect(result).toContain('1 must-fix');
   });
 
-  it('classifies CRITICAL with low confidence as verify', () => {
+  it('classifies CRITICAL with low confidence as needs-human', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 45 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 needs-human');
+    expect(result).not.toContain('must-fix');
+  });
+
+  it('classifies very low-confidence CRITICAL as needs-repro', () => {
     const docs = [makeDoc({ severity: 'CRITICAL', confidence: 30 })];
     const result = buildTriageDigest(docs);
-    expect(result).toContain('1 verify');
+    expect(result).toContain('1 needs-repro');
+    expect(result).not.toContain('needs-human');
     expect(result).not.toContain('must-fix');
+  });
+
+  it('counts extremely low-confidence CRITICAL as hidden speculative in public triage', () => {
+    const docs = [makeDoc({ severity: 'CRITICAL', confidence: 0 })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 speculative hidden');
+  });
+
+  it('routes FP-heavy provider-contract CRITICAL findings to hidden speculative', () => {
+    const docs = [makeDoc({
+      severity: 'CRITICAL',
+      confidence: 27,
+      confidenceTrace: {
+        final: 27,
+        classPrior: 'provider-contract-flexibility',
+      },
+    })];
+    const result = buildTriageDigest(docs);
+    expect(result).toContain('1 speculative hidden');
+    expect(result).not.toContain('needs-repro');
   });
 
   it('classifies WARNING with high confidence as verify', () => {
@@ -544,23 +797,29 @@ describe('buildTriageDigest', () => {
   });
 
   it('defaults confidence to 50 when not set', () => {
-    // CRITICAL with default 50 → conf ≤ 50 → verify
+    // CRITICAL with default 50 → conf ≤ 50 → needs-human
     const docs = [makeDoc({ severity: 'CRITICAL', confidence: undefined })];
     const result = buildTriageDigest(docs);
-    expect(result).toContain('1 verify');
+    expect(result).toContain('1 needs-human');
   });
 
   it('classifies a mix of docs correctly', () => {
     const docs = [
       makeDoc({ severity: 'CRITICAL', confidence: 90 }),     // must-fix
-      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // verify
+      makeDoc({ severity: 'CRITICAL', confidence: 45 }),     // needs-human
+      makeDoc({ severity: 'CRITICAL', confidence: 30 }),     // needs-repro
+      makeDoc({ severity: 'CRITICAL', confidence: 0 }),      // speculative hidden
+      makeDoc({ severity: 'CRITICAL', confidenceTrace: { final: 27, classPrior: 'provider-contract-flexibility' } }),
       makeDoc({ severity: 'WARNING', confidence: 80 }),      // verify
       makeDoc({ severity: 'SUGGESTION', confidence: 50 }),   // ignore
       makeDoc({ severity: 'SUGGESTION', confidence: 90 }),   // ignore
     ];
     const result = buildTriageDigest(docs);
     expect(result).toContain('1 must-fix');
-    expect(result).toContain('2 verify');
+    expect(result).toContain('1 needs-human');
+    expect(result).toContain('1 needs-repro');
+    expect(result).toContain('2 speculative hidden');
+    expect(result).toContain('1 verify');
     expect(result).toContain('2 ignore');
   });
 
@@ -604,6 +863,80 @@ describe('buildSummaryBody triage digest', () => {
     expect(body).toContain('1 must-fix');
     expect(body).toContain('1 verify');
     expect(body).toContain('1 ignore');
+  });
+
+  it('renders low-confidence CRITICAL docs as Needs Human instead of Verify', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 45 })],
+      discussions: [],
+    });
+    expect(body).toContain('1 needs-human');
+    expect(body).toContain('### Needs Human');
+    expect(body).not.toContain('### Verify');
+  });
+
+  it('renders very low-confidence CRITICAL docs as Needs Repro', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        severity: 'CRITICAL',
+        confidence: 30,
+        confidenceTrace: {
+          raw: 80,
+          filtered: 40,
+          corroborated: 30,
+          final: 30,
+          evidence: 0.6,
+          classPrior: 'generic-potential',
+        },
+      })],
+      discussions: [],
+    });
+    expect(body).toContain('1 needs-repro');
+    expect(body).toContain('Needs reproduction appendix (1)');
+    expect(body).toContain('These low-confidence items are not pre-merge gates.');
+    expect(body).toContain('Repro card');
+    expect(body).toContain('Expected if valid: Value may be null at this point.');
+    expect(body).toContain('Actual to check: Line 42 dereferences without null check');
+    expect(body).toContain('Confidence: final confidence 30%; class prior generic-potential; stage trace hidden from summary');
+    expect(body).not.toContain('### Needs Human');
+  });
+
+  it('collapses extremely low-confidence CRITICAL docs as hidden hypotheses', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 0 })],
+      discussions: [],
+    });
+    expect(body).toContain('1 speculative hypothesis(es) hidden');
+    expect(body).toContain('These are not merge blockers');
+    expect(body).toContain('(speculative, final 0%)');
+    expect(body).toContain('| Follow-up only | 1 non-blocking follow-up item(s); inspect collapsed audit sections only if needed. |');
+    expect(body).not.toContain('🔴 0%');
+    expect(body).not.toContain('### Speculative');
+    expect(body).not.toContain('### Needs Human');
+  });
+
+  it('renders action details for public findings', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary(),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({ severity: 'CRITICAL', confidence: 90 })],
+      discussions: [],
+    });
+    expect(body).toContain('Must-fix action details');
+    expect(body).toContain('Why this matters: Value may be null at this point.');
+    expect(body).toContain('How to verify: Line 42 dereferences without null check');
+    expect(body).toContain('Suggested fix: Add a null check before use.');
+    expect(body).toContain('Confidence: final confidence 90%');
   });
 
   it('places triage digest between heading and verdict', () => {

@@ -441,6 +441,7 @@ describe('github-action production policy', () => {
 
     expect(validateGitHubTokenPermissions(reviewWorkflow.permissions, {
       reporterMode: 'check-run',
+      uploadSarif: true,
     })).toMatchObject({ valid: true });
   });
 

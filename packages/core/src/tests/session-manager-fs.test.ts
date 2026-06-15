@@ -5,26 +5,41 @@
  * We clean up after each test using the resolved absolute paths.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import { rm, readFile, access } from 'fs/promises';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { rm, readFile, access, mkdtemp } from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { SessionManager } from '../session/manager.js';
 import { SESSION_ARTIFACT_SCHEMA_VERSION } from '@codeagora/shared/contracts/stable.js';
 
 describe('SessionManager (real fs)', () => {
-  const cwd = process.cwd();
-  const caRoot = path.join(cwd, '.ca');
+  const previousCaRoot = process.env['CODEAGORA_CA_ROOT'];
+  let tmpRoot: string;
+
+  beforeEach(async () => {
+    tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'codeagora-session-fs-'));
+    process.env['CODEAGORA_CA_ROOT'] = path.join(tmpRoot, '.ca');
+  });
 
   afterEach(async () => {
-    // Best-effort cleanup of .ca/ sessions created during tests
-    await rm(path.join(caRoot, 'sessions'), { recursive: true, force: true });
-    await rm(path.join(caRoot, 'logs'), { recursive: true, force: true });
+    if (previousCaRoot === undefined) {
+      delete process.env['CODEAGORA_CA_ROOT'];
+    } else {
+      process.env['CODEAGORA_CA_ROOT'] = previousCaRoot;
+    }
+    await rm(tmpRoot, { recursive: true, force: true });
   });
+
+  function artifactPath(relativeOrAbsolutePath: string): string {
+    return path.isAbsolute(relativeOrAbsolutePath)
+      ? relativeOrAbsolutePath
+      : path.join(process.cwd(), relativeOrAbsolutePath);
+  }
 
   it('create() initialises the .ca session directory structure', async () => {
     const sm = await SessionManager.create('/tmp/diff.patch');
 
-    const sessionDir = path.join(cwd, sm.getDir());
+    const sessionDir = artifactPath(sm.getDir());
     await expect(access(sessionDir)).resolves.toBeUndefined();
     await expect(access(path.join(sessionDir, 'reviews'))).resolves.toBeUndefined();
     await expect(access(path.join(sessionDir, 'discussions'))).resolves.toBeUndefined();
@@ -36,7 +51,7 @@ describe('SessionManager (real fs)', () => {
     const sm = await SessionManager.create(diffPath);
     const after = Date.now();
 
-    const metaPath = path.join(cwd, sm.getDir(), 'metadata.json');
+    const metaPath = path.join(artifactPath(sm.getDir()), 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
 
     expect(meta.schemaVersion).toBe(SESSION_ARTIFACT_SCHEMA_VERSION);
@@ -63,7 +78,7 @@ describe('SessionManager (real fs)', () => {
 
     expect(sm.getMetadata().status).toBe('completed');
 
-    const metaPath = path.join(cwd, sm.getDir(), 'metadata.json');
+    const metaPath = path.join(artifactPath(sm.getDir()), 'metadata.json');
     const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
     expect(meta.schemaVersion).toBe(SESSION_ARTIFACT_SCHEMA_VERSION);
     expect(meta.status).toBe('completed');
@@ -75,7 +90,7 @@ describe('SessionManager (real fs)', () => {
     await sm.setStatus('failed');
 
     expect(sm.getMetadata().status).toBe('failed');
-    const meta = JSON.parse(await readFile(path.join(cwd, sm.getDir(), 'metadata.json'), 'utf-8'));
+    const meta = JSON.parse(await readFile(path.join(artifactPath(sm.getDir()), 'metadata.json'), 'utf-8'));
     expect(meta.status).toBe('failed');
     expect(typeof meta.completedAt).toBe('number');
   });

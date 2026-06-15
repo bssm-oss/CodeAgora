@@ -17,6 +17,8 @@ Examples:
   ${displayName} review --pr 123                   Review a GitHub PR
   ${displayName} review --staged                   Review staged changes
   ${displayName} review --quick                    Quick review (L1 only)
+  ${displayName} review --no-discussion            Skip L2 debate for faster local runs
+  ${displayName} review --timeout 3600             Allow slow local CLI reviews to finish
   ${displayName} review --verbose                   Show full issue details
   ${displayName} review --context-lines 40         More surrounding context
   ${displayName} review --context-lines 0          Disable context

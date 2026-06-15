@@ -66,6 +66,7 @@ function parseArgs(argv) {
     evidenceDir: path.join('.sisyphus', 'evidence'),
     output: undefined,
     skipTests: false,
+    release: false,
   };
 
   for (let index = 0; index < argv.length; index++) {
@@ -82,9 +83,14 @@ function parseArgs(argv) {
       options.output = arg.slice('--output='.length);
     } else if (arg === '--skip-tests') {
       options.skipTests = true;
+    } else if (arg === '--release') {
+      options.release = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
+  }
+  if (options.release && options.skipTests) {
+    throw new Error('Release redaction/path-safety evidence requires real focused tests; --skip-tests is not allowed with --release');
   }
 
   return options;
@@ -115,6 +121,7 @@ export function buildRedactionPathSafetyEvidence({
   testResult,
   outputPath,
   cwd = process.cwd(),
+  evidenceMode,
 }) {
   const normalizedTestResult = testResult ?? {
     stdout: '',
@@ -127,6 +134,7 @@ export function buildRedactionPathSafetyEvidence({
 
   return {
     schemaVersion: REDACTION_PATH_SAFETY_EVIDENCE_SCHEMA_VERSION,
+    evidenceMode: evidenceMode ?? (normalizedTestResult.skipped === true ? 'skipped' : 'real'),
     capturedAt: new Date().toISOString(),
     redactionStatus: 'safe-to-publish',
     releaseTier: 'rc',
@@ -157,6 +165,9 @@ export function buildRedactionPathSafetyEvidence({
 }
 
 export async function runRedactionPathSafetyEvidence(options = {}) {
+  if (options.release && options.skipTests) {
+    throw new Error('Release redaction/path-safety evidence requires real focused tests; --skip-tests is not allowed with --release');
+  }
   const cwd = options.cwd ?? process.cwd();
   const evidenceDir = path.resolve(cwd, options.evidenceDir ?? path.join('.sisyphus', 'evidence'));
   const outputPath = path.resolve(cwd, options.output ?? path.join(evidenceDir, 'redaction-path-safety-evidence.json'));
@@ -172,7 +183,12 @@ export async function runRedactionPathSafetyEvidence(options = {}) {
       env: options.env ?? process.env,
     });
 
-  const evidence = buildRedactionPathSafetyEvidence({ testResult, outputPath, cwd });
+  const evidence = buildRedactionPathSafetyEvidence({
+    testResult,
+    outputPath,
+    cwd,
+    evidenceMode: options.skipTests ? 'skipped' : 'real',
+  });
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
 

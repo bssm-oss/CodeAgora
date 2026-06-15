@@ -14,7 +14,7 @@ import { mapToGitHubReview } from './mapper.js';
 import { postReview, setCommitStatus, handleNeedsHuman } from './poster.js';
 import { createAppOctokit } from './client.js';
 import { fetchPrMetadata } from './pr-diff.js';
-import { buildSarifReport, serializeSarif } from './sarif.js';
+import { buildSarifReport, filterSarifPublishableEvidenceDocs, serializeSarif } from './sarif.js';
 import { resolveReviewedPrCommitSha } from './action-event.js';
 import { loadConfigFile } from '@codeagora/core/config/loader.js';
 import {
@@ -35,6 +35,7 @@ import {
   writeDocumentedActionOutputs,
 } from './action-reporting.js';
 import type { EvidenceDocument } from '@codeagora/core/types/core.js';
+import type { GitHubCommitStatusVerdict } from './types.js';
 
 const DEFAULT_SARIF_OUTPUT_PATH = '/tmp/codeagora-results.sarif';
 
@@ -53,7 +54,11 @@ async function writeSarifOutput(
 ): Promise<string> {
   try {
     const safeSarifPath = await validateActionOutputPath(rawSarifPath ?? DEFAULT_SARIF_OUTPUT_PATH, process.cwd());
-    const sarifReport = buildSarifReport(evidenceDocs, sessionId, sessionDate);
+    const publishableDocs = filterSarifPublishableEvidenceDocs(evidenceDocs);
+    if (publishableDocs.length !== evidenceDocs.length) {
+      console.log(`SARIF publishing filtered ${evidenceDocs.length - publishableDocs.length} unverified finding(s)`);
+    }
+    const sarifReport = buildSarifReport(publishableDocs, sessionId, sessionDate);
     await fs.writeFile(safeSarifPath, serializeSarif(sarifReport));
     console.log(`SARIF report written to ${safeSarifPath}`);
     return safeSarifPath;
@@ -333,6 +338,7 @@ async function main(): Promise<void> {
       : undefined,
     reviewRun: result.reviewRun,
     reviewQueues: result.reviewQueues,
+    decisionBrief: result.decisionBrief,
     options: {
       postSuggestions: ghIntegration?.postSuggestions,
       collapseDiscussions: ghIntegration?.collapseDiscussions,
@@ -341,7 +347,8 @@ async function main(): Promise<void> {
   });
 
   let reviewUrl = '';
-  let postedVerdict = result.summary.decision;
+  let postedVerdict: GitHubCommitStatusVerdict = review.verdict;
+  let forceDegradedVerdict = false;
 
   if (githubWritesAllowed) {
     console.log('::group::Posting review to GitHub');
@@ -397,6 +404,7 @@ async function main(): Promise<void> {
         const message = err instanceof Error ? err.message : String(err);
         logActionDiagnostic('GitHub posting degraded', 'github-post-failed', message);
         markActionDegraded('github-post-failed');
+        forceDegradedVerdict = true;
         writeActionSummary('degraded', 'github-post-failed', message);
       }
       console.log('::endgroup::');
@@ -420,15 +428,18 @@ async function main(): Promise<void> {
   );
 
   // Set outputs
+  if (forceDegradedVerdict) {
+    postedVerdict = 'DEGRADED';
+  }
   writeDocumentedActionOutputs({
-    verdict: result.summary.decision,
+    verdict: postedVerdict,
     reviewUrl,
     sessionId: result.sessionId,
     sarifFile,
   });
 
   if (reviewUrl) console.log(`Review posted: ${reviewUrl}`);
-  console.log(`Verdict: ${result.summary.decision}`);
+  console.log(`Verdict: ${postedVerdict}`);
 
   // Exit with failure if REJECT and failOnReject is enabled
   if (postedVerdict === 'REJECT' && inputs.failOnReject) {

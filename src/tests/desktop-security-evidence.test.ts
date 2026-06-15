@@ -41,6 +41,7 @@ describe('desktop security evidence', () => {
       })));
       expect(result.evidence).toMatchObject({
         schemaVersion: DESKTOP_SECURITY_EVIDENCE_SCHEMA_VERSION,
+        evidenceMode: 'real',
         redactionStatus: 'safe-to-publish',
         releaseTier: 'rc',
         outputPath: path.relative(process.cwd(), output),
@@ -130,6 +131,13 @@ describe('desktop security evidence', () => {
       evidenceDir: '.tmp/evidence',
       output: 'desktop-security.json',
       skipTests: true,
+      release: false,
     });
+  });
+
+  it('rejects skipped tests in release mode', () => {
+    expect(() => parseDesktopSecurityEvidenceArgs(['--release', '--skip-tests'])).toThrow(
+      'Release desktop security evidence requires real focused tests',
+    );
   });
 });
