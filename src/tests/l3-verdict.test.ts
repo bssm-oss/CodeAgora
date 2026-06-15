@@ -313,6 +313,61 @@ describe('makeHeadVerdict()', () => {
       expect(verdict.questionsForHuman?.[0]).toContain('d-boundary-harshly-critical');
     });
 
+    it('accepts when only speculative critical discussions remain below 20 confidence', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-speculative-critical',
+            finalSeverity: 'CRITICAL',
+            consensusReached: false,
+            avgConfidence: 19,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('ACCEPT');
+      expect(verdict.questionsForHuman).toBeUndefined();
+    });
+
+    it('keeps high-risk speculative critical discussions on the human review path', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-high-risk-speculative',
+            finalSeverity: 'CRITICAL',
+            consensusReached: false,
+            avgConfidence: 4,
+            reasoning: 'Potential authorization bypass across a permission boundary, but evidence is weak.',
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.join('\n')).toContain('d-high-risk-speculative');
+    });
+
+    it('routes critical confidence 20 to human review at the speculative boundary', async () => {
+      const report = makeReport({
+        discussions: [
+          makeVerdict({
+            discussionId: 'd-speculative-boundary',
+            finalSeverity: 'CRITICAL',
+            consensusReached: false,
+            avgConfidence: 20,
+          }),
+        ],
+      });
+
+      const verdict = await makeHeadVerdict(report);
+
+      expect(verdict.decision).toBe('NEEDS_HUMAN');
+      expect(verdict.questionsForHuman?.[0]).toContain('d-speculative-boundary');
+    });
+
     it('rejects critical confidence 60 as blocking', async () => {
       const report = makeReport({
         discussions: [
@@ -581,6 +636,67 @@ describe('applyHeadVerdictSafety()', () => {
 
     expect(verdict.decision).toBe('NEEDS_HUMAN');
     expect(verdict.questionsForHuman?.[0]).toContain('d-low-confidence');
+  });
+
+  it('overrides REJECT to ACCEPT when only speculative critical discussions remain', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-speculative-critical',
+          finalSeverity: 'CRITICAL',
+          consensusReached: false,
+          avgConfidence: 4,
+        }),
+        makeVerdict({
+          discussionId: 'd-dismissed',
+          finalSeverity: 'DISMISSED',
+          consensusReached: true,
+          avgConfidence: 0,
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'REJECT',
+      reasoning: 'LLM treated speculative findings as blocking.',
+      questionsForHuman: ['Should a human inspect d-speculative-critical?'],
+    }, report);
+
+    expect(verdict.decision).toBe('ACCEPT');
+    expect(verdict.reasoning).toContain('speculative critical');
+    expect(verdict.questionsForHuman).toBeUndefined();
+  });
+
+  it('does not override high-risk speculative critical discussions to ACCEPT', () => {
+    const report = makeReport({
+      discussions: [
+        makeVerdict({
+          discussionId: 'd-high-risk-speculative',
+          finalSeverity: 'CRITICAL',
+          consensusReached: false,
+          avgConfidence: 4,
+          reasoning: 'Possible SQL injection, but the current trace is weak.',
+        }),
+      ],
+    });
+
+    const verdict = applyHeadVerdictSafety({
+      decision: 'ACCEPT',
+      reasoning: 'LLM accepted a weak security finding.',
+    }, report);
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.questionsForHuman?.join('\n')).toContain('d-high-risk-speculative');
+  });
+
+  it('does not override LLM verdicts for an empty moderator report', () => {
+    const verdict = applyHeadVerdictSafety({
+      decision: 'NEEDS_HUMAN',
+      reasoning: 'LLM asked for manual inspection.',
+    }, makeReport());
+
+    expect(verdict.decision).toBe('NEEDS_HUMAN');
+    expect(verdict.reasoning).toBe('LLM asked for manual inspection.');
   });
 
   it('overrides REJECT to NEEDS_HUMAN for forced tie-break critical discussions', () => {

@@ -80,6 +80,44 @@ function isCriticalSeverity(doc: EvidenceDocument): boolean {
   return doc.severity === 'CRITICAL' || doc.severity === 'HARSHLY_CRITICAL';
 }
 
+function isCriticalDiscussion(discussion: DiscussionVerdict): boolean {
+  return discussion.finalSeverity === 'CRITICAL' || discussion.finalSeverity === 'HARSHLY_CRITICAL';
+}
+
+const HIGH_RISK_SPECULATIVE_PATTERNS = [
+  /\bauth(?:entication|orization)? bypass\b/i,
+  /\bpermission boundary\b/i,
+  /\bprivilege escalation\b/i,
+  /\bdata loss\b/i,
+  /\bremote code execution\b|\brce\b/i,
+  /\bsql injection\b|\bxss\b|\bcsrf\b|\bssrf\b/i,
+  /\bsecret leak\b|\bcredential leak\b|\btoken leak\b/i,
+];
+
+function containsHighRiskSpeculativeClaim(text: string): boolean {
+  return HIGH_RISK_SPECULATIVE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function isHighRiskSpeculativeDoc(doc: EvidenceDocument): boolean {
+  return isCriticalSeverity(doc) &&
+    containsHighRiskSpeculativeClaim([doc.issueTitle, doc.problem, ...doc.evidence, doc.suggestion].join('\n'));
+}
+
+function isLowConfidenceCriticalDiscussion(discussion: DiscussionVerdict): boolean {
+  return isCriticalDiscussion(discussion) &&
+    discussion.avgConfidence != null &&
+    discussion.avgConfidence < SPECULATIVE_CONFIDENCE_MAX;
+}
+
+function isHighRiskSpeculativeDiscussion(discussion: DiscussionVerdict): boolean {
+  return isLowConfidenceCriticalDiscussion(discussion) &&
+    containsHighRiskSpeculativeClaim(discussion.reasoning);
+}
+
+function isSpeculativeCriticalDiscussion(discussion: DiscussionVerdict): boolean {
+  return isLowConfidenceCriticalDiscussion(discussion) && !isHighRiskSpeculativeDiscussion(discussion);
+}
+
 const PUBLIC_SUMMARY_HIDDEN_CLASS_PRIORS = new Set([
   'provider-contract-flexibility',
   'review-run-summary-policy',
@@ -101,7 +139,7 @@ function splitPublicVerifyDocs(docs: EvidenceDocument[]): {
   const verify: EvidenceDocument[] = [];
   for (const doc of docs) {
     const confidence = evidenceConfidence(doc);
-    if (isCriticalSeverity(doc) && (confidence < SPECULATIVE_CONFIDENCE_MAX || isHiddenClassPrior(doc))) {
+    if (isCriticalSeverity(doc) && !isHighRiskSpeculativeDoc(doc) && (confidence < SPECULATIVE_CONFIDENCE_MAX || isHiddenClassPrior(doc))) {
       speculative.push(doc);
     } else if (isCriticalSeverity(doc) && confidence < NEEDS_REPRO_CONFIDENCE_MAX) {
       needsRepro.push(doc);
@@ -152,6 +190,20 @@ function formatConfidenceBasis(doc: EvidenceDocument): string {
     trace.classPrior ? `class prior ${trace.classPrior}` : undefined,
   ].filter(Boolean);
   return parts.join(' -> ');
+}
+
+function discussionConfidenceLabel(discussion: DiscussionVerdict): string {
+  return discussion.avgConfidence == null ? 'confidence n/a' : `${discussion.avgConfidence}%`;
+}
+
+function formatDiscussionSeverityLabel(discussion: DiscussionVerdict): string {
+  if (isHighRiskSpeculativeDiscussion(discussion)) {
+    return `high-risk speculative ${discussion.finalSeverity} (${discussionConfidenceLabel(discussion)})`;
+  }
+  if (isSpeculativeCriticalDiscussion(discussion)) {
+    return `speculative ${discussion.finalSeverity} (${discussionConfidenceLabel(discussion)})`;
+  }
+  return discussion.finalSeverity;
 }
 
 function commandLikeSnippet(text: string): string | null {
@@ -506,7 +558,7 @@ export function mapToInlineCommentBody(
         }
       }
 
-      lines.push(`**Verdict:** ${discussion.finalSeverity} \u2014 ${discussion.reasoning}`);
+      lines.push(`**Verdict:** ${formatDiscussionSeverityLabel(discussion)} \u2014 ${discussion.reasoning}`);
       lines.push('');
       lines.push('</details>');
     } else {
@@ -726,7 +778,7 @@ export function buildSummaryBody(params: {
       const consensusIcon = d.consensusReached ? '\u2705' : '\u26A0\uFE0F';
       const consensusText = d.consensusReached ? 'consensus' : 'forced';
       lines.push(`<details>`);
-      lines.push(`<summary>${consensusIcon} ${d.discussionId} \u2014 ${d.rounds} round(s), ${consensusText} \u2192 ${d.finalSeverity}</summary>`);
+      lines.push(`<summary>${consensusIcon} ${d.discussionId} \u2014 ${d.rounds} round(s), ${consensusText} \u2192 ${formatDiscussionSeverityLabel(d)}</summary>`);
       lines.push('');
 
       // Round-by-round detail if available
@@ -749,7 +801,7 @@ export function buildSummaryBody(params: {
         }
       }
 
-      lines.push(`**Verdict:** ${d.finalSeverity} \u2014 ${d.reasoning}`);
+      lines.push(`**Verdict:** ${formatDiscussionSeverityLabel(d)} \u2014 ${d.reasoning}`);
       lines.push('');
       lines.push('</details>');
       lines.push('');

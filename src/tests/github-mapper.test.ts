@@ -111,6 +111,30 @@ describe('mapToInlineCommentBody', () => {
     expect(body).toContain('forced decision');
   });
 
+  it('labels speculative critical inline discussions without presenting them as blocking criticals', () => {
+    const body = mapToInlineCommentBody(
+      makeDoc(),
+      makeDiscussion({ consensusReached: false, avgConfidence: 4 }),
+    );
+
+    expect(body).toContain('forced decision');
+    expect(body).toContain('**Verdict:** speculative CRITICAL (4%)');
+    expect(body).not.toContain('**Verdict:** CRITICAL —');
+  });
+
+  it('labels high-risk speculative critical inline discussions as high-risk', () => {
+    const body = mapToInlineCommentBody(
+      makeDoc(),
+      makeDiscussion({
+        consensusReached: false,
+        avgConfidence: 4,
+        reasoning: 'Possible authorization bypass across a permission boundary, but evidence is weak.',
+      }),
+    );
+
+    expect(body).toContain('**Verdict:** high-risk speculative CRITICAL (4%)');
+  });
+
   it('includes reviewer IDs when provided', () => {
     const body = mapToInlineCommentBody(makeDoc(), undefined, ['r1-kimi', 'r2-codex']);
     expect(body).toContain('r1-kimi');
@@ -303,6 +327,43 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('Simplify branch');
     expect(body).toContain('Check nullable path');
     expect(body).not.toContain('<summary>2 suggestion(s)</summary>');
+  });
+
+  it('labels speculative critical discussions in the consensus log', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'ACCEPT', reasoning: 'Only speculative hypotheses remain.' }),
+      sessionId: '005-speculative',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [makeDiscussion({ consensusReached: false, avgConfidence: 4 })],
+    });
+
+    expect(body).toContain('forced → speculative CRITICAL (4%)');
+    expect(body).toContain('**Verdict:** speculative CRITICAL (4%)');
+    expect(body).not.toContain('forced → CRITICAL');
+  });
+
+  it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A weak security claim needs reproduction.' }),
+      sessionId: '005-high-risk',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [makeDoc({
+        confidence: 4,
+        issueTitle: 'Possible SQL injection',
+        problem: 'Possible SQL injection if the query builder does not escape this branch.',
+      })],
+      discussions: [makeDiscussion({
+        consensusReached: false,
+        avgConfidence: 4,
+        reasoning: 'Possible SQL injection, but the current trace is weak.',
+      })],
+    });
+
+    expect(body).toContain('1 needs-repro');
+    expect(body).toContain('### Needs Repro');
+    expect(body).toContain('forced → high-risk speculative CRITICAL (4%)');
+    expect(body).not.toContain('1 speculative hypothesis(es) hidden');
   });
 
   it('redacts reviewRun and reviewQueues before rendering public summary', () => {
