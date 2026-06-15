@@ -151,6 +151,25 @@ function formatPublicTriageCounts(triage: ReturnType<typeof triageDocs>): string
   return parts.join(' \u00B7 ') || 'no issues';
 }
 
+function isNeedsHumanDiscussion(discussion: DiscussionVerdict): boolean {
+  return isCriticalDiscussion(discussion) &&
+    discussion.avgConfidence != null &&
+    discussion.avgConfidence >= SPECULATIVE_CONFIDENCE_MAX &&
+    discussion.avgConfidence < LOW_CONFIDENCE_CRITICAL_MAX;
+}
+
+function formatSummaryTriageCounts(triage: ReturnType<typeof triageDocs>, discussions: DiscussionVerdict[]): string {
+  const formatted = formatPublicTriageCounts(triage);
+  const discussionNeedsHuman = discussions.filter(isNeedsHumanDiscussion).length;
+  if (discussionNeedsHuman === 0) {
+    return formatted;
+  }
+  if (formatted === 'no issues') {
+    return `${discussionNeedsHuman} needs-human discussion`;
+  }
+  return `${formatted} \u00B7 ${discussionNeedsHuman} needs-human discussion`;
+}
+
 function formatLocation(doc: EvidenceDocument): string {
   return `${doc.filePath}:${doc.lineRange[0]}`;
 }
@@ -221,14 +240,21 @@ function pushDecisionSnapshot(
   publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
   discussions: DiscussionVerdict[],
 ): void {
-  const blockersNow = summary.decision === 'REJECT' ? 'review rejected' : '0';
-  const followUpLater = publicVerify.needsHuman.length + publicVerify.needsRepro.length + publicVerify.verify.length;
+  const decisionGate = summary.decision === 'REJECT'
+    ? 'merge blocked'
+    : summary.decision === 'NEEDS_HUMAN'
+      ? 'human review required'
+      : '0';
+  const followUpLater = publicVerify.needsHuman.length +
+    publicVerify.needsRepro.length +
+    publicVerify.verify.length +
+    discussions.filter(isNeedsHumanDiscussion).length;
   const hiddenSpeculative = publicVerify.speculative.length + countForcedSpeculativeDiscussions(discussions);
   lines.push('### Decision Snapshot');
   lines.push('');
-  lines.push('| Blockers now | Follow-up later | Ignored speculative |');
+  lines.push('| Decision gate | Follow-up later | Ignored speculative |');
   lines.push('|---:|---:|---:|');
-  lines.push(`| ${blockersNow} | ${followUpLater} | ${hiddenSpeculative} |`);
+  lines.push(`| ${decisionGate} | ${followUpLater} | ${hiddenSpeculative} |`);
   lines.push('');
   lines.push('Verdict is based on current blockers. Follow-up and speculative items are non-blocking until reproduced or backed by stronger evidence.');
   lines.push('');
@@ -653,7 +679,7 @@ export function buildSummaryBody(params: {
   // Unified header: verdict + triage
   const vb = VERDICT_BADGE[summary.decision] ?? { emoji: '\u2753', label: summary.decision };
   const triage = triageDocs(evidenceDocs);
-  const triageStr = formatPublicTriageCounts(triage);
+  const triageStr = formatSummaryTriageCounts(triage, discussions);
   const publicVerify = splitPublicVerifyDocs(triage.verify);
   const metaParts = formatRoleMeta(summary, safeParams.reviewRun);
 

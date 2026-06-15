@@ -222,7 +222,7 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('REJECT');
     expect(body).toContain('CodeAgora');
     expect(body).toContain('### Decision Snapshot');
-    expect(body).toContain('| Blockers now | Follow-up later | Ignored speculative |');
+    expect(body).toContain('| Decision gate | Follow-up later | Ignored speculative |');
   });
 
   it('renders blocking issues table for critical docs', () => {
@@ -399,6 +399,24 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('**Trace:** Tie broken by forced decision');
     expect(body).not.toContain('consensus → speculative hypothesis');
     expect(body).not.toContain('**Verdict:** speculative hypothesis');
+  });
+
+  it('counts needs-human discussion verdicts in the summary snapshot', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A low-confidence critical discussion needs human judgment.' }),
+      sessionId: '005-needs-human-discussion',
+      sessionDate: '2026-03-16',
+      evidenceDocs: [],
+      discussions: [makeDiscussion({
+        consensusReached: true,
+        avgConfidence: 26,
+        reasoning: 'All supporters agreed on the issue',
+      })],
+    });
+
+    expect(body).toContain('1 needs-human discussion');
+    expect(body).toContain('| human review required | 1 | 0 |');
+    expect(body).not.toContain('| 0 | 0 |');
   });
 
   it('keeps high-risk speculative critical docs in needs-repro instead of hiding them', () => {
