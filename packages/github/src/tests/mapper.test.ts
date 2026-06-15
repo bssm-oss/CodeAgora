@@ -363,6 +363,9 @@ describe('buildSummaryBody', () => {
       discussions: [],
     });
     expect(body).toContain('ACCEPT');
+    expect(body).toContain('### Merge Decision Contract');
+    expect(body).toContain('| Merge now? | yes |');
+    expect(body).toContain('| Blocking items to fix before merge | none |');
     expect(body).toContain('### Final Decision Table');
     expect(body).toContain('No current blockers or human gates remain.');
     expect(body).toContain('### Decision Snapshot');
@@ -518,11 +521,18 @@ describe('buildSummaryBody', () => {
     });
 
     expect(body).toContain('1 needs-human discussion');
+    expect(body).toContain('### Merge Decision Contract');
+    expect(body).toContain('| Merge now? | no |');
+    expect(body).toContain('| Human checks required before merge | d001 `src/foo.ts:42` human-gated critical-risk hypothesis (26%) |');
     expect(body).toContain('| d001 — discussion verdict | 26% | human-gated critical-risk hypothesis (26%) | human gate |');
     expect(body).toContain('### Human Gate Evidence Cards');
     expect(body).toContain('Policy basis: 20-59% critical-risk discussions require human review');
     expect(body).toContain('### Maintainer Action Top-3');
     expect(body).toContain('Run: `Inspect src/foo.ts:42 and run the nearest focused test.`');
+    expect(body).toContain('consensus → human-gated critical-risk hypothesis (26%)');
+    expect(body).toContain('**Disposition:** human-gated critical-risk hypothesis (26%) — human check required before merge.');
+    expect(body).not.toContain('consensus → CRITICAL');
+    expect(body).not.toContain('**Verdict:** CRITICAL — All supporters agreed');
     expect(body).toContain('| human review required | 1 | 0 |');
     expect(body).not.toContain('| 0 | 0 |');
   });

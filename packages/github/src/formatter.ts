@@ -234,6 +234,11 @@ function pushDiscussionDisposition(lines: string[], discussion: DiscussionVerdic
     lines.push(`**Trace:** ${discussion.reasoning}`);
     return;
   }
+  if (isNeedsHumanDiscussion(discussion)) {
+    lines.push(`**Disposition:** ${formatDiscussionDecisionDisposition(discussion)} — human check required before merge.`);
+    lines.push(`**Trace:** ${discussion.reasoning}`);
+    return;
+  }
   lines.push(`**Verdict:** ${severityLabel} \u2014 ${discussion.reasoning}`);
 }
 
@@ -263,7 +268,60 @@ function pushDecisionSnapshot(
   lines.push('|---:|---:|---:|');
   lines.push(`| ${decisionGate} | ${followUpLater} | ${hiddenSpeculative} |`);
   lines.push('');
-  lines.push('Verdict is based on current blockers. Follow-up and speculative items are non-blocking until reproduced or backed by stronger evidence.');
+  if (summary.decision === 'NEEDS_HUMAN') {
+    lines.push('Human-gated items require maintainer confirmation before merge. Needs-repro and speculative items remain non-blocking until reproduced or backed by stronger evidence.');
+  } else {
+    lines.push('Verdict is based on current blockers. Follow-up and speculative items are non-blocking until reproduced or backed by stronger evidence.');
+  }
+  lines.push('');
+}
+
+function formatContractItems(items: string[], empty = 'none'): string {
+  if (items.length === 0) return empty;
+  const visible = items.slice(0, 3).join('<br>');
+  return items.length > 3 ? `${visible}<br>+${items.length - 3} more` : visible;
+}
+
+function pushMergeDecisionContract(
+  lines: string[],
+  summary: PipelineSummary,
+  triage: ReturnType<typeof triageDocs>,
+  publicVerify: ReturnType<typeof splitPublicVerifyDocs>,
+  discussions: DiscussionVerdict[],
+): void {
+  const mustFixItems = triage.mustFix.map((doc) => `\`${formatLocation(doc)}\` ${doc.issueTitle}`);
+  const humanItems = [
+    ...publicVerify.needsHuman.map((doc) => `\`${formatLocation(doc)}\` ${doc.issueTitle}`),
+    ...discussions.filter(isNeedsHumanDiscussion).map((discussion) =>
+      `${discussion.discussionId} \`${discussion.filePath}:${discussion.lineRange[0]}\` ${formatDiscussionDecisionDisposition(discussion)}`,
+    ),
+  ];
+  const followUpItems = [
+    ...publicVerify.needsRepro.map((doc) => `\`${formatLocation(doc)}\` ${doc.issueTitle}`),
+    ...publicVerify.verify.map((doc) => `\`${formatLocation(doc)}\` ${doc.issueTitle}`),
+    ...publicVerify.speculative.map((doc) => `\`${formatLocation(doc)}\` ${doc.issueTitle}`),
+    ...discussions.filter(isForcedSpeculativeDiscussion).map((discussion) =>
+      `${discussion.discussionId} \`${discussion.filePath}:${discussion.lineRange[0]}\` ${formatDiscussionSeverityLabel(discussion)}`,
+    ),
+  ];
+  const mergeNow = summary.decision === 'ACCEPT' && mustFixItems.length === 0 && humanItems.length === 0
+    ? 'yes'
+    : 'no';
+  const blockingLabel = mustFixItems.length > 0
+    ? formatContractItems(mustFixItems)
+    : summary.decision === 'REJECT'
+      ? 'reject verdict; inspect final decision table'
+      : 'none';
+
+  lines.push('### Merge Decision Contract');
+  lines.push('');
+  lines.push('| Question | Answer |');
+  lines.push('|---|---|');
+  lines.push(`| Merge now? | ${mergeNow} |`);
+  lines.push(`| Blocking items to fix before merge | ${blockingLabel} |`);
+  lines.push(`| Human checks required before merge | ${formatContractItems(humanItems)} |`);
+  lines.push(`| Follow-up only | ${formatContractItems(followUpItems)} |`);
+  lines.push('| Confidence rule | CRITICAL/HARSHLY_CRITICAL at >=60% blocks merge; 20-59% is a human gate; <20% is speculative unless reproduced. |');
   lines.push('');
 }
 
@@ -931,6 +989,7 @@ export function buildSummaryBody(params: {
   lines.push('');
   lines.push(`**${triageStr}**${metaParts ? ` | ${metaParts}` : ''}`);
   lines.push('');
+  pushMergeDecisionContract(lines, summary, triage, publicVerify, discussions);
   pushFinalDecisionTable(lines, triage, publicVerify, discussions);
   pushDiscussionEvidenceCards(lines, discussions);
   pushMaintainerActionTop3(lines, triage, publicVerify, discussions);
@@ -1086,7 +1145,7 @@ export function buildSummaryBody(params: {
       const consensusIcon = forcedDecision ? '\u26A0\uFE0F' : '\u2705';
       const consensusText = forcedDecision ? 'forced' : 'consensus';
       lines.push(`<details>`);
-      lines.push(`<summary>${consensusIcon} ${d.discussionId} \u2014 ${d.rounds} round(s), ${consensusText} \u2192 ${formatDiscussionSeverityLabel(d)}</summary>`);
+      lines.push(`<summary>${consensusIcon} ${d.discussionId} \u2014 ${d.rounds} round(s), ${consensusText} \u2192 ${formatDiscussionDecisionDisposition(d)}</summary>`);
       lines.push('');
 
       // Round-by-round detail if available
