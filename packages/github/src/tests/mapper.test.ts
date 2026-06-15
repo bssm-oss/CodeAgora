@@ -536,6 +536,38 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('| 0 | 1 | 0 |');
   });
 
+  it('renders concrete verification cards for human-gated discussions', () => {
+    const body = buildSummaryBody({
+      summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A contract change needs human judgment.' }),
+      sessionId: 'sess-001',
+      sessionDate: '2026-03-21',
+      evidenceDocs: [makeDoc({
+        filePath: 'scripts/release-gate-summary.mjs',
+        lineRange: [14, 73],
+        confidence: 44,
+        issueTitle: 'Changed return type and error message format',
+        problem: 'Callers expecting the old release gate summary shape may mis-handle the new evidence validity fields.',
+        evidence: ['summarizeReleaseGates now returns evidenceValid and invalidEvidence fields alongside passed.'],
+      })],
+      discussions: [makeVerdict({
+        discussionId: 'd004',
+        filePath: 'scripts/release-gate-summary.mjs',
+        lineRange: [14, 73],
+        consensusReached: true,
+        avgConfidence: 44,
+        reasoning: 'All supporters agreed on the issue',
+      })],
+    });
+
+    expect(body).toContain('### Human Gate Evidence Cards');
+    expect(body).toContain('Exact change to inspect: summarizeReleaseGates now returns evidenceValid and invalidEvidence fields alongside passed.');
+    expect(body).toContain('Affected contract/callers: Callers expecting the old release gate summary shape may mis-handle the new evidence validity fields.');
+    expect(body).toContain('Reproduce command: `Inspect scripts/release-gate-summary.mjs:14 and run the nearest focused test.`');
+    expect(body).toContain('Expected result: the referenced contract remains compatible and the focused check passes.');
+    expect(body).toContain('Actual result to check: the focused command or code inspection reproduces the reported contract break.');
+    expect(body).toContain('Decision rule: pass removes the human gate; fail keeps the pre-merge gate until fixed.');
+  });
+
   it('uses focused path commands instead of long suggestion code blocks in maintainer actions', () => {
     const body = buildSummaryBody({
       summary: makeSummary({ decision: 'NEEDS_HUMAN', reasoning: 'A manifest issue needs reproduction.' }),

@@ -467,7 +467,15 @@ function pushFinalDecisionTable(
   lines.push('');
 }
 
-function pushDiscussionEvidenceCards(lines: string[], discussions: DiscussionVerdict[]): void {
+function findEvidenceForDiscussion(discussion: DiscussionVerdict, docs: EvidenceDocument[]): EvidenceDocument | undefined {
+  return docs.find((doc) =>
+    doc.filePath === discussion.filePath &&
+    doc.lineRange[0] <= discussion.lineRange[1] &&
+    doc.lineRange[1] >= discussion.lineRange[0]
+  );
+}
+
+function pushDiscussionEvidenceCards(lines: string[], discussions: DiscussionVerdict[], docs: EvidenceDocument[]): void {
   const humanGateDiscussions = discussions.filter(isNeedsHumanDiscussion);
   if (humanGateDiscussions.length === 0) return;
 
@@ -475,14 +483,19 @@ function pushDiscussionEvidenceCards(lines: string[], discussions: DiscussionVer
   lines.push('');
   for (const discussion of humanGateDiscussions.slice(0, 3)) {
     const location = `${discussion.filePath}:${discussion.lineRange[0]}`;
+    const doc = findEvidenceForDiscussion(discussion, docs);
+    const command = suggestedDiscussionCommand(discussion);
+    const observedChange = doc ? firstEvidence(doc) : discussion.reasoning;
+    const impact = doc?.problem ?? 'The discussion kept this as a pre-merge contract check.';
     lines.push(`**${discussion.discussionId} — \`${location}\`**`);
     lines.push('');
-    lines.push(`- Observed signal: L2 kept a critical-risk discussion at ${discussionConfidenceLabel(discussion)} confidence.`);
-    lines.push(`- Policy basis: 20-59% critical-risk discussions require human review instead of automatic reject or accept.`);
-    lines.push(`- Reproduce: \`${suggestedDiscussionCommand(discussion)}\``);
-    lines.push(`- Pass: focused check or code inspection shows the reported contract did not regress.`);
-    lines.push(`- Fail: the reported behavior changed unintentionally; keep the gate until fixed.`);
-    lines.push(`- Trace: ${truncateResponse(discussion.reasoning, 180)}`);
+    lines.push(`- Exact change to inspect: ${truncateResponse(observedChange, 180)}`);
+    lines.push(`- Affected contract/callers: ${truncateResponse(impact, 180)}`);
+    lines.push(`- Reproduce command: \`${command}\``);
+    lines.push('- Expected result: the referenced contract remains compatible and the focused check passes.');
+    lines.push('- Actual result to check: the focused command or code inspection reproduces the reported contract break.');
+    lines.push('- Decision rule: pass removes the human gate; fail keeps the pre-merge gate until fixed.');
+    lines.push(`- Trace: ${truncateResponse(discussion.reasoning, 140)}`);
     lines.push('');
   }
 }
@@ -665,7 +678,7 @@ function hiddenQueueMessage(title: string, count: number): string {
 
 function queueDispositionReason(title: string, doc: EvidenceDocument): string {
   if (title === 'Removed by hallucination filter') {
-    return `rejected by hallucination checks; ${formatPublicConfidenceBasis(doc)}`;
+    return 'rejected by hallucination checks; confidence omitted because the claim lacked diff support';
   }
   if (title === 'Uncertain after hallucination checks') {
     return `retained as uncertain after penalties; ${formatPublicConfidenceBasis(doc)}`;
@@ -1009,7 +1022,7 @@ export function buildSummaryBody(params: {
   pushMergeDecisionContract(lines, publicDecision, triage, publicVerify, discussions);
   pushTopMaintainerActionList(lines, triage, publicVerify, discussions);
   pushFinalDecisionTable(lines, triage, publicVerify, discussions);
-  pushDiscussionEvidenceCards(lines, discussions);
+  pushDiscussionEvidenceCards(lines, discussions, evidenceDocs);
   pushDecisionSnapshot(lines, publicDecision, publicVerify, discussions);
   pushReviewCoverage(lines, summary, safeParams.reviewRun);
   pushNonBlockingQueues(lines, safeParams.reviewRun, safeParams.reviewQueues);

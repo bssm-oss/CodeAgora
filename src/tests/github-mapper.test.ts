@@ -573,7 +573,8 @@ describe('buildSummaryBody', () => {
     expect(body).toContain('src/auth.ts:42');
     expect(body).toContain('Imaginary SQL injection');
     expect(body).toContain('rejected by hallucination checks');
-    expect(body).toContain('final confidence 20%; stage trace hidden from summary');
+    expect(body).toContain('confidence omitted because the claim lacked diff support');
+    expect(body).not.toContain('final confidence 20%');
   });
 
   it('renders one-line reasons for hidden low-confidence queue items', () => {
