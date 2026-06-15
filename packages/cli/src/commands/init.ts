@@ -63,6 +63,10 @@ export interface GeneratedConfig {
   [key: string]: unknown;
 }
 
+interface BuildCliPresetConfigOptions {
+  language?: Language;
+}
+
 export class UserCancelledError extends Error {
   constructor() { super('Setup cancelled by user.'); this.name = 'UserCancelledError'; }
 }
@@ -820,7 +824,8 @@ function isKorean(): boolean {
  */
 export async function writeGitHubWorkflow(
   baseDir: string,
-  force = false
+  force = false,
+  language: Language = 'en',
 ): Promise<boolean> {
   const workflowDir = path.join(baseDir, '.github', 'workflows');
   const workflowPath = path.join(workflowDir, 'codeagora-review.yml');
@@ -831,7 +836,7 @@ export async function writeGitHubWorkflow(
   }
 
   await fs.mkdir(workflowDir, { recursive: true });
-  await fs.writeFile(workflowPath, renderCodeAgoraWorkflowTemplate(), 'utf-8');
+  await fs.writeFile(workflowPath, renderCodeAgoraWorkflowTemplate({ language }), 'utf-8');
   return true;
 }
 
@@ -853,13 +858,17 @@ function selectionsFromPreset(selected: DynamicPreset): ProviderModelSelection[]
   }));
 }
 
-export async function buildPresetConfig(preset: string): Promise<GeneratedConfig> {
+export async function buildPresetConfig(
+  preset: string,
+  options: BuildCliPresetConfigOptions = {},
+): Promise<GeneratedConfig> {
   const canonicalPreset = resolvePresetAlias(preset);
   if (!canonicalPreset) {
     throw new Error('Preset must be specified.');
   }
+  const language = options.language ?? 'en';
   if (canonicalPreset === 'action') {
-    return buildActionPresetConfig({ language: 'en' }) as GeneratedConfig;
+    return buildActionPresetConfig({ language }) as GeneratedConfig;
   }
 
   const [env, catalog, cliBackends] = await Promise.all([
@@ -901,7 +910,7 @@ export async function buildPresetConfig(preset: string): Promise<GeneratedConfig
     selections,
     reviewerCount: selected.reviewerCount,
     discussion: selected.discussion,
-    language: 'en',
+    language,
     mode: 'pragmatic',
     maxRounds: selected.maxRounds,
     supporterSelection: selected.roleSelections?.supporter,
@@ -929,8 +938,9 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   // Config file
   const configFileName = format === 'yaml' ? 'config.yaml' : 'config.json';
   const configPath = path.join(caDir, configFileName);
+  const language = detectLocale();
   const configContent = preset
-    ? JSON.stringify(await buildPresetConfig(preset), null, 2)
+    ? JSON.stringify(await buildPresetConfig(preset, { language }), null, 2)
     : generateMinimalTemplate(format);
   await writeFile(configPath, configContent, force, created, skipped);
 
@@ -945,7 +955,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   // GitHub Actions workflow
   if (ci) {
     const workflowPath = path.join(baseDir, '.github', 'workflows', 'codeagora-review.yml');
-    const written = await writeGitHubWorkflow(baseDir, force);
+    const written = await writeGitHubWorkflow(baseDir, force, language);
     if (written) {
       created.push(workflowPath);
     } else {
@@ -1050,7 +1060,9 @@ export async function runInitInteractive(options: InitOptions): Promise<InitResu
     const language = languageSelection as Language;
     selectedLanguage = language;
 
-    if (selections.length === 1 && selectedPreset.backend === 'api') {
+    if (selectedPreset.id === 'action') {
+      configData = buildActionPresetConfig({ language }) as GeneratedConfig;
+    } else if (selections.length === 1 && selectedPreset.backend === 'api') {
       configData = buildCustomConfig({
         provider: primaryProvider,
         model: primaryModel,

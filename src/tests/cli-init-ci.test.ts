@@ -9,7 +9,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { parse as parseYaml } from 'yaml';
 
-import { writeGitHubWorkflow, runInit } from '@codeagora/cli/commands/init.js';
+import { writeGitHubWorkflow, runInit, buildPresetConfig } from '@codeagora/cli/commands/init.js';
 import { validateConfig } from '@codeagora/core/types/config.js';
 import {
   buildActionPresetConfig,
@@ -118,6 +118,22 @@ describe('writeGitHubWorkflow()', () => {
 
     expect(content).toBe(renderCodeAgoraWorkflowTemplate());
     expect(extractConfigFromWorkflow(content)).toEqual(buildActionPresetConfig({ language: 'en' }));
+  });
+
+  it('writes the shared Action workflow template with the requested language', async () => {
+    await writeGitHubWorkflow(tmpDir, false, 'ko');
+
+    const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
+    const content = await fs.readFile(filePath, 'utf-8');
+
+    expect(content).toBe(renderCodeAgoraWorkflowTemplate({ language: 'ko' }));
+    expect(extractConfigFromWorkflow(content)).toEqual(buildActionPresetConfig({ language: 'ko' }));
+  });
+
+  it('builds the action preset config with the requested language', async () => {
+    await expect(buildPresetConfig('action', { language: 'ko' })).resolves.toEqual(
+      buildActionPresetConfig({ language: 'ko' }),
+    );
   });
 });
 
