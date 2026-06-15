@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import {
   buildActionPresetConfig,
+  CODEAGORA_WORKFLOW_MAX_DIFF_LINES,
   renderCodeAgoraWorkflowTemplate,
 } from '@codeagora/shared/action-preset.js';
 
@@ -138,6 +139,7 @@ describe('GitHub Actions runtime readiness', () => {
 
     expect(extractConfigFromWorkflow(review)).toEqual(buildActionPresetConfig({ language: 'ko' }));
     expect(review).toBe(renderCodeAgoraWorkflowTemplate({ language: 'ko', localAction: true }));
+    expect(review).toContain(`max-diff-lines: '${CODEAGORA_WORKFLOW_MAX_DIFF_LINES}'`);
   });
 
   it('keeps the generated workflow template aligned with the shared renderer', () => {
@@ -145,6 +147,7 @@ describe('GitHub Actions runtime readiness', () => {
 
     expect(extractConfigFromWorkflow(template)).toEqual(buildActionPresetConfig({ language: 'en' }));
     expect(template).toBe(renderCodeAgoraWorkflowTemplate({ language: 'en' }));
+    expect(template).toContain(`max-diff-lines: '${CODEAGORA_WORKFLOW_MAX_DIFF_LINES}'`);
   });
 
   it('keeps provider health workflow generated from shared Action config with issue dedupe', () => {

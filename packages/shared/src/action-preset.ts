@@ -10,6 +10,7 @@ export interface WorkflowTemplateOptions extends ActionPresetOptions {
 }
 
 export const CODEAGORA_ACTION_REF = 'bssm-oss/CodeAgora@v0.1.0-rc.6';
+export const CODEAGORA_WORKFLOW_MAX_DIFF_LINES = 6000;
 
 export const ACTION_CHEAP_PRESET = {
   provider: 'openrouter',
@@ -167,7 +168,7 @@ ${configJson}
         with:
           github-token: \${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
-          max-diff-lines: '5000'
+          max-diff-lines: '${CODEAGORA_WORKFLOW_MAX_DIFF_LINES}'
           reporter-mode: check-run
           upload-sarif: 'true'
         env:
