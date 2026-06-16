@@ -52,164 +52,94 @@
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">LLM 코드 리뷰를 운영 가능한 파이프라인으로</p>
+          <p class="eyebrow">LLM 다자 토론형 코드 리뷰</p>
           <h1 id="hero-title">
             <span>토론하는 리뷰,</span>
             <span>근거 있는 판정.</span>
           </h1>
           <p class="lede">
-            <span>CodeAgora는 여러 모델을 병렬 리뷰어로 실행합니다.</span>
-            <span>약한 지적은 걸러냅니다.</span>
-            <span>사람이 검토할 수 있는 최종 Verdict와 증거를 남깁니다.</span>
+            <span>독립된 리뷰어들이 같은 diff를 병렬로 분석합니다.</span>
+            <span>충돌한 지적은 토론과 필터를 거쳐 최종 Verdict로 정리됩니다.</span>
+            <span>존재하지 않는 파일, 잘못된 라인, 조작된 인용처럼 검증 가능한 오류를 먼저 걷어냅니다.</span>
           </p>
-          <div class="hero-status-row" aria-label="랜딩 핵심 상태">
-            <span class="status-label good">CLI 준비</span>
-            <span class="status-label info">MCP 연결</span>
-            <span class="status-label warn">Desktop RC</span>
-          </div>
           <div class="hero-actions" aria-label="주요 작업">
             <a class="button primary" href="#install">RC 설치하기</a>
-            <a class="button secondary" href="https://github.com/bssm-oss/CodeAgora">소스 보기</a>
+            <a class="button secondary" href="https://github.com/bssm-oss/CodeAgora">GitHub 소스 보기</a>
           </div>
         </div>
 
-        <div class="app-demo" aria-label="CodeAgora 리뷰 콘솔 데모">
-          <aside class="demo-sidebar" aria-hidden="true">
-            <div class="demo-brand">
-              <img src="/assets/logo.svg" alt="" width="38" height="38">
-              <div>
-                <strong>CodeAgora</strong>
-                <span>Desktop RC</span>
-              </div>
+        <div class="review-arena" aria-label="CodeAgora 리뷰 아레나 데모">
+          <div class="arena-window-bar" aria-hidden="true">
+            <div class="terminal-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
             </div>
-            <div class="demo-nav">
-              <span class="is-active">Review Run</span>
-              <span>Sessions</span>
-              <span>Evidence</span>
-              <span>Config</span>
-            </div>
-          </aside>
-
-          <div class="demo-main">
-            <div class="demo-topbar">
-              <div>
-                <span class="status-dot"></span>
-                <strong>PR #584 landing-page</strong>
-              </div>
-              <span class="run-state" data-run-state>리뷰 진행 중</span>
-            </div>
-
-            <div class="demo-metrics" aria-label="리뷰 실행 요약">
-              <div class="metric-card good">
-                <span>Reviewers</span>
-                <strong>4 active</strong>
-              </div>
-              <div class="metric-card info">
-                <span>Discussion</span>
-                <strong>1 round</strong>
-              </div>
-              <div class="metric-card warn">
-                <span>Decision</span>
-                <strong>Human check</strong>
-              </div>
-            </div>
-
-            <div class="demo-grid">
-              <section class="run-panel diff-panel">
-                <div class="panel-heading">
-                  <span>01</span>
-                  <h2>Diff 분석</h2>
-                </div>
-                <div class="diff-lines" aria-hidden="true">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <p>영향 범위, TS 진단, 리뷰 제외 규칙을 먼저 정리합니다.</p>
-              </section>
-
-              <section class="run-panel reviewers-panel">
-                <div class="panel-heading">
-                  <span>02</span>
-                  <h2>병렬 리뷰어</h2>
-                </div>
-                <div class="reviewer-list" aria-label="병렬 리뷰어 상태">
-                  <article class="reviewer-card reviewer-card-1">
-                    <strong>Security</strong>
-                    <span>인증 경계 확인</span>
-                  </article>
-                  <article class="reviewer-card reviewer-card-2">
-                    <strong>Reliability</strong>
-                    <span>실패 경로 확인</span>
-                  </article>
-                  <article class="reviewer-card reviewer-card-3">
-                    <strong>Maintainer</strong>
-                    <span>패키지 영향 확인</span>
-                  </article>
-                  <article class="reviewer-card reviewer-card-4">
-                    <strong>UX</strong>
-                    <span>사용 흐름 확인</span>
-                  </article>
-                </div>
-              </section>
-
-              <section class="run-panel debate-panel">
-                <div class="panel-heading">
-                  <span>03</span>
-                  <h2>토론과 필터</h2>
-                </div>
-                <div class="debate-track" aria-hidden="true">
-                  <span class="node node-a"></span>
-                  <span class="node node-b"></span>
-                  <span class="node node-c"></span>
-                </div>
-                <p>중복, 근거 없는 라인 인용, 상충된 결론을 정리합니다.</p>
-              </section>
-
-              <section class="run-panel verdict-panel">
-                <div class="panel-heading">
-                  <span>04</span>
-                  <h2>Head Verdict</h2>
-                </div>
-                <strong class="verdict-text" data-verdict>확인 필요</strong>
-                <p>확정 2건, 확인 필요 1건</p>
-                <div class="verdict-evidence" aria-hidden="true">
-                  <span>line 42</span>
-                  <span>config</span>
-                  <span>risk</span>
-                </div>
-              </section>
-            </div>
-
-            <div class="progress-row" aria-label="리뷰 파이프라인 진행률">
-              <span data-step-label>Diff 분석</span>
-              <div class="progress-shell">
-                <div class="progress-fill"></div>
-              </div>
-              <span>4단계 순환</span>
-            </div>
+            <span>CodeAgora Desktop RC · review.diff</span>
           </div>
-        </div>
-      </section>
 
-      <section class="proof-strip" aria-label="제품 요약">
-        <div>
-          <strong>4</strong>
-          <span>공식 지원 표면</span>
-        </div>
-        <div>
-          <strong>L0-L3</strong>
-          <span>리뷰 파이프라인</span>
-        </div>
-        <div>
-          <strong>RC</strong>
-          <span>npm 배포 채널</span>
-        </div>
-        <div>
-          <strong>MIT</strong>
-          <span>오픈소스</span>
+          <div class="arena-body">
+            <aside class="arena-files" aria-label="검토 파일">
+              <div class="arena-brand">
+                <img src="/assets/logo.svg" alt="" width="34" height="34">
+                <div>
+                  <strong>CodeAgora</strong>
+                  <span>Consensus Review</span>
+                </div>
+              </div>
+              <nav aria-label="리뷰 파일 목록">
+                <span class="is-active">packages/cli/src/commands/init.ts</span>
+                <span>packages/core/src/pipeline/orchestrator.ts</span>
+                <span>action.yml</span>
+                <span>packages/desktop/src/main.ts</span>
+              </nav>
+            </aside>
+
+            <section class="arena-diff" aria-label="실제 저장소 코드 기반 리뷰 예시">
+              <div class="diff-header">
+                <div>
+                  <span class="path-label">packages/cli/src/commands/init.ts</span>
+                  <strong>프리셋 생성 경로 검토</strong>
+                </div>
+                <span class="verdict-stamp">NEEDS_HUMAN</span>
+              </div>
+
+              <div class="code-review-card">
+                <pre><code><span class="code-muted">const</span> CLI_PRESET_EXCLUDED_BACKENDS = <span class="code-muted">new</span> Set([<span class="code-string">'copilot'</span>]);
+
+<span class="code-muted">export function</span> generatePresets(
+  env: EnvironmentReport,
+  catalog: ModelsCatalog | null,
+  cliBackends?: DetectedCli[],
+): DynamicPreset[] {
+  <span class="code-add">const availableCli = [...(cliBackends?.filter((c) =&gt;</span>
+  <span class="code-add">  c.available &amp;&amp; !CLI_PRESET_EXCLUDED_BACKENDS.has(c.backend)</span>
+  <span class="code-add">) ?? [])].sort((a, b) =&gt; {</span></code></pre>
+
+                <div class="thread-stack" aria-label="에이전트 토론 스레드">
+                  <article class="agent-comment security">
+                    <span>Security</span>
+                    <p>로컬 CLI 백엔드는 허용된 실행 경로만 프리셋에 들어가야 합니다. 제외 목록과 탐지 결과를 같이 확인합니다.</p>
+                  </article>
+                  <article class="agent-comment maintainer">
+                    <span>Maintainer</span>
+                    <p>`fast`, `budget`, `github-action` 별칭이 같은 설정 계약으로 귀결되는지도 함께 검토해야 합니다.</p>
+                  </article>
+                  <article class="agent-comment head">
+                    <span>Head Verdict</span>
+                    <p>파일 경로와 코드 인용은 확인됨. 프리셋 별칭과 CLI 백엔드 제외 정책은 사람 검토로 올립니다.</p>
+                  </article>
+                </div>
+              </div>
+
+              <div class="filter-rail" aria-label="환각 필터 체크">
+                <span data-step-label>파일 실존 확인</span>
+                <span>라인 범위 검증</span>
+                <span>코드 인용 대조</span>
+                <span>상충 주장 검출</span>
+              </div>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -248,7 +178,7 @@
       <section id="surfaces" class="section surfaces-section">
         <div class="section-heading compact">
           <div class="heading-group">
-            <p class="eyebrow">하나의 엔진, 네 가지 진입점</p>
+            <p class="eyebrow">공식 지원 표면</p>
             <h2>CLI, GitHub Action, MCP, Desktop이 같은 리뷰 의미론을 공유합니다.</h2>
           </div>
         </div>
@@ -269,6 +199,48 @@
             <h3>Desktop</h3>
             <p>로컬 세션 탐색, 리뷰 실행, 결과 확인, 증거 내보내기를 앱에서 다룹니다.</p>
           </article>
+        </div>
+      </section>
+
+      <section id="security" class="section trust-section">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">보안 경계</p>
+            <h2>중개 프록시 없이, 자격 증명은 로컬에서 관리합니다.</h2>
+          </div>
+          <p class="description">CodeAgora는 사용자가 설정한 모델 공급자 API와 직접 통신합니다. API 키는 로컬 자격 증명 경로에 저장하고, 로그와 evidence에서 비밀값이 새지 않도록 redaction 경계를 둡니다.</p>
+        </div>
+        <div class="trust-grid">
+          <article>
+            <span>credentials</span>
+            <strong>~/.config/codeagora/credentials</strong>
+            <p>`agora env set &lt;provider&gt;`로 저장되는 키는 로컬 파일 권한 경계 안에서 관리합니다.</p>
+          </article>
+          <article>
+            <span>provider direct</span>
+            <strong>OpenAI · Anthropic · OpenRouter</strong>
+            <p>코드 리뷰 요청은 중간 CodeAgora SaaS 서버가 아니라 사용자가 지정한 공급자 엔드포인트로 향합니다.</p>
+          </article>
+          <article>
+            <span>fork safe</span>
+            <strong>Secret이 없는 PR은 안전하게 강하</strong>
+            <p>GitHub Action 표면은 fork PR, 누락된 secret, provider 실패 같은 경로를 배포 계약 안에서 다룹니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="quality" class="section quality-section">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">검증 가능한 품질</p>
+            <h2>마케팅 수치 대신, 로컬에서 돌릴 수 있는 테스트와 벤치마크를 둡니다.</h2>
+          </div>
+          <p class="description">저장소의 `benchmarks/`, 중앙 Vitest 스위트, release evidence 스크립트로 파이프라인 품질과 배포 주장을 검증합니다. 랜딩도 같은 원칙을 따라 확인 가능한 사실만 말합니다.</p>
+        </div>
+        <div class="quality-strip" aria-label="검증 명령 예시">
+          <code>pnpm test</code>
+          <code>pnpm --filter @codeagora/site smoke</code>
+          <code>pnpm evidence:manifest -- --require=rc</code>
         </div>
       </section>
 

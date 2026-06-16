@@ -14,8 +14,12 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("MCP");
     expect(html).toContain("Desktop");
     expect(html).toContain("공식 지원 표면");
+    expect(html).toContain("중개 프록시 없이");
+    expect(html).toContain("검증 가능한 품질");
     expect(html).not.toMatch(/web dashboard/i);
     expect(html).not.toMatch(/stable desktop/i);
+    expect(html).not.toMatch(/90%|85%/);
+    expect(html).not.toContain("코드가 기기를 떠나지");
   });
 
   it("provides rc-friendly install and action snippets", () => {
@@ -27,16 +31,20 @@ describe("CodeAgora landing page", () => {
   it("uses Korean app-console copy with responsive progressive motion", () => {
     expect(html).toContain('lang="ko"');
     expect(html).toContain("토론하는 리뷰");
-    expect(html).toContain("LLM 코드 리뷰를 운영 가능한 파이프라인으로");
-    expect(html).toContain("Diff 분석");
-    expect(html).toContain("병렬 리뷰어");
-    expect(html).toContain("토론과 필터");
+    expect(html).toContain("LLM 다자 토론형 코드 리뷰");
+    expect(html).toContain("CodeAgora 리뷰 아레나 데모");
+    expect(html).toContain("packages/cli/src/commands/init.ts");
+    expect(html).toContain("CLI_PRESET_EXCLUDED_BACKENDS");
+    expect(html).toContain("파일 실존 확인");
+    expect(html).toContain("코드 인용 대조");
     expect(html).toContain("Head Verdict");
     expect(css).toContain("@media");
     expect(css).toContain("prefers-reduced-motion");
     expect(css).toContain("--brand: #05a6b9");
     expect(css).toContain("--brand-strong: #191a51");
-    expect(css).toContain(".app-demo");
+    expect(css).toContain(".review-arena");
+    expect(css).toContain(".arena-files");
+    expect(css).toContain("scan-beam");
     expect(js).toContain("data-command-tab");
     expect(js).toContain("navigator.clipboard");
     expect(js).toContain("reviewSteps");

@@ -26,10 +26,10 @@ const runState = document.querySelector("[data-run-state]");
 const verdict = document.querySelector("[data-verdict]");
 
 const reviewSteps = [
-  { label: "Diff 분석", state: "변경 범위 분석 중", verdict: "ANALYZING" },
-  { label: "병렬 리뷰", state: "4명 리뷰어 실행 중", verdict: "REVIEWING" },
-  { label: "토론", state: "충돌 지적 정리 중", verdict: "DISCUSSING" },
-  { label: "Verdict", state: "최종 판정 생성", verdict: "확인 필요" }
+  { label: "파일 실존 확인", state: "경로 검증 중", verdict: "EVIDENCE" },
+  { label: "라인 범위 검증", state: "라인 매핑 중", verdict: "CHECKING" },
+  { label: "코드 인용 대조", state: "인용 대조 중", verdict: "DISCUSSING" },
+  { label: "상충 주장 검출", state: "최종 판정 생성", verdict: "NEEDS_HUMAN" }
 ];
 
 for (const tab of commandTabs) {
