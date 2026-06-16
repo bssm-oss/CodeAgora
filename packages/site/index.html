@@ -195,10 +195,11 @@
     <header class="site-header">
       <a class="brand" href="#top" aria-label="CodeAgora 홈">
         <img src="./assets/logo.svg" alt="" width="34" height="34">
-        <span>CodeAgora</span>
+        <img class="brand-wordmark" src="./assets/codeagora-wordmark.png" alt="CodeAgora" width="188" height="40">
       </a>
       <div class="header-actions">
         <nav class="nav-links" aria-label="주요 탐색">
+          <a href="#arena">리뷰 화면</a>
           <a href="#pipeline">작동 방식</a>
           <a href="#surfaces">사용 위치</a>
           <a href="#faq">FAQ</a>
@@ -227,14 +228,20 @@
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
+          <p class="poster-kicker">AI가 코드를 쏟아낼수록, 검증은 더 치밀해져야 합니다.</p>
+          <div class="poster-wordmark" aria-label="CodeAgora">
+            <img class="poster-logo-mark" src="./assets/logo.svg" alt="" width="82" height="82">
+            <img class="poster-logo-type" src="./assets/codeagora-wordmark.png" alt="CodeAgora" width="548" height="117">
+          </div>
+          <p class="poster-author">3114 황준혁 | Justn</p>
           <p class="eyebrow">여러 AI가 토론하고 사람이 결정하는 코드 리뷰</p>
           <h1 id="hero-title">
-            <span>토론하는 리뷰,</span>
-            <span>근거 있는 판정.</span>
+            <span>단일 AI 리뷰를 넘어</span>
+            <span>검증 가능한 최종 판단으로.</span>
           </h1>
           <p class="lede">
-            <span>하나의 AI는 틀릴 수 있습니다.</span>
-            <span>CodeAgora는 여러 AI 리뷰어가 같은 변경을 따로 보고 서로 검증하게 한 뒤, 사람이 바로 판단할 수 있는 최종 판정표를 남깁니다.</span>
+            <span>AI가 짠 코드, 성능 좋은 AI 하나로 검증하기엔 부족하고 비쌉니다.</span>
+            <span>CodeAgora는 코드 변경사항을 여러 AI 리뷰어에게 나눠 분석시키고, 중요한 의견은 토론하게 만든 뒤, 승인 가능·수정 필요·사람 확인 필요로 바로 이해할 수 있게 정리합니다.</span>
           </p>
           <div class="hero-actions" aria-label="주요 작업">
             <a class="button primary" href="#install">RC로 시작하기</a>
@@ -262,6 +269,49 @@
           </div>
         </div>
 
+        <div class="poster-panel" aria-label="CodeAgora 포스터형 요약">
+          <a class="poster-qr" href="https://github.com/bssm-oss/CodeAgora" aria-label="CodeAgora GitHub에서 더 알아보기">
+            <span class="qr-grid" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+            <strong>CodeAgora 더 알아보기</strong>
+            <span>설계 과정 · 벤치마크 · 개발 기록</span>
+          </a>
+          <div class="poster-sigil" aria-hidden="true">
+            <img src="./assets/logo.svg" alt="" width="280" height="280">
+          </div>
+          <div class="poster-metrics" aria-label="품질 검증 결과 요약">
+            <div>
+              <span>테스트 사례</span>
+              <strong>20</strong>
+            </div>
+            <div>
+              <span>탐지율</span>
+              <strong>100%</strong>
+            </div>
+            <div>
+              <span>정밀도</span>
+              <strong>94.4%</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="arena" class="section arena-section" aria-labelledby="arena-title">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">실제 리뷰가 어떻게 보이나요?</p>
+            <h2 id="arena-title">결과는 단순 문장이 아니라, 판단 가능한 형태로 정리됩니다.</h2>
+          </div>
+          <p class="description">여러 리뷰어가 낸 의견을 그대로 늘어놓지 않습니다. 파일·라인·인용을 확인하고, 중요한 이견은 토론하게 만든 뒤, 최종 판단자가 결과를 정리합니다.</p>
+        </div>
         <div class="review-arena" aria-label="CodeAgora 리뷰 아레나 데모">
           <div class="arena-window-bar" aria-hidden="true">
             <div class="terminal-dots">

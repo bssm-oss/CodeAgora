@@ -9,6 +9,7 @@ const js = readFileSync(resolve(siteRoot, "src/main.js"), "utf8");
 const robots = readFileSync(resolve(siteRoot, "robots.txt"), "utf8");
 const sitemap = readFileSync(resolve(siteRoot, "sitemap.xml"), "utf8");
 const socialCard = readFileSync(resolve(siteRoot, "assets/social-card.svg"), "utf8");
+const wordmark = readFileSync(resolve(siteRoot, "assets/codeagora-wordmark.png"));
 const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8")) as {
   framework?: string | null;
   installCommand?: string;
@@ -34,6 +35,9 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("MCP 코드 리뷰");
     expect(html).toContain("Desktop RC");
     expect(html).toContain("자주 묻는 질문");
+    expect(html).toContain("AI가 코드를 쏟아낼수록");
+    expect(html).toContain("3114 황준혁 | Justn");
+    expect(html).toContain("94.4%");
     expect(html).toContain("RC는 정식 출시 전 검증 채널");
     expect(html).toContain("data-command-status");
     expect(html).not.toMatch(/web dashboard/i);
@@ -137,6 +141,7 @@ describe("CodeAgora landing page", () => {
     expect(socialCard).toContain("<svg");
     expect(socialCard).toContain("CodeAgora");
     expect(socialCard).toContain("토론하는 리뷰");
+    expect(wordmark.byteLength).toBeGreaterThan(1000);
   });
 
   it("configures Vercel to deploy only the static site package", () => {
@@ -157,6 +162,7 @@ describe("CodeAgora landing page", () => {
   it("keeps static asset paths portable for subpath hosting", () => {
     expect(html).toContain('href="./assets/logo.svg"');
     expect(html).toContain('src="./assets/logo.svg"');
+    expect(html).toContain('src="./assets/codeagora-wordmark.png"');
     expect(html).not.toContain('href="/assets/logo.svg"');
     expect(html).not.toContain('src="/assets/logo.svg"');
   });
@@ -208,6 +214,9 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("NEEDS_HUMAN");
     expect(html).toContain("scroll-progress");
     expect(html).toContain("CodeAgora 리뷰 아레나 데모");
+    expect(html).toContain("poster-wordmark");
+    expect(html).toContain("poster-panel");
+    expect(html).toContain("poster-metrics");
     expect(html).toContain('data-arena-file="init"');
     expect(html).toContain('data-arena-file="orchestrator"');
     expect(html).toContain('data-filter-step="quote"');
@@ -230,6 +239,10 @@ describe("CodeAgora landing page", () => {
     expect(css).toContain("--brand: #05a6b9");
     expect(css).toContain("--brand-strong: #191a51");
     expect(css).toContain(".review-arena");
+    expect(css).toContain(".poster-panel");
+    expect(css).toContain(".poster-panel.is-tilting");
+    expect(css).toContain(".poster-logo-type");
+    expect(css).toContain(".brand-wordmark");
     expect(css).toContain(".arena-files");
     expect(css).toContain(".plain-summary");
     expect(css).toContain(".explain-grid");

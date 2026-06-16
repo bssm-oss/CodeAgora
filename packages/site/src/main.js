@@ -203,6 +203,7 @@ function attachTiltEffect(element, strength = 6) {
 }
 
 attachTiltEffect(document.querySelector(".review-arena"), 4.5);
+attachTiltEffect(document.querySelector(".poster-panel"), 3.6);
 for (const card of document.querySelectorAll(".pipeline-cards article, .surface-list article, .explain-grid article, .use-case-grid article")) {
   attachTiltEffect(card, 3.2);
 }

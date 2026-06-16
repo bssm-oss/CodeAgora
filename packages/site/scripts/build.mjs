@@ -11,6 +11,7 @@ const files = [
   ["src/styles.css", "src/styles.css"],
   ["src/main.js", "src/main.js"],
   ["../../assets/logo.svg", "assets/logo.svg"],
+  ["assets/codeagora-wordmark.png", "assets/codeagora-wordmark.png"],
   ["assets/social-card.svg", "assets/social-card.svg"],
   ["robots.txt", "robots.txt"],
   ["sitemap.xml", "sitemap.xml"]

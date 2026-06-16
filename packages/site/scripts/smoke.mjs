@@ -10,6 +10,7 @@ const requiredFiles = [
   "dist/src/styles.css",
   "dist/src/main.js",
   "dist/assets/logo.svg",
+  "dist/assets/codeagora-wordmark.png",
   "dist/assets/social-card.svg",
   "dist/robots.txt",
   "dist/sitemap.xml"
@@ -34,6 +35,8 @@ const requiredCopy = [
   "GitHub Action",
   "MCP",
   "Desktop",
+  "AI가 코드를 쏟아낼수록",
+  "3114 황준혁 | Justn",
   "AI 코드 리뷰 도구",
   "GitHub Action 코드 리뷰 자동화",
   "자주 묻는 질문",
