@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 따로 확인하고 서로 반박한 뒤, 사람이 결정하기 쉬운 판정표와 근거를 남기는 코드 리뷰 도구입니다.">
     <title>CodeAgora - 근거를 남기는 AI 코드 리뷰</title>
-    <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+    <link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./src/styles.css">
     <script>
       (function() {
-        const savedTheme = localStorage.getItem("theme");
+        var savedTheme = null;
+        try {
+          savedTheme = localStorage.getItem("theme");
+        } catch {
+          savedTheme = null;
+        }
         const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
         if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
           document.documentElement.setAttribute("data-theme", "dark");
@@ -20,7 +25,7 @@
   <body>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="CodeAgora 홈">
-        <img src="/assets/logo.svg" alt="" width="34" height="34">
+        <img src="./assets/logo.svg" alt="" width="34" height="34">
         <span>CodeAgora</span>
       </a>
       <div class="header-actions">
@@ -100,7 +105,7 @@
           <div class="arena-body">
             <aside class="arena-files" aria-label="검토 파일">
               <div class="arena-brand">
-                <img src="/assets/logo.svg" alt="" width="34" height="34">
+                <img src="./assets/logo.svg" alt="" width="34" height="34">
                 <div>
                   <strong>CodeAgora</strong>
                   <span>연동 환경별 판정 예시</span>
@@ -346,13 +351,13 @@
             <span class="terminal-status" data-command-status>CLI · RC channel</span>
           </div>
           <div class="tabs" role="tablist" aria-label="설치 명령">
-            <button class="is-active" type="button" role="tab" aria-selected="true" data-command-tab="cli"><span>CLI</span><small>local diff</small></button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="action"><span>Action</span><small>pull request</small></button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="mcp"><span>MCP</span><small>agent tools</small></button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="desktop"><span>Desktop</span><small>RC app</small></button>
+            <button id="command-tab-cli" class="is-active" type="button" role="tab" aria-selected="true" aria-controls="command-panel-cli" data-command-tab="cli"><span>CLI</span><small>local diff</small></button>
+            <button id="command-tab-action" type="button" role="tab" aria-selected="false" aria-controls="command-panel-action" tabindex="-1" data-command-tab="action"><span>Action</span><small>pull request</small></button>
+            <button id="command-tab-mcp" type="button" role="tab" aria-selected="false" aria-controls="command-panel-mcp" tabindex="-1" data-command-tab="mcp"><span>MCP</span><small>agent tools</small></button>
+            <button id="command-tab-desktop" type="button" role="tab" aria-selected="false" aria-controls="command-panel-desktop" tabindex="-1" data-command-tab="desktop"><span>Desktop</span><small>RC app</small></button>
           </div>
 
-          <div class="command-panel" data-command-panel="cli">
+          <div id="command-panel-cli" class="command-panel" role="tabpanel" aria-labelledby="command-tab-cli" data-command-panel="cli">
             <div class="command-meta">
               <span>1분 시작</span>
               <strong>로컬 diff를 바로 리뷰합니다</strong>
@@ -367,7 +372,7 @@
 <span class="result">→ ACCEPT / REJECT / NEEDS_HUMAN verdict with evidence</span></code></pre>
           </div>
 
-          <div class="command-panel" data-command-panel="action" hidden>
+          <div id="command-panel-action" class="command-panel" role="tabpanel" aria-labelledby="command-tab-action" data-command-panel="action" hidden>
             <div class="command-meta">
               <span>PR 자동화</span>
               <strong>GitHub Pull Request마다 같은 기준을 적용합니다</strong>
@@ -382,7 +387,7 @@
 <span class="result"># posts a review verdict back to the PR</span></code></pre>
           </div>
 
-          <div class="command-panel" data-command-panel="mcp" hidden>
+          <div id="command-panel-mcp" class="command-panel" role="tabpanel" aria-labelledby="command-tab-mcp" data-command-panel="mcp" hidden>
             <div class="command-meta">
               <span>에이전트 연동</span>
               <strong>AI IDE와 코딩 에이전트가 CodeAgora를 도구로 호출합니다</strong>
@@ -400,7 +405,7 @@
 <span class="result"># exposes CodeAgora review tools to your agent</span></code></pre>
           </div>
 
-          <div class="command-panel" data-command-panel="desktop" hidden>
+          <div id="command-panel-desktop" class="command-panel" role="tabpanel" aria-labelledby="command-tab-desktop" data-command-panel="desktop" hidden>
             <div class="command-meta">
               <span>Desktop RC</span>
               <strong>로컬 세션과 리뷰 결과를 앱 화면에서 확인합니다</strong>

@@ -2174,18 +2174,18 @@ code .result {
     max-width: 100%;
     gap: 12px;
     overflow-x: auto;
-    padding: 2px 2px 4px;
+    padding: 2px 2px 8px;
     white-space: nowrap;
-    scrollbar-width: none;
+    scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
   }
 
   .nav-links::-webkit-scrollbar {
-    display: none;
+    height: 4px;
   }
 
   .nav-links a {
-    min-height: 32px;
+    min-height: 40px;
     flex: 0 0 auto;
     font-size: 0.82rem;
   }
@@ -2193,6 +2193,9 @@ code .result {
   .theme-toggle-btn {
     order: 2;
     position: static;
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
     margin-left: auto;
   }
 
@@ -2223,6 +2226,7 @@ code .result {
     width: auto;
     flex: 1 1 calc(50% - 8px);
     max-width: none;
+    min-height: 44px;
   }
 
   .plain-summary,
@@ -2404,12 +2408,12 @@ code .result {
   }
 
   .code-review-card pre {
-    max-height: 78px;
     padding: 12px;
-    overflow: hidden;
-    word-break: break-all;
+    overflow: auto;
     font-size: 0.68rem;
     line-height: 1.58;
+    white-space: pre;
+    word-break: normal;
   }
 
   .code-review-card pre code {
@@ -2445,6 +2449,7 @@ code .result {
 
   .filter-rail button {
     min-width: max-content;
+    min-height: 44px;
     flex: 1 1 calc(50% - 8px);
   }
 

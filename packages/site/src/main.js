@@ -1,25 +1,59 @@
 // Theme Toggle
 const themeToggle = document.getElementById("theme-toggle");
+
+function readLocalTheme() {
+  try {
+    return localStorage.getItem("theme");
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalTheme(theme) {
+  try {
+    localStorage.setItem("theme", theme);
+  } catch {
+    // Theme persistence is optional; the in-page theme still changes.
+  }
+}
+
+function systemPrefersDark() {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function currentTheme() {
+  return document.documentElement.getAttribute("data-theme") || (systemPrefersDark() ? "dark" : "light");
+}
+
+function updateThemeToggleLabel(theme = currentTheme()) {
+  if (!themeToggle) {
+    return;
+  }
+
+  themeToggle.setAttribute("aria-label", theme === "dark" ? "라이트 테마로 전환" : "다크 테마로 전환");
+}
+
 if (themeToggle) {
-  const savedTheme = localStorage.getItem("theme");
-  const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const savedTheme = readLocalTheme();
   
-  if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
+  if (savedTheme === "dark" || (!savedTheme && systemPrefersDark())) {
     document.documentElement.setAttribute("data-theme", "dark");
   } else if (savedTheme === "light") {
     document.documentElement.setAttribute("data-theme", "light");
   }
 
+  updateThemeToggleLabel();
+
   themeToggle.addEventListener("click", () => {
-    const currentTheme = document.documentElement.getAttribute("data-theme") || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    const newTheme = currentTheme === "dark" ? "light" : "dark";
+    const newTheme = currentTheme() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("theme", newTheme);
+    writeLocalTheme(newTheme);
+    updateThemeToggleLabel(newTheme);
   });
 }
 
 // Progressive Command tabs
-const commandTabs = document.querySelectorAll("[data-command-tab]");
+const commandTabs = [...document.querySelectorAll("[data-command-tab]")];
 const commandPanels = document.querySelectorAll("[data-command-panel]");
 const commandStatus = document.querySelector("[data-command-status]");
 const stepLabel = document.querySelector("[data-step-label]");
@@ -191,24 +225,53 @@ function renderArena(fileKey = activeArenaFile, filterKey = activeFilterStep) {
   }
 }
 
+function activateCommandTab(tab, options = {}) {
+  const target = tab.getAttribute("data-command-tab");
+
+  for (const button of commandTabs) {
+    const isActive = button === tab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+    button.tabIndex = isActive ? 0 : -1;
+  }
+
+  for (const panel of commandPanels) {
+    panel.hidden = panel.getAttribute("data-command-panel") !== target;
+  }
+
+  if (commandStatus) {
+    commandStatus.textContent = commandStatusLabels[target] ?? "CodeAgora RC";
+  }
+
+  if (options.focus) {
+    tab.focus();
+  }
+}
+
 for (const tab of commandTabs) {
   tab.addEventListener("click", () => {
-    const target = tab.getAttribute("data-command-tab");
+    activateCommandTab(tab);
+  });
 
-    for (const button of commandTabs) {
-      const isActive = button === tab;
-      button.classList.toggle("is-active", isActive);
-      button.setAttribute("aria-selected", String(isActive));
-      button.tabIndex = isActive ? 0 : -1;
+  tab.addEventListener("keydown", (event) => {
+    const currentIndex = commandTabs.indexOf(tab);
+    const lastIndex = commandTabs.length - 1;
+    let nextIndex = currentIndex;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    } else {
+      return;
     }
 
-    for (const panel of commandPanels) {
-      panel.hidden = panel.getAttribute("data-command-panel") !== target;
-    }
-
-    if (commandStatus) {
-      commandStatus.textContent = commandStatusLabels[target] ?? "CodeAgora RC";
-    }
+    event.preventDefault();
+    activateCommandTab(commandTabs[nextIndex], { focus: true });
   });
 }
 
@@ -228,19 +291,40 @@ if (document.querySelector("[data-arena-code]")) {
   renderArena();
 }
 
+function commandTextFromCode(target) {
+  const clone = target.cloneNode(true);
+  clone.querySelectorAll(".result").forEach((node) => node.remove());
+
+  return clone.textContent
+    .split("\n")
+    .map((line) => line.replace(/\s+$/u, "").replace(/^\s*\$\s?/u, ""))
+    .filter((line) => line.trim())
+    .join("\n")
+    .trim();
+}
+
+function setCopyButtonLabel(button, label) {
+  button.textContent = label;
+  window.setTimeout(() => {
+    button.textContent = "복사";
+  }, 1400);
+}
+
 // Copy to Clipboard buttons
 for (const button of document.querySelectorAll("[data-copy-target]")) {
   button.addEventListener("click", async () => {
     const target = document.querySelector(button.getAttribute("data-copy-target"));
-    const text = target?.textContent?.trim();
+    const text = target ? commandTextFromCode(target) : "";
     if (!text || !navigator.clipboard) {
+      setCopyButtonLabel(button, "복사 실패");
       return;
     }
 
-    await navigator.clipboard.writeText(text);
-    button.textContent = "복사됨";
-    window.setTimeout(() => {
-      button.textContent = "복사";
-    }, 1400);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyButtonLabel(button, "복사됨");
+    } catch (error) {
+      setCopyButtonLabel(button, "복사 실패");
+    }
   });
 }

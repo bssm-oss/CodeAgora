@@ -31,6 +31,46 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("@codeagora/mcp@rc");
   });
 
+  it("keeps static asset paths portable for subpath hosting", () => {
+    expect(html).toContain('href="./assets/logo.svg"');
+    expect(html).toContain('src="./assets/logo.svg"');
+    expect(html).not.toContain('href="/assets/logo.svg"');
+    expect(html).not.toContain('src="/assets/logo.svg"');
+  });
+
+  it("wires install tabs with accessible tabpanel semantics and keyboard support", () => {
+    for (const tab of ["cli", "action", "mcp", "desktop"]) {
+      expect(html).toContain(`id="command-tab-${tab}"`);
+      expect(html).toContain(`aria-controls="command-panel-${tab}"`);
+      expect(html).toContain(`id="command-panel-${tab}"`);
+      expect(html).toContain('role="tabpanel"');
+      expect(html).toContain(`aria-labelledby="command-tab-${tab}"`);
+    }
+
+    expect(js).toContain("activateCommandTab");
+    expect(js).toContain('event.key === "ArrowRight"');
+    expect(js).toContain('event.key === "ArrowLeft"');
+    expect(js).toContain('event.key === "Home"');
+    expect(js).toContain('event.key === "End"');
+  });
+
+  it("copies runnable snippets instead of terminal prompts or output", () => {
+    expect(js).toContain("commandTextFromCode");
+    expect(js).toContain('clone.querySelectorAll(".result").forEach((node) => node.remove())');
+    expect(js).toContain('replace(/^\\s*\\$\\s?/u, "")');
+    expect(js).toContain("복사 실패");
+    expect(js).toContain("await navigator.clipboard.writeText(text)");
+  });
+
+  it("keeps theme storage optional so page interactions survive restricted browsers", () => {
+    expect(js).toContain("function readLocalTheme");
+    expect(js).toContain("function writeLocalTheme");
+    expect(js).toContain("try");
+    expect(js).toContain("catch {");
+    expect(html).toContain("savedTheme = null");
+    expect(html).toContain("try {");
+  });
+
   it("uses Korean app-console copy with responsive progressive motion", () => {
     expect(html).toContain('lang="ko"');
     expect(html).toContain("토론하는 리뷰");
@@ -77,5 +117,13 @@ describe("CodeAgora landing page", () => {
     expect(js).toContain("판정 정리");
     expect(js).toContain("navigator.clipboard");
     expect(js).toContain("reviewSteps");
+  });
+
+  it("keeps mobile code snippets readable instead of clipped", () => {
+    expect(css).not.toContain("max-height: 78px");
+    expect(css).not.toContain("word-break: break-all");
+    expect(css).toContain("word-break: normal");
+    expect(css).toContain("overflow: auto");
+    expect(css).toContain("scrollbar-width: thin");
   });
 });
