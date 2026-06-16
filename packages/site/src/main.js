@@ -59,7 +59,7 @@ const arenaScenarios = {
   },
   orchestrator: {
     path: "packages/core/src/pipeline/orchestrator.ts",
-    title: "환각 필터 적용 경로 검토",
+    title: "AI 오답 방지 필터 적용 경로 검토",
     verdict: "EVIDENCE",
     code: `<span class="code-muted">const</span> { filterHallucinations } =
   <span class="code-muted">await import</span>(<span class="code-string">'./hallucination-filter.js'</span>);
@@ -76,7 +76,7 @@ allEvidenceDocs = [
     comments: [
       ["Reliability", "틀렸다고 판단한 지적과 아직 애매한 지적이 서로 다른 목록으로 넘어가는지 확인합니다."],
       ["Security", "제거된 지적도 왜 빠졌는지 추적할 수 있어야 합니다. 그래야 중요한 경고가 조용히 사라지지 않습니다."],
-      ["Head Verdict", "환각 필터 경로는 확인됐습니다. 애매한 항목이 최종 판정에서 어떻게 보이는지까지 함께 봅니다."]
+      ["Head Verdict", "AI 오답 방지 필터 경로는 확인됐습니다. 애매한 항목이 최종 판정에서 어떻게 보이는지까지 함께 봅니다."]
     ],
     filters: {
       file: "orchestrator.ts는 리뷰 파이프라인을 실제로 조립하는 핵심 파일입니다.",
@@ -112,7 +112,7 @@ allEvidenceDocs = [
   },
   desktop: {
     path: "packages/desktop/src/main.ts",
-    title: "Desktop 테마와 세션 표면 검토",
+    title: "Desktop 테마와 세션 환경 검토",
     verdict: "ACCEPT",
     code: `<span class="code-muted">const</span> themePreferenceKey =
   <span class="code-string">'codeagora.desktop.theme'</span>;
@@ -125,7 +125,7 @@ allEvidenceDocs = [
 <span class="code-muted">type</span> View = <span class="code-string">'sessions'</span> | <span class="code-string">'run'</span> | <span class="code-string">'config'</span> | <span class="code-string">'setup'</span>;`,
     comments: [
       ["UX", "랜딩의 색상과 대비가 Desktop 앱의 다크/라이트 테마와 같은 제품군처럼 보여야 합니다."],
-      ["Maintainer", "Desktop은 새로운 리뷰 규칙을 만드는 앱이 아니라, sessions/run/config/setup 화면으로 같은 core 계약을 보여주는 표면입니다."],
+      ["Maintainer", "Desktop은 새로운 리뷰 규칙을 만드는 앱이 아니라, sessions/run/config/setup 화면으로 같은 리뷰 결과를 보여주는 RC 앱입니다."],
       ["Head Verdict", "테마와 화면 이름은 제품 계약과 맞습니다. 랜딩에서도 같은 시각 언어를 쓰는 방향으로 승인할 수 있습니다."]
     ],
     filters: {

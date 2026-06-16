@@ -13,7 +13,7 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("GitHub Action");
     expect(html).toContain("MCP");
     expect(html).toContain("Desktop");
-    expect(html).toContain("공식 지원 표면");
+    expect(html).toContain("공식 지원 환경");
     expect(html).toContain("중개 서버 없이");
     expect(html).toContain("검증 가능한 품질");
     expect(html).toContain("어디서 실행해도 같은 기준");
@@ -33,7 +33,7 @@ describe("CodeAgora landing page", () => {
   it("uses Korean app-console copy with responsive progressive motion", () => {
     expect(html).toContain('lang="ko"');
     expect(html).toContain("토론하는 리뷰");
-    expect(html).toContain("LLM 다자 토론형 코드 리뷰");
+    expect(html).toContain("여러 AI가 토론하고 사람이 결정하는 코드 리뷰");
     expect(html).toContain("비개발자");
     expect(html).toContain("그럴듯한 오답");
     expect(html).toContain("무엇을 해야 하는지");

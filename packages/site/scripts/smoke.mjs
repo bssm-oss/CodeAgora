@@ -30,7 +30,7 @@ const requiredCopy = [
   "MCP",
   "Desktop",
   "토론하는 리뷰",
-  "공식 지원 표면"
+  "공식 지원 환경"
 ];
 
 for (const copy of requiredCopy) {
