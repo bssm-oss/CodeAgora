@@ -9,6 +9,14 @@ const js = readFileSync(resolve(siteRoot, "src/main.js"), "utf8");
 const robots = readFileSync(resolve(siteRoot, "robots.txt"), "utf8");
 const sitemap = readFileSync(resolve(siteRoot, "sitemap.xml"), "utf8");
 const socialCard = readFileSync(resolve(siteRoot, "assets/social-card.svg"), "utf8");
+const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8")) as {
+  framework?: string | null;
+  installCommand?: string;
+  buildCommand?: string;
+  outputDirectory?: string;
+  cleanUrls?: boolean;
+};
+const vercelIgnore = readFileSync(resolve(process.cwd(), ".vercelignore"), "utf8");
 const siteUrl = "https://bssm-oss.github.io/CodeAgora/";
 
 describe("CodeAgora landing page", () => {
@@ -81,6 +89,20 @@ describe("CodeAgora landing page", () => {
     expect(socialCard).toContain("<svg");
     expect(socialCard).toContain("CodeAgora");
     expect(socialCard).toContain("토론하는 리뷰");
+  });
+
+  it("configures Vercel to deploy only the static site package", () => {
+    expect(vercelConfig).toMatchObject({
+      framework: null,
+      installCommand: "corepack enable && pnpm install --frozen-lockfile",
+      buildCommand: "pnpm --filter @codeagora/site build",
+      outputDirectory: "packages/site/dist",
+      cleanUrls: true
+    });
+    expect(vercelIgnore).toContain("node_modules");
+    expect(vercelIgnore).toContain("packages/core");
+    expect(vercelIgnore).toContain("!packages/site");
+    expect(vercelIgnore).toContain("!assets/logo.svg");
   });
 
   it("keeps static asset paths portable for subpath hosting", () => {
