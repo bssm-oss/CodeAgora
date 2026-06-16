@@ -29,6 +29,11 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("중개 서버 없이");
     expect(html).toContain("검증 가능한 품질");
     expect(html).toContain("어디서 실행해도 같은 기준");
+    expect(html).toContain("AI 코드 리뷰 도구");
+    expect(html).toContain("GitHub Action 코드 리뷰 자동화");
+    expect(html).toContain("MCP 코드 리뷰");
+    expect(html).toContain("Desktop RC");
+    expect(html).toContain("자주 묻는 질문");
     expect(html).toContain("RC는 정식 출시 전 검증 채널");
     expect(html).toContain("data-command-status");
     expect(html).not.toMatch(/web dashboard/i);
@@ -50,8 +55,14 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain('<meta property="og:type" content="website">');
     expect(html).toContain(`<meta property="og:url" content="${siteUrl}">`);
     expect(html).toContain('<meta property="og:image" content="https://codeagora.vercel.app/assets/social-card.svg">');
+    expect(html).toContain('<meta property="og:image:type" content="image/svg+xml">');
+    expect(html).toContain('<meta property="og:image:width" content="1200">');
+    expect(html).toContain('<meta property="og:image:height" content="630">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(html).toContain('<meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정">');
     expect(html).toContain('<meta name="theme-color" content="#111318">');
+    expect(html).toContain('<meta name="application-name" content="CodeAgora">');
+    expect(html).toContain('<meta name="format-detection" content="telephone=no">');
     expect(html).not.toContain("90%");
   });
 
@@ -69,10 +80,47 @@ describe("CodeAgora landing page", () => {
           inLanguage: "ko-KR"
         }),
         expect.objectContaining({
+          "@type": "WebPage",
+          "@id": `${siteUrl}#webpage`,
+          about: {
+            "@id": `${siteUrl}#software`
+          }
+        }),
+        expect.objectContaining({
           "@type": "SoftwareApplication",
           applicationCategory: "DeveloperApplication",
+          applicationSubCategory: "AI code review",
+          softwareVersion: "0.1.0-rc.6",
+          isAccessibleForFree: true,
           codeRepository: "https://github.com/bssm-oss/CodeAgora",
-          downloadUrl: "https://www.npmjs.com/package/@codeagora/review"
+          downloadUrl: "https://www.npmjs.com/package/@codeagora/review",
+          featureList: expect.arrayContaining([
+            "GitHub Action pull request automation",
+            "MCP server for AI IDEs and coding agents",
+            "Desktop RC local review UI"
+          ])
+        }),
+        expect.objectContaining({
+          "@type": "FAQPage",
+          "@id": `${siteUrl}#faq`,
+          mainEntity: expect.arrayContaining([
+            expect.objectContaining({
+              "@type": "Question",
+              name: "CodeAgora는 무엇인가요?"
+            }),
+            expect.objectContaining({
+              "@type": "Question",
+              name: "GitHub Action 코드 리뷰 자동화에 쓸 수 있나요?"
+            }),
+            expect.objectContaining({
+              "@type": "Question",
+              name: "Desktop은 안정판인가요?"
+            })
+          ])
+        }),
+        expect.objectContaining({
+          "@type": "BreadcrumbList",
+          "@id": `${siteUrl}#breadcrumb`
         })
       ])
     );
@@ -171,6 +219,11 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("Head Verdict");
     expect(html).toContain("로컬 diff를 바로 리뷰합니다");
     expect(html).toContain("→ ACCEPT / REJECT / NEEDS_HUMAN verdict with evidence");
+    expect(html).toContain("어떤 검색어로 찾아도 같은 제품");
+    expect(html).toContain("CLI diff review");
+    expect(html).toContain("AI IDE와 코딩 에이전트");
+    expect(html).toContain("<details open>");
+    expect(html).toContain("API 키와 코드는 어디에 저장되나요?");
     expect(css).toContain("@media");
     expect(css).toContain("prefers-reduced-motion");
     expect(css).toContain("--brand: #05a6b9");
@@ -182,6 +235,8 @@ describe("CodeAgora landing page", () => {
     expect(css).toContain(".decision-grid");
     expect(css).toContain(".verdict-guide");
     expect(css).toContain(".diff-insight-row");
+    expect(css).toContain(".use-case-grid");
+    expect(css).toContain(".faq-list");
     expect(css).toContain("scan-beam");
     expect(js).toContain("data-command-tab");
     expect(js).toContain("commandStatusLabels");

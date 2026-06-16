@@ -9,6 +9,9 @@
     <meta name="author" content="bssm-oss">
     <meta name="creator" content="bssm-oss">
     <meta name="publisher" content="bssm-oss">
+    <meta name="application-name" content="CodeAgora">
+    <meta name="apple-mobile-web-app-title" content="CodeAgora">
+    <meta name="format-detection" content="telephone=no">
     <meta name="robots" content="index, follow, max-image-preview:large">
     <meta name="theme-color" content="#111318">
     <link rel="canonical" href="https://codeagora.vercel.app/">
@@ -22,11 +25,15 @@
     <meta property="og:title" content="CodeAgora - 근거를 남기는 AI 코드 리뷰">
     <meta property="og:description" content="여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 서로 반박한 뒤, 사람이 결정하기 쉬운 최종 판정표와 근거를 남깁니다.">
     <meta property="og:image" content="https://codeagora.vercel.app/assets/social-card.svg">
+    <meta property="og:image:type" content="image/svg+xml">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="CodeAgora - 근거를 남기는 AI 코드 리뷰">
     <meta name="twitter:description" content="여러 AI 리뷰어가 같은 코드 변경을 따로 보고 서로 검증한 뒤, 사람이 바로 판단할 수 있는 판정표를 남깁니다.">
     <meta name="twitter:image" content="https://codeagora.vercel.app/assets/social-card.svg">
+    <meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정">
     <link rel="stylesheet" href="./src/styles.css">
     <script type="application/ld+json">
       {
@@ -44,6 +51,21 @@
             }
           },
           {
+            "@type": "WebPage",
+            "@id": "https://codeagora.vercel.app/#webpage",
+            "url": "https://codeagora.vercel.app/",
+            "name": "CodeAgora - 근거를 남기는 AI 코드 리뷰",
+            "isPartOf": {
+              "@id": "https://codeagora.vercel.app/#website"
+            },
+            "about": {
+              "@id": "https://codeagora.vercel.app/#software"
+            },
+            "primaryImageOfPage": "https://codeagora.vercel.app/assets/social-card.svg",
+            "inLanguage": "ko-KR",
+            "description": "CodeAgora는 CLI, GitHub Action, MCP, Desktop RC에서 같은 멀티 LLM 코드 리뷰 파이프라인을 실행하고 근거 있는 판정을 남기는 개발자 도구입니다."
+          },
+          {
             "@type": "Organization",
             "@id": "https://github.com/bssm-oss#organization",
             "name": "bssm-oss",
@@ -55,12 +77,24 @@
             "@id": "https://codeagora.vercel.app/#software",
             "name": "CodeAgora",
             "applicationCategory": "DeveloperApplication",
+            "applicationSubCategory": "AI code review",
             "operatingSystem": "macOS, Windows, Linux",
+            "softwareVersion": "0.1.0-rc.6",
             "url": "https://codeagora.vercel.app/",
             "codeRepository": "https://github.com/bssm-oss/CodeAgora",
             "downloadUrl": "https://www.npmjs.com/package/@codeagora/review",
             "license": "https://github.com/bssm-oss/CodeAgora/blob/main/LICENSE",
             "description": "CLI, GitHub Action, MCP, Desktop 환경에서 같은 리뷰 파이프라인을 실행하는 멀티 LLM 코드 리뷰 도구입니다.",
+            "programmingLanguage": ["TypeScript", "Rust"],
+            "isAccessibleForFree": true,
+            "featureList": [
+              "parallel AI code reviewers",
+              "evidence-backed review verdicts",
+              "GitHub Action pull request automation",
+              "MCP server for AI IDEs and coding agents",
+              "CLI diff review",
+              "Desktop RC local review UI"
+            ],
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -69,6 +103,73 @@
             "sameAs": [
               "https://github.com/bssm-oss/CodeAgora",
               "https://www.npmjs.com/package/@codeagora/review"
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://codeagora.vercel.app/#faq",
+            "inLanguage": "ko-KR",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "CodeAgora는 무엇인가요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 근거를 확인한 뒤, ACCEPT, REJECT, NEEDS_HUMAN 판정으로 정리하는 AI 코드 리뷰 도구입니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "하나의 AI 코드 리뷰와 무엇이 다른가요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "한 모델의 답을 그대로 믿지 않고 여러 리뷰어의 의견을 비교합니다. 파일 존재, 라인 범위, 코드 인용, 서로 다른 주장까지 확인해 그럴듯한 오답을 줄입니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "GitHub Action 코드 리뷰 자동화에 쓸 수 있나요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "네. GitHub Action에서 Pull Request마다 CodeAgora 리뷰를 실행할 수 있습니다. fork PR, 누락된 secret, provider 실패 같은 경로는 안전하게 낮춘 상태로 보고하도록 설계되어 있습니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "MCP는 왜 필요한가요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "MCP 서버는 AI IDE와 코딩 에이전트가 CodeAgora 리뷰, 설정, 세션 조회 기능을 정해진 도구 계약으로 호출하게 해 줍니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "API 키와 코드는 어디에 저장되나요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "CodeAgora는 별도 SaaS 서버에 코드를 쌓아두는 구조가 아닙니다. provider API 키는 로컬 파일 권한 경계에 저장하고, 로그와 산출물에서는 비밀값을 가립니다."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Desktop은 안정판인가요?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "현재 Desktop은 RC 경로입니다. 로컬 UI로 세션과 리뷰 결과를 다루는 방향이며, 이 랜딩 페이지는 안정판 Desktop 배포나 안정판 업데이트 채널을 약속하지 않습니다."
+                }
+              }
+            ]
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "https://codeagora.vercel.app/#breadcrumb",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "CodeAgora",
+                "item": "https://codeagora.vercel.app/"
+              }
             ]
           }
         ]
@@ -99,6 +200,7 @@
         <nav class="nav-links" aria-label="주요 탐색">
           <a href="#pipeline">작동 방식</a>
           <a href="#surfaces">사용 위치</a>
+          <a href="#faq">FAQ</a>
           <a class="nav-cta" href="#install">RC 시작</a>
           <a href="https://github.com/bssm-oss/CodeAgora">GitHub</a>
         </nav>
@@ -358,6 +460,43 @@
         </div>
       </section>
 
+      <section id="use-cases" class="section use-case-section">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">어떤 검색어로 찾아도 같은 제품</p>
+            <h2>AI 코드 리뷰 도구가 필요한 순간을 CodeAgora스럽게 정리했습니다.</h2>
+          </div>
+          <p class="description">CodeAgora는 단순히 “AI가 리뷰 코멘트를 써주는 도구”가 아닙니다. 로컬 diff, GitHub Pull Request, MCP 기반 AI IDE, Desktop RC까지 같은 판단 기준으로 연결해 팀이 결정할 수 있는 근거를 남깁니다.</p>
+        </div>
+        <div class="use-case-grid">
+          <article>
+            <span>AI 코드 리뷰 도구</span>
+            <h3>한 번의 답보다 여러 관점의 합의를 보고 싶을 때</h3>
+            <p>보안, 안정성, 유지보수성 리뷰어가 같은 변경을 따로 보고 충돌하는 주장을 다시 토론합니다. 최종 결과는 긴 감상문이 아니라 사람이 결정할 수 있는 판정표로 남습니다.</p>
+          </article>
+          <article>
+            <span>GitHub Action 코드 리뷰 자동화</span>
+            <h3>Pull Request마다 같은 기준을 자동으로 붙이고 싶을 때</h3>
+            <p>팀 저장소에서는 GitHub Action으로 PR 리뷰를 실행합니다. provider secret이 없거나 fork PR처럼 조심해야 하는 상황도 리뷰 실패와 보안 상태를 구분해서 다룹니다.</p>
+          </article>
+          <article>
+            <span>MCP 코드 리뷰</span>
+            <h3>AI IDE와 코딩 에이전트가 리뷰 도구를 직접 부르게 할 때</h3>
+            <p>MCP 서버는 에이전트가 CodeAgora의 리뷰, 설정, 세션 조회 기능을 정해진 도구 계약으로 호출하게 합니다. 에이전트마다 따로 리뷰 의미를 재해석하지 않아도 됩니다.</p>
+          </article>
+          <article>
+            <span>CLI diff review</span>
+            <h3>로컬에서 커밋 전 변경을 빠르게 확인하고 싶을 때</h3>
+            <p>터미널에서 현재 diff를 넘기면 동일한 멀티 LLM 리뷰 파이프라인이 실행됩니다. 로컬 세션 산출물이 남기 때문에 나중에 같은 판단을 다시 확인할 수 있습니다.</p>
+          </article>
+          <article>
+            <span>Desktop RC</span>
+            <h3>터미널이 익숙하지 않은 팀원도 결과를 읽어야 할 때</h3>
+            <p>Desktop은 로컬 리뷰 세션과 결과 확인을 화면에서 다루기 위한 RC 앱입니다. 별도의 판단 규칙을 만들지 않고 CLI, Action, MCP와 같은 결과 의미를 보여주는 방향입니다.</p>
+          </article>
+        </div>
+      </section>
+
       <section id="security" class="section trust-section">
         <div class="section-heading">
           <div class="heading-group">
@@ -382,6 +521,42 @@
             <strong>위험한 PR 경로는 분리</strong>
             <p>GitHub Action 연동은 fork PR, 누락된 secret, provider 실패 같은 경로를 한 덩어리 오류로 숨기지 않고, 안전하게 낮춘 상태로 보고합니다.</p>
           </article>
+        </div>
+      </section>
+
+      <section id="faq" class="section faq-section">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">자주 묻는 질문</p>
+            <h2>검색해서 들어온 사람이 바로 확인해야 할 답입니다.</h2>
+          </div>
+          <p class="description">CodeAgora의 핵심은 “AI가 코멘트를 많이 다는 것”이 아니라, 리뷰 주장을 검증하고 사람이 결정할 수 있게 만드는 것입니다. 아래 답변은 현재 RC 채널 기준의 공개 약속만 담습니다.</p>
+        </div>
+        <div class="faq-list">
+          <details open>
+            <summary>CodeAgora는 무엇인가요?</summary>
+            <p>CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 파일·라인·코드 인용 같은 근거를 확인한 뒤, ACCEPT, REJECT, NEEDS_HUMAN 판정으로 정리하는 AI 코드 리뷰 도구입니다.</p>
+          </details>
+          <details>
+            <summary>하나의 AI 코드 리뷰와 무엇이 다른가요?</summary>
+            <p>한 모델의 답을 그대로 믿지 않습니다. 여러 리뷰어가 다른 관점으로 같은 diff를 보고, 틀린 파일이나 조작된 인용처럼 그럴듯한 오답을 걸러내며, 충돌하는 주장은 토론과 반박으로 좁힙니다.</p>
+          </details>
+          <details>
+            <summary>GitHub Action 코드 리뷰 자동화에 쓸 수 있나요?</summary>
+            <p>네. GitHub Action으로 Pull Request마다 CodeAgora 리뷰를 실행할 수 있습니다. fork PR, 누락된 secret, provider 실패처럼 주의가 필요한 경로는 한 덩어리 오류로 숨기지 않고 안전한 상태로 분리해 보여주는 방향입니다.</p>
+          </details>
+          <details>
+            <summary>MCP는 왜 필요한가요?</summary>
+            <p>MCP는 AI IDE와 코딩 에이전트가 CodeAgora를 도구처럼 호출하게 하는 연결 방식입니다. 리뷰 실행, 설정 확인, 세션 조회를 정해진 계약으로 다뤄서 에이전트별로 리뷰 의미가 달라지는 일을 줄입니다.</p>
+          </details>
+          <details>
+            <summary>API 키와 코드는 어디에 저장되나요?</summary>
+            <p>CodeAgora는 별도 SaaS 서버에 코드를 쌓아두는 구조가 아닙니다. 사용자가 지정한 모델 공급자와 직접 통신하고, provider API 키는 로컬 파일 권한 경계 안에서 관리하며, 로그와 산출물에서는 비밀값을 가립니다.</p>
+          </details>
+          <details>
+            <summary>Desktop은 안정판인가요?</summary>
+            <p>현재 Desktop은 RC 경로입니다. 로컬 UI로 세션과 리뷰 결과를 다루는 방향이며, 이 랜딩 페이지는 안정판 Desktop 배포나 안정판 업데이트 채널을 약속하지 않습니다.</p>
+          </details>
         </div>
       </section>
 

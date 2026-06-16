@@ -34,6 +34,9 @@ const requiredCopy = [
   "GitHub Action",
   "MCP",
   "Desktop",
+  "AI 코드 리뷰 도구",
+  "GitHub Action 코드 리뷰 자동화",
+  "자주 묻는 질문",
   "토론하는 리뷰",
   "공식 지원 환경"
 ];
@@ -52,7 +55,11 @@ const requiredSeo = [
   'rel="canonical"',
   'property="og:title"',
   'property="og:image"',
+  'property="og:image:width"',
   'name="twitter:card"',
+  'name="application-name"',
+  '"@type": "FAQPage"',
+  '"@type": "BreadcrumbList"',
   'type="application/ld+json"',
   "https://codeagora.vercel.app/"
 ];
