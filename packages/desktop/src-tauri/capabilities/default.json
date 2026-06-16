@@ -9,6 +9,9 @@
       "dialog:allow-open",
       "mcp-bridge:default",
       "notification:default",
+      "process:allow-restart",
+      "updater:allow-check",
+      "updater:allow-download-and-install",
       "window-state:default"
     ]
   }

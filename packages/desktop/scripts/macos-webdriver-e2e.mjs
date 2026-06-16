@@ -194,6 +194,19 @@ async function text(sessionId, selector) {
   return request('GET', `/session/${sessionId}/element/${id}/text`);
 }
 
+async function title(sessionId) {
+  return request('GET', `/session/${sessionId}/title`);
+}
+
+async function pageSource(sessionId) {
+  try {
+    const source = await request('GET', `/session/${sessionId}/source`);
+    return String(source).replace(/\s+/g, ' ').slice(0, 4000);
+  } catch (error) {
+    return `<source unavailable: ${error instanceof Error ? error.message : String(error)}>`;
+  }
+}
+
 async function waitForText(sessionId, selector, expected) {
   const started = Date.now();
   let lastValue = '';
@@ -209,7 +222,23 @@ async function waitForText(sessionId, selector, expected) {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Timed out waiting for ${selector} to contain ${expected}. Last text: ${lastValue || '<empty>'}. Last error: ${lastError || '<none>'}`);
+  const source = await pageSource(sessionId);
+  const shellText = await text(sessionId, '[data-testid="desktop-shell"]').catch((error) => (
+    `<shell text unavailable: ${error instanceof Error ? error.message : String(error)}>`
+  ));
+  throw new Error(`Timed out waiting for ${selector} to contain ${expected}. Last text: ${lastValue || '<empty>'}. Last error: ${lastError || '<none>'}. Shell text: ${String(shellText).slice(0, 2000)}. Page source: ${source}`);
+}
+
+async function waitForTitle(sessionId, expected) {
+  const started = Date.now();
+  let lastValue = '';
+  while (Date.now() - started < 20_000) {
+    const value = String(await title(sessionId));
+    lastValue = value;
+    if (value.includes(expected)) return value;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Timed out waiting for title to contain ${expected}. Last title: ${lastValue || '<empty>'}`);
 }
 
 if (process.platform !== 'darwin') {
@@ -272,10 +301,12 @@ try {
   await click(sessionId, '[data-testid="button-review-staged-changes"]');
   await waitForText(sessionId, '[data-testid="desktop-shell"]', '자동 리뷰 완료');
   await waitForText(sessionId, '[data-testid="acceptance-panel"]', '이 리뷰 결과를 받아들일 수 있습니다');
+  await waitForText(sessionId, '[data-testid="desktop-shell"]', '원본 리포트 미리보기');
   writeFile(path.join(workspace, '.ca', 'fail-next-review'), '1\n');
+  await click(sessionId, '[data-testid="button-quick-review"]');
+  await waitForTitle(sessionId, '(1)');
   await click(sessionId, '[data-testid="button-run-review"]');
   await waitForText(sessionId, '[data-testid="run-panel"]', '리뷰 결과 만들기');
-  await click(sessionId, '[data-testid="button-review-staged-changes"]');
   await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '리뷰를 완료하지 못했습니다');
   await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '다시 실행');
   await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '셋업 확인');

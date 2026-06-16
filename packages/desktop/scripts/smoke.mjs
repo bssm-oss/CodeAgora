@@ -45,9 +45,20 @@ assert(tauriConfig.version === packageJson.version, 'Tauri config version does n
 assert(tauriConfig.productName === 'CodeAgora', 'Unexpected Tauri product name');
 assert(tauriConfig.app?.withGlobalTauri === true, 'Tauri global API must be enabled for the MCP bridge');
 assert(typeof tauriConfig.app?.security?.csp === 'string' && tauriConfig.app.security.csp.includes("default-src 'self'"), 'Tauri CSP must be enabled for desktop RC gates');
+assert(tauriConfig.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be generated for Desktop RC distribution');
+assert(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes('dmg'), 'Desktop RC distribution must build a macOS DMG target');
+assert(tauriConfig.plugins?.updater?.endpoints?.[0]?.endsWith('/latest-0.1-rc.json'), 'Desktop RC updater endpoint must be scoped to latest-0.1-rc.json');
+assert(typeof tauriConfig.plugins?.updater?.pubkey === 'string' && tauriConfig.plugins.updater.pubkey.length > 40, 'Desktop RC updater public key is missing');
 assert(capabilities[0]?.permissions?.includes('mcp-bridge:default'), 'MCP bridge permission is missing');
+assert(capabilities[0]?.permissions?.includes('updater:allow-check'), 'Updater check permission is missing');
+assert(capabilities[0]?.permissions?.includes('updater:allow-download-and-install'), 'Updater install permission is missing');
+assert(capabilities[0]?.permissions?.includes('process:allow-restart'), 'Process restart permission is missing');
 assert(cargoToml.includes('tauri-plugin-mcp-bridge'), 'MCP bridge dependency is missing from Cargo.toml');
+assert(cargoToml.includes('tauri-plugin-updater'), 'Updater dependency is missing from Cargo.toml');
+assert(cargoToml.includes('tauri-plugin-process'), 'Process dependency is missing from Cargo.toml');
 assert(main.includes('tauri_plugin_mcp_bridge::init()'), 'MCP bridge plugin is not registered');
+assert(main.includes('tauri_plugin_updater::Builder::new().build()'), 'Updater plugin is not registered');
+assert(main.includes('tauri_plugin_process::init()'), 'Process plugin is not registered');
 assert(main.includes('#[cfg(debug_assertions)]'), 'MCP bridge must remain debug-build only');
 assert(main.includes('tauri_plugin_webdriver_automation::init()'), 'WebDriver automation plugin is not registered');
 

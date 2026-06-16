@@ -25,6 +25,8 @@ describe('desktop WebDriver automation security boundary', () => {
   it('does not enable the WebDriver feature in release build or desktop RC bundle scripts', () => {
     expect(desktopPackage.scripts['tauri:build']).toBe('tauri build');
     expect(desktopPackage.scripts['bundle:smoke']).not.toContain('webdriver-automation');
+    expect(desktopPackage.scripts['bundle:smoke']).toContain('--bundles app,dmg');
+    expect(desktopPackage.scripts['bundle:smoke']).toContain('createUpdaterArtifacts');
     expect(rootPackage.scripts['rc:desktop-gate']).toBe('node scripts/desktop-release-gate-runner.mjs');
     expect(DESKTOP_RELEASE_CHECKS.map((check) => check.command)).toContain(
       'pnpm desktop:macos-webdriver-e2e',
@@ -35,6 +37,7 @@ describe('desktop WebDriver automation security boundary', () => {
     );
 
     expect(desktopPackage.scripts['macos:webdriver-e2e']).toContain('tauri build --debug --features webdriver-automation');
+    expect(desktopPackage.scripts['macos:webdriver-e2e']).toContain('createUpdaterArtifacts');
     expect(rootPackage.scripts['desktop:macos-webdriver-e2e']).toContain('macos:webdriver-e2e');
   });
 
