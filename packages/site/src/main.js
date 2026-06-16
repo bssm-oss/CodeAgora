@@ -1,5 +1,30 @@
 // Theme Toggle
 const themeToggle = document.getElementById("theme-toggle");
+const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function prefersReducedMotion() {
+  return motionQuery.matches;
+}
+
+function updateScrollProgress() {
+  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+  const progress = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0;
+  document.documentElement.style.setProperty("--scroll-progress", `${(progress * 100).toFixed(2)}%`);
+}
+
+function updatePointerGlow(event) {
+  if (prefersReducedMotion()) {
+    return;
+  }
+
+  document.documentElement.style.setProperty("--cursor-x", `${event.clientX}px`);
+  document.documentElement.style.setProperty("--cursor-y", `${event.clientY}px`);
+}
+
+window.addEventListener("scroll", updateScrollProgress, { passive: true });
+window.addEventListener("resize", updateScrollProgress, { passive: true });
+window.addEventListener("pointermove", updatePointerGlow, { passive: true });
+updateScrollProgress();
 
 function readLocalTheme() {
   try {
@@ -50,6 +75,136 @@ if (themeToggle) {
     writeLocalTheme(newTheme);
     updateThemeToggleLabel(newTheme);
   });
+}
+
+const revealTargets = [
+  ...document.querySelectorAll(".section-heading, .pipeline-cards article, .surface-list article, .explain-grid article, .decision-grid article, .trust-grid article, .quality-strip code, .use-case-grid article, .faq-list details, .command-console")
+];
+
+function syncRevealTargets() {
+  if (prefersReducedMotion()) {
+    revealTargets.forEach((target) => target.classList.add("is-visible"));
+    return;
+  }
+
+  const visibleLine = window.innerHeight * 0.9;
+  for (const target of revealTargets) {
+    if (target.classList.contains("is-visible")) {
+      continue;
+    }
+
+    if (target.getBoundingClientRect().top < visibleLine) {
+      target.classList.add("is-visible");
+    }
+  }
+}
+
+if ("IntersectionObserver" in window && !prefersReducedMotion()) {
+  revealTargets.forEach((target) => target.classList.add("reveal-on-scroll"));
+  const revealObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          revealObserver.unobserve(entry.target);
+        }
+      }
+    },
+    { rootMargin: "0px 0px -12% 0px", threshold: 0.16 }
+  );
+
+  revealTargets.forEach((target) => revealObserver.observe(target));
+} else {
+  revealTargets.forEach((target) => target.classList.add("is-visible"));
+}
+
+window.addEventListener("scroll", syncRevealTargets, { passive: true });
+window.addEventListener("resize", syncRevealTargets, { passive: true });
+syncRevealTargets();
+
+const sectionLinks = [...document.querySelectorAll(".nav-links a[href^='#']")];
+const sectionTargets = sectionLinks
+  .map((link) => document.querySelector(link.getAttribute("href")))
+  .filter(Boolean);
+
+function syncActiveSectionLink() {
+  let activeId = "";
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const section of sectionTargets) {
+    const distance = Math.abs(section.getBoundingClientRect().top - window.innerHeight * 0.28);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      activeId = section.id;
+    }
+  }
+
+  for (const link of sectionLinks) {
+    link.classList.toggle("is-current", Boolean(activeId) && link.getAttribute("href") === `#${activeId}`);
+  }
+}
+
+if ("IntersectionObserver" in window && sectionTargets.length) {
+  const sectionObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+      if (!visible) {
+        return;
+      }
+
+      const id = visible.target.id;
+      for (const link of sectionLinks) {
+        link.classList.toggle("is-current", link.getAttribute("href") === `#${id}`);
+      }
+    },
+    { rootMargin: "-26% 0px -58% 0px", threshold: [0.08, 0.24, 0.42] }
+  );
+
+  sectionTargets.forEach((target) => sectionObserver.observe(target));
+}
+
+window.addEventListener("scroll", syncActiveSectionLink, { passive: true });
+window.addEventListener("resize", syncActiveSectionLink, { passive: true });
+syncActiveSectionLink();
+
+function attachTiltEffect(element, strength = 6) {
+  if (!element) {
+    return;
+  }
+
+  element.addEventListener("pointermove", (event) => {
+    if (prefersReducedMotion()) {
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    const rotateX = (0.5 - y) * strength;
+    const rotateY = (x - 0.5) * strength;
+
+    element.style.setProperty("--tilt-x", `${rotateY.toFixed(2)}deg`);
+    element.style.setProperty("--tilt-y", `${rotateX.toFixed(2)}deg`);
+    element.style.setProperty("--glow-x", `${(x * 100).toFixed(1)}%`);
+    element.style.setProperty("--glow-y", `${(y * 100).toFixed(1)}%`);
+    element.classList.add("is-tilting");
+  });
+
+  element.addEventListener("pointerleave", () => {
+    element.style.removeProperty("--tilt-x");
+    element.style.removeProperty("--tilt-y");
+    element.style.removeProperty("--glow-x");
+    element.style.removeProperty("--glow-y");
+    element.classList.remove("is-tilting");
+  });
+}
+
+attachTiltEffect(document.querySelector(".review-arena"), 4.5);
+for (const card of document.querySelectorAll(".pipeline-cards article, .surface-list article, .explain-grid article, .use-case-grid article")) {
+  attachTiltEffect(card, 3.2);
 }
 
 // Progressive Command tabs
@@ -305,8 +460,10 @@ function commandTextFromCode(target) {
 
 function setCopyButtonLabel(button, label) {
   button.textContent = label;
+  button.classList.toggle("is-copied", label === "복사됨");
   window.setTimeout(() => {
     button.textContent = "복사";
+    button.classList.remove("is-copied");
   }, 1400);
 }
 

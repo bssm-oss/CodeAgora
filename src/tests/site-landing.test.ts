@@ -206,6 +206,7 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("ACCEPT");
     expect(html).toContain("REJECT");
     expect(html).toContain("NEEDS_HUMAN");
+    expect(html).toContain("scroll-progress");
     expect(html).toContain("CodeAgora 리뷰 아레나 데모");
     expect(html).toContain('data-arena-file="init"');
     expect(html).toContain('data-arena-file="orchestrator"');
@@ -237,7 +238,19 @@ describe("CodeAgora landing page", () => {
     expect(css).toContain(".diff-insight-row");
     expect(css).toContain(".use-case-grid");
     expect(css).toContain(".faq-list");
+    expect(css).toContain(".scroll-progress");
+    expect(css).toContain(".reveal-on-scroll");
+    expect(css).toContain(".is-tilting");
+    expect(css).toContain("copy-pulse");
+    expect(css).toContain("--cursor-x");
     expect(css).toContain("scan-beam");
+    expect(js).toContain("updateScrollProgress");
+    expect(js).toContain("updatePointerGlow");
+    expect(js).toContain("syncRevealTargets");
+    expect(js).toContain("syncActiveSectionLink");
+    expect(js).toContain("IntersectionObserver");
+    expect(js).toContain("attachTiltEffect");
+    expect(js).toContain("prefersReducedMotion");
     expect(js).toContain("data-command-tab");
     expect(js).toContain("commandStatusLabels");
     expect(js).toContain("arenaScenarios");
