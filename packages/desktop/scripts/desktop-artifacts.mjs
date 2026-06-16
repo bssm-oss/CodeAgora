@@ -9,9 +9,61 @@ export const MACOS_ARM64_ARCH = 'arm64';
 export const MACOS_ARM64_TAURI_ARCH = 'aarch64';
 export const MACOS_ARM64_SIGNING_EVIDENCE_SCHEMA_VERSION = 'codeagora.desktop-macos-arm64-signing-evidence.v1';
 export const MACOS_ARM64_SIGNING_EVIDENCE_FILENAME = 'desktop-macos-arm64-signing-evidence.json';
+export const DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION = 'codeagora.desktop-rc-distribution-evidence.v1';
+export const DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME = 'desktop-rc-distribution-evidence.json';
+export const DESKTOP_RC_UPDATER_PLATFORM = 'darwin-aarch64';
+
+const RC_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)-rc\.(\d+)$/;
+const RC_TAG_PATTERN = /^v(\d+\.\d+\.\d+-rc\.\d+)$/;
+const SECRET_VALUE_PATTERN = /(?:api[_-]?key|token|secret|password|private[_-]?key|-----BEGIN|sk-[a-z0-9_-]+)/i;
 
 function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+}
+
+export function parseDesktopRcVersion(version) {
+  const match = typeof version === 'string' ? RC_VERSION_PATTERN.exec(version) : null;
+  if (!match) {
+    throw new Error(
+      `Desktop RC version must be npm semver prerelease X.Y.Z-rc.N without build metadata, received ${String(version ?? 'missing')}`,
+    );
+  }
+  return {
+    version,
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    rc: Number(match[4]),
+    releaseLine: `${match[1]}.${match[2]}`,
+    gitTag: `v${version}`,
+    npmDistTag: 'rc',
+    updaterManifestFilename: `latest-${match[1]}.${match[2]}-rc.json`,
+  };
+}
+
+export function parseDesktopRcTag(tag) {
+  const match = typeof tag === 'string' ? RC_TAG_PATTERN.exec(tag) : null;
+  if (!match) {
+    throw new Error(`Desktop RC git tag must be vX.Y.Z-rc.N, received ${String(tag ?? 'missing')}`);
+  }
+  return parseDesktopRcVersion(match[1]);
+}
+
+export function desktopRcUpdaterManifestFilename(versionOrTag) {
+  const parsed = String(versionOrTag).startsWith('v')
+    ? parseDesktopRcTag(versionOrTag)
+    : parseDesktopRcVersion(versionOrTag);
+  return parsed.updaterManifestFilename;
+}
+
+function validUrl(value) {
+  if (!isNonEmptyString(value)) return false;
+  try {
+    const url = new globalThis.URL(value);
+    return url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export function tauriMacosArchSuffix(arch = os.arch()) {
@@ -246,12 +298,292 @@ export function assertMacosArm64SigningEvidence(params = {}) {
   return result;
 }
 
+function releaseLineFromVersion(version) {
+  try {
+    return parseDesktopRcVersion(version).releaseLine;
+  } catch {
+    return null;
+  }
+}
+
+function collectSecretLeaks(value, pathLabel = 'evidence') {
+  const leaks = [];
+  if (typeof value === 'string') {
+    if (SECRET_VALUE_PATTERN.test(value)) {
+      leaks.push(pathLabel);
+    }
+    return leaks;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => leaks.push(...collectSecretLeaks(entry, `${pathLabel}[${index}]`)));
+    return leaks;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      leaks.push(...collectSecretLeaks(entry, `${pathLabel}.${key}`));
+    }
+  }
+  return leaks;
+}
+
+function collectRcCodesignDistributionErrors(codesign = {}) {
+  const errors = collectCodesignEvidenceErrors(codesign);
+  const authority = Array.isArray(codesign.authority) ? codesign.authority.join('\n') : String(codesign.authority ?? '');
+  if (!/Developer ID Application:/i.test(authority)) {
+    errors.push('codesign.authority must include a Developer ID Application signing authority');
+  }
+  if (/\bAd Hoc\b|adhoc|^-$/i.test(authority)) {
+    errors.push('ad-hoc signatures are not valid for Desktop RC distribution');
+  }
+  if (codesign.verifyDeepStrict !== true) {
+    errors.push('codesign.verifyDeepStrict must be true');
+  }
+  if (codesign.spctlAssess !== true) {
+    errors.push('codesign.spctlAssess must be true');
+  }
+  return errors;
+}
+
+function collectRcNotarizationDistributionErrors(notarization = {}) {
+  const errors = collectNotarizationEvidenceErrors(notarization);
+  if (notarization.appTicketStapled !== true) {
+    errors.push('notarization.appTicketStapled must be true');
+  }
+  if (notarization.dmgTicketStapled !== true) {
+    errors.push('notarization.dmgTicketStapled must be true');
+  }
+  return errors;
+}
+
+function collectHashErrors(record, label) {
+  const errors = [];
+  if (!isNonEmptyString(record?.path)) {
+    errors.push(`${label}.path is required`);
+  }
+  if (!/^[a-f0-9]{64}$/i.test(String(record?.sha256 ?? ''))) {
+    errors.push(`${label}.sha256 must be a SHA-256 hex digest`);
+  }
+  return errors;
+}
+
+export function validateDesktopRcUpdaterManifest(manifest = {}, options = {}) {
+  const errors = [];
+  const expected = parseDesktopRcVersion(options.version ?? manifest.version);
+  const platforms = manifest.platforms ?? {};
+  const platformEntry = platforms[DESKTOP_RC_UPDATER_PLATFORM] ?? {};
+  const version = typeof manifest.version === 'string' && manifest.version.startsWith('v')
+    ? manifest.version.slice(1)
+    : manifest.version;
+
+  if (version !== expected.version) {
+    errors.push(`updater manifest version must be ${expected.version}, received ${String(manifest.version ?? 'missing')}`);
+  }
+  if (releaseLineFromVersion(version) !== expected.releaseLine) {
+    errors.push(`updater manifest version must stay on ${expected.releaseLine}.x RC line`);
+  }
+  if (!validUrl(platformEntry.url)) {
+    errors.push(`${DESKTOP_RC_UPDATER_PLATFORM}.url must be an https URL`);
+  }
+  if (!isNonEmptyString(platformEntry.signature)) {
+    errors.push(`${DESKTOP_RC_UPDATER_PLATFORM}.signature must contain the .sig file content`);
+  }
+  if (!isNonEmptyString(manifest.pub_date)) {
+    errors.push('updater manifest pub_date is required');
+  }
+  if (manifest.platforms && Object.keys(platforms).some((platform) => platform !== DESKTOP_RC_UPDATER_PLATFORM)) {
+    errors.push(`updater manifest may only include ${DESKTOP_RC_UPDATER_PLATFORM} for this RC pipeline`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    version: version ?? null,
+    releaseLine: releaseLineFromVersion(version),
+    platform: DESKTOP_RC_UPDATER_PLATFORM,
+    url: platformEntry.url ?? null,
+    signaturePresent: isNonEmptyString(platformEntry.signature),
+    errors,
+  };
+}
+
+export function validateDesktopRcDistributionEvidence(evidence = {}, options = {}) {
+  const errors = [];
+  if (!evidence || typeof evidence !== 'object') {
+    return {
+      schemaVersion: DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION,
+      valid: false,
+      errors: [`Missing ${DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION} evidence`],
+    };
+  }
+  if (evidence.schemaVersion !== DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION) {
+    errors.push(
+      `Expected distribution evidence schema ${DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION}, received ${String(evidence.schemaVersion ?? 'missing')}`,
+    );
+  }
+
+  let expected;
+  try {
+    expected = parseDesktopRcVersion(options.version ?? evidence.version);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    expected = null;
+  }
+  if (expected && evidence.gitTag !== expected.gitTag) {
+    errors.push(`gitTag must be ${expected.gitTag}, received ${String(evidence.gitTag ?? 'missing')}`);
+  }
+  if (expected && evidence.npmDistTag !== 'rc') {
+    errors.push(`npmDistTag must be rc for ${expected.version}`);
+  }
+  if (expected && evidence.githubRelease?.prerelease !== true) {
+    errors.push('githubRelease.prerelease must be true');
+  }
+  if (evidence.target?.platform !== MACOS_DESKTOP_PLATFORM || evidence.target?.arch !== MACOS_ARM64_ARCH) {
+    errors.push('target must be macOS arm64 only for Desktop RC distribution');
+  }
+
+  errors.push(...collectHashErrors(evidence.app, 'app'));
+  errors.push(...collectHashErrors(evidence.dmg, 'dmg'));
+  if (!isNonEmptyString(evidence.app?.bundleIdentifier)) {
+    errors.push('app.bundleIdentifier is required');
+  }
+  if (!isNonEmptyString(evidence.app?.infoPlist?.CFBundleShortVersionString)) {
+    errors.push('app.infoPlist.CFBundleShortVersionString is required');
+  }
+  if (!isNonEmptyString(evidence.app?.infoPlist?.CFBundleVersion)) {
+    errors.push('app.infoPlist.CFBundleVersion is required');
+  }
+  if (expected && evidence.app?.infoPlist?.CFBundleShortVersionString !== expected.version) {
+    errors.push('app Info.plist CFBundleShortVersionString must match the RC semver version');
+  }
+  if (expected && evidence.app?.infoPlist?.CFBundleVersion !== expected.version) {
+    errors.push('app Info.plist CFBundleVersion must match the RC semver version');
+  }
+
+  errors.push(...collectRcCodesignDistributionErrors(evidence.codesign));
+  errors.push(...collectRcNotarizationDistributionErrors(evidence.notarization));
+
+  const updater = evidence.updater ?? {};
+  if (!isNonEmptyString(updater.publicKey)) {
+    errors.push('updater.publicKey is required');
+  }
+  if (!isNonEmptyString(updater.artifact?.path)) {
+    errors.push('updater.artifact.path is required');
+  }
+  if (isNonEmptyString(updater.artifact?.path) && path.basename(updater.artifact.path) === path.basename(evidence.dmg?.path ?? '')) {
+    errors.push('updater.artifact.path must reference the Tauri updater app artifact, not the DMG');
+  }
+  if (isNonEmptyString(updater.artifact?.path) && updater.artifact.path.endsWith('.dmg')) {
+    errors.push('updater.artifact.path must not be a DMG');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(String(updater.artifact?.sha256 ?? ''))) {
+    errors.push('updater.artifact.sha256 must be a SHA-256 hex digest');
+  }
+  if (!isNonEmptyString(updater.signature?.path)) {
+    errors.push('updater.signature.path is required');
+  }
+  if (!isNonEmptyString(updater.signature?.content)) {
+    errors.push('updater.signature.content must contain the generated .sig file content');
+  }
+  if (expected && updater.manifest?.filename !== expected.updaterManifestFilename) {
+    errors.push(`updater.manifest.filename must be ${expected.updaterManifestFilename}`);
+  }
+  if (expected && updater.releaseLine !== expected.releaseLine) {
+    errors.push(`updater.releaseLine must be ${expected.releaseLine}`);
+  }
+  if (!validUrl(updater.manifest?.url)) {
+    errors.push('updater.manifest.url must be an https URL');
+  }
+  if (updater.manifest?.json) {
+    try {
+      const manifestValidation = validateDesktopRcUpdaterManifest(updater.manifest.json, {
+        version: expected?.version ?? evidence.version,
+      });
+      errors.push(...manifestValidation.errors);
+      const manifestArtifactUrl = manifestValidation.url ? new globalThis.URL(manifestValidation.url) : null;
+      if (
+        manifestArtifactUrl
+        && isNonEmptyString(updater.artifact?.path)
+        && path.basename(manifestArtifactUrl.pathname) !== path.basename(updater.artifact.path)
+      ) {
+        errors.push('updater manifest URL must point to the recorded updater artifact');
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  } else {
+    errors.push('updater.manifest.json is required');
+  }
+
+  const releaseAssets = Array.isArray(evidence.githubRelease?.assets)
+    ? evidence.githubRelease.assets
+    : [];
+  for (const requiredAsset of [
+    evidence.dmg?.path,
+    updater.artifact?.path,
+    updater.signature?.path,
+    updater.manifest?.filename,
+    DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME,
+  ].filter(Boolean)) {
+    const basename = path.basename(requiredAsset);
+    if (!releaseAssets.some((asset) => asset === basename || asset?.name === basename)) {
+      errors.push(`githubRelease.assets must include ${basename}`);
+    }
+  }
+
+  const secretLeaks = collectSecretLeaks(evidence);
+  if (secretLeaks.length > 0) {
+    errors.push(`distribution evidence contains secret-looking values at: ${secretLeaks.join(', ')}`);
+  }
+
+  return {
+    schemaVersion: DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION,
+    valid: errors.length === 0,
+    version: evidence.version ?? null,
+    gitTag: evidence.gitTag ?? null,
+    releaseLine: expected?.releaseLine ?? null,
+    updaterManifestFilename: expected?.updaterManifestFilename ?? null,
+    errors,
+  };
+}
+
+export function assertDesktopRcDistributionEvidence(params = {}) {
+  const result = validateDesktopRcDistributionEvidence(params.evidence, params);
+  if (!result.valid) {
+    throw new Error(`Invalid Desktop RC distribution evidence: ${result.errors.join('; ')}`);
+  }
+  return result;
+}
+
 export function readMacosArm64SigningEvidence(options = {}) {
   const cwd = options.cwd ?? process.cwd();
   const evidenceRoot = path.resolve(cwd, options.evidenceRoot ?? path.join('.sisyphus', 'evidence'));
   const evidencePath = path.resolve(
     cwd,
     options.evidencePath ?? path.join(evidenceRoot, MACOS_ARM64_SIGNING_EVIDENCE_FILENAME),
+  );
+
+  if (!fs.existsSync(evidencePath)) {
+    return {
+      present: false,
+      path: evidencePath,
+      relativePath: path.relative(cwd, evidencePath),
+      evidence: null,
+    };
+  }
+
+  return {
+    present: true,
+    path: evidencePath,
+    relativePath: path.relative(cwd, evidencePath),
+    evidence: JSON.parse(fs.readFileSync(evidencePath, 'utf8')),
+  };
+}
+
+export function readDesktopRcDistributionEvidence(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const evidenceRoot = path.resolve(cwd, options.evidenceRoot ?? path.join('.sisyphus', 'evidence'));
+  const evidencePath = path.resolve(
+    cwd,
+    options.evidencePath ?? path.join(evidenceRoot, DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME),
   );
 
   if (!fs.existsSync(evidencePath)) {

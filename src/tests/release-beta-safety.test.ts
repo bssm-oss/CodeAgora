@@ -10,6 +10,10 @@ function readPackageVersion(filePath: string): string {
   return manifest.version;
 }
 
+function readJson<T>(filePath: string): T {
+  return JSON.parse(readText(filePath)) as T;
+}
+
 describe('prerelease safety', () => {
   it('publishes prerelease packages with explicit prerelease dist-tags', () => {
     const workflow = readText('.github/workflows/release.yml');
@@ -19,6 +23,12 @@ describe('prerelease safety', () => {
     expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'stable'");
     expect(workflow).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
     expect(workflow).toContain('cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"');
+    expect(workflow).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || 'npm-publish'");
+    expect(workflow).toContain('pnpm rc:desktop-distribution-gate');
+    expect(workflow).toContain('CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL=desktop-${parsed.releaseLine}-rc');
+    expect(workflow).toContain('tag_name: ${{ env.CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL }}');
+    expect(workflow).toContain('verify-rc-github-release-assets.mjs');
+    expect(workflow).toContain("fail_on_unmatched_files: ${{ contains(github.ref_name, '-rc.') && 'true' || 'false' }}");
   });
 
   it('allows manual prerelease dist-tagging but blocks prereleases from latest', () => {
@@ -33,9 +43,15 @@ describe('prerelease safety', () => {
   it('keeps public package versions aligned for prerelease', () => {
     const rootVersion = readPackageVersion('package.json');
     const mcpVersion = readPackageVersion('packages/mcp/package.json');
+    const desktopVersion = readPackageVersion('packages/desktop/package.json');
+    const tauriConfig = readJson<{ version: string }>('packages/desktop/src-tauri/tauri.conf.json');
+    const cargoToml = readText('packages/desktop/src-tauri/Cargo.toml');
 
     expect(rootVersion).toBe('0.1.0-rc.6');
     expect(mcpVersion).toBe(rootVersion);
+    expect(desktopVersion).toBe(rootVersion);
+    expect(tauriConfig.version).toBe(rootVersion);
+    expect(cargoToml).toContain(`version = "${rootVersion}"`);
   });
 
   it('keeps public and generated Action examples on the prerelease ref, not legacy v2', () => {

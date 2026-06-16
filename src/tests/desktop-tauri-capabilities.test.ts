@@ -25,6 +25,9 @@ const REQUIRED_CAPABILITY_PERMISSIONS = [
   'dialog:allow-open',
   'mcp-bridge:default',
   'notification:default',
+  'process:allow-restart',
+  'updater:allow-check',
+  'updater:allow-download-and-install',
   'window-state:default',
 ];
 
@@ -35,7 +38,6 @@ const DISALLOWED_PERMISSION_PREFIXES = [
   'http:',
   'opener:',
   'os:',
-  'process:',
   'shell:',
   'sql:',
   'store:',
@@ -151,6 +153,13 @@ describe('desktop Tauri capability permissions', () => {
       'notification:default',
       'window-state:default',
     ]);
+    expect(permissionIds.filter((permission) => permission.startsWith('process:'))).toEqual([
+      'process:allow-restart',
+    ]);
+    expect(permissionIds.filter((permission) => permission.startsWith('updater:'))).toEqual([
+      'updater:allow-check',
+      'updater:allow-download-and-install',
+    ]);
     expect(permissionIds).not.toContain('dialog:default');
     expect(permissionIds).not.toContain('core:window:allow-create');
     expect(permissionIds).not.toContain('core:webview:allow-create-webview-window');
@@ -177,6 +186,8 @@ describe('desktop Tauri capability permissions', () => {
     expect(rustMain).toContain('tauri_plugin_dialog::init()');
     expect(rustMain).toContain('tauri_plugin_mcp_bridge::init()');
     expect(rustMain).toContain('tauri_plugin_notification::init()');
+    expect(rustMain).toContain('tauri_plugin_process::init()');
+    expect(rustMain).toContain('tauri_plugin_updater::Builder::new().build()');
     expect(rustMain).toContain('tauri_plugin_window_state::Builder::new().build()');
     expect(rustMain).not.toContain('tauri_plugin_shell');
     expect(rustMain).not.toContain('tauri_plugin_fs');

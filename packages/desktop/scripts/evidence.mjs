@@ -4,8 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   MACOS_ARM64_SIGNING_EVIDENCE_FILENAME,
+  DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME,
   locateMacosDesktopArtifact,
+  readDesktopRcDistributionEvidence,
   readMacosArm64SigningEvidence,
+  validateDesktopRcDistributionEvidence,
   validateMacosArm64SigningEvidence,
 } from './desktop-artifacts.mjs';
 
@@ -50,6 +53,14 @@ const macosArm64SigningValidation = validateMacosArm64SigningEvidence({
   artifact: macosArm64Artifact,
   evidence: macosArm64SigningEvidence.evidence,
 });
+const desktopRcDistributionEvidence = readDesktopRcDistributionEvidence({
+  cwd: repoRoot,
+  evidenceRoot,
+});
+const desktopRcDistributionValidation = validateDesktopRcDistributionEvidence(
+  desktopRcDistributionEvidence.evidence,
+  { version: packageJson.version },
+);
 
 const commands = [
   'open_external_link',
@@ -107,7 +118,8 @@ const manifest = {
     notarization: macosArm64SigningValidation.valid
       ? 'valid-macos-arm64-release-evidence'
       : 'missing-or-invalid-macos-arm64-release-evidence',
-    updater: 'disabled-unless-release-evidence-enables-it',
+    updater: 'enabled-for-line-scoped-rc-updates',
+    updaterManifest: 'latest-0.1-rc.json',
     packageSmoke: 'pnpm --filter @codeagora/desktop smoke',
     appE2e: 'pnpm --filter @codeagora/desktop app:e2e',
     macosWebdriverE2e: 'pnpm --filter @codeagora/desktop macos:webdriver-e2e (debug .app bundle)',
@@ -134,6 +146,12 @@ const manifest = {
         ?? path.join('.sisyphus', 'evidence', MACOS_ARM64_SIGNING_EVIDENCE_FILENAME),
       present: macosArm64SigningEvidence.present,
       validation: macosArm64SigningValidation,
+    },
+    desktopRcDistributionEvidence: {
+      path: desktopRcDistributionEvidence.relativePath
+        ?? path.join('.sisyphus', 'evidence', DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME),
+      present: desktopRcDistributionEvidence.present,
+      validation: desktopRcDistributionValidation,
     },
   },
   artifacts: [

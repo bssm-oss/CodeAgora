@@ -63,8 +63,10 @@ Use the following stable filenames for locally captured release-candidate eviden
 | MCP package dry-run | `package-mcp-dry-run.log` | `pnpm --filter @codeagora/mcp pack --dry-run` |
 | Action smoke bundle | `action-smoke.log` | `pnpm build:action && pnpm release:beta-smoke` |
 | MCP smoke | `mcp-smoke.log` | covered by `pnpm release:beta-smoke` |
-| Desktop private-preview gate | `desktop-gate.log` | `pnpm rc:desktop-gate` |
+| Desktop RC UI/package gate | `desktop-gate.log` | `pnpm rc:desktop-gate` |
 | Desktop evidence manifest | `desktop-evidence-manifest.json` | `pnpm desktop:evidence` |
+| Desktop RC distribution evidence | `desktop-rc-distribution-evidence.json` | capture after signed/notarized/stapled macOS arm64 RC artifacts exist |
+| Desktop RC distribution gate | `desktop-rc-distribution-gate.log` | `pnpm rc:desktop-distribution-gate` |
 | Security regression gate | `security-regression.log` | `pnpm test:security` |
 | Live benchmark report | `live-benchmark-report.md` | `pnpm bench:fn:run` with provider credentials or GitHub Models |
 | Live GitHub Action PR smoke | `live-github-action-pr-smoke.md` | `pnpm evidence:github-action-pr-smoke` from a real `pull_request` workflow context plus degraded-path evidence |
@@ -74,9 +76,13 @@ Use the following stable filenames for locally captured release-candidate eviden
 
 `desktop-gate.log` must show desktop typecheck, desktop smoke, Tauri check,
 backend app E2E, macOS WebDriver E2E on macOS preview hardware, desktop evidence
-generation, and bundle smoke passing. Desktop signing, notarization, updater,
-and public distribution remain deferred private-preview decisions recorded in
-`docs/for-users/DESKTOP_PREVIEW.md` and `desktop-evidence-manifest.json`.
+generation, and bundle smoke passing. `desktop-rc-distribution-gate.log` is
+separate and is required only for official macOS arm64 Desktop RC distribution:
+it validates `X.Y.Z-rc.N` versions, Developer ID signature, notarization,
+stapled tickets, updater `.sig`, and same-line `latest-X.Y-rc.json`; the
+release workflow also verifies the actual versioned prerelease and
+`desktop-X.Y-rc` updater-channel asset lists after upload. Stable Desktop distribution and stable updater channels
+remain out of scope.
 
 Generate the RC manifest after the logs are captured:
 

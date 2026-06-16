@@ -12,7 +12,8 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
-    environment: npm-publish
+    environment:
+      name: ${{ contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || 'npm-publish' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -98,18 +99,135 @@ jobs:
         if: contains(github.ref_name, '-rc.')
         run: pnpm rc:desktop-gate
 
+      - name: Validate Desktop RC version contract
+        if: contains(github.ref_name, '-rc.')
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { parseDesktopRcTag, desktopRcUpdaterManifestFilename } from './packages/desktop/scripts/desktop-artifacts.mjs';
+
+          const tag = process.env.GITHUB_REF_NAME;
+          const parsed = parseDesktopRcTag(tag);
+          const packageFiles = [
+            'package.json',
+            'packages/core/package.json',
+            'packages/shared/package.json',
+            'packages/cli/package.json',
+            'packages/github/package.json',
+            'packages/mcp/package.json',
+            'packages/desktop/package.json',
+          ];
+          for (const file of packageFiles) {
+            const version = JSON.parse(fs.readFileSync(file, 'utf8')).version;
+            if (version !== parsed.version) {
+              throw new Error(`${file} version ${version} does not match ${parsed.version}`);
+            }
+          }
+          const tauriConfig = JSON.parse(fs.readFileSync('packages/desktop/src-tauri/tauri.conf.json', 'utf8'));
+          if (tauriConfig.version !== parsed.version) {
+            throw new Error(`Tauri version ${tauriConfig.version} does not match ${parsed.version}`);
+          }
+          const cargoToml = fs.readFileSync('packages/desktop/src-tauri/Cargo.toml', 'utf8');
+          if (!cargoToml.includes(`version = "${parsed.version}"`)) {
+            throw new Error(`Cargo.toml version does not match ${parsed.version}`);
+          }
+          const endpoint = tauriConfig.plugins?.updater?.endpoints?.[0] ?? '';
+          const expectedManifest = desktopRcUpdaterManifestFilename(parsed.version);
+          if (!endpoint.endsWith(`/${expectedManifest}`)) {
+            throw new Error(`Updater endpoint must end with ${expectedManifest}, received ${endpoint}`);
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, [
+            `CODEAGORA_DESKTOP_RC_RELEASE_LINE=${parsed.releaseLine}`,
+            `CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL=desktop-${parsed.releaseLine}-rc`,
+            `CODEAGORA_DESKTOP_RC_UPDATER_MANIFEST=${expectedManifest}`,
+            '',
+          ].join('\n'));
+          NODE
+
+      - name: Import Apple Developer ID certificate
+        if: contains(github.ref_name, '-rc.')
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN_PATH="$RUNNER_TEMP/codeagora-desktop-rc.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+          CERTIFICATE_PATH="$RUNNER_TEMP/codeagora-desktop-rc.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY"
+          echo "CODEAGORA_DESKTOP_RC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Prepare App Store Connect API key
+        if: contains(github.ref_name, '-rc.')
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_PATH: ${{ secrets.APPLE_API_KEY_PATH }}
+        run: |
+          set -euo pipefail
+          if [ -n "${APPLE_API_KEY_PATH:-}" ] && [ -f "$APPLE_API_KEY_PATH" ]; then
+            echo "APPLE_API_KEY_PATH=$APPLE_API_KEY_PATH" >> "$GITHUB_ENV"
+          else
+            if [ -z "${APPLE_API_KEY_PATH:-}" ]; then
+              echo "::error::APPLE_API_KEY_PATH must be either an existing key path or the App Store Connect private key content"
+              exit 1
+            fi
+            API_KEY_FILE="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            printf '%s' "$APPLE_API_KEY_PATH" > "$API_KEY_FILE"
+            chmod 600 "$API_KEY_FILE"
+            echo "APPLE_API_KEY_PATH=$API_KEY_FILE" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build signed notarized Desktop RC DMG
+        if: contains(github.ref_name, '-rc.')
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-darwin
+          pnpm --filter @codeagora/desktop exec tauri build --target aarch64-apple-darwin --bundles app,dmg
+
+      - name: Capture Desktop RC distribution evidence
+        if: contains(github.ref_name, '-rc.')
+        env:
+          GITHUB_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle -name 'CodeAgora.app' -type d -print -quit)"
+          DMG_PATH="$(find packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -name 'CodeAgora_*_aarch64.dmg' -type f -print -quit)"
+          UPDATER_PATH="$(find packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos -name '*.tar.gz' -type f -print -quit)"
+          SIG_PATH="${UPDATER_PATH}.sig"
+          if [ ! -f "$SIG_PATH" ]; then
+            SIG_PATH="$(find packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos -name '*.sig' -type f -print -quit)"
+          fi
+          node packages/desktop/scripts/capture-rc-distribution-evidence.mjs \
+            --tag "${{ github.ref_name }}" \
+            --release-url "$GITHUB_RELEASE_URL" \
+            --app "$APP_PATH" \
+            --dmg "$DMG_PATH" \
+            --updater "$UPDATER_PATH" \
+            --updater-sig "$SIG_PATH"
+
+      - name: Desktop RC distribution gate
+        if: contains(github.ref_name, '-rc.')
+        run: pnpm rc:desktop-distribution-gate
+
       - name: Generate evidence manifest
         run: |
           REQUIRED_TIER=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'stable');")
           pnpm evidence:manifest -- --require="$REQUIRED_TIER"
-
-      - name: Upload release evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-evidence-${{ github.ref_name }}
-          path: .sisyphus/evidence/
-          retention-days: 30
 
       - name: Preflight npm version availability
         run: |
@@ -142,5 +260,60 @@ jobs:
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
+          fail_on_unmatched_files: ${{ contains(github.ref_name, '-rc.') && 'true' || 'false' }}
+          files: |
+            packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz
+            packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig
+            .sisyphus/evidence/latest-*-rc.json
+            .sisyphus/evidence/desktop-rc-distribution-evidence.json
+            .sisyphus/evidence/desktop-rc-distribution-gate.log
+            .sisyphus/evidence/evidence-manifest.json
           body: |
             Release evidence artifact: `release-evidence-${{ github.ref_name }}`
+
+      - name: Update Desktop RC updater channel
+        if: contains(github.ref_name, '-rc.')
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL }}
+          name: Desktop ${{ env.CODEAGORA_DESKTOP_RC_RELEASE_LINE }} RC updater channel
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: .sisyphus/evidence/${{ env.CODEAGORA_DESKTOP_RC_UPDATER_MANIFEST }}
+          body: |
+            Line-scoped updater manifest for the ${{ env.CODEAGORA_DESKTOP_RC_RELEASE_LINE }}.x Desktop RC channel.
+            Distribution artifacts remain attached to `${{ github.ref_name }}`.
+
+      - name: Verify Desktop RC GitHub release assets
+        if: contains(github.ref_name, '-rc.')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node packages/desktop/scripts/verify-rc-github-release-assets.mjs \
+            --tag "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}"
+
+      - name: Refresh evidence manifest after release asset verification
+        if: contains(github.ref_name, '-rc.')
+        run: pnpm evidence:manifest -- --require=rc
+
+      - name: Upload Desktop RC verification evidence
+        if: contains(github.ref_name, '-rc.')
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: |
+            .sisyphus/evidence/desktop-rc-github-release-assets.json
+            .sisyphus/evidence/evidence-manifest.json
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ github.ref_name }}
+          path: .sisyphus/evidence/
+          retention-days: 30

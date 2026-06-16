@@ -10,9 +10,9 @@ contracts used by the automation surfaces.
 |------|--------------------------|
 | Channel | Official desktop app |
 | Public desktop launch | Included in release readiness |
-| Signing | Release evidence must state current signing status |
-| Notarization | Release evidence must state current notarization status |
-| Updater | Disabled unless explicitly enabled in release evidence |
+| Signing | RC distribution requires Developer ID evidence |
+| Notarization | RC distribution requires accepted notarization and stapled tickets |
+| Updater | RC-only static GitHub Release JSON, scoped to `desktop-X.Y-rc/latest-X.Y-rc.json` for the installed version line |
 | Canonical review engine | Existing CLI/core path |
 | Canonical sessions | Existing `.ca/sessions` artifacts |
 | Canonical config | Existing `.ca/config.*` schema and files |
@@ -24,6 +24,21 @@ Run the desktop gate before cutting an RC:
 ```bash
 pnpm rc:desktop-gate
 ```
+
+Official macOS arm64 Desktop RC distribution also requires:
+
+```bash
+pnpm rc:desktop-distribution-gate
+```
+
+The distribution gate is RC-only. It requires `X.Y.Z-rc.N` versions, the `rc`
+npm dist-tag, a `vX.Y.Z-rc.N` prerelease, signed/notarized/stapled macOS arm64
+DMG evidence, updater app artifact evidence, updater `.sig` evidence, and a same-line `latest-X.Y-rc.json`
+manifest. The installed app reads the line-scoped `desktop-X.Y-rc` updater
+release for its version line; the JSON points at the versioned `vX.Y.Z-rc.N`
+prerelease assets.
+Stable Desktop distribution, stable updater channels, and npm
+`latest` promotion are out of scope for this RC gate.
 
 This runs:
 
@@ -53,6 +68,7 @@ The desktop smoke checks:
 
 - built `dist/index.html` and `dist/main.js`
 - package/Tauri version alignment
+- RC updater configuration and updater artifact generation
 - Tauri product metadata
 - command bridge coverage for repository, sessions, review progress, config,
   providers, MCP, GitHub Action setup, release evidence, export, and command

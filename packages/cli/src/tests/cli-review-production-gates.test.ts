@@ -44,6 +44,7 @@ function makeCliEnv(homeDir: string): NodeJS.ProcessEnv {
     CODEAGORA_LANG: 'en',
     LANG: 'en_US.UTF-8',
     CI: '1',
+    NODE_OPTIONS: [process.env.NODE_OPTIONS, '--no-deprecation'].filter(Boolean).join(' '),
   };
 
   for (const envVar of providerEnvVars) {

@@ -179,6 +179,9 @@ describe('release evidence manifest', () => {
         'desktop-gate.log',
         'desktop-evidence-manifest.json',
         'desktop-security-evidence.json',
+        'desktop-rc-distribution-evidence.json',
+        'desktop-rc-distribution-gate.log',
+        'desktop-rc-github-release-assets.json',
         'security-regression.log',
         'redaction-path-safety-evidence.json',
         'github-security-evidence.json',
@@ -186,6 +189,8 @@ describe('release evidence manifest', () => {
       for (const file of rcFiles) {
         if ([
           'desktop-security-evidence.json',
+          'desktop-rc-distribution-evidence.json',
+          'desktop-rc-github-release-assets.json',
           'redaction-path-safety-evidence.json',
           'github-security-evidence.json',
         ].includes(file)) {
@@ -208,6 +213,8 @@ describe('release evidence manifest', () => {
       const desktopSecurity = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-security-evidence');
       const redactionPathSafety = manifest.entries.find((entry: { name: string }) => entry.name === 'redaction-path-safety-evidence');
       const githubSecurity = manifest.entries.find((entry: { name: string }) => entry.name === 'github-security-evidence');
+      const desktopRcDistribution = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-rc-distribution-evidence');
+      const desktopRcGitHubReleaseAssets = manifest.entries.find((entry: { name: string }) => entry.name === 'desktop-rc-github-release-assets');
       expect(desktopGate.requiredForRelease).not.toBe(false);
       expect(desktopGate.exists).toBe(true);
       expect(desktopSecurity).toMatchObject({
@@ -228,9 +235,21 @@ describe('release evidence manifest', () => {
         tier: 'rc',
         exists: true,
       });
+      expect(desktopRcDistribution).toMatchObject({
+        filename: 'desktop-rc-distribution-evidence.json',
+        tier: 'rc',
+        exists: true,
+      });
+      expect(desktopRcGitHubReleaseAssets).toMatchObject({
+        filename: 'desktop-rc-github-release-assets.json',
+        tier: 'rc',
+        exists: true,
+      });
       expect(desktopSecurity.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
       expect(redactionPathSafety.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
       expect(githubSecurity.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
+      expect(desktopRcDistribution.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
+      expect(desktopRcGitHubReleaseAssets.releaseValidity).toMatchObject({ evidenceMode: 'real', validForRelease: true });
       expect(manifest.gateExitStatus.passed).toBe(true);
       expect(manifest.gateSummary.passed).toBe(true);
       expect(manifest.gateExitStatus.failed).toEqual([]);
@@ -462,6 +481,9 @@ describe('release evidence manifest', () => {
         'desktop-gate.log',
         'desktop-evidence-manifest.json',
         'desktop-security-evidence.json',
+        'desktop-rc-distribution-evidence.json',
+        'desktop-rc-distribution-gate.log',
+        'desktop-rc-github-release-assets.json',
         'security-regression.log',
         'redaction-path-safety-evidence.json',
         'github-security-evidence.json',
@@ -473,6 +495,8 @@ describe('release evidence manifest', () => {
           fs.writeFileSync(path.join(dir, file), `${JSON.stringify({ evidenceMode: 'placeholder' })}\n`);
         } else if (file === 'redaction-path-safety-evidence.json') {
           writeRealArtifact(dir, file);
+        } else if (file === 'desktop-rc-distribution-evidence.json') {
+          fs.writeFileSync(path.join(dir, file), `${JSON.stringify({ evidenceMode: 'placeholder' })}\n`);
         } else {
           fs.writeFileSync(path.join(dir, file), `${file} ok\n`);
         }
@@ -487,6 +511,7 @@ describe('release evidence manifest', () => {
       expect(result.stderr).toContain('Missing or invalid required rc evidence');
       expect(result.stderr).toContain('desktop-security-evidence.json (invalid evidence mode: skipped)');
       expect(result.stderr).toContain('github-security-evidence.json (invalid evidence mode: placeholder)');
+      expect(result.stderr).toContain('desktop-rc-distribution-evidence.json (invalid evidence mode: placeholder)');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

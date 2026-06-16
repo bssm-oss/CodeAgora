@@ -18,6 +18,9 @@ import {
   runDesktopReleaseGate,
 } from '../../scripts/desktop-release-gate-runner.mjs';
 import {
+  runDesktopRcDistributionGate,
+} from '../../scripts/desktop-rc-distribution-gate.mjs';
+import {
   assertGateExitStatusesPass,
   evaluateGateExitStatuses,
 } from '../../scripts/release-gate-evaluator.mjs';
@@ -44,6 +47,7 @@ describe('release gate inventory', () => {
       'pnpm desktop:visual-qa',
       'pnpm rc:desktop-gate',
       'pnpm desktop:evidence',
+      'pnpm rc:desktop-distribution-gate',
       'pnpm test:security',
     ]);
   });
@@ -88,6 +92,7 @@ describe('release gate inventory', () => {
       ].includes(entry.execution),
     );
     expect(liveExecutions.map((entry) => entry.name)).toEqual([
+      'desktop-rc-github-release-assets',
       'cli-live-clean-diff-smoke',
       'cli-live-clean-diff-transcript',
       'cli-live-staged-diff-smoke',
@@ -120,6 +125,45 @@ describe('release gate inventory', () => {
       execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
     });
     expect(deterministicLocalReleaseGates()).not.toContain(signingEvidence);
+  });
+
+  it('tracks macOS arm64 Desktop RC distribution as an rc artifact and command gate', () => {
+    const rootPackage = JSON.parse(fs.readFileSync('package.json', 'utf-8')) as {
+      scripts: Record<string, string>;
+    };
+    const distributionEvidence = EXPECTED_EVIDENCE.find(
+      (entry) => entry.name === 'desktop-rc-distribution-evidence',
+    );
+    const distributionGate = EXPECTED_EVIDENCE.find(
+      (entry) => entry.name === 'desktop-rc-distribution-gate',
+    );
+    const releaseAssetEvidence = EXPECTED_EVIDENCE.find(
+      (entry) => entry.name === 'desktop-rc-github-release-assets',
+    );
+
+    expect(rootPackage.scripts['rc:desktop-distribution-gate']).toBe('node scripts/desktop-rc-distribution-gate.mjs');
+    expect(distributionEvidence).toMatchObject({
+      filename: 'desktop-rc-distribution-evidence.json',
+      tier: 'rc',
+      redactionStatus: 'safe-to-publish',
+      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+    });
+    expect(distributionGate).toMatchObject({
+      filename: 'desktop-rc-distribution-gate.log',
+      command: 'pnpm rc:desktop-distribution-gate',
+      tier: 'rc',
+      redactionStatus: 'safe-to-publish',
+      execution: RELEASE_GATE_EXECUTIONS.LOCAL_COMMAND,
+    });
+    expect(releaseAssetEvidence).toMatchObject({
+      filename: 'desktop-rc-github-release-assets.json',
+      tier: 'rc',
+      redactionStatus: 'safe-to-publish',
+      execution: RELEASE_GATE_EXECUTIONS.LIVE_GITHUB,
+    });
+    expect(deterministicLocalReleaseGates()).toContain(distributionGate);
+    expect(deterministicLocalReleaseGates()).not.toContain(distributionEvidence);
+    expect(deterministicLocalReleaseGates()).not.toContain(releaseAssetEvidence);
   });
 
   it('tracks GitHub token and fork security evidence as an rc local artifact', () => {
@@ -272,6 +316,129 @@ describe('release gate command runner', () => {
       '[FAIL] desktop-smoke: pnpm --filter @codeagora/desktop smoke',
     );
     expect(formatDesktopReleaseGateOutput(result)).toContain('desktop smoke failed');
+  });
+
+  it('fails the Desktop RC distribution gate when required official evidence is missing', () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-rc-distribution-missing-'));
+    try {
+      const result = runDesktopRcDistributionGate({ cwd });
+
+      expect(result).toMatchObject({
+        name: 'desktop-rc-distribution-gate',
+        command: 'pnpm rc:desktop-distribution-gate',
+        exitCode: 1,
+        passed: false,
+        evidencePresent: false,
+      });
+      expect(result.errors.join('\n')).toContain('Missing codeagora.desktop-rc-distribution-evidence.v1 evidence');
+      expect(fs.existsSync(path.join(cwd, '.sisyphus', 'evidence', 'desktop-rc-distribution-gate.log'))).toBe(true);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('passes the Desktop RC distribution gate for valid public RC evidence and manifest validity', () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-rc-distribution-valid-'));
+    try {
+      const evidenceDir = path.join(cwd, '.sisyphus', 'evidence');
+      fs.mkdirSync(evidenceDir, { recursive: true });
+      const evidence = {
+        schemaVersion: 'codeagora.desktop-rc-distribution-evidence.v1',
+        evidenceMode: 'real',
+        version: '0.1.0-rc.7',
+        gitTag: 'v0.1.0-rc.7',
+        npmDistTag: 'rc',
+        target: { platform: 'macos', arch: 'arm64' },
+        app: {
+          path: 'CodeAgora.app',
+          sha256: 'a'.repeat(64),
+          bundleIdentifier: 'dev.codeagora.desktop',
+          infoPlist: {
+            CFBundleShortVersionString: '0.1.0-rc.7',
+            CFBundleVersion: '0.1.0-rc.7',
+          },
+        },
+        dmg: {
+          path: 'CodeAgora_0.1.0-rc.7_aarch64.dmg',
+          sha256: 'b'.repeat(64),
+        },
+        codesign: {
+          status: 'accepted',
+          authority: ['Developer ID Application: CodeAgora Test (TEAMID1234)'],
+          teamIdentifier: 'TEAMID1234',
+          identifier: 'dev.codeagora.desktop',
+          hardenedRuntime: true,
+          verifyDeepStrict: true,
+          spctlAssess: true,
+        },
+        notarization: {
+          status: 'accepted',
+          ticketStapled: true,
+          appTicketStapled: true,
+          dmgTicketStapled: true,
+        },
+        updater: {
+          releaseLine: '0.1',
+          publicKey: 'public updater key',
+          artifact: { path: 'CodeAgora.app.tar.gz', sha256: 'c'.repeat(64) },
+          signature: { path: 'CodeAgora.app.tar.gz.sig', content: 'signature content' },
+          manifest: {
+            filename: 'latest-0.1-rc.json',
+            url: 'https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0-rc.7/latest-0.1-rc.json',
+            json: {
+              version: '0.1.0-rc.7',
+              pub_date: '2026-06-16T00:00:00.000Z',
+              platforms: {
+                'darwin-aarch64': {
+                  url: 'https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0-rc.7/CodeAgora.app.tar.gz',
+                  signature: 'signature content',
+                },
+              },
+            },
+          },
+        },
+        githubRelease: {
+          prerelease: true,
+          assets: [
+            'CodeAgora_0.1.0-rc.7_aarch64.dmg',
+            'CodeAgora.app.tar.gz',
+            'CodeAgora.app.tar.gz.sig',
+            'latest-0.1-rc.json',
+            'desktop-rc-distribution-evidence.json',
+          ],
+        },
+      };
+      fs.writeFileSync(path.join(evidenceDir, 'desktop-rc-distribution-evidence.json'), `${JSON.stringify(evidence)}\n`);
+      fs.writeFileSync(path.join(evidenceDir, 'evidence-manifest.json'), `${JSON.stringify({
+        entries: [
+          {
+            name: 'desktop-rc-distribution-evidence',
+            exists: true,
+            path: '.sisyphus/evidence/desktop-rc-distribution-evidence.json',
+            releaseValidity: {
+              evidenceMode: 'real',
+              validForRelease: true,
+            },
+          },
+        ],
+      })}\n`);
+
+      const result = runDesktopRcDistributionGate({ cwd, requireManifest: true });
+
+      expect(result).toMatchObject({
+        name: 'desktop-rc-distribution-gate',
+        exitCode: 0,
+        passed: true,
+        evidencePresent: true,
+        validation: {
+          valid: true,
+          releaseLine: '0.1',
+          updaterManifestFilename: 'latest-0.1-rc.json',
+        },
+      });
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it('executes inventory commands and captures stdout, stderr, and exit code', async () => {

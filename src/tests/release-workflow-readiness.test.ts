@@ -30,7 +30,7 @@ describe('release workflow readiness gates', () => {
     const release = read('.github/workflows/release.yml');
     const rootPackage = JSON.parse(read('package.json'));
 
-    expect(release).toContain('environment: npm-publish');
+    expect(release).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || 'npm-publish'");
     expect(release).toContain('id-token: write');
     expect(release).toContain('npm view "$spec" version');
     expect(release).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
