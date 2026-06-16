@@ -1764,19 +1764,34 @@ h1 span {
 /* ── Terminal Console ─────────────────────────── */
 
 .command-console {
+  position: relative;
   overflow: hidden;
   border: 1px solid rgba(237, 241, 255, 0.16);
   border-radius: var(--radius-lg);
-  background: #10131a;
-  box-shadow: var(--shadow);
+  background:
+    linear-gradient(180deg, rgba(237, 241, 255, 0.04), transparent 34%),
+    #0d1117;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.28), var(--shadow);
+}
+
+.command-console::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #05a6b9, #7be6ef, #86efac);
+  opacity: 0.9;
 }
 
 .terminal-header {
   display: flex;
   align-items: center;
+  gap: 14px;
   height: 36px;
   padding: 0 16px;
-  background: #151922;
+  background:
+    linear-gradient(180deg, rgba(237, 241, 255, 0.065), transparent),
+    #151922;
   border-bottom: 1px solid rgba(237, 241, 255, 0.08);
 }
 
@@ -1797,11 +1812,24 @@ h1 span {
 .terminal-dots .dot.green { background: #27c93f; }
 
 .terminal-title {
-  margin: 0 auto;
+  flex: 1;
   color: rgba(237, 241, 255, 0.4);
   font-size: 0.74rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  transform: translateX(-15px);
+}
+
+.terminal-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid rgba(5, 166, 185, 0.24);
+  border-radius: var(--radius-md);
+  color: #7be6ef;
+  background: rgba(5, 166, 185, 0.1);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 850;
 }
 
 .tabs {
@@ -1811,7 +1839,10 @@ h1 span {
 }
 
 .tabs button {
-  min-height: 50px;
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  padding: 10px 8px;
   border: 0;
   border-right: 1px solid rgba(237, 241, 255, 0.14);
   color: rgba(237, 241, 255, 0.7);
@@ -1829,33 +1860,96 @@ h1 span {
 
 .tabs button.is-active {
   color: white;
-  background: rgba(5, 166, 185, 0.34);
+  background:
+    linear-gradient(180deg, rgba(5, 166, 185, 0.32), rgba(5, 166, 185, 0.14));
+}
+
+.tabs button span,
+.tabs button small {
+  display: block;
+}
+
+.tabs button small {
+  color: rgba(237, 241, 255, 0.44);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
+.tabs button.is-active small {
+  color: #9be8ef;
 }
 
 .command-panel {
   position: relative;
   min-height: 286px;
-  padding: 24px;
+  padding: 20px;
+}
+
+.command-meta {
+  display: grid;
+  gap: 5px;
+  margin: 0 76px 16px 0;
+}
+
+.command-meta span {
+  justify-self: start;
+  padding: 4px 8px;
+  border: 1px solid rgba(5, 166, 185, 0.22);
+  border-radius: var(--radius-md);
+  color: #7be6ef;
+  background: rgba(5, 166, 185, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.command-meta strong {
+  color: #f3f6fb;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.command-meta p {
+  color: #aeb8c9;
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
 pre {
-  min-height: 228px;
+  min-height: 192px;
   margin: 0;
+  padding: 18px;
   overflow: auto;
+  border: 1px solid rgba(237, 241, 255, 0.1);
+  border-radius: var(--radius-md);
   color: #edf1ff;
-  font-size: clamp(0.82rem, 1.6vw, 0.98rem);
+  background:
+    linear-gradient(90deg, rgba(5, 166, 185, 0.08), transparent 34%),
+    #090d13;
+  font-size: clamp(0.78rem, 1.25vw, 0.9rem);
   line-height: 1.7;
   white-space: pre-wrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+code .prompt {
+  color: #7be6ef;
+  font-weight: 900;
+}
+
+code .result {
+  color: #86efac;
+}
+
 .copy-button {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 20px;
+  right: 20px;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid rgba(237, 241, 255, 0.2);
@@ -2411,12 +2505,38 @@ code {
     min-width: 0;
   }
 
+  .terminal-status {
+    display: none;
+  }
+
   .tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tabs button {
+    min-height: 52px;
+  }
+
   .command-panel {
     padding: 22px 16px;
+  }
+
+  .command-meta {
+    margin-right: 64px;
+  }
+
+  .command-meta strong {
+    font-size: 0.92rem;
+  }
+
+  .command-meta p {
+    font-size: 0.8rem;
+  }
+
+  pre {
+    min-height: 176px;
+    padding: 14px;
+    font-size: 0.72rem;
   }
 }
 

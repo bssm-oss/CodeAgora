@@ -343,47 +343,74 @@
               <span class="dot green"></span>
             </div>
             <div class="terminal-title">CodeAgora Terminal</div>
+            <span class="terminal-status" data-command-status>CLI · RC channel</span>
           </div>
           <div class="tabs" role="tablist" aria-label="설치 명령">
-            <button class="is-active" type="button" role="tab" aria-selected="true" data-command-tab="cli">CLI</button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="action">Action</button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="mcp">MCP</button>
-            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="desktop">Desktop</button>
+            <button class="is-active" type="button" role="tab" aria-selected="true" data-command-tab="cli"><span>CLI</span><small>local diff</small></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="action"><span>Action</span><small>pull request</small></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="mcp"><span>MCP</span><small>agent tools</small></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="desktop"><span>Desktop</span><small>RC app</small></button>
           </div>
 
           <div class="command-panel" data-command-panel="cli">
+            <div class="command-meta">
+              <span>1분 시작</span>
+              <strong>로컬 diff를 바로 리뷰합니다</strong>
+              <p>설치, 초기화, 현재 변경 검토까지 같은 터미널에서 이어집니다.</p>
+            </div>
             <button class="copy-button" type="button" data-copy-target="#cli-command">복사</button>
-            <pre><code id="cli-command">npm i -g @codeagora/review@rc
-agora init
-git diff | agora review</code></pre>
+            <pre><code id="cli-command"><span class="prompt">$</span> npm i -g @codeagora/review@rc
+<span class="result">✓ installed @codeagora/review on rc channel</span>
+<span class="prompt">$</span> agora init
+<span class="result">✓ provider and reviewer config prepared</span>
+<span class="prompt">$</span> git diff | agora review
+<span class="result">→ ACCEPT / REJECT / NEEDS_HUMAN verdict with evidence</span></code></pre>
           </div>
 
           <div class="command-panel" data-command-panel="action" hidden>
+            <div class="command-meta">
+              <span>PR 자동화</span>
+              <strong>GitHub Pull Request마다 같은 기준을 적용합니다</strong>
+              <p>fork, secret 누락, provider 실패는 안전하게 낮춘 상태로 분리합니다.</p>
+            </div>
             <button class="copy-button" type="button" data-copy-target="#action-command">복사</button>
-            <pre><code id="action-command">- uses: bssm-oss/CodeAgora@v0.1.0-rc.6
+            <pre><code id="action-command"><span class="prompt">uses:</span> bssm-oss/CodeAgora@v0.1.0-rc.6
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
   env:
-    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}</code></pre>
+    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+<span class="result"># posts a review verdict back to the PR</span></code></pre>
           </div>
 
           <div class="command-panel" data-command-panel="mcp" hidden>
+            <div class="command-meta">
+              <span>에이전트 연동</span>
+              <strong>AI IDE와 코딩 에이전트가 CodeAgora를 도구로 호출합니다</strong>
+              <p>리뷰, 설정, 세션 조회를 같은 MCP 서버 계약으로 연결합니다.</p>
+            </div>
             <button class="copy-button" type="button" data-copy-target="#mcp-command">복사</button>
-            <pre><code id="mcp-command">{
+            <pre><code id="mcp-command"><span class="prompt">config</span> {
   "mcpServers": {
     "codeagora": {
       "command": "npx",
       "args": ["-y", "@codeagora/mcp@rc"]
     }
   }
-}</code></pre>
+}
+<span class="result"># exposes CodeAgora review tools to your agent</span></code></pre>
           </div>
 
           <div class="command-panel" data-command-panel="desktop" hidden>
+            <div class="command-meta">
+              <span>Desktop RC</span>
+              <strong>로컬 세션과 리뷰 결과를 앱 화면에서 확인합니다</strong>
+              <p>현재는 RC 개발 경로이며 안정판 배포 약속은 포함하지 않습니다.</p>
+            </div>
             <button class="copy-button" type="button" data-copy-target="#desktop-command">복사</button>
-            <pre><code id="desktop-command">pnpm install
-pnpm --filter @codeagora/desktop dev
-pnpm desktop:smoke</code></pre>
+            <pre><code id="desktop-command"><span class="prompt">$</span> pnpm install
+<span class="prompt">$</span> pnpm --filter @codeagora/desktop dev
+<span class="prompt">$</span> pnpm desktop:smoke
+<span class="result">✓ local desktop smoke path verified</span></code></pre>
           </div>
         </div>
       </section>

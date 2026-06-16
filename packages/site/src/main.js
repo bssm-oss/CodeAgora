@@ -21,7 +21,15 @@ if (themeToggle) {
 // Progressive Command tabs
 const commandTabs = document.querySelectorAll("[data-command-tab]");
 const commandPanels = document.querySelectorAll("[data-command-panel]");
+const commandStatus = document.querySelector("[data-command-status]");
 const stepLabel = document.querySelector("[data-step-label]");
+
+const commandStatusLabels = {
+  cli: "CLI · RC channel",
+  action: "GitHub Action · PR review",
+  mcp: "MCP · agent tools",
+  desktop: "Desktop · local RC"
+};
 
 const reviewSteps = [
   { id: "file", label: "검토 범위" },
@@ -196,6 +204,10 @@ for (const tab of commandTabs) {
 
     for (const panel of commandPanels) {
       panel.hidden = panel.getAttribute("data-command-panel") !== target;
+    }
+
+    if (commandStatus) {
+      commandStatus.textContent = commandStatusLabels[target] ?? "CodeAgora RC";
     }
   });
 }
