@@ -1022,7 +1022,7 @@ h1 span {
 
 .section {
   position: relative;
-  padding: clamp(62px, 9vw, 110px) clamp(20px, 5vw, 72px);
+  padding: clamp(46px, 7vw, 84px) clamp(20px, 5vw, 72px);
   border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
@@ -1032,7 +1032,7 @@ h1 span {
   gap: clamp(24px, 5vw, 68px);
   align-items: end;
   max-width: 1240px;
-  margin: 0 auto 34px;
+  margin: 0 auto 24px;
 }
 
 .section-heading h2 {
@@ -1048,8 +1048,8 @@ h1 span {
 .section-heading p:last-child {
   max-width: 590px;
   color: var(--muted);
-  font-size: 0.98rem;
-  line-height: 1.72;
+  font-size: 0.94rem;
+  line-height: 1.58;
 }
 
 .section-heading.compact {
@@ -1077,8 +1077,8 @@ h1 span {
 .explain-grid article {
   position: relative;
   overflow: hidden;
-  min-height: 214px;
-  padding: 24px;
+  min-height: 154px;
+  padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-soft);
@@ -1174,9 +1174,9 @@ h1 span {
 
 .decision-grid article {
   position: relative;
-  min-height: 168px;
+  min-height: 132px;
   overflow: hidden;
-  padding: 20px;
+  padding: 18px;
   border: 1px solid rgba(237, 241, 255, 0.14);
   border-radius: var(--radius-md);
   background: rgba(237, 241, 255, 0.06);
@@ -1184,7 +1184,7 @@ h1 span {
 
 .decision-grid span {
   display: inline-flex;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   padding: 5px 9px;
   border-radius: var(--radius-md);
   color: #7be6ef;
@@ -1202,10 +1202,10 @@ h1 span {
 }
 
 .decision-grid p {
-  margin-top: 10px;
+  margin-top: 8px;
   color: #b8c0cf;
-  font-size: 0.9rem;
-  line-height: 1.62;
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .pipeline-cards span,
@@ -1215,7 +1215,7 @@ h1 span {
   justify-content: center;
   width: 34px;
   height: 34px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   border-radius: var(--radius-pill);
   color: var(--brand);
   background: var(--brand-soft);
@@ -1247,8 +1247,8 @@ h1 span {
 .install-copy p {
   margin-top: 12px;
   color: var(--muted);
-  font-size: 0.93rem;
-  line-height: 1.66;
+  font-size: 0.9rem;
+  line-height: 1.52;
 }
 
 .surfaces-section {
@@ -1272,8 +1272,8 @@ h1 span {
 }
 
 .trust-grid article {
-  min-height: 238px;
-  padding: 24px;
+  min-height: 160px;
+  padding: 20px;
   border: 1px solid var(--border);
   border-left: 4px solid var(--brand);
   border-radius: var(--radius-md);
@@ -1298,7 +1298,7 @@ h1 span {
 
 .trust-grid span {
   display: inline-flex;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   padding: 5px 9px;
   border-radius: var(--radius-md);
   color: var(--brand);
@@ -1316,10 +1316,10 @@ h1 span {
 }
 
 .trust-grid p {
-  margin-top: 14px;
+  margin-top: 10px;
   color: var(--muted);
-  font-size: 0.93rem;
-  line-height: 1.66;
+  font-size: 0.9rem;
+  line-height: 1.52;
 }
 
 .quality-section {
@@ -1352,10 +1352,10 @@ h1 span {
 }
 
 .quality-strip code {
-  min-height: 88px;
+  min-height: 62px;
   display: flex;
   align-items: center;
-  padding: 18px;
+  padding: 14px 16px;
   border: 1px solid rgba(237, 241, 255, 0.14);
   border-radius: var(--radius-md);
   color: #e8efff;
@@ -1401,8 +1401,8 @@ h1 span {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  min-height: 62px;
-  padding: 18px 20px;
+  min-height: 54px;
+  padding: 15px 18px;
   color: var(--text);
   cursor: pointer;
   font-weight: 850;
@@ -1436,10 +1436,10 @@ h1 span {
 }
 
 .faq-list p {
-  padding: 0 20px 20px;
+  padding: 0 18px 16px;
   color: var(--muted);
-  font-size: 0.94rem;
-  line-height: 1.7;
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 /* ── Install section ─────────────────────────── */
@@ -1588,14 +1588,14 @@ h1 span {
 
 .command-panel {
   position: relative;
-  min-height: 286px;
+  min-height: 248px;
   padding: 20px;
 }
 
 .command-meta {
   display: grid;
   gap: 5px;
-  margin: 0 76px 16px 0;
+  margin: 0 76px 12px 0;
 }
 
 .command-meta span {
@@ -1623,7 +1623,7 @@ h1 span {
 }
 
 pre {
-  min-height: 192px;
+  min-height: 174px;
   margin: 0;
   padding: 18px;
   overflow: auto;

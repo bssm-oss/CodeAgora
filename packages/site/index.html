@@ -243,18 +243,15 @@
             <span>최종 판단으로.</span>
           </h1>
           <p class="lede">
-            <span>AI가 짠 코드는 좋은 AI 하나로만</span>
-            <span>검증하기엔 부족하고 비쌉니다.</span>
-            <span>CodeAgora는 코드 변경을</span>
-            <span>여러 AI 리뷰어에게 나눠 맡기고,</span>
-            <span>중요한 의견은 토론시킨 뒤</span>
-            <span>바로 이해할 수 있는 판정으로 정리합니다.</span>
+            <span>여러 AI 리뷰어가 같은 diff를 따로 보고,</span>
+            <span>근거와 반박을 모아</span>
+            <span>사람이 결정할 수 있게 정리합니다.</span>
           </p>
           <div class="hero-actions" aria-label="주요 작업">
             <a class="button primary" href="#install">RC로 시작하기</a>
             <a class="button secondary" href="https://github.com/bssm-oss/CodeAgora">GitHub에서 검증하기</a>
           </div>
-          <p class="release-note">RC는 정식 출시 전 검증 채널입니다. 현재 랜딩은 안정판 Desktop 배포를 약속하지 않습니다.</p>
+          <p class="release-note">현재 RC 채널입니다.</p>
           <div class="plain-summary" aria-label="CodeAgora 결과 요약">
             <div>
               <span>무엇을 봤는지</span>
@@ -281,9 +278,9 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">실제 리뷰가 어떻게 보이나요?</p>
-            <h2 id="arena-title">결과는 단순 문장이 아니라, 판단 가능한 형태로 정리됩니다.</h2>
+            <h2 id="arena-title">결과는 판단 가능한 형태로 정리됩니다.</h2>
           </div>
-          <p class="description">여러 리뷰어가 낸 의견을 그대로 늘어놓지 않습니다. 파일·라인·인용을 확인하고, 중요한 이견은 토론하게 만든 뒤, 최종 판단자가 결과를 정리합니다.</p>
+          <p class="description">파일, 라인, 인용, 반박을 한 화면에서 확인합니다.</p>
         </div>
         <div class="review-arena" aria-label="CodeAgora 리뷰 아레나 데모">
           <div class="arena-window-bar" aria-hidden="true">
@@ -370,23 +367,23 @@
         <div class="decision-band">
           <div>
             <p class="eyebrow">판정표 중심 리뷰</p>
-            <h2 id="decision-title">긴 코멘트 목록 대신, 결정에 필요한 것만 먼저 보여줍니다.</h2>
+            <h2 id="decision-title">긴 코멘트보다 결정이 먼저입니다.</h2>
           </div>
           <div class="decision-grid" aria-label="CodeAgora 판정 항목">
             <article>
               <span>Decision</span>
               <strong>지금 합쳐도 되는가</strong>
-              <p>승인 가능, 수정 필요, 사람 확인 필요를 먼저 분리합니다.</p>
+              <p>승인·수정·확인을 먼저 가릅니다.</p>
             </article>
             <article>
               <span>Evidence</span>
               <strong>왜 그렇게 판단했는가</strong>
-              <p>파일, 라인, 실제 코드 인용, 반박 기록을 같이 남깁니다.</p>
+              <p>파일, 라인, 인용을 남깁니다.</p>
             </article>
             <article>
               <span>Action</span>
               <strong>다음 행동은 무엇인가</strong>
-              <p>바로 고칠 항목과 나중에 볼 항목, 사람이 확인할 질문을 나눕니다.</p>
+              <p>수정할 일만 분리합니다.</p>
             </article>
           </div>
         </div>
@@ -396,25 +393,25 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">기존 AI 리뷰와 무엇이 다른가요?</p>
-            <h2 id="why-title">AI 리뷰를 많이 붙이는 것보다, 잘못된 지적을 차단하는 것이 핵심입니다.</h2>
+            <h2 id="why-title">많이 말하는 AI보다, 틀린 말을 거르는 리뷰.</h2>
           </div>
-          <p class="description">비개발자에게도 핵심은 단순합니다. CodeAgora는 “이 코드를 합쳐도 되는가?”라는 질문에 답하기 위해, 주장마다 근거를 붙이고 약한 추측은 따로 분리합니다.</p>
+          <p class="description">주장마다 근거를 붙이고 약한 추측은 낮춥니다.</p>
         </div>
         <div class="explain-grid">
           <article>
             <span>01</span>
             <h3>그럴듯한 오답을 줄입니다</h3>
-            <p>AI는 때로 없는 파일, 틀린 라인, 실제 코드와 다른 인용을 말합니다. CodeAgora는 먼저 그런 주장을 확인해 제거하거나 낮은 신뢰도로 표시합니다.</p>
+            <p>없는 파일, 틀린 라인, 잘못된 인용을 걸러냅니다.</p>
           </article>
           <article>
             <span>02</span>
             <h3>서로 다른 관점을 한곳에 모읍니다</h3>
-            <p>보안, 안정성, 유지보수성, 배포 영향은 서로 다른 문제입니다. 여러 리뷰어가 같은 변경을 각자 보고, 겹치는 지적과 충돌하는 지적을 분리합니다.</p>
+            <p>보안, 안정성, 유지보수 관점을 분리해 봅니다.</p>
           </article>
           <article>
             <span>03</span>
             <h3>결정 피로를 낮춥니다</h3>
-            <p>긴 코멘트 목록만 받으면 결국 사람이 다시 처음부터 읽어야 합니다. CodeAgora는 수정해야 할 항목, 나중에 봐도 되는 항목, 사람이 확인해야 할 질문을 나눕니다.</p>
+            <p>읽을거리보다 지금 할 일을 앞에 둡니다.</p>
           </article>
         </div>
       </section>
@@ -423,35 +420,35 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">체계적인 자동 검증 프로세스</p>
-            <h2>CodeAgora는 리뷰 코멘트가 아니라, 결정 자료를 만듭니다.</h2>
+            <h2>CodeAgora는 결정 자료를 만듭니다.</h2>
           </div>
-          <p class="description">코드 변경을 설명하고, 독립 리뷰를 모으고, 근거가 약한 주장을 걷어낸 뒤, 마지막에는 `ACCEPT`, `REJECT`, `NEEDS_HUMAN` 중 하나로 정리합니다. 개발자가 아닌 PM, 운영자, 팀 리더도 “무엇을 확인해야 하는지”를 읽을 수 있게 만드는 흐름입니다.</p>
+          <p class="description">diff에서 판정까지, 같은 기준으로 좁혀갑니다.</p>
         </div>
         <div class="pipeline-cards">
           <article>
             <span>01</span>
             <h3>변경 내용 정리</h3>
-            <p>먼저 어떤 파일이 바뀌었고, 설정·보안·배포 중 어디에 영향을 줄 수 있는지 정리합니다. 리뷰어가 추측으로 시작하지 않게 기본 맥락을 맞춥니다.</p>
+            <p>무엇이 바뀌었는지 먼저 맞춥니다.</p>
           </article>
           <article>
             <span>02</span>
             <h3>독립 검토</h3>
-            <p>보안, 안정성, 유지보수성 관점의 리뷰어가 서로의 답을 보지 않고 같은 diff를 봅니다. 한 모델의 성향이 전체 결론을 끌고 가지 않게 합니다.</p>
+            <p>여러 리뷰어가 같은 diff를 따로 봅니다.</p>
           </article>
           <article>
             <span>03</span>
             <h3>근거 확인</h3>
-            <p>지적한 파일이 실제로 있는지, 라인 범위가 맞는지, 코드 인용이 조작되지 않았는지 확인합니다. 틀린 주장은 제거하고 애매한 주장은 낮은 신뢰도로 보냅니다.</p>
+            <p>파일, 라인, 코드 인용을 대조합니다.</p>
           </article>
           <article>
             <span>04</span>
             <h3>토론과 반박</h3>
-            <p>리뷰어들이 서로 다른 결론을 내면 찬성하는 AI와 반대하는 AI가 서로의 논리를 다시 검증합니다. 근거가 충분하면 결론을 좁히고, 부족하면 사람 확인으로 올립니다.</p>
+            <p>충돌하는 주장은 다시 검증합니다.</p>
           </article>
           <article>
             <span>05</span>
             <h3>판정표</h3>
-            <p>마지막 결과는 승인 가능, 수정 필요, 사람 확인 필요로 읽히는 판정표가 됩니다. 함께 남는 근거 덕분에 나중에 같은 결정을 다시 검토할 수 있습니다.</p>
+            <p>ACCEPT, REJECT, NEEDS_HUMAN으로 끝냅니다.</p>
           </article>
         </div>
       </section>
@@ -462,24 +459,24 @@
             <p class="eyebrow">공식 지원 환경</p>
             <h2>어디서 실행해도 같은 기준으로 판단합니다.</h2>
           </div>
-          <p class="description">터미널에서 직접 돌리든, GitHub PR에 붙이든, IDE 에이전트가 호출하든, Desktop 앱에서 보든 결과의 의미는 같습니다. 실행 환경만 다르고 핵심 리뷰 파이프라인은 하나입니다.</p>
+          <p class="description">CLI, Action, MCP, Desktop이 같은 파이프라인을 씁니다.</p>
         </div>
         <div class="surface-list">
           <article>
             <h3>CLI</h3>
-            <p>개발자가 로컬에서 작업 중인 변경을 바로 점검할 때 씁니다. 터미널에서 diff를 넣으면 같은 리뷰 파이프라인을 실행하고, 나중에 확인할 세션 산출물을 남깁니다.</p>
+            <p>로컬 diff를 바로 리뷰합니다.</p>
           </article>
           <article>
             <h3>GitHub Action</h3>
-            <p>팀이 Pull Request를 열 때 자동으로 실행됩니다. 권한, secret 누락, 외부 기여자의 fork PR처럼 조심해야 하는 상황은 무리하게 실패시키지 않고 상태를 분리해 보여줍니다.</p>
+            <p>Pull Request마다 자동으로 실행합니다.</p>
           </article>
           <article>
             <h3>MCP</h3>
-            <p>AI IDE나 코딩 에이전트가 CodeAgora를 도구처럼 부를 수 있는 경로입니다. 에이전트가 임의로 해석하지 않고, 리뷰·설정·세션 도구를 정해진 계약으로 호출합니다.</p>
+            <p>AI IDE와 에이전트가 도구로 호출합니다.</p>
           </article>
           <article>
             <h3>Desktop</h3>
-            <p>터미널이 익숙하지 않은 팀원도 로컬 세션, 리뷰 실행, 결과 확인, 증거 내보내기를 화면에서 다룰 수 있게 하는 RC 앱입니다. 별도 판단 규칙을 만들지 않고 같은 리뷰 결과를 보여줍니다.</p>
+            <p>로컬 세션과 결과를 화면에서 봅니다.</p>
           </article>
         </div>
       </section>
@@ -490,23 +487,23 @@
             <p class="eyebrow">보안과 프라이버시</p>
             <h2>중개 서버 없이, API 키는 내 컴퓨터에서 관리합니다.</h2>
           </div>
-          <p class="description">CodeAgora는 별도 SaaS 서버에 코드를 쌓아두는 구조가 아닙니다. 사용자가 설정한 모델 공급자 API와 직접 통신하고, API 키는 로컬 파일 권한 안에 저장하며, 로그와 검토 기록에서는 비밀값을 가려서 남깁니다.</p>
+          <p class="description">코드는 사용자가 고른 모델 공급자로 직접 보냅니다.</p>
         </div>
         <div class="trust-grid">
           <article>
             <span>credentials</span>
             <strong>키는 내 컴퓨터에 저장</strong>
-            <p>`agora env set &lt;provider&gt;`로 저장되는 키는 `~/.config/codeagora/credentials` 아래에서 로컬 파일 권한 경계 안에 둡니다.</p>
+            <p>provider key는 로컬 권한 안에 둡니다.</p>
           </article>
           <article>
             <span>provider direct</span>
             <strong>모델 공급자로 직접 요청</strong>
-            <p>리뷰 요청은 중간 CodeAgora SaaS 서버가 아니라 사용자가 지정한 OpenAI, Anthropic, OpenRouter 같은 공급자 엔드포인트로 향합니다.</p>
+            <p>중간 CodeAgora SaaS 서버를 거치지 않습니다.</p>
           </article>
           <article>
             <span>fork safe</span>
             <strong>위험한 PR 경로는 분리</strong>
-            <p>GitHub Action 연동은 fork PR, 누락된 secret, provider 실패 같은 경로를 한 덩어리 오류로 숨기지 않고, 안전하게 낮춘 상태로 보고합니다.</p>
+            <p>fork, secret 누락, provider 실패를 구분합니다.</p>
           </article>
         </div>
       </section>
@@ -515,34 +512,34 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">자주 묻는 질문</p>
-            <h2>검색해서 들어온 사람이 바로 확인해야 할 답입니다.</h2>
+            <h2>필요한 답만 짧게.</h2>
           </div>
-          <p class="description">CodeAgora의 핵심은 “AI가 코멘트를 많이 다는 것”이 아니라, 리뷰 주장을 검증하고 사람이 결정할 수 있게 만드는 것입니다. 아래 답변은 현재 RC 채널 기준의 공개 약속만 담습니다.</p>
+          <p class="description">현재 RC 기준의 공개 약속입니다.</p>
         </div>
         <div class="faq-list">
           <details open>
             <summary>CodeAgora는 무엇인가요?</summary>
-            <p>CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 파일·라인·코드 인용 같은 근거를 확인한 뒤, ACCEPT, REJECT, NEEDS_HUMAN 판정으로 정리하는 AI 코드 리뷰 도구입니다.</p>
+            <p>여러 AI 리뷰어가 같은 diff를 보고 근거 있는 판정으로 정리하는 코드 리뷰 도구입니다.</p>
           </details>
           <details>
             <summary>하나의 AI 코드 리뷰와 무엇이 다른가요?</summary>
-            <p>한 모델의 답을 그대로 믿지 않습니다. 여러 리뷰어가 다른 관점으로 같은 diff를 보고, 틀린 파일이나 조작된 인용처럼 그럴듯한 오답을 걸러내며, 충돌하는 주장은 토론과 반박으로 좁힙니다.</p>
+            <p>한 모델의 답을 그대로 믿지 않고, 여러 주장과 근거를 비교합니다.</p>
           </details>
           <details>
             <summary>GitHub Action 코드 리뷰 자동화에 쓸 수 있나요?</summary>
-            <p>네. GitHub Action으로 Pull Request마다 CodeAgora 리뷰를 실행할 수 있습니다. fork PR, 누락된 secret, provider 실패처럼 주의가 필요한 경로는 한 덩어리 오류로 숨기지 않고 안전한 상태로 분리해 보여주는 방향입니다.</p>
+            <p>네. Pull Request마다 같은 리뷰 기준을 자동으로 붙일 수 있습니다.</p>
           </details>
           <details>
             <summary>MCP는 왜 필요한가요?</summary>
-            <p>MCP는 AI IDE와 코딩 에이전트가 CodeAgora를 도구처럼 호출하게 하는 연결 방식입니다. 리뷰 실행, 설정 확인, 세션 조회를 정해진 계약으로 다뤄서 에이전트별로 리뷰 의미가 달라지는 일을 줄입니다.</p>
+            <p>AI IDE와 에이전트가 CodeAgora를 정해진 도구 계약으로 호출하게 합니다.</p>
           </details>
           <details>
             <summary>API 키와 코드는 어디에 저장되나요?</summary>
-            <p>CodeAgora는 별도 SaaS 서버에 코드를 쌓아두는 구조가 아닙니다. 사용자가 지정한 모델 공급자와 직접 통신하고, provider API 키는 로컬 파일 권한 경계 안에서 관리하며, 로그와 산출물에서는 비밀값을 가립니다.</p>
+            <p>API 키는 로컬 권한 안에서 관리하고, 비밀값은 로그와 산출물에서 가립니다.</p>
           </details>
           <details>
             <summary>Desktop은 안정판인가요?</summary>
-            <p>현재 Desktop은 RC 경로입니다. 로컬 UI로 세션과 리뷰 결과를 다루는 방향이며, 이 랜딩 페이지는 안정판 Desktop 배포나 안정판 업데이트 채널을 약속하지 않습니다.</p>
+            <p>아직 RC 경로입니다. 안정판 Desktop 배포 약속은 아닙니다.</p>
           </details>
         </div>
       </section>
@@ -551,9 +548,9 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">검증 가능한 품질</p>
-            <h2>우리가 한 말을 테스트로 다시 확인합니다.</h2>
+            <h2>주장은 테스트로 확인합니다.</h2>
           </div>
-          <p class="description">좋은 리뷰 도구라고 말하려면 실제로 틀린 지적을 줄이고, 중요한 문제를 놓치지 않고, 모든 실행 환경이 같은 의미로 동작해야 합니다. 저장소의 `benchmarks/`, 중앙 Vitest 스위트, release evidence 스크립트는 그 약속을 반복해서 확인하는 장치입니다.</p>
+          <p class="description">벤치마크, 테스트, release evidence로 공개 약속을 점검합니다.</p>
         </div>
         <div class="quality-strip" aria-label="검증 명령 예시">
           <code>pnpm test</code>
@@ -565,8 +562,8 @@
       <section id="install" class="section install-section">
         <div class="install-copy">
           <p class="eyebrow">RC 채널로 시작하기</p>
-          <h2>먼저 로컬에서 확인하고, 팀 흐름에 붙이고, 필요하면 앱으로 넓힙니다.</h2>
-          <p>처음에는 CLI로 현재 변경을 빠르게 확인하세요. 팀에서는 GitHub Action으로 PR마다 같은 기준을 적용하고, AI IDE나 Desktop이 필요한 경우 MCP와 앱으로 확장하면 됩니다.</p>
+          <h2>CLI로 시작하고, 팀 흐름에 붙입니다.</h2>
+          <p>필요하면 GitHub Action, MCP, Desktop RC로 확장합니다.</p>
         </div>
 
         <div class="command-console">
@@ -590,7 +587,6 @@
             <div class="command-meta">
               <span>1분 시작</span>
               <strong>로컬 diff를 바로 리뷰합니다</strong>
-              <p>설치, 초기화, 현재 변경 검토까지 같은 터미널에서 이어집니다.</p>
             </div>
             <button class="copy-button" type="button" data-copy-target="#cli-command">복사</button>
             <pre><code id="cli-command"><span class="prompt">$</span> npm i -g @codeagora/review@rc
@@ -605,7 +601,6 @@
             <div class="command-meta">
               <span>PR 자동화</span>
               <strong>GitHub Pull Request마다 같은 기준을 적용합니다</strong>
-              <p>fork, secret 누락, provider 실패는 안전하게 낮춘 상태로 분리합니다.</p>
             </div>
             <button class="copy-button" type="button" data-copy-target="#action-command">복사</button>
             <pre><code id="action-command"><span class="prompt">uses:</span> bssm-oss/CodeAgora@v0.1.0-rc.6
@@ -620,7 +615,6 @@
             <div class="command-meta">
               <span>에이전트 연동</span>
               <strong>AI IDE와 코딩 에이전트가 CodeAgora를 도구로 호출합니다</strong>
-              <p>리뷰, 설정, 세션 조회를 같은 MCP 서버 계약으로 연결합니다.</p>
             </div>
             <button class="copy-button" type="button" data-copy-target="#mcp-command">복사</button>
             <pre><code id="mcp-command"><span class="prompt">config</span> {
@@ -638,7 +632,6 @@
             <div class="command-meta">
               <span>Desktop RC</span>
               <strong>로컬 세션과 리뷰 결과를 앱 화면에서 확인합니다</strong>
-              <p>현재는 RC 개발 경로이며 안정판 배포 약속은 포함하지 않습니다.</p>
             </div>
             <button class="copy-button" type="button" data-copy-target="#desktop-command">복사</button>
             <pre><code id="desktop-command"><span class="prompt">$</span> pnpm install

@@ -39,7 +39,7 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("검증은 더 치밀해져야 합니다.");
     expect(html).not.toContain("3114 황준혁 | Justn");
     expect(html).not.toContain("qr-grid");
-    expect(html).toContain("RC는 정식 출시 전 검증 채널");
+    expect(html).toContain("현재 RC 채널입니다.");
     expect(html).toContain("data-command-status");
     expect(html).not.toMatch(/web dashboard/i);
     expect(html).not.toMatch(/stable desktop/i);
@@ -205,11 +205,10 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain('lang="ko"');
     expect(html).toContain("토론하는 리뷰");
     expect(html).toContain("여러 AI가 토론하고 사람이 결정하는 코드 리뷰");
-    expect(html).toContain("비개발자");
     expect(html).toContain("그럴듯한 오답");
     expect(html).toContain("무엇을 해야 하는지");
     expect(html).toContain("결정 자료");
-    expect(html).toContain("긴 코멘트 목록 대신");
+    expect(html).toContain("긴 코멘트보다 결정이 먼저입니다.");
     expect(html).toContain("ACCEPT");
     expect(html).toContain("REJECT");
     expect(html).toContain("NEEDS_HUMAN");
