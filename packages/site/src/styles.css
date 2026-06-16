@@ -343,8 +343,8 @@ p {
 
 h1 {
   color: var(--text);
-  font-size: clamp(3rem, 5vw, 5.2rem);
-  line-height: 1.04;
+  font-size: clamp(2.75rem, 4.35vw, 4.45rem);
+  line-height: 1.08;
   letter-spacing: 0;
   font-weight: 850;
 }
@@ -360,9 +360,9 @@ h1 span {
 
 .lede {
   max-width: 650px;
-  margin-top: 24px;
+  margin-top: 20px;
   color: var(--muted);
-  font-size: clamp(1.05rem, 1.35vw, 1.18rem);
+  font-size: clamp(1rem, 1.22vw, 1.1rem);
   line-height: 1.7;
 }
 
@@ -1428,10 +1428,10 @@ h1 span {
 }
 
 .section-heading h2 {
-  max-width: 16ch;
+  max-width: 18ch;
   color: var(--text);
-  font-size: clamp(1.85rem, 3.35vw, 3.25rem);
-  line-height: 1.18;
+  font-size: clamp(1.55rem, 2.45vw, 2.45rem);
+  line-height: 1.24;
   font-weight: 850;
   letter-spacing: 0;
 }
@@ -1531,10 +1531,10 @@ h1 span {
 }
 
 .decision-section h2 {
-  max-width: 16ch;
+  max-width: 18ch;
   color: #f3f6fb;
-  font-size: clamp(1.75rem, 3.1vw, 2.85rem);
-  line-height: 1.16;
+  font-size: clamp(1.55rem, 2.35vw, 2.35rem);
+  line-height: 1.23;
   font-weight: 850;
 }
 
@@ -1749,10 +1749,10 @@ h1 span {
 }
 
 .install-copy h2 {
-  max-width: 17ch;
+  max-width: 19ch;
   color: white;
-  font-size: clamp(1.85rem, 3.35vw, 3.2rem);
-  line-height: 1.14;
+  font-size: clamp(1.55rem, 2.45vw, 2.45rem);
+  line-height: 1.22;
   font-weight: 850;
   letter-spacing: 0;
 }
@@ -2203,13 +2203,13 @@ code {
   }
 
   h1 {
-    font-size: clamp(2.55rem, 10.5vw, 3.35rem);
-    line-height: 1.08;
+    font-size: clamp(2.25rem, 9.2vw, 2.85rem);
+    line-height: 1.12;
     word-break: keep-all;
   }
 
   .lede {
-    font-size: 0.98rem;
+    font-size: 0.95rem;
     line-height: 1.7;
     overflow-wrap: anywhere;
     word-break: keep-all;
@@ -2395,12 +2395,12 @@ code {
 
   .section-heading h2,
   .install-copy h2 {
-    font-size: clamp(1.72rem, 8.2vw, 2.55rem);
-    line-height: 1.18;
+    font-size: clamp(1.42rem, 6.6vw, 2rem);
+    line-height: 1.23;
   }
 
   .decision-section h2 {
-    font-size: clamp(1.65rem, 7.6vw, 2.35rem);
+    font-size: clamp(1.36rem, 6.2vw, 1.9rem);
   }
 
   .install-section {
