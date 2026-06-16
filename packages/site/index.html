@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CodeAgora는 여러 LLM 리뷰어가 같은 PR을 독립적으로 검토하고 토론한 뒤 근거 있는 최종 Verdict를 반환하는 코드 리뷰 파이프라인입니다.">
+    <title>CodeAgora - LLM 코드 리뷰 운영 콘솔</title>
+    <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./src/styles.css">
+    <script>
+      (function() {
+        const savedTheme = localStorage.getItem("theme");
+        const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="CodeAgora 홈">
+        <img src="/assets/logo.svg" alt="" width="34" height="34">
+        <span>CodeAgora</span>
+      </a>
+      <div class="header-actions">
+        <nav class="nav-links" aria-label="주요 탐색">
+          <a href="#pipeline">파이프라인</a>
+          <a href="#surfaces">지원 표면</a>
+          <a href="#install">설치</a>
+          <a href="https://github.com/bssm-oss/CodeAgora">GitHub</a>
+        </nav>
+        <button id="theme-toggle" class="theme-toggle-btn" aria-label="테마 전환" type="button">
+          <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
+          </svg>
+          <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">LLM 코드 리뷰를 운영 가능한 파이프라인으로</p>
+          <h1 id="hero-title">
+            <span>토론하는 리뷰,</span>
+            <span>근거 있는 판정.</span>
+          </h1>
+          <p class="lede">
+            <span>CodeAgora는 여러 모델을 병렬 리뷰어로 실행합니다.</span>
+            <span>약한 지적은 걸러냅니다.</span>
+            <span>사람이 검토할 수 있는 최종 Verdict와 증거를 남깁니다.</span>
+          </p>
+          <div class="hero-status-row" aria-label="랜딩 핵심 상태">
+            <span class="status-label good">CLI 준비</span>
+            <span class="status-label info">MCP 연결</span>
+            <span class="status-label warn">Desktop RC</span>
+          </div>
+          <div class="hero-actions" aria-label="주요 작업">
+            <a class="button primary" href="#install">RC 설치하기</a>
+            <a class="button secondary" href="https://github.com/bssm-oss/CodeAgora">소스 보기</a>
+          </div>
+        </div>
+
+        <div class="app-demo" aria-label="CodeAgora 리뷰 콘솔 데모">
+          <aside class="demo-sidebar" aria-hidden="true">
+            <div class="demo-brand">
+              <img src="/assets/logo.svg" alt="" width="38" height="38">
+              <div>
+                <strong>CodeAgora</strong>
+                <span>Desktop RC</span>
+              </div>
+            </div>
+            <div class="demo-nav">
+              <span class="is-active">Review Run</span>
+              <span>Sessions</span>
+              <span>Evidence</span>
+              <span>Config</span>
+            </div>
+          </aside>
+
+          <div class="demo-main">
+            <div class="demo-topbar">
+              <div>
+                <span class="status-dot"></span>
+                <strong>PR #584 landing-page</strong>
+              </div>
+              <span class="run-state" data-run-state>리뷰 진행 중</span>
+            </div>
+
+            <div class="demo-metrics" aria-label="리뷰 실행 요약">
+              <div class="metric-card good">
+                <span>Reviewers</span>
+                <strong>4 active</strong>
+              </div>
+              <div class="metric-card info">
+                <span>Discussion</span>
+                <strong>1 round</strong>
+              </div>
+              <div class="metric-card warn">
+                <span>Decision</span>
+                <strong>Human check</strong>
+              </div>
+            </div>
+
+            <div class="demo-grid">
+              <section class="run-panel diff-panel">
+                <div class="panel-heading">
+                  <span>01</span>
+                  <h2>Diff 분석</h2>
+                </div>
+                <div class="diff-lines" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <p>영향 범위, TS 진단, 리뷰 제외 규칙을 먼저 정리합니다.</p>
+              </section>
+
+              <section class="run-panel reviewers-panel">
+                <div class="panel-heading">
+                  <span>02</span>
+                  <h2>병렬 리뷰어</h2>
+                </div>
+                <div class="reviewer-list" aria-label="병렬 리뷰어 상태">
+                  <article class="reviewer-card reviewer-card-1">
+                    <strong>Security</strong>
+                    <span>인증 경계 확인</span>
+                  </article>
+                  <article class="reviewer-card reviewer-card-2">
+                    <strong>Reliability</strong>
+                    <span>실패 경로 확인</span>
+                  </article>
+                  <article class="reviewer-card reviewer-card-3">
+                    <strong>Maintainer</strong>
+                    <span>패키지 영향 확인</span>
+                  </article>
+                  <article class="reviewer-card reviewer-card-4">
+                    <strong>UX</strong>
+                    <span>사용 흐름 확인</span>
+                  </article>
+                </div>
+              </section>
+
+              <section class="run-panel debate-panel">
+                <div class="panel-heading">
+                  <span>03</span>
+                  <h2>토론과 필터</h2>
+                </div>
+                <div class="debate-track" aria-hidden="true">
+                  <span class="node node-a"></span>
+                  <span class="node node-b"></span>
+                  <span class="node node-c"></span>
+                </div>
+                <p>중복, 근거 없는 라인 인용, 상충된 결론을 정리합니다.</p>
+              </section>
+
+              <section class="run-panel verdict-panel">
+                <div class="panel-heading">
+                  <span>04</span>
+                  <h2>Head Verdict</h2>
+                </div>
+                <strong class="verdict-text" data-verdict>확인 필요</strong>
+                <p>확정 2건, 확인 필요 1건</p>
+                <div class="verdict-evidence" aria-hidden="true">
+                  <span>line 42</span>
+                  <span>config</span>
+                  <span>risk</span>
+                </div>
+              </section>
+            </div>
+
+            <div class="progress-row" aria-label="리뷰 파이프라인 진행률">
+              <span data-step-label>Diff 분석</span>
+              <div class="progress-shell">
+                <div class="progress-fill"></div>
+              </div>
+              <span>4단계 순환</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proof-strip" aria-label="제품 요약">
+        <div>
+          <strong>4</strong>
+          <span>공식 지원 표면</span>
+        </div>
+        <div>
+          <strong>L0-L3</strong>
+          <span>리뷰 파이프라인</span>
+        </div>
+        <div>
+          <strong>RC</strong>
+          <span>npm 배포 채널</span>
+        </div>
+        <div>
+          <strong>MIT</strong>
+          <span>오픈소스</span>
+        </div>
+      </section>
+
+      <section id="pipeline" class="section pipeline-section">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">단일 프롬프트가 아니라 리뷰 시스템</p>
+            <h2>모델 의견을 그대로 믿지 않고, 검증 가능한 결론으로 좁힙니다.</h2>
+          </div>
+          <p class="description">CodeAgora는 리뷰어 선택, 병렬 검토, hallucination 필터, 토론, 최종 판정을 분리해 약한 신호가 릴리스 결정을 흔들지 않게 만듭니다.</p>
+        </div>
+        <div class="pipeline-cards">
+          <article>
+            <span>01</span>
+            <h3>분석</h3>
+            <p>변경 범위와 위험도를 먼저 계산해 리뷰어에게 필요한 맥락을 제공합니다.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>병렬 검토</h3>
+            <p>보안, 안정성, 유지보수성 관점의 리뷰어가 독립적으로 같은 diff를 봅니다.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>토론</h3>
+            <p>충돌된 지적은 supporter와 devil's advocate를 거쳐 근거를 다시 확인합니다.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>판정</h3>
+            <p>`ACCEPT`, `REJECT`, `NEEDS_HUMAN`과 함께 재검토 가능한 증거를 남깁니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="surfaces" class="section surfaces-section">
+        <div class="section-heading compact">
+          <div class="heading-group">
+            <p class="eyebrow">하나의 엔진, 네 가지 진입점</p>
+            <h2>CLI, GitHub Action, MCP, Desktop이 같은 리뷰 의미론을 공유합니다.</h2>
+          </div>
+        </div>
+        <div class="surface-list">
+          <article>
+            <h3>CLI</h3>
+            <p>터미널에서 diff 리뷰를 실행하고 세션 산출물을 남깁니다.</p>
+          </article>
+          <article>
+            <h3>GitHub Action</h3>
+            <p>PR에서 권한, secret, provider 실패를 안전하게 처리하며 리뷰 결과를 게시합니다.</p>
+          </article>
+          <article>
+            <h3>MCP</h3>
+            <p>IDE와 에이전트가 리뷰, 설정, 세션 도구를 같은 계약으로 호출합니다.</p>
+          </article>
+          <article>
+            <h3>Desktop</h3>
+            <p>로컬 세션 탐색, 리뷰 실행, 결과 확인, 증거 내보내기를 앱에서 다룹니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="section install-section">
+        <div class="install-copy">
+          <p class="eyebrow">RC 채널로 시작하기</p>
+          <h2>팀의 현재 작업 흐름에 바로 붙입니다.</h2>
+          <p>터미널, CI/CD, IDE 에이전트, 로컬 Desktop 중 팀 환경에 맞는 인터페이스를 골라 같은 리뷰 파이프라인을 바로 실행하세요.</p>
+        </div>
+
+        <div class="command-console">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <div class="terminal-title">CodeAgora Terminal</div>
+          </div>
+          <div class="tabs" role="tablist" aria-label="설치 명령">
+            <button class="is-active" type="button" role="tab" aria-selected="true" data-command-tab="cli">CLI</button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="action">Action</button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="mcp">MCP</button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-command-tab="desktop">Desktop</button>
+          </div>
+
+          <div class="command-panel" data-command-panel="cli">
+            <button class="copy-button" type="button" data-copy-target="#cli-command">복사</button>
+            <pre><code id="cli-command">npm i -g @codeagora/review@rc
+agora init
+git diff | agora review</code></pre>
+          </div>
+
+          <div class="command-panel" data-command-panel="action" hidden>
+            <button class="copy-button" type="button" data-copy-target="#action-command">복사</button>
+            <pre><code id="action-command">- uses: bssm-oss/CodeAgora@v0.1.0-rc.6
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+  env:
+    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}</code></pre>
+          </div>
+
+          <div class="command-panel" data-command-panel="mcp" hidden>
+            <button class="copy-button" type="button" data-copy-target="#mcp-command">복사</button>
+            <pre><code id="mcp-command">{
+  "mcpServers": {
+    "codeagora": {
+      "command": "npx",
+      "args": ["-y", "@codeagora/mcp@rc"]
+    }
+  }
+}</code></pre>
+          </div>
+
+          <div class="command-panel" data-command-panel="desktop" hidden>
+            <button class="copy-button" type="button" data-copy-target="#desktop-command">복사</button>
+            <pre><code id="desktop-command">pnpm install
+pnpm --filter @codeagora/desktop dev
+pnpm desktop:smoke</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>CodeAgora</span>
+      <a href="https://github.com/bssm-oss/CodeAgora">GitHub</a>
+      <a href="https://www.npmjs.com/package/@codeagora/review">npm</a>
+      <a href="https://github.com/bssm-oss/CodeAgora/tree/main/docs">문서</a>
+    </footer>
+
+    <script src="./src/main.js" type="module"></script>
+  </body>
+</html>
