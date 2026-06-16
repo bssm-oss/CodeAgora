@@ -17,6 +17,7 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("중개 서버 없이");
     expect(html).toContain("검증 가능한 품질");
     expect(html).toContain("어디서 실행해도 같은 기준");
+    expect(html).toContain("RC는 정식 출시 전 검증 채널");
     expect(html).not.toMatch(/web dashboard/i);
     expect(html).not.toMatch(/stable desktop/i);
     expect(html).not.toMatch(/90%|85%/);
@@ -37,6 +38,10 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("그럴듯한 오답");
     expect(html).toContain("무엇을 해야 하는지");
     expect(html).toContain("결정 자료");
+    expect(html).toContain("긴 코멘트 목록 대신");
+    expect(html).toContain("ACCEPT");
+    expect(html).toContain("REJECT");
+    expect(html).toContain("NEEDS_HUMAN");
     expect(html).toContain("CodeAgora 리뷰 아레나 데모");
     expect(html).toContain('data-arena-file="init"');
     expect(html).toContain('data-arena-file="orchestrator"');
@@ -45,6 +50,8 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("CLI_PRESET_EXCLUDED_BACKENDS");
     expect(html).toContain("검토 범위");
     expect(html).toContain("근거 대조");
+    expect(html).toContain("파일 확인");
+    expect(html).toContain("인용 검증");
     expect(html).toContain("Head Verdict");
     expect(css).toContain("@media");
     expect(css).toContain("prefers-reduced-motion");
@@ -54,6 +61,9 @@ describe("CodeAgora landing page", () => {
     expect(css).toContain(".arena-files");
     expect(css).toContain(".plain-summary");
     expect(css).toContain(".explain-grid");
+    expect(css).toContain(".decision-grid");
+    expect(css).toContain(".verdict-guide");
+    expect(css).toContain(".diff-insight-row");
     expect(css).toContain("scan-beam");
     expect(js).toContain("data-command-tab");
     expect(js).toContain("arenaScenarios");

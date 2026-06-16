@@ -213,11 +213,27 @@ p {
 }
 
 .nav-links a {
-  transition: color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .nav-links a:hover {
   color: var(--brand);
+}
+
+.nav-links .nav-cta {
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--brand) 52%, var(--border));
+  border-radius: var(--radius-md);
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+}
+
+.nav-links .nav-cta:hover {
+  color: var(--primary-text);
+  background: var(--brand);
 }
 
 /* ── Theme Toggle Button ─────────────────────────── */
@@ -275,6 +291,8 @@ p {
 /* ── Hero Section ─────────────────────────── */
 
 .hero {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(320px, 0.58fr) minmax(0, 1fr);
   gap: clamp(24px, 4vw, 52px);
@@ -288,7 +306,22 @@ p {
   color: #f3f6fb;
 }
 
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(237, 241, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(237, 241, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, transparent 0 52%, rgba(5, 166, 185, 0.16) 52% 52.2%, transparent 52.2%);
+  background-size: 52px 52px, 52px 52px, 100% 100%;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.74), transparent 92%);
+  pointer-events: none;
+}
+
 .hero-copy {
+  position: relative;
   align-self: start;
   min-width: 0;
   max-width: 690px;
@@ -318,6 +351,7 @@ h1 {
 
 .hero h1 {
   color: #f3f6fb;
+  text-shadow: 0 18px 46px rgba(5, 166, 185, 0.2);
 }
 
 h1 span {
@@ -432,6 +466,57 @@ h1 span {
   line-height: 1.48;
 }
 
+.release-note {
+  max-width: 590px;
+  margin-top: 12px;
+  color: #8f99aa;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.verdict-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.verdict-guide span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid rgba(237, 241, 255, 0.12);
+  border-radius: var(--radius-md);
+  color: #b8c0cf;
+  background: rgba(237, 241, 255, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.verdict-guide strong {
+  color: #edf1ff;
+  font-family: inherit;
+  font-size: 0.72rem;
+}
+
+.verdict-guide .good {
+  border-color: rgba(134, 239, 172, 0.34);
+  color: #86efac;
+}
+
+.verdict-guide .danger {
+  border-color: rgba(252, 165, 165, 0.34);
+  color: #fca5a5;
+}
+
+.verdict-guide .warn {
+  border-color: rgba(251, 191, 36, 0.38);
+  color: #fbbf24;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -454,13 +539,15 @@ h1 span {
 
 .button.primary {
   border-color: color-mix(in srgb, var(--brand) 80%, var(--border));
-  color: var(--primary-text);
-  background: var(--brand);
-  box-shadow: var(--shadow-soft);
+  color: #06131a;
+  background:
+    linear-gradient(135deg, #7be6ef 0%, var(--brand) 48%, #86efac 120%);
+  box-shadow: 0 14px 30px rgba(5, 166, 185, 0.22), var(--shadow-soft);
 }
 
 .button.primary:hover {
-  background: color-mix(in srgb, var(--brand) 88%, var(--text));
+  background:
+    linear-gradient(135deg, #a7f3f8 0%, var(--brand) 48%, #bbf7d0 120%);
   box-shadow: var(--shadow);
 }
 
@@ -489,6 +576,7 @@ h1 span {
 /* ── Review Arena Hero ─────────────────────────── */
 
 .review-arena {
+  position: relative;
   justify-self: end;
   width: min(100%, 840px);
   min-width: 0;
@@ -496,7 +584,17 @@ h1 span {
   border: 1px solid rgba(237, 241, 255, 0.14);
   border-radius: var(--radius-lg);
   background: #111318;
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(5, 166, 185, 0.08) inset;
+}
+
+.review-arena::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #05a6b9, #fbbf24, #86efac);
+  opacity: 0.92;
+  pointer-events: none;
 }
 
 .arena-window-bar {
@@ -623,6 +721,25 @@ h1 span {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 16px;
+}
+
+.diff-insight-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.diff-insight-row span {
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 1px solid rgba(5, 166, 185, 0.2);
+  border-radius: var(--radius-md);
+  color: #9be8ef;
+  background: rgba(5, 166, 185, 0.08);
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-align: center;
 }
 
 .diff-header strong,
@@ -1279,7 +1396,9 @@ h1 span {
 /* ── Sections general ─────────────────────────── */
 
 .section {
+  position: relative;
   padding: clamp(62px, 9vw, 110px) clamp(20px, 5vw, 72px);
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
 }
 
 .section-heading {
@@ -1331,6 +1450,8 @@ h1 span {
 .pipeline-cards article,
 .surface-list article,
 .explain-grid article {
+  position: relative;
+  overflow: hidden;
   min-height: 214px;
   padding: 24px;
   border: 1px solid var(--border);
@@ -1338,6 +1459,18 @@ h1 span {
   background: var(--surface-soft);
   box-shadow: var(--shadow-soft);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.3s;
+}
+
+.pipeline-cards article::before,
+.surface-list article::before,
+.explain-grid article::before,
+.decision-grid article::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: linear-gradient(90deg, var(--brand), transparent);
 }
 
 .pipeline-cards article:hover,
@@ -1357,6 +1490,75 @@ h1 span {
 
 .pipeline-section {
   background: var(--bg);
+}
+
+.decision-section {
+  padding-block: clamp(34px, 5vw, 62px);
+  background:
+    linear-gradient(90deg, rgba(5, 166, 185, 0.12), transparent 42%),
+    var(--report-bg);
+  color: var(--report-text);
+}
+
+.decision-band {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(22px, 4vw, 52px);
+  align-items: center;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.decision-section .eyebrow {
+  color: #7be6ef;
+}
+
+.decision-section h2 {
+  max-width: 14ch;
+  color: #f3f6fb;
+  font-size: clamp(1.8rem, 4vw, 3.4rem);
+  line-height: 1.17;
+  font-weight: 850;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.decision-grid article {
+  position: relative;
+  min-height: 168px;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid rgba(237, 241, 255, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(237, 241, 255, 0.06);
+}
+
+.decision-grid span {
+  display: inline-flex;
+  margin-bottom: 16px;
+  padding: 5px 9px;
+  border-radius: var(--radius-md);
+  color: #7be6ef;
+  background: rgba(5, 166, 185, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.decision-grid strong {
+  display: block;
+  color: #f3f6fb;
+  font-size: 1rem;
+}
+
+.decision-grid p {
+  margin-top: 10px;
+  color: #b8c0cf;
+  line-height: 1.62;
 }
 
 .pipeline-cards span,
@@ -1877,9 +2079,14 @@ code {
   }
 
   .plain-summary,
+  .decision-band,
   .filter-rail,
   .trust-grid,
   .quality-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1971,6 +2178,15 @@ code {
     margin-top: 18px;
   }
 
+  .release-note {
+    max-width: calc(100vw - 32px);
+  }
+
+  .verdict-guide {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .button {
     min-height: 44px;
     padding-inline: 14px;
@@ -2012,6 +2228,17 @@ code {
 
   .diff-header strong {
     font-size: 0.88rem;
+  }
+
+  .diff-insight-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .diff-insight-row span {
+    min-height: 26px;
+    padding: 5px 6px;
+    font-size: 0.66rem;
   }
 
   .path-label {
@@ -2100,6 +2327,7 @@ code {
   .pipeline-cards,
   .surface-list,
   .explain-grid,
+  .decision-grid,
   .trust-grid,
   .quality-strip {
     grid-template-columns: 1fr;
