@@ -10,7 +10,10 @@ const files = [
   ["index.html", "index.html"],
   ["src/styles.css", "src/styles.css"],
   ["src/main.js", "src/main.js"],
-  ["../../assets/logo.svg", "assets/logo.svg"]
+  ["../../assets/logo.svg", "assets/logo.svg"],
+  ["assets/social-card.svg", "assets/social-card.svg"],
+  ["robots.txt", "robots.txt"],
+  ["sitemap.xml", "sitemap.xml"]
 ];
 
 await rm(distDir, { force: true, recursive: true });
@@ -22,4 +25,3 @@ for (const [from, to] of files) {
 }
 
 console.log(`Built CodeAgora site at ${distDir.replace(repoRoot, ".")}`);
-

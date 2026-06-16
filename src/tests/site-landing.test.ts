@@ -6,6 +6,10 @@ const siteRoot = resolve(process.cwd(), "packages/site");
 const html = readFileSync(resolve(siteRoot, "index.html"), "utf8");
 const css = readFileSync(resolve(siteRoot, "src/styles.css"), "utf8");
 const js = readFileSync(resolve(siteRoot, "src/main.js"), "utf8");
+const robots = readFileSync(resolve(siteRoot, "robots.txt"), "utf8");
+const sitemap = readFileSync(resolve(siteRoot, "sitemap.xml"), "utf8");
+const socialCard = readFileSync(resolve(siteRoot, "assets/social-card.svg"), "utf8");
+const siteUrl = "https://bssm-oss.github.io/CodeAgora/";
 
 describe("CodeAgora landing page", () => {
   it("keeps public claims aligned with supported product surfaces", () => {
@@ -29,6 +33,54 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("npm i -g @codeagora/review@rc");
     expect(html).toContain("bssm-oss/CodeAgora@v0.1.0-rc.6");
     expect(html).toContain("@codeagora/mcp@rc");
+  });
+
+  it("publishes canonical SEO and social preview metadata", () => {
+    expect(html).toContain(`<link rel="canonical" href="${siteUrl}">`);
+    expect(html).toContain(`<link rel="alternate" hreflang="ko" href="${siteUrl}">`);
+    expect(html).toContain('<meta name="robots" content="index, follow, max-image-preview:large">');
+    expect(html).toContain('<meta property="og:type" content="website">');
+    expect(html).toContain(`<meta property="og:url" content="${siteUrl}">`);
+    expect(html).toContain('<meta property="og:image" content="https://bssm-oss.github.io/CodeAgora/assets/social-card.svg">');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(html).toContain('<meta name="theme-color" content="#111318">');
+    expect(html).not.toContain("90%");
+  });
+
+  it("keeps structured data valid and aligned with supported surfaces", () => {
+    const match = html.match(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/);
+    expect(match?.[1]).toBeTruthy();
+    const structuredData = JSON.parse(match?.[1] ?? "{}");
+
+    expect(structuredData["@context"]).toBe("https://schema.org");
+    expect(structuredData["@graph"]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          "@type": "WebSite",
+          url: siteUrl,
+          inLanguage: "ko-KR"
+        }),
+        expect.objectContaining({
+          "@type": "SoftwareApplication",
+          applicationCategory: "DeveloperApplication",
+          codeRepository: "https://github.com/bssm-oss/CodeAgora",
+          downloadUrl: "https://www.npmjs.com/package/@codeagora/review"
+        })
+      ])
+    );
+    expect(JSON.stringify(structuredData)).toContain("CLI, GitHub Action, MCP, Desktop");
+    expect(JSON.stringify(structuredData)).not.toMatch(/stable Desktop|web dashboard/i);
+  });
+
+  it("ships crawler files and social card assets", () => {
+    expect(robots).toContain("User-agent: *");
+    expect(robots).toContain("Allow: /");
+    expect(robots).toContain("Sitemap: https://bssm-oss.github.io/CodeAgora/sitemap.xml");
+    expect(sitemap).toContain(`<loc>${siteUrl}</loc>`);
+    expect(sitemap).toContain("<lastmod>2026-06-16</lastmod>");
+    expect(socialCard).toContain("<svg");
+    expect(socialCard).toContain("CodeAgora");
+    expect(socialCard).toContain("토론하는 리뷰");
   });
 
   it("keeps static asset paths portable for subpath hosting", () => {
