@@ -228,20 +228,27 @@
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="poster-kicker">AI가 코드를 쏟아낼수록, 검증은 더 치밀해져야 합니다.</p>
+          <p class="poster-kicker">
+            <span>AI가 코드를 쏟아낼수록,</span>
+            <span>검증은 더 치밀해져야 합니다.</span>
+          </p>
           <div class="poster-wordmark" aria-label="CodeAgora">
             <img class="poster-logo-mark" src="./assets/logo.svg" alt="" width="82" height="82">
             <img class="poster-logo-type" src="./assets/codeagora-wordmark.png" alt="CodeAgora" width="548" height="117">
           </div>
-          <p class="poster-author">3114 황준혁 | Justn</p>
           <p class="eyebrow">여러 AI가 토론하고 사람이 결정하는 코드 리뷰</p>
           <h1 id="hero-title">
             <span>단일 AI 리뷰를 넘어</span>
-            <span>검증 가능한 최종 판단으로.</span>
+            <span>검증 가능한</span>
+            <span>최종 판단으로.</span>
           </h1>
           <p class="lede">
-            <span>AI가 짠 코드, 성능 좋은 AI 하나로 검증하기엔 부족하고 비쌉니다.</span>
-            <span>CodeAgora는 코드 변경사항을 여러 AI 리뷰어에게 나눠 분석시키고, 중요한 의견은 토론하게 만든 뒤, 승인 가능·수정 필요·사람 확인 필요로 바로 이해할 수 있게 정리합니다.</span>
+            <span>AI가 짠 코드는 좋은 AI 하나로만</span>
+            <span>검증하기엔 부족하고 비쌉니다.</span>
+            <span>CodeAgora는 코드 변경을</span>
+            <span>여러 AI 리뷰어에게 나눠 맡기고,</span>
+            <span>중요한 의견은 토론시킨 뒤</span>
+            <span>바로 이해할 수 있는 판정으로 정리합니다.</span>
           </p>
           <div class="hero-actions" aria-label="주요 작업">
             <a class="button primary" href="#install">RC로 시작하기</a>
@@ -266,40 +273,6 @@
             <span class="good">ACCEPT <strong>승인 가능</strong></span>
             <span class="danger">REJECT <strong>수정 필요</strong></span>
             <span class="warn">NEEDS_HUMAN <strong>사람 확인</strong></span>
-          </div>
-        </div>
-
-        <div class="poster-panel" aria-label="CodeAgora 포스터형 요약">
-          <a class="poster-qr" href="https://github.com/bssm-oss/CodeAgora" aria-label="CodeAgora GitHub에서 더 알아보기">
-            <span class="qr-grid" aria-hidden="true">
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-            </span>
-            <strong>CodeAgora 더 알아보기</strong>
-            <span>설계 과정 · 벤치마크 · 개발 기록</span>
-          </a>
-          <div class="poster-sigil" aria-hidden="true">
-            <img src="./assets/logo.svg" alt="" width="280" height="280">
-          </div>
-          <div class="poster-metrics" aria-label="품질 검증 결과 요약">
-            <div>
-              <span>테스트 사례</span>
-              <strong>20</strong>
-            </div>
-            <div>
-              <span>탐지율</span>
-              <strong>100%</strong>
-            </div>
-            <div>
-              <span>정밀도</span>
-              <strong>94.4%</strong>
-            </div>
           </div>
         </div>
       </section>
@@ -507,43 +480,6 @@
           <article>
             <h3>Desktop</h3>
             <p>터미널이 익숙하지 않은 팀원도 로컬 세션, 리뷰 실행, 결과 확인, 증거 내보내기를 화면에서 다룰 수 있게 하는 RC 앱입니다. 별도 판단 규칙을 만들지 않고 같은 리뷰 결과를 보여줍니다.</p>
-          </article>
-        </div>
-      </section>
-
-      <section id="use-cases" class="section use-case-section">
-        <div class="section-heading">
-          <div class="heading-group">
-            <p class="eyebrow">어떤 검색어로 찾아도 같은 제품</p>
-            <h2>AI 코드 리뷰 도구가 필요한 순간을 CodeAgora스럽게 정리했습니다.</h2>
-          </div>
-          <p class="description">CodeAgora는 단순히 “AI가 리뷰 코멘트를 써주는 도구”가 아닙니다. 로컬 diff, GitHub Pull Request, MCP 기반 AI IDE, Desktop RC까지 같은 판단 기준으로 연결해 팀이 결정할 수 있는 근거를 남깁니다.</p>
-        </div>
-        <div class="use-case-grid">
-          <article>
-            <span>AI 코드 리뷰 도구</span>
-            <h3>한 번의 답보다 여러 관점의 합의를 보고 싶을 때</h3>
-            <p>보안, 안정성, 유지보수성 리뷰어가 같은 변경을 따로 보고 충돌하는 주장을 다시 토론합니다. 최종 결과는 긴 감상문이 아니라 사람이 결정할 수 있는 판정표로 남습니다.</p>
-          </article>
-          <article>
-            <span>GitHub Action 코드 리뷰 자동화</span>
-            <h3>Pull Request마다 같은 기준을 자동으로 붙이고 싶을 때</h3>
-            <p>팀 저장소에서는 GitHub Action으로 PR 리뷰를 실행합니다. provider secret이 없거나 fork PR처럼 조심해야 하는 상황도 리뷰 실패와 보안 상태를 구분해서 다룹니다.</p>
-          </article>
-          <article>
-            <span>MCP 코드 리뷰</span>
-            <h3>AI IDE와 코딩 에이전트가 리뷰 도구를 직접 부르게 할 때</h3>
-            <p>MCP 서버는 에이전트가 CodeAgora의 리뷰, 설정, 세션 조회 기능을 정해진 도구 계약으로 호출하게 합니다. 에이전트마다 따로 리뷰 의미를 재해석하지 않아도 됩니다.</p>
-          </article>
-          <article>
-            <span>CLI diff review</span>
-            <h3>로컬에서 커밋 전 변경을 빠르게 확인하고 싶을 때</h3>
-            <p>터미널에서 현재 diff를 넘기면 동일한 멀티 LLM 리뷰 파이프라인이 실행됩니다. 로컬 세션 산출물이 남기 때문에 나중에 같은 판단을 다시 확인할 수 있습니다.</p>
-          </article>
-          <article>
-            <span>Desktop RC</span>
-            <h3>터미널이 익숙하지 않은 팀원도 결과를 읽어야 할 때</h3>
-            <p>Desktop은 로컬 리뷰 세션과 결과 확인을 화면에서 다루기 위한 RC 앱입니다. 별도의 판단 규칙을 만들지 않고 CLI, Action, MCP와 같은 결과 의미를 보여주는 방향입니다.</p>
           </article>
         </div>
       </section>

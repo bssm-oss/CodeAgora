@@ -6,6 +6,10 @@ function prefersReducedMotion() {
   return motionQuery.matches;
 }
 
+function supportsFinePointer() {
+  return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
 function updateScrollProgress() {
   const scrollable = document.documentElement.scrollHeight - window.innerHeight;
   const progress = scrollable > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollable)) : 0;
@@ -13,7 +17,7 @@ function updateScrollProgress() {
 }
 
 function updatePointerGlow(event) {
-  if (prefersReducedMotion()) {
+  if (prefersReducedMotion() || !supportsFinePointer()) {
     return;
   }
 
@@ -78,7 +82,7 @@ if (themeToggle) {
 }
 
 const revealTargets = [
-  ...document.querySelectorAll(".section-heading, .pipeline-cards article, .surface-list article, .explain-grid article, .decision-grid article, .trust-grid article, .quality-strip code, .use-case-grid article, .faq-list details, .command-console")
+  ...document.querySelectorAll(".section-heading, .pipeline-cards article, .surface-list article, .explain-grid article, .decision-grid article, .trust-grid article, .quality-strip code, .faq-list details, .command-console")
 ];
 
 function syncRevealTargets() {
@@ -203,8 +207,7 @@ function attachTiltEffect(element, strength = 6) {
 }
 
 attachTiltEffect(document.querySelector(".review-arena"), 4.5);
-attachTiltEffect(document.querySelector(".poster-panel"), 3.6);
-for (const card of document.querySelectorAll(".pipeline-cards article, .surface-list article, .explain-grid article, .use-case-grid article")) {
+for (const card of document.querySelectorAll(".pipeline-cards article, .surface-list article, .explain-grid article")) {
   attachTiltEffect(card, 3.2);
 }
 
