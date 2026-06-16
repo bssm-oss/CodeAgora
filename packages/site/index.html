@@ -88,24 +88,24 @@
                 </div>
               </div>
               <nav aria-label="리뷰 파일 목록">
-                <span class="is-active">packages/cli/src/commands/init.ts</span>
-                <span>packages/core/src/pipeline/orchestrator.ts</span>
-                <span>action.yml</span>
-                <span>packages/desktop/src/main.ts</span>
+                <button class="is-active" type="button" data-arena-file="init" aria-pressed="true">packages/cli/src/commands/init.ts</button>
+                <button type="button" data-arena-file="orchestrator" aria-pressed="false">packages/core/src/pipeline/orchestrator.ts</button>
+                <button type="button" data-arena-file="action" aria-pressed="false">action.yml</button>
+                <button type="button" data-arena-file="desktop" aria-pressed="false">packages/desktop/src/main.ts</button>
               </nav>
             </aside>
 
-            <section class="arena-diff" aria-label="실제 저장소 코드 기반 리뷰 예시">
+            <section class="arena-diff" aria-label="실제 저장소 코드 기반 리뷰 예시" aria-live="polite">
               <div class="diff-header">
                 <div>
-                  <span class="path-label">packages/cli/src/commands/init.ts</span>
-                  <strong>프리셋 생성 경로 검토</strong>
+                  <span class="path-label" data-arena-path>packages/cli/src/commands/init.ts</span>
+                  <strong data-arena-title>프리셋 생성 경로 검토</strong>
                 </div>
-                <span class="verdict-stamp">NEEDS_HUMAN</span>
+                <span class="verdict-stamp" data-arena-verdict>NEEDS_HUMAN</span>
               </div>
 
               <div class="code-review-card">
-                <pre><code><span class="code-muted">const</span> CLI_PRESET_EXCLUDED_BACKENDS = <span class="code-muted">new</span> Set([<span class="code-string">'copilot'</span>]);
+                <pre><code data-arena-code><span class="code-muted">const</span> CLI_PRESET_EXCLUDED_BACKENDS = <span class="code-muted">new</span> Set([<span class="code-string">'copilot'</span>]);
 
 <span class="code-muted">export function</span> generatePresets(
   env: EnvironmentReport,
@@ -118,25 +118,25 @@
 
                 <div class="thread-stack" aria-label="에이전트 토론 스레드">
                   <article class="agent-comment security">
-                    <span>Security</span>
-                    <p>로컬 CLI 백엔드는 허용된 실행 경로만 프리셋에 들어가야 합니다. 제외 목록과 탐지 결과를 같이 확인합니다.</p>
+                    <span data-agent-role="0">Security</span>
+                    <p data-agent-text="0">로컬 CLI 백엔드는 허용된 실행 경로만 프리셋에 들어가야 합니다. 제외 목록과 탐지 결과를 같이 확인합니다.</p>
                   </article>
                   <article class="agent-comment maintainer">
-                    <span>Maintainer</span>
-                    <p>`fast`, `budget`, `github-action` 별칭이 같은 설정 계약으로 귀결되는지도 함께 검토해야 합니다.</p>
+                    <span data-agent-role="1">Maintainer</span>
+                    <p data-agent-text="1">`fast`, `budget`, `github-action` 별칭이 같은 설정 계약으로 귀결되는지도 함께 검토해야 합니다.</p>
                   </article>
                   <article class="agent-comment head">
-                    <span>Head Verdict</span>
-                    <p>파일 경로와 코드 인용은 확인됨. 프리셋 별칭과 CLI 백엔드 제외 정책은 사람 검토로 올립니다.</p>
+                    <span data-agent-role="2">Head Verdict</span>
+                    <p data-agent-text="2">파일 경로와 코드 인용은 확인됨. 프리셋 별칭과 CLI 백엔드 제외 정책은 사람 검토로 올립니다.</p>
                   </article>
                 </div>
               </div>
 
               <div class="filter-rail" aria-label="환각 필터 체크">
-                <span data-step-label>파일 실존 확인</span>
-                <span>라인 범위 검증</span>
-                <span>코드 인용 대조</span>
-                <span>상충 주장 검출</span>
+                <button class="is-active" type="button" data-filter-step="file" aria-pressed="true"><span data-step-label>파일 실존 확인</span></button>
+                <button type="button" data-filter-step="line" aria-pressed="false">라인 범위 검증</button>
+                <button type="button" data-filter-step="quote" aria-pressed="false">코드 인용 대조</button>
+                <button type="button" data-filter-step="conflict" aria-pressed="false">상충 주장 검출</button>
               </div>
             </section>
           </div>

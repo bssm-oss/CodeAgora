@@ -33,6 +33,9 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain("토론하는 리뷰");
     expect(html).toContain("LLM 다자 토론형 코드 리뷰");
     expect(html).toContain("CodeAgora 리뷰 아레나 데모");
+    expect(html).toContain('data-arena-file="init"');
+    expect(html).toContain('data-arena-file="orchestrator"');
+    expect(html).toContain('data-filter-step="quote"');
     expect(html).toContain("packages/cli/src/commands/init.ts");
     expect(html).toContain("CLI_PRESET_EXCLUDED_BACKENDS");
     expect(html).toContain("파일 실존 확인");
@@ -46,6 +49,10 @@ describe("CodeAgora landing page", () => {
     expect(css).toContain(".arena-files");
     expect(css).toContain("scan-beam");
     expect(js).toContain("data-command-tab");
+    expect(js).toContain("arenaScenarios");
+    expect(js).toContain("renderArena");
+    expect(js).toContain("data-arena-file");
+    expect(js).toContain("data-filter-step");
     expect(js).toContain("navigator.clipboard");
     expect(js).toContain("reviewSteps");
   });

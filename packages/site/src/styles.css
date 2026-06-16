@@ -517,24 +517,41 @@ h1 span {
   gap: 8px;
 }
 
-.arena-files nav span {
+.arena-files nav button {
   min-width: 0;
   overflow: hidden;
   padding: 10px 11px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: #aeb8c9;
+  background: transparent;
+  cursor: pointer;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.74rem;
   font-weight: 700;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+}
+
+.arena-files nav button:hover {
+  border-color: rgba(237, 241, 255, 0.14);
+  color: #f3f6fb;
+  background: rgba(237, 241, 255, 0.06);
+}
+
+.arena-files nav button:focus-visible,
+.filter-rail button:focus-visible {
+  outline: 3px solid rgba(5, 166, 185, 0.42);
+  outline-offset: 2px;
 }
 
 .arena-files nav .is-active {
   border-color: rgba(5, 166, 185, 0.34);
   color: #7be6ef;
   background: rgba(5, 166, 185, 0.16);
+  transform: translateX(2px);
 }
 
 .arena-diff {
@@ -597,6 +614,9 @@ h1 span {
 }
 
 .code-review-card {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   border: 1px solid rgba(237, 241, 255, 0.12);
   border-radius: var(--radius-lg);
@@ -604,6 +624,9 @@ h1 span {
 }
 
 .code-review-card pre {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 0;
   padding: 18px;
   border-bottom: 1px solid rgba(237, 241, 255, 0.1);
@@ -612,6 +635,12 @@ h1 span {
   line-height: 1.72;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.code-review-card code {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .code-muted {
@@ -674,16 +703,31 @@ h1 span {
   margin-top: 14px;
 }
 
-.filter-rail span {
+.filter-rail button {
   min-height: 32px;
   padding: 8px 9px;
   border: 1px solid rgba(5, 166, 185, 0.22);
   border-radius: var(--radius-md);
   color: #aeb8c9;
   background: rgba(5, 166, 185, 0.08);
+  cursor: pointer;
   font-size: 0.72rem;
   font-weight: 800;
   text-align: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+}
+
+.filter-rail button:hover {
+  border-color: rgba(5, 166, 185, 0.46);
+  color: #f3f6fb;
+  background: rgba(5, 166, 185, 0.14);
+}
+
+.filter-rail button.is-active {
+  border-color: rgba(251, 191, 36, 0.52);
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.16);
+  transform: translateY(-1px);
 }
 
 /* ── App Mockup / Demo ─────────────────────────── */
@@ -1729,7 +1773,28 @@ code {
   }
 
   .arena-files {
+    display: block;
+    padding: 10px 12px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(237, 241, 255, 0.1);
+  }
+
+  .arena-brand {
     display: none;
+  }
+
+  .arena-files nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-x: visible;
+    padding-bottom: 2px;
+  }
+
+  .arena-files nav button {
+    width: auto;
+    flex: 1 1 calc(50% - 8px);
+    max-width: none;
   }
 
   .filter-rail,
@@ -1880,13 +1945,13 @@ code {
     max-height: 78px;
     padding: 12px;
     overflow: hidden;
+    word-break: break-all;
     font-size: 0.68rem;
     line-height: 1.58;
   }
 
   .code-review-card pre code {
     display: block;
-    transform: translateY(-48px);
   }
 
   .thread-stack {
@@ -1908,7 +1973,17 @@ code {
   }
 
   .filter-rail {
-    display: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-x: visible;
+    margin-top: 10px;
+    padding-bottom: 2px;
+  }
+
+  .filter-rail button {
+    min-width: max-content;
+    flex: 1 1 calc(50% - 8px);
   }
 
   .demo-topbar {
