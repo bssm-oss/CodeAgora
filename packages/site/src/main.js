@@ -24,10 +24,10 @@ const commandPanels = document.querySelectorAll("[data-command-panel]");
 const stepLabel = document.querySelector("[data-step-label]");
 
 const reviewSteps = [
-  { id: "file", label: "파일 실존 확인" },
-  { id: "line", label: "라인 범위 검증" },
-  { id: "quote", label: "코드 인용 대조" },
-  { id: "conflict", label: "상충 주장 검출" }
+  { id: "file", label: "검토 범위" },
+  { id: "line", label: "라인 확인" },
+  { id: "quote", label: "근거 대조" },
+  { id: "conflict", label: "판정 정리" }
 ];
 
 const arenaScenarios = {
@@ -46,15 +46,15 @@ const arenaScenarios = {
   <span class="code-add">  c.available &amp;&amp; !CLI_PRESET_EXCLUDED_BACKENDS.has(c.backend)</span>
   <span class="code-add">) ?? [])].sort((a, b) =&gt; {</span>`,
     comments: [
-      ["Security", "로컬 CLI 백엔드는 허용된 실행 경로만 프리셋에 들어가야 합니다. 제외 목록과 탐지 결과를 같이 확인합니다."],
-      ["Maintainer", "`fast`, `budget`, `github-action` 별칭이 같은 설정 계약으로 귀결되는지도 함께 검토해야 합니다."],
-      ["Head Verdict", "파일 경로와 코드 인용은 확인됨. 프리셋 별칭과 CLI 백엔드 제외 정책은 사람 검토로 올립니다."]
+      ["Security", "사용자 컴퓨터에서 실행되는 CLI 도구는 허용된 실행 경로만 설정에 들어가야 합니다. 잘못 넣으면 리뷰가 엉뚱한 도구를 부를 수 있습니다."],
+      ["Maintainer", "`fast`, `budget`, `github-action`처럼 이름만 다른 선택지가 실제로 같은 설정 규칙으로 이어지는지도 확인해야 합니다."],
+      ["Head Verdict", "파일과 코드 인용은 확인됐습니다. 다만 어떤 CLI 백엔드를 기본 프리셋에 넣을지는 제품 정책 판단이 필요해 사람 확인으로 올립니다."]
     ],
     filters: {
-      file: "실제 저장소의 init.ts 경로와 코드 인용을 먼저 확인했습니다.",
-      line: "표시된 블록은 프리셋 생성 함수 내부의 CLI 백엔드 필터링 흐름에 연결됩니다.",
+      file: "이 지적이 실제 저장소의 init.ts 변경을 보고 나온 것인지 먼저 확인했습니다.",
+      line: "표시된 코드는 프리셋을 만드는 함수 안에 있으며, CLI 도구를 골라내는 흐름과 연결됩니다.",
       quote: "화면의 `CLI_PRESET_EXCLUDED_BACKENDS` 인용은 실제 코드 토큰과 대조 가능한 형태로 유지합니다.",
-      conflict: "보안 경계와 사용성 별칭 계약이 충돌하므로 Head Verdict가 사람 검토로 올립니다."
+      conflict: "보안을 더 엄격히 하면 사용성은 줄 수 있습니다. 자동으로 단정하지 않고, 제품 정책 질문으로 정리합니다."
     }
   },
   orchestrator: {
@@ -74,15 +74,15 @@ allEvidenceDocs = [
   ...hallucinationResult.uncertain,
 ];`,
     comments: [
-      ["Reliability", "필터 결과가 `filtered`와 `uncertain`으로 나뉘어 다음 단계에 전달되는지 확인합니다."],
-      ["Security", "제거된 finding을 조용히 버리지 않고 evidence 흐름에서 추적 가능해야 합니다."],
-      ["Head Verdict", "필터 적용 경로는 확인됨. uncertain 큐가 최종 판정에 어떻게 보존되는지 검토합니다."]
+      ["Reliability", "틀렸다고 판단한 지적과 아직 애매한 지적이 서로 다른 목록으로 넘어가는지 확인합니다."],
+      ["Security", "제거된 지적도 왜 빠졌는지 추적할 수 있어야 합니다. 그래야 중요한 경고가 조용히 사라지지 않습니다."],
+      ["Head Verdict", "환각 필터 경로는 확인됐습니다. 애매한 항목이 최종 판정에서 어떻게 보이는지까지 함께 봅니다."]
     ],
     filters: {
-      file: "orchestrator.ts는 pipeline 진입점으로 확인됩니다.",
-      line: "필터 호출과 evidence 재구성 라인을 같은 블록으로 묶어 검토합니다.",
-      quote: "`filterHallucinations` 호출 인용이 실제 import/호출 구조와 일치하는지 확인합니다.",
-      conflict: "제거된 finding과 uncertain finding의 처리 정책이 판정 단계와 충돌하지 않는지 봅니다."
+      file: "orchestrator.ts는 리뷰 파이프라인을 실제로 조립하는 핵심 파일입니다.",
+      line: "필터를 호출하는 부분과 evidence를 다시 묶는 부분을 같은 흐름으로 확인합니다.",
+      quote: "`filterHallucinations`라는 함수 호출이 실제 import와 호출 구조에 맞는지 대조합니다.",
+      conflict: "삭제한 지적과 애매한 지적을 같은 취급으로 뭉개지 않도록, 최종 판정 단계와 맞춰봅니다."
     }
   },
   action: {
@@ -99,15 +99,15 @@ allEvidenceDocs = [
 <span class="code-muted">- name:</span> Run CodeAgora review
   <span class="code-muted">run:</span> node "$ACTION_PATH/dist/action.js"`,
     comments: [
-      ["CI Reviewer", "PR diff 획득 실패가 provider 호출 실패와 구분되어 degraded output으로 남는지 확인합니다."],
-      ["Maintainer", "fork PR과 secret 누락 경로가 리뷰 게시 실패와 섞이지 않아야 합니다."],
-      ["Head Verdict", "Action 경로는 fail-open이 아니라 degraded 상태를 명시하는 방향으로 검토합니다."]
+      ["CI Reviewer", "PR 변경 내용을 가져오지 못한 상황과 AI 공급자 호출 실패는 원인이 다릅니다. 결과 화면에서도 구분되어야 합니다."],
+      ["Maintainer", "외부 기여자의 PR이나 secret 누락은 흔한 운영 상황입니다. 리뷰 게시 실패와 섞이면 팀이 원인을 찾기 어렵습니다."],
+      ["Head Verdict", "GitHub Action은 조용히 통과시키는 대신, 어떤 부분이 낮아진 상태인지 표시하는 방향으로 검토합니다."]
     ],
     filters: {
-      file: "루트 action.yml 경로를 기준으로 composite action 계약을 확인합니다.",
-      line: "diff 획득 실패와 review 실행 단계가 분리되어 있는지 라인 범위를 확인합니다.",
-      quote: "`degraded=true` 출력 인용이 실제 Action output 계약과 맞는지 대조합니다.",
-      conflict: "fork PR 안전성, secret 부재, 게시 실패를 하나의 실패로 뭉개지 않는지 확인합니다."
+      file: "루트 action.yml을 기준으로 GitHub PR에서 실행되는 공개 사용 경로를 확인합니다.",
+      line: "변경 내용 획득 실패와 실제 리뷰 실행 단계가 분리되어 있는지 확인합니다.",
+      quote: "`degraded=true` 출력이 실제 Action output 계약과 맞는지 대조합니다.",
+      conflict: "fork PR, secret 부재, 게시 실패는 각각 다른 운영 문제입니다. 하나의 실패로 뭉개지 않는지 확인합니다."
     }
   },
   desktop: {
@@ -124,15 +124,15 @@ allEvidenceDocs = [
 
 <span class="code-muted">type</span> View = <span class="code-string">'sessions'</span> | <span class="code-string">'run'</span> | <span class="code-string">'config'</span> | <span class="code-string">'setup'</span>;`,
     comments: [
-      ["UX", "랜딩의 다크/라이트 토큰이 Desktop 테마 전환과 같은 제품군처럼 보여야 합니다."],
-      ["Maintainer", "Desktop은 별도 리뷰 의미론이 아니라 sessions/run/config/setup 표면으로 core 계약을 보여줍니다."],
-      ["Head Verdict", "테마와 표면 명명은 제품 계약과 정렬되어 있어 랜딩 목업에 반영 가능합니다."]
+      ["UX", "랜딩의 색상과 대비가 Desktop 앱의 다크/라이트 테마와 같은 제품군처럼 보여야 합니다."],
+      ["Maintainer", "Desktop은 새로운 리뷰 규칙을 만드는 앱이 아니라, sessions/run/config/setup 화면으로 같은 core 계약을 보여주는 표면입니다."],
+      ["Head Verdict", "테마와 화면 이름은 제품 계약과 맞습니다. 랜딩에서도 같은 시각 언어를 쓰는 방향으로 승인할 수 있습니다."]
     ],
     filters: {
-      file: "Desktop main.ts 경로와 테마 preference key를 기준으로 제품 테마를 확인합니다.",
-      line: "테마 적용 함수와 View 타입이 같은 화면 계약 안에 있는지 확인합니다.",
-      quote: "`codeagora.desktop.theme` 인용은 랜딩 테마 토큰의 근거로 사용할 수 있습니다.",
-      conflict: "Desktop이 별도 semantics를 만들지 않는다는 문구와 화면 구성이 일치합니다."
+      file: "Desktop main.ts의 테마 설정을 기준으로 랜딩의 색상 방향을 맞춥니다.",
+      line: "테마 적용 함수와 화면 타입이 같은 앱 계약 안에 있는지 확인합니다.",
+      quote: "`codeagora.desktop.theme` 인용은 랜딩 테마 토큰을 설명하는 근거로 사용할 수 있습니다.",
+      conflict: "Desktop이 별도 판단 규칙을 만들지 않는다는 문구와 화면 구성이 일치합니다."
     }
   }
 };
@@ -179,7 +179,7 @@ function renderArena(fileKey = activeArenaFile, filterKey = activeFilterStep) {
   }
 
   if (stepLabel) {
-    stepLabel.textContent = reviewSteps.find((step) => step.id === filterKey)?.label ?? "파일 실존 확인";
+    stepLabel.textContent = reviewSteps.find((step) => step.id === filterKey)?.label ?? "검토 범위";
   }
 }
 

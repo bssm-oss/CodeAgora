@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="CodeAgora는 여러 LLM 리뷰어가 같은 PR을 독립적으로 검토하고 토론한 뒤 근거 있는 최종 Verdict를 반환하는 코드 리뷰 파이프라인입니다.">
-    <title>CodeAgora - LLM 코드 리뷰 운영 콘솔</title>
+    <meta name="description" content="CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 따로 확인하고 서로 반박한 뒤, 사람이 결정하기 쉬운 판정표와 근거를 남기는 코드 리뷰 도구입니다.">
+    <title>CodeAgora - 근거를 남기는 AI 코드 리뷰</title>
     <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="./src/styles.css">
     <script>
@@ -25,8 +25,8 @@
       </a>
       <div class="header-actions">
         <nav class="nav-links" aria-label="주요 탐색">
-          <a href="#pipeline">파이프라인</a>
-          <a href="#surfaces">지원 표면</a>
+          <a href="#pipeline">작동 방식</a>
+          <a href="#surfaces">사용 위치</a>
           <a href="#install">설치</a>
           <a href="https://github.com/bssm-oss/CodeAgora">GitHub</a>
         </nav>
@@ -58,13 +58,26 @@
             <span>근거 있는 판정.</span>
           </h1>
           <p class="lede">
-            <span>독립된 리뷰어들이 같은 diff를 병렬로 분석합니다.</span>
-            <span>충돌한 지적은 토론과 필터를 거쳐 최종 Verdict로 정리됩니다.</span>
-            <span>존재하지 않는 파일, 잘못된 라인, 조작된 인용처럼 검증 가능한 오류를 먼저 걷어냅니다.</span>
+            <span>코드 변경을 한 명의 AI에게만 맡기면 그럴듯하지만 틀린 지적이 섞일 수 있습니다.</span>
+            <span>CodeAgora는 여러 AI 리뷰어가 같은 변경을 따로 보고, 서로의 주장을 반박하게 한 뒤, 사람이 바로 판단할 수 있는 판정표와 근거를 남깁니다.</span>
           </p>
           <div class="hero-actions" aria-label="주요 작업">
             <a class="button primary" href="#install">RC 설치하기</a>
             <a class="button secondary" href="https://github.com/bssm-oss/CodeAgora">GitHub 소스 보기</a>
+          </div>
+          <div class="plain-summary" aria-label="CodeAgora 결과 요약">
+            <div>
+              <span>무엇을 봤는지</span>
+              <strong>파일·영향·위험 신호</strong>
+            </div>
+            <div>
+              <span>왜 문제인지</span>
+              <strong>코드 근거·라인·반박</strong>
+            </div>
+            <div>
+              <span>무엇을 해야 하는지</span>
+              <strong>수정·승인·사람 확인</strong>
+            </div>
           </div>
         </div>
 
@@ -84,7 +97,7 @@
                 <img src="/assets/logo.svg" alt="" width="34" height="34">
                 <div>
                   <strong>CodeAgora</strong>
-                  <span>Consensus Review</span>
+                  <span>표면별 판정 예시</span>
                 </div>
               </div>
               <nav aria-label="리뷰 파일 목록">
@@ -133,13 +146,40 @@
               </div>
 
               <div class="filter-rail" aria-label="환각 필터 체크">
-                <button class="is-active" type="button" data-filter-step="file" aria-pressed="true"><span data-step-label>파일 실존 확인</span></button>
-                <button type="button" data-filter-step="line" aria-pressed="false">라인 범위 검증</button>
-                <button type="button" data-filter-step="quote" aria-pressed="false">코드 인용 대조</button>
-                <button type="button" data-filter-step="conflict" aria-pressed="false">상충 주장 검출</button>
+                <button class="is-active" type="button" data-filter-step="file" aria-pressed="true"><span data-step-label>검토 범위</span></button>
+                <button type="button" data-filter-step="line" aria-pressed="false">라인 확인</button>
+                <button type="button" data-filter-step="quote" aria-pressed="false">근거 대조</button>
+                <button type="button" data-filter-step="conflict" aria-pressed="false">판정 정리</button>
               </div>
             </section>
           </div>
+        </div>
+      </section>
+
+      <section class="section explain-section" aria-labelledby="why-title">
+        <div class="section-heading">
+          <div class="heading-group">
+            <p class="eyebrow">왜 필요한가</p>
+            <h2 id="why-title">AI 리뷰를 더 많이 붙이는 것보다, 믿을 수 없는 지적을 걸러내는 일이 중요합니다.</h2>
+          </div>
+          <p class="description">비개발자에게도 핵심은 단순합니다. CodeAgora는 “이 코드를 합쳐도 되는가?”라는 질문에 답하기 위해, 주장마다 근거를 붙이고 약한 추측은 따로 분리합니다.</p>
+        </div>
+        <div class="explain-grid">
+          <article>
+            <span>01</span>
+            <h3>그럴듯한 오답을 줄입니다</h3>
+            <p>AI는 때로 없는 파일, 틀린 라인, 실제 코드와 다른 인용을 말합니다. CodeAgora는 먼저 그런 주장을 확인해 제거하거나 낮은 신뢰도로 표시합니다.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>서로 다른 관점을 한곳에 모읍니다</h3>
+            <p>보안, 안정성, 유지보수성, 배포 영향은 서로 다른 문제입니다. 여러 리뷰어가 같은 변경을 각자 보고, 겹치는 지적과 충돌하는 지적을 분리합니다.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>결정 피로를 낮춥니다</h3>
+            <p>긴 코멘트 목록만 받으면 결국 사람이 다시 처음부터 읽어야 합니다. CodeAgora는 수정해야 할 항목, 나중에 봐도 되는 항목, 사람이 확인해야 할 질문을 나눕니다.</p>
+          </article>
         </div>
       </section>
 
@@ -147,57 +187,63 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">단일 프롬프트가 아니라 리뷰 시스템</p>
-            <h2>모델 의견을 그대로 믿지 않고, 검증 가능한 결론으로 좁힙니다.</h2>
+            <h2>CodeAgora는 리뷰 코멘트가 아니라, 결정 자료를 만듭니다.</h2>
           </div>
-          <p class="description">CodeAgora는 리뷰어 선택, 병렬 검토, hallucination 필터, 토론, 최종 판정을 분리해 약한 신호가 릴리스 결정을 흔들지 않게 만듭니다.</p>
+          <p class="description">코드 변경을 설명하고, 독립 리뷰를 모으고, 근거가 약한 주장을 걷어낸 뒤, 마지막에는 `ACCEPT`, `REJECT`, `NEEDS_HUMAN` 중 하나로 정리합니다. 개발자가 아닌 PM, 운영자, 팀 리더도 “무엇을 확인해야 하는지”를 읽을 수 있게 만드는 흐름입니다.</p>
         </div>
         <div class="pipeline-cards">
           <article>
             <span>01</span>
-            <h3>분석</h3>
-            <p>변경 범위와 위험도를 먼저 계산해 리뷰어에게 필요한 맥락을 제공합니다.</p>
+            <h3>변경 내용 정리</h3>
+            <p>먼저 어떤 파일이 바뀌었고, 설정·보안·배포 중 어디에 영향을 줄 수 있는지 정리합니다. 리뷰어가 추측으로 시작하지 않게 기본 맥락을 맞춥니다.</p>
           </article>
           <article>
             <span>02</span>
-            <h3>병렬 검토</h3>
-            <p>보안, 안정성, 유지보수성 관점의 리뷰어가 독립적으로 같은 diff를 봅니다.</p>
+            <h3>독립 검토</h3>
+            <p>보안, 안정성, 유지보수성 관점의 리뷰어가 서로의 답을 보지 않고 같은 diff를 봅니다. 한 모델의 성향이 전체 결론을 끌고 가지 않게 합니다.</p>
           </article>
           <article>
             <span>03</span>
-            <h3>토론</h3>
-            <p>충돌된 지적은 supporter와 devil's advocate를 거쳐 근거를 다시 확인합니다.</p>
+            <h3>근거 확인</h3>
+            <p>지적한 파일이 실제로 있는지, 라인 범위가 맞는지, 코드 인용이 조작되지 않았는지 확인합니다. 틀린 주장은 제거하고 애매한 주장은 낮은 신뢰도로 보냅니다.</p>
           </article>
           <article>
             <span>04</span>
-            <h3>판정</h3>
-            <p>`ACCEPT`, `REJECT`, `NEEDS_HUMAN`과 함께 재검토 가능한 증거를 남깁니다.</p>
+            <h3>토론과 반박</h3>
+            <p>리뷰어들이 서로 다른 결론을 내면 supporter와 반대 관점이 다시 따집니다. 근거가 충분하면 결론을 좁히고, 부족하면 사람 확인으로 올립니다.</p>
+          </article>
+          <article>
+            <span>05</span>
+            <h3>판정표</h3>
+            <p>마지막 결과는 승인 가능, 수정 필요, 사람 확인 필요로 읽히는 판정표가 됩니다. 함께 남는 근거 덕분에 나중에 같은 결정을 다시 검토할 수 있습니다.</p>
           </article>
         </div>
       </section>
 
       <section id="surfaces" class="section surfaces-section">
-        <div class="section-heading compact">
+        <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">공식 지원 표면</p>
-            <h2>CLI, GitHub Action, MCP, Desktop이 같은 리뷰 의미론을 공유합니다.</h2>
+            <h2>어디서 실행해도 같은 기준으로 판단합니다.</h2>
           </div>
+          <p class="description">터미널에서 직접 돌리든, GitHub PR에 붙이든, IDE 에이전트가 호출하든, Desktop 앱에서 보든 결과의 의미는 같습니다. 표면만 다르고 핵심 리뷰 파이프라인은 하나입니다.</p>
         </div>
         <div class="surface-list">
           <article>
             <h3>CLI</h3>
-            <p>터미널에서 diff 리뷰를 실행하고 세션 산출물을 남깁니다.</p>
+            <p>개발자가 로컬에서 작업 중인 변경을 바로 점검할 때 씁니다. 터미널에서 diff를 넣으면 같은 리뷰 파이프라인을 실행하고, 나중에 확인할 세션 산출물을 남깁니다.</p>
           </article>
           <article>
             <h3>GitHub Action</h3>
-            <p>PR에서 권한, secret, provider 실패를 안전하게 처리하며 리뷰 결과를 게시합니다.</p>
+            <p>팀이 Pull Request를 열 때 자동으로 실행됩니다. 권한, secret 누락, 외부 기여자의 fork PR처럼 조심해야 하는 상황은 무리하게 실패시키지 않고 상태를 분리해 보여줍니다.</p>
           </article>
           <article>
             <h3>MCP</h3>
-            <p>IDE와 에이전트가 리뷰, 설정, 세션 도구를 같은 계약으로 호출합니다.</p>
+            <p>AI IDE나 코딩 에이전트가 CodeAgora를 도구처럼 부를 수 있는 경로입니다. 에이전트가 임의로 해석하지 않고, 리뷰·설정·세션 도구를 정해진 계약으로 호출합니다.</p>
           </article>
           <article>
             <h3>Desktop</h3>
-            <p>로컬 세션 탐색, 리뷰 실행, 결과 확인, 증거 내보내기를 앱에서 다룹니다.</p>
+            <p>터미널이 익숙하지 않은 팀원도 로컬 세션, 리뷰 실행, 결과 확인, 증거 내보내기를 화면에서 다룰 수 있게 하는 앱 표면입니다. 별도 의미론을 만들지 않고 core 계약을 보여줍니다.</p>
           </article>
         </div>
       </section>
@@ -206,25 +252,25 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">보안 경계</p>
-            <h2>중개 프록시 없이, 자격 증명은 로컬에서 관리합니다.</h2>
+            <h2>중개 서버 없이, 자격 증명은 로컬에서 관리합니다.</h2>
           </div>
-          <p class="description">CodeAgora는 사용자가 설정한 모델 공급자 API와 직접 통신합니다. API 키는 로컬 자격 증명 경로에 저장하고, 로그와 evidence에서 비밀값이 새지 않도록 redaction 경계를 둡니다.</p>
+          <p class="description">CodeAgora는 별도 SaaS 서버에 코드를 쌓아두는 구조가 아닙니다. 사용자가 설정한 모델 공급자 API와 직접 통신하고, API 키는 로컬 자격 증명 경로에 저장하며, 로그와 evidence에서 비밀값이 새지 않도록 redaction 경계를 둡니다.</p>
         </div>
         <div class="trust-grid">
           <article>
             <span>credentials</span>
-            <strong>~/.config/codeagora/credentials</strong>
-            <p>`agora env set &lt;provider&gt;`로 저장되는 키는 로컬 파일 권한 경계 안에서 관리합니다.</p>
+            <strong>키는 내 컴퓨터에 저장</strong>
+            <p>`agora env set &lt;provider&gt;`로 저장되는 키는 `~/.config/codeagora/credentials` 아래에서 로컬 파일 권한 경계 안에 둡니다.</p>
           </article>
           <article>
             <span>provider direct</span>
-            <strong>OpenAI · Anthropic · OpenRouter</strong>
-            <p>코드 리뷰 요청은 중간 CodeAgora SaaS 서버가 아니라 사용자가 지정한 공급자 엔드포인트로 향합니다.</p>
+            <strong>모델 공급자로 직접 요청</strong>
+            <p>리뷰 요청은 중간 CodeAgora SaaS 서버가 아니라 사용자가 지정한 OpenAI, Anthropic, OpenRouter 같은 공급자 엔드포인트로 향합니다.</p>
           </article>
           <article>
             <span>fork safe</span>
-            <strong>Secret이 없는 PR은 안전하게 강하</strong>
-            <p>GitHub Action 표면은 fork PR, 누락된 secret, provider 실패 같은 경로를 배포 계약 안에서 다룹니다.</p>
+            <strong>위험한 PR 경로는 분리</strong>
+            <p>GitHub Action 표면은 fork PR, 누락된 secret, provider 실패 같은 경로를 한 덩어리 오류로 숨기지 않고, 안전하게 낮춘 상태로 보고합니다.</p>
           </article>
         </div>
       </section>
@@ -233,9 +279,9 @@
         <div class="section-heading">
           <div class="heading-group">
             <p class="eyebrow">검증 가능한 품질</p>
-            <h2>마케팅 수치 대신, 로컬에서 돌릴 수 있는 테스트와 벤치마크를 둡니다.</h2>
+            <h2>우리가 한 말을 테스트로 다시 확인합니다.</h2>
           </div>
-          <p class="description">저장소의 `benchmarks/`, 중앙 Vitest 스위트, release evidence 스크립트로 파이프라인 품질과 배포 주장을 검증합니다. 랜딩도 같은 원칙을 따라 확인 가능한 사실만 말합니다.</p>
+          <p class="description">좋은 리뷰 도구라고 말하려면 실제로 틀린 지적을 줄이고, 중요한 문제를 놓치지 않고, 배포 표면이 같은 의미로 동작해야 합니다. 저장소의 `benchmarks/`, 중앙 Vitest 스위트, release evidence 스크립트는 그 약속을 반복해서 확인하는 장치입니다.</p>
         </div>
         <div class="quality-strip" aria-label="검증 명령 예시">
           <code>pnpm test</code>
@@ -247,8 +293,8 @@
       <section id="install" class="section install-section">
         <div class="install-copy">
           <p class="eyebrow">RC 채널로 시작하기</p>
-          <h2>팀의 현재 작업 흐름에 바로 붙입니다.</h2>
-          <p>터미널, CI/CD, IDE 에이전트, 로컬 Desktop 중 팀 환경에 맞는 인터페이스를 골라 같은 리뷰 파이프라인을 바로 실행하세요.</p>
+          <h2>먼저 로컬에서 확인하고, 팀 흐름에 붙이고, 필요하면 앱으로 넓힙니다.</h2>
+          <p>처음에는 CLI로 현재 변경을 빠르게 확인하세요. 팀에서는 GitHub Action으로 PR마다 같은 기준을 적용하고, AI IDE나 Desktop이 필요한 경우 MCP와 앱 표면으로 확장하면 됩니다.</p>
         </div>
 
         <div class="command-console">
