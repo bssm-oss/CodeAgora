@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bssm-oss.github.io/CodeAgora/sitemap.xml
+Sitemap: https://codeagora.vercel.app/sitemap.xml

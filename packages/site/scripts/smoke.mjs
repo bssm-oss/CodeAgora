@@ -54,7 +54,7 @@ const requiredSeo = [
   'property="og:image"',
   'name="twitter:card"',
   'type="application/ld+json"',
-  "https://bssm-oss.github.io/CodeAgora/"
+  "https://codeagora.vercel.app/"
 ];
 
 for (const marker of requiredSeo) {
@@ -63,11 +63,11 @@ for (const marker of requiredSeo) {
   }
 }
 
-if (!robots.includes("Sitemap: https://bssm-oss.github.io/CodeAgora/sitemap.xml")) {
+if (!robots.includes("Sitemap: https://codeagora.vercel.app/sitemap.xml")) {
   throw new Error("robots.txt is missing the canonical sitemap URL");
 }
 
-if (!sitemap.includes("<loc>https://bssm-oss.github.io/CodeAgora/</loc>")) {
+if (!sitemap.includes("<loc>https://codeagora.vercel.app/</loc>")) {
   throw new Error("sitemap.xml is missing the canonical landing URL");
 }
 

@@ -17,7 +17,7 @@ const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json
   cleanUrls?: boolean;
 };
 const vercelIgnore = readFileSync(resolve(process.cwd(), ".vercelignore"), "utf8");
-const siteUrl = "https://bssm-oss.github.io/CodeAgora/";
+const siteUrl = "https://codeagora.vercel.app/";
 
 describe("CodeAgora landing page", () => {
   it("keeps public claims aligned with supported product surfaces", () => {
@@ -49,7 +49,7 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain('<meta name="robots" content="index, follow, max-image-preview:large">');
     expect(html).toContain('<meta property="og:type" content="website">');
     expect(html).toContain(`<meta property="og:url" content="${siteUrl}">`);
-    expect(html).toContain('<meta property="og:image" content="https://bssm-oss.github.io/CodeAgora/assets/social-card.svg">');
+    expect(html).toContain('<meta property="og:image" content="https://codeagora.vercel.app/assets/social-card.svg">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain('<meta name="theme-color" content="#111318">');
     expect(html).not.toContain("90%");
@@ -83,7 +83,7 @@ describe("CodeAgora landing page", () => {
   it("ships crawler files and social card assets", () => {
     expect(robots).toContain("User-agent: *");
     expect(robots).toContain("Allow: /");
-    expect(robots).toContain("Sitemap: https://bssm-oss.github.io/CodeAgora/sitemap.xml");
+    expect(robots).toContain("Sitemap: https://codeagora.vercel.app/sitemap.xml");
     expect(sitemap).toContain(`<loc>${siteUrl}</loc>`);
     expect(sitemap).toContain("<lastmod>2026-06-16</lastmod>");
     expect(socialCard).toContain("<svg");
@@ -94,14 +94,15 @@ describe("CodeAgora landing page", () => {
   it("configures Vercel to deploy only the static site package", () => {
     expect(vercelConfig).toMatchObject({
       framework: null,
-      installCommand: "corepack enable && pnpm install --frozen-lockfile",
+      installCommand: "pnpm install --frozen-lockfile",
       buildCommand: "pnpm --filter @codeagora/site build",
       outputDirectory: "packages/site/dist",
       cleanUrls: true
     });
-    expect(vercelIgnore).toContain("node_modules");
-    expect(vercelIgnore).toContain("packages/core");
+    expect(vercelIgnore).toContain("/node_modules");
+    expect(vercelIgnore).toContain("/packages/core");
     expect(vercelIgnore).toContain("!packages/site");
+    expect(vercelIgnore).toContain("!packages/site/**");
     expect(vercelIgnore).toContain("!assets/logo.svg");
   });
 
