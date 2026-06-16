@@ -343,8 +343,8 @@ p {
 
 h1 {
   color: var(--text);
-  font-size: clamp(2.45rem, 3.8vw, 3.9rem);
-  line-height: 1.14;
+  font-size: clamp(3rem, 5vw, 5.2rem);
+  line-height: 1.04;
   letter-spacing: 0;
   font-weight: 850;
 }
@@ -359,15 +359,15 @@ h1 span {
 }
 
 .lede {
-  max-width: 610px;
-  margin-top: 22px;
+  max-width: 650px;
+  margin-top: 24px;
   color: var(--muted);
-  font-size: clamp(1.04rem, 1.5vw, 1.2rem);
-  line-height: 1.58;
+  font-size: clamp(1.05rem, 1.35vw, 1.18rem);
+  line-height: 1.7;
 }
 
 .hero .lede {
-  color: #c5cedd;
+  color: #d4dbe8;
 }
 
 .lede span {
@@ -456,14 +456,14 @@ h1 span {
 
 .plain-summary span {
   color: #aeb8c9;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 820;
 }
 
 .plain-summary strong {
   margin-top: 6px;
   color: #edf1ff;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   line-height: 1.48;
 }
 
@@ -471,7 +471,7 @@ h1 span {
   max-width: 590px;
   margin-top: 12px;
   color: #aeb8c9;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1.55;
 }
 
@@ -1148,7 +1148,8 @@ h1 span {
 .surface-list h3,
 .pipeline-cards h3 {
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 1.03rem;
+  line-height: 1.34;
   font-weight: 850;
   letter-spacing: 0;
 }
@@ -1427,20 +1428,20 @@ h1 span {
 }
 
 .section-heading h2 {
-  max-width: 18ch;
+  max-width: 16ch;
   color: var(--text);
-  font-size: clamp(2rem, 4.6vw, 4.1rem);
-  line-height: 1.22;
+  font-size: clamp(1.85rem, 3.35vw, 3.25rem);
+  line-height: 1.18;
   font-weight: 850;
   letter-spacing: 0;
 }
 
 .section-heading .description,
 .section-heading p:last-child {
-  max-width: 620px;
+  max-width: 590px;
   color: var(--muted);
-  font-size: 1.03rem;
-  line-height: 1.76;
+  font-size: 0.98rem;
+  line-height: 1.72;
 }
 
 .section-heading.compact {
@@ -1530,10 +1531,10 @@ h1 span {
 }
 
 .decision-section h2 {
-  max-width: 14ch;
+  max-width: 16ch;
   color: #f3f6fb;
-  font-size: clamp(1.8rem, 4vw, 3.4rem);
-  line-height: 1.17;
+  font-size: clamp(1.75rem, 3.1vw, 2.85rem);
+  line-height: 1.16;
   font-weight: 850;
 }
 
@@ -1561,19 +1562,21 @@ h1 span {
   color: #7be6ef;
   background: rgba(5, 166, 185, 0.12);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
 }
 
 .decision-grid strong {
   display: block;
   color: #f3f6fb;
-  font-size: 1rem;
+  font-size: 1.08rem;
+  line-height: 1.35;
 }
 
 .decision-grid p {
   margin-top: 10px;
   color: #b8c0cf;
+  font-size: 0.9rem;
   line-height: 1.62;
 }
 
@@ -1605,7 +1608,7 @@ h1 span {
 
 .explain-grid h3 {
   color: var(--text);
-  font-size: clamp(1rem, 1.5vw, 1.16rem);
+  font-size: clamp(1.02rem, 1.35vw, 1.14rem);
   line-height: 1.35;
   font-weight: 850;
 }
@@ -1616,6 +1619,7 @@ h1 span {
 .install-copy p {
   margin-top: 12px;
   color: var(--muted);
+  font-size: 0.93rem;
   line-height: 1.66;
 }
 
@@ -1679,13 +1683,14 @@ h1 span {
 .trust-grid strong {
   display: block;
   color: var(--text);
-  font-size: clamp(1.08rem, 1.7vw, 1.32rem);
+  font-size: clamp(1.02rem, 1.45vw, 1.18rem);
   line-height: 1.35;
 }
 
 .trust-grid p {
   margin-top: 14px;
   color: var(--muted);
+  font-size: 0.93rem;
   line-height: 1.66;
 }
 
@@ -1744,10 +1749,10 @@ h1 span {
 }
 
 .install-copy h2 {
-  max-width: 14ch;
+  max-width: 17ch;
   color: white;
-  font-size: clamp(2rem, 4.6vw, 4rem);
-  line-height: 1.08;
+  font-size: clamp(1.85rem, 3.35vw, 3.2rem);
+  line-height: 1.14;
   font-weight: 850;
   letter-spacing: 0;
 }
@@ -2198,14 +2203,14 @@ code {
   }
 
   h1 {
-    font-size: clamp(2.2rem, 10vw, 3rem);
-    line-height: 1.18;
+    font-size: clamp(2.55rem, 10.5vw, 3.35rem);
+    line-height: 1.08;
     word-break: keep-all;
   }
 
   .lede {
-    font-size: 1rem;
-    line-height: 1.65;
+    font-size: 0.98rem;
+    line-height: 1.7;
     overflow-wrap: anywhere;
     word-break: keep-all;
   }
@@ -2390,7 +2395,12 @@ code {
 
   .section-heading h2,
   .install-copy h2 {
-    font-size: clamp(1.9rem, 10vw, 3rem);
+    font-size: clamp(1.72rem, 8.2vw, 2.55rem);
+    line-height: 1.18;
+  }
+
+  .decision-section h2 {
+    font-size: clamp(1.65rem, 7.6vw, 2.35rem);
   }
 
   .install-section {
