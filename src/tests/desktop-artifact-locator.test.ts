@@ -6,19 +6,27 @@ import {
   MACOS_ARM64_SIGNING_EVIDENCE_SCHEMA_VERSION,
   DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION,
   DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME,
+  DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION,
+  DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_FILENAME,
   DESKTOP_RC_UPDATER_PLATFORM,
+  DESKTOP_STABLE_UPDATER_PLATFORM,
   assertMacosArm64NotarizationEvidence,
   assertMacosArm64SigningEvidence,
   assertMacosArm64ArtifactMetadata,
   assertMacosDesktopArtifact,
   desktopRcUpdaterManifestFilename,
+  desktopStableUpdaterManifestFilename,
   locateMacosDesktopArtifact,
   macosDesktopArtifactFilename,
   parseDesktopRcTag,
   parseDesktopRcVersion,
+  parseDesktopStableTag,
+  parseDesktopStableVersion,
   tauriMacosArchSuffix,
   validateDesktopRcDistributionEvidence,
   validateDesktopRcUpdaterManifest,
+  validateDesktopStableDistributionEvidence,
+  validateDesktopStableUpdaterManifest,
   validateMacosArm64NotarizationEvidence,
   validateMacosArm64SigningEvidence,
   validateMacosArm64ArtifactMetadata,
@@ -46,6 +54,24 @@ describe('macOS desktop artifact locator', () => {
     expect(() => parseDesktopRcVersion('0.1.0-rc7')).toThrow('X.Y.Z-rc.N');
     expect(() => parseDesktopRcVersion('0.1.0-desktop-rc.7')).toThrow('X.Y.Z-rc.N');
     expect(() => parseDesktopRcVersion('0.1.0-rc.7+build.1')).toThrow('X.Y.Z-rc.N');
+  });
+
+  it('accepts only stable npm-semver versions and maps the stable updater manifest', () => {
+    expect(parseDesktopStableVersion('0.1.0')).toMatchObject({
+      version: '0.1.0',
+      releaseLine: '0.1',
+      gitTag: 'v0.1.0',
+      npmDistTag: 'latest',
+      updaterManifestFilename: 'latest-0.1.json',
+    });
+    expect(parseDesktopStableTag('v0.2.0')).toMatchObject({
+      version: '0.2.0',
+      releaseLine: '0.2',
+      updaterManifestFilename: 'latest-0.2.json',
+    });
+    expect(desktopStableUpdaterManifestFilename('v0.1.0')).toBe('latest-0.1.json');
+    expect(() => parseDesktopStableVersion('0.1.0-rc.7')).toThrow('without prerelease');
+    expect(() => parseDesktopStableVersion('0.1.0+build.1')).toThrow('without prerelease');
   });
 
   it('builds the expected Tauri macOS release artifact name for arm64', () => {
@@ -441,6 +467,100 @@ describe('macOS desktop artifact locator', () => {
       version: '0.1.0-rc.7',
       releaseLine: '0.1',
       updaterManifestFilename: 'latest-0.1-rc.json',
+      errors: [],
+    });
+  });
+
+  it('validates Desktop stable distribution evidence for signed, notarized, stapled macOS arm64 artifacts and updater JSON', () => {
+    const manifestJson = {
+      version: '0.1.0',
+      pub_date: '2026-06-17T00:00:00.000Z',
+      platforms: {
+        [DESKTOP_STABLE_UPDATER_PLATFORM]: {
+          url: 'https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0/CodeAgora.app.tar.gz',
+          signature: 'trusted stable updater signature content',
+        },
+      },
+    };
+    const evidence = {
+      schemaVersion: DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION,
+      evidenceMode: 'real',
+      version: '0.1.0',
+      gitTag: 'v0.1.0',
+      npmDistTag: 'latest',
+      target: {
+        platform: 'macos',
+        arch: 'arm64',
+      },
+      app: {
+        path: 'packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/CodeAgora.app',
+        sha256: 'a'.repeat(64),
+        bundleIdentifier: 'dev.codeagora.desktop',
+        infoPlist: {
+          CFBundleShortVersionString: '0.1.0',
+          CFBundleVersion: '0.1.0',
+        },
+      },
+      dmg: {
+        path: 'packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/CodeAgora_0.1.0_aarch64.dmg',
+        sha256: 'b'.repeat(64),
+      },
+      codesign: {
+        status: 'accepted',
+        authority: ['Developer ID Application: CodeAgora Test (TEAMID1234)'],
+        teamIdentifier: 'TEAMID1234',
+        identifier: 'dev.codeagora.desktop',
+        hardenedRuntime: true,
+        verifyDeepStrict: true,
+        spctlAssess: true,
+      },
+      notarization: {
+        status: 'accepted',
+        ticketStapled: true,
+        appTicketStapled: true,
+        dmgTicketStapled: true,
+      },
+      updater: {
+        releaseLine: '0.1',
+        publicKey: 'trusted public key',
+        artifact: {
+          path: 'packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/CodeAgora.app.tar.gz',
+          sha256: 'c'.repeat(64),
+        },
+        signature: {
+          path: 'packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/CodeAgora.app.tar.gz.sig',
+          content: 'trusted stable updater signature content',
+        },
+        manifest: {
+          filename: 'latest-0.1.json',
+          url: 'https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0/latest-0.1.json',
+          json: manifestJson,
+        },
+      },
+      githubRelease: {
+        tag: 'v0.1.0',
+        prerelease: false,
+        assets: [
+          'CodeAgora_0.1.0_aarch64.dmg',
+          'CodeAgora.app.tar.gz',
+          'CodeAgora.app.tar.gz.sig',
+          'latest-0.1.json',
+          DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_FILENAME,
+        ],
+      },
+    };
+
+    expect(validateDesktopStableUpdaterManifest(manifestJson, { version: '0.1.0' })).toMatchObject({
+      valid: true,
+      releaseLine: '0.1',
+      signaturePresent: true,
+      errors: [],
+    });
+    expect(validateDesktopStableDistributionEvidence(evidence)).toMatchObject({
+      valid: true,
+      version: '0.1.0',
+      releaseLine: '0.1',
+      updaterManifestFilename: 'latest-0.1.json',
       errors: [],
     });
   });

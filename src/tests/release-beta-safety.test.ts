@@ -23,12 +23,13 @@ describe('release channel safety', () => {
     expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'stable'");
     expect(workflow).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
     expect(workflow).toContain('cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"');
-    expect(workflow).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || 'npm-publish'");
+    expect(workflow).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || (!contains(github.ref_name, '-') && 'desktop-stable-distribution' || 'npm-publish')");
     expect(workflow).toContain('pnpm rc:desktop-distribution-gate');
-    expect(workflow).toContain('CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL=desktop-${parsed.releaseLine}-rc');
-    expect(workflow).toContain('tag_name: ${{ env.CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL }}');
+    expect(workflow).toContain('pnpm stable:desktop-distribution-gate');
+    expect(workflow).toContain("`CODEAGORA_DESKTOP_UPDATER_CHANNEL=desktop-${parsed.releaseLine}${isRc ? '-rc' : ''}`");
+    expect(workflow).toContain('tag_name: ${{ env.CODEAGORA_DESKTOP_UPDATER_CHANNEL }}');
     expect(workflow).toContain('verify-rc-github-release-assets.mjs');
-    expect(workflow).toContain("fail_on_unmatched_files: ${{ contains(github.ref_name, '-rc.') && 'true' || 'false' }}");
+    expect(workflow).toContain("fail_on_unmatched_files: ${{ (contains(github.ref_name, '-rc.') || !contains(github.ref_name, '-')) && 'true' || 'false' }}");
   });
 
   it('allows manual prerelease dist-tagging but blocks prereleases from latest', () => {

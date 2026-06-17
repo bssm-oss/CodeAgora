@@ -1208,6 +1208,112 @@ describe('GitHub Action runtime', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  it('skips stale-head posting after review mapping when the PR head moved', async () => {
+    const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
+    const outputFile = path.join(tempDir, 'output.txt');
+    const summaryFile = path.join(tempDir, 'summary.md');
+    const diffFile = path.join(tempDir, 'diff.patch');
+    const sarifFile = path.join(tempDir, 'results.sarif');
+    const eventFile = path.join(tempDir, 'event.json');
+    const appKit = {
+      auth: 'app',
+      checks: {
+        listForRef: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+    };
+
+    process.env.GITHUB_OUTPUT = outputFile;
+    process.env.GITHUB_STEP_SUMMARY = summaryFile;
+    process.env.GITHUB_TOKEN = 'ghp_test';
+    process.env.OPENROUTER_API_KEY = 'provider-secret';
+    process.env.GITHUB_EVENT_NAME = 'pull_request';
+    process.env.GITHUB_EVENT_PATH = eventFile;
+    await writeFile(eventFile, JSON.stringify({ pull_request: { head: { sha: eventHeadSha } } }));
+
+    vi.mocked(mocks.parseActionInputs).mockReturnValue({
+      repo: 'owner/repo',
+      sha: inputSha,
+      pr: 42,
+      diff: diffFile,
+      token: 'ghp_test',
+      configPath: '.ca/config.json',
+      baseSha: 'base123',
+      maxDiffLines: 0,
+      failOnReject: true,
+      postResults: true,
+      reporterMode: 'check-run',
+      baseRepo: 'owner/repo',
+      headRepo: 'owner/repo',
+      checkRunName: 'CodeAgora Review',
+    } as never);
+    vi.mocked(mocks.determineActionPolicy).mockReturnValue({
+      degraded: false,
+      shouldRunReview: true,
+      shouldPostResults: true,
+      verdictOverride: undefined,
+    } as never);
+    vi.mocked(mocks.validateActionDiffPath).mockResolvedValue(diffFile);
+    vi.mocked(mocks.validateActionOutputPath).mockResolvedValue(sarifFile);
+    vi.mocked(mocks.readFile).mockResolvedValue('diff --git a/src/app.ts b/src/app.ts\n+changed');
+    vi.mocked(mocks.loadConfigFile).mockResolvedValue({ github: { sarifOutputPath: sarifFile } } as never);
+    vi.mocked(mocks.runPipeline).mockResolvedValue({
+      status: 'success',
+      summary: {
+        decision: 'REJECT',
+        reasoning: 'blocking issue',
+        totalReviewers: 3,
+        forfeitedReviewers: 0,
+        severityCounts: { CRITICAL: 1 },
+        topIssues: [],
+        totalDiscussions: 0,
+        resolved: 0,
+        escalated: 0,
+      },
+      sessionId: 'session-stale-head',
+      date: '2026-06-08',
+      evidenceDocs: [],
+      discussions: [],
+    } as never);
+    vi.mocked(mocks.createAppOctokit).mockResolvedValue(appKit as never);
+    vi.mocked(mocks.fetchPrMetadata).mockResolvedValue({ headSha: 'new-head-sha' } as never);
+    vi.mocked(mocks.isStaleHead).mockReturnValue(true);
+    vi.mocked(mocks.mapToGitHubReview).mockReturnValue({
+      commit_id: eventHeadSha,
+      event: 'REQUEST_CHANGES',
+      verdict: 'REJECT',
+      body: 'configured PR-facing review',
+      comments: [],
+    } as never);
+    vi.mocked(mocks.writeFile).mockResolvedValue(undefined);
+
+    await import('../action.js');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.runPipeline).toHaveBeenCalled();
+    expect(mocks.mapToGitHubReview).toHaveBeenCalled();
+    expect(mocks.fetchPrMetadata).toHaveBeenCalled();
+    expect(mocks.isStaleHead).toHaveBeenCalledWith(eventHeadSha, 'new-head-sha');
+    expect(mocks.postReview).not.toHaveBeenCalled();
+    expect(mocks.setCommitStatus).not.toHaveBeenCalled();
+    expect(mocks.handleNeedsHuman).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+
+    const output = await readFile(outputFile, 'utf-8');
+    expect(output).toContain('degraded=true');
+    expect(output).toContain('degraded-reason=stale-head-sha');
+    expect(output).toContain('verdict=SKIPPED');
+
+    const summary = await readFile(summaryFile, 'utf-8');
+    expect(summary).toContain('CodeAgora review skipped');
+    expect(summary).toContain('Reason: `stale-head-sha`');
+    expect(summary).toContain('new-head-sha');
+
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
   it('posts only the commit-status reporter when configured', async () => {
     const { mkdtemp, readFile, rm, writeFile } = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'codeagora-action-runtime-'));
