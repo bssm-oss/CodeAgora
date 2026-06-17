@@ -14,6 +14,7 @@ const reportPath = path.join(evidenceRoot, 'desktop-visual-qa.json');
 const port = Number(process.env.CODEAGORA_DESKTOP_MCP_PORT ?? 9223);
 const windowWidth = Number(process.env.CODEAGORA_DESKTOP_VISUAL_WIDTH ?? 1180);
 const windowHeight = Number(process.env.CODEAGORA_DESKTOP_VISUAL_HEIGHT ?? 728);
+const appReadyTimeoutMs = Number(process.env.CODEAGORA_DESKTOP_VISUAL_APP_READY_TIMEOUT_MS ?? 180_000);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -108,7 +109,7 @@ function parseMcpTextJson(response) {
 
 async function waitForAppReady(appProcess) {
   const started = Date.now();
-  while (Date.now() - started < 30_000) {
+  while (Date.now() - started < appReadyTimeoutMs) {
     if (appProcess.exitCode !== null) {
       throw new Error(`Tauri app exited before MCP bridge became ready:\n${appProcess.output}`);
     }
