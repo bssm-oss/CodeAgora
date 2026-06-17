@@ -63,7 +63,7 @@ describe('writeGitHubWorkflow()', () => {
 
     const filePath = path.join(tmpDir, '.github', 'workflows', 'codeagora-review.yml');
     const content = await fs.readFile(filePath, 'utf-8');
-    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.1');
     expect(content).not.toContain('bssm-oss/CodeAgora@v2');
     expect(content).not.toContain('npx codeagora');
   });
@@ -107,7 +107,7 @@ describe('writeGitHubWorkflow()', () => {
 
     const content = await fs.readFile(workflowPath, 'utf-8');
     expect(content).not.toBe('existing content');
-    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.1');
   });
 
   it('writes the shared Action workflow template', async () => {
@@ -290,6 +290,6 @@ describe('runInit() with ci: true', () => {
 
     expect(result.created).toContain(workflowPath);
     const content = await fs.readFile(workflowPath, 'utf-8');
-    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.0');
+    expect(content).toContain('uses: bssm-oss/CodeAgora@v0.1.1');
   });
 });

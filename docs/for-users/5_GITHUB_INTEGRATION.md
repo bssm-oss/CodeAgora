@@ -3,7 +3,7 @@
 > Complete specification for PR review comments, GitHub Actions, SARIF output, and UX design.
 > Last updated: 2026-05-04
 >
-> Note: internal markers such as `codeagora-v3` are compatibility/spec examples, not current branding. For user setup, follow [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md) and the current `0.1.0` release line.
+> Note: internal markers such as `codeagora-v3` are compatibility/spec examples, not current branding. For user setup, follow [GITHUB_ACTIONS_SETUP.md](./GITHUB_ACTIONS_SETUP.md) and the current `0.1.1` release line.
 
 ---
 
@@ -534,7 +534,7 @@ permissions:
   security-events: write
 
 steps:
-- uses: bssm-oss/CodeAgora@v0.1.0
+- uses: bssm-oss/CodeAgora@v0.1.1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     upload-sarif: 'true'

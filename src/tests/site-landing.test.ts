@@ -9,7 +9,7 @@ const css = readFileSync(resolve(siteRoot, "src/styles/site.css"), "utf8");
 const js = readFileSync(resolve(siteRoot, "src/scripts/site.js"), "utf8");
 const robots = readFileSync(resolve(siteRoot, "dist/robots.txt"), "utf8");
 const sitemap = readFileSync(resolve(siteRoot, "dist/sitemap.xml"), "utf8");
-const socialCard = readFileSync(resolve(siteRoot, "assets/social-card.svg"), "utf8");
+const socialCard = readFileSync(resolve(siteRoot, "assets/social-card.png"));
 const wordmark = readFileSync(resolve(siteRoot, "assets/codeagora-wordmark.png"));
 const icon = readFileSync(resolve(siteRoot, "assets/codeagora-icon.png"));
 const rootPackage = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
@@ -96,10 +96,10 @@ describe("CodeAgora landing page", () => {
 
   it("provides stable install and action snippets", () => {
     expect(html).toContain("npm i -g @codeagora/review");
-    expect(html).toContain("bssm-oss/CodeAgora@v0.1.0");
+    expect(html).toContain("bssm-oss/CodeAgora@v0.1.1");
     expect(html).toContain("@codeagora/mcp");
     expect(html).toContain("Desktop app");
-    expect(html).toContain("v0.1.0 macOS arm64 unsigned preview DMG");
+    expect(html).toContain("v0.1.1 macOS arm64 unsigned preview DMG");
   });
 
   it("publishes canonical SEO and social preview metadata", () => {
@@ -108,8 +108,8 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain('<meta name="robots" content="index, follow, max-image-preview:large">');
     expect(html).toContain('<meta property="og:type" content="website">');
     expect(html).toContain(`<meta property="og:url" content="${siteUrl}">`);
-    expect(html).toContain('<meta property="og:image" content="https://codeagora.vercel.app/assets/social-card.svg">');
-    expect(html).toContain('<meta property="og:image:type" content="image/svg+xml">');
+    expect(html).toContain('<meta property="og:image" content="https://codeagora.vercel.app/assets/social-card.png">');
+    expect(html).toContain('<meta property="og:image:type" content="image/png">');
     expect(html).toContain('<meta property="og:image:width" content="1200">');
     expect(html).toContain('<meta property="og:image:height" content="630">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
@@ -134,7 +134,7 @@ describe("CodeAgora landing page", () => {
           "@type": "SoftwareApplication",
           applicationCategory: "DeveloperApplication",
           applicationSubCategory: "AI code review",
-          softwareVersion: "0.1.0",
+          softwareVersion: "0.1.1",
           isAccessibleForFree: true,
           codeRepository: "https://github.com/bssm-oss/CodeAgora",
           downloadUrl: "https://www.npmjs.com/package/@codeagora/review",
@@ -178,9 +178,8 @@ describe("CodeAgora landing page", () => {
     expect(robots).toContain("Sitemap: https://codeagora.vercel.app/sitemap.xml");
     expect(sitemap).toContain(`<loc>${siteUrl}</loc>`);
     expect(sitemap).toContain("<lastmod>2026-06-16</lastmod>");
-    expect(socialCard).toContain("<svg");
-    expect(socialCard).toContain("CodeAgora");
-    expect(socialCard).toContain("토론하는 리뷰");
+    expect(socialCard.subarray(1, 4).toString("ascii")).toBe("PNG");
+    expect(socialCard.byteLength).toBeGreaterThan(100_000);
     expect(wordmark.byteLength).toBeGreaterThan(1000);
     expect(icon.byteLength).toBeGreaterThan(1000);
   });

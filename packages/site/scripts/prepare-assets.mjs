@@ -8,7 +8,7 @@ const assets = [
   ["../../assets/logo.svg", "public/assets/logo.svg"],
   ["assets/codeagora-icon.png", "public/assets/codeagora-icon.png"],
   ["assets/codeagora-wordmark.png", "public/assets/codeagora-wordmark.png"],
-  ["assets/social-card.svg", "public/assets/social-card.svg"],
+  ["assets/social-card.png", "public/assets/social-card.png"],
   ["robots.txt", "public/robots.txt"],
   ["sitemap.xml", "public/sitemap.xml"]
 ];

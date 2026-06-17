@@ -331,7 +331,7 @@ jobs:
           body: |
             Release evidence artifact: `release-evidence-${{ github.ref_name }}`
 
-            Desktop macOS DMG is an unsigned preview build for v0.1.0. It is not Developer ID signed, not notarized, and does not enable the Tauri updater channel; macOS Gatekeeper warning is expected.
+            Desktop macOS DMG is an unsigned preview build for ${{ github.ref_name }}. It is not Developer ID signed, not notarized, and does not enable the Tauri updater channel; macOS Gatekeeper warning is expected.
 
       - name: Update Desktop updater channel
         if: contains(github.ref_name, '-rc.')

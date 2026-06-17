@@ -2,7 +2,7 @@
 import "../styles/site.css";
 import siteScriptUrl from "../scripts/site.js?url";
 
-const version = "0.1.0";
+const version = "0.1.1";
 const canonicalUrl = "https://codeagora.vercel.app/";
 const rawDeploymentCommitSha = (process.env.CODEAGORA_STABLE_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "").trim();
 const deploymentCommitSha = /^[0-9a-f]{40}$/i.test(rawDeploymentCommitSha)
@@ -74,7 +74,7 @@ const schema = {
           name: "Desktop은 안정판인가요?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Desktop은 공식 지원 표면입니다. v0.1.0은 macOS arm64 unsigned preview DMG로 배포되며, Developer ID 서명, 공증, Tauri updater 채널은 아직 포함하지 않습니다."
+            text: "Desktop은 공식 지원 표면입니다. v0.1.1은 macOS arm64 unsigned preview DMG로 배포되며, Developer ID 서명, 공증, Tauri updater 채널은 아직 포함하지 않습니다."
           }
         }
       ]
@@ -154,7 +154,7 @@ const faqs = [
   ["하나의 AI 리뷰와 무엇이 다른가요?", "한 모델의 답을 그대로 믿지 않고 여러 주장과 근거를 비교합니다. 그래서 그럴듯하지만 틀린 지적을 줄이는 데 초점을 둡니다."],
   ["비용은 어떻게 되나요?", "CodeAgora 자체는 MIT 오픈소스입니다. OpenAI, Anthropic, OpenRouter 같은 외부 모델을 쓰면 해당 공급자의 API 비용이 발생할 수 있습니다."],
   ["GitHub Action에 쓸 수 있나요?", "네. Pull Request마다 같은 리뷰 기준을 자동으로 붙일 수 있습니다."],
-  ["Desktop은 안정판인가요?", "Desktop은 공식 지원 표면입니다. v0.1.0은 macOS arm64 unsigned preview DMG로 제공되며, Developer ID 서명, 공증, Tauri updater 채널은 후속 작업입니다. macOS Gatekeeper 경고가 뜰 수 있습니다."]
+  ["Desktop은 안정판인가요?", "Desktop은 공식 지원 표면입니다. v0.1.1은 macOS arm64 unsigned preview DMG로 제공되며, Developer ID 서명, 공증, Tauri updater 채널은 후속 작업입니다. macOS Gatekeeper 경고가 뜰 수 있습니다."]
 ];
 
 const escapeHtml = (value) =>
@@ -229,7 +229,7 @@ const cliCommand = escapeHtml(`$ npm i -g @codeagora/review
 $ agora init
 $ git diff | agora review`);
 
-const actionCommand = escapeHtml(`uses: bssm-oss/CodeAgora@v0.1.0
+const actionCommand = escapeHtml(`uses: bssm-oss/CodeAgora@v0.1.1
 with:
   github-token: secrets.GITHUB_TOKEN
 env:
@@ -247,7 +247,7 @@ const mcpCommand = escapeHtml(`{
 const desktopCommand = escapeHtml(`Desktop app
 - local review session viewer
 - same CLI/MCP/GitHub verdict semantics
-- v0.1.0 macOS arm64 unsigned preview DMG`);
+- v0.1.1 macOS arm64 unsigned preview DMG`);
 
 const commandLogs = {
   cli: ["resolve package latest", "load .ca/config", "read git diff", "write verdict artifact"],
@@ -283,15 +283,15 @@ const commandLogs = {
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content="CodeAgora - 근거를 남기는 AI 코드 리뷰" />
     <meta property="og:description" content="여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 서로 반박한 뒤, 사람이 결정하기 쉬운 최종 판정표와 근거를 남깁니다." />
-    <meta property="og:image" content={`${canonicalUrl}assets/social-card.svg`} />
-    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image" content={`${canonicalUrl}assets/social-card.png`} />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="CodeAgora - 근거를 남기는 AI 코드 리뷰" />
     <meta name="twitter:description" content="여러 AI 리뷰어가 같은 코드 변경을 따로 보고 서로 검증한 뒤, 사람이 바로 판단할 수 있는 판정표를 남깁니다." />
-    <meta name="twitter:image" content={`${canonicalUrl}assets/social-card.svg`} />
+    <meta name="twitter:image" content={`${canonicalUrl}assets/social-card.png`} />
     <meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정" />
     <script type="application/ld+json" set:html={JSON.stringify(schema)}></script>
   </head>
@@ -711,7 +711,7 @@ const commandLogs = {
       <div class="footer-note" aria-label="Additional notes">
         <article>
           <strong>Release status</strong>
-          <p>v0.1.0 Desktop ships as an unsigned macOS arm64 preview DMG; signing, notarization, and updater distribution are follow-up work.</p>
+          <p>v0.1.1 Desktop ships as an unsigned macOS arm64 preview DMG; signing, notarization, and updater distribution are follow-up work.</p>
         </article>
         <article>
           <strong>Cost note</strong>

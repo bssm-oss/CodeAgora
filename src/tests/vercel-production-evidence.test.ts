@@ -18,7 +18,7 @@ const html = `<!doctype html>
     CodeAgora GitHub Action MCP Desktop
     <img src="/assets/codeagora-icon.png">
     <img src="/assets/codeagora-wordmark.png">
-    <img src="/assets/social-card.svg">
+    <img src="/assets/social-card.png">
   </body>
 </html>`;
 
@@ -31,7 +31,7 @@ function makeFetch(overrides: Record<string, string> = {}) {
       '/sitemap.xml': '<urlset><url><loc>https://codeagora.vercel.app/</loc></url></urlset>\n',
       '/assets/codeagora-icon.png': 'x'.repeat(1200),
       '/assets/codeagora-wordmark.png': 'x'.repeat(1200),
-      '/assets/social-card.svg': '<svg><text>CodeAgora</text></svg>',
+      '/assets/social-card.png': 'x'.repeat(1200),
     }[pathname];
 
     return {

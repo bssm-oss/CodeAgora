@@ -10,7 +10,7 @@ const requiredFiles = [
   "dist/assets/logo.svg",
   "dist/assets/codeagora-icon.png",
   "dist/assets/codeagora-wordmark.png",
-  "dist/assets/social-card.svg",
+  "dist/assets/social-card.png",
   "dist/robots.txt",
   "dist/sitemap.xml"
 ];

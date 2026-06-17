@@ -17,7 +17,7 @@ const REQUIRED_HTML_MARKERS = [
   'Desktop',
   '/assets/codeagora-icon.png',
   '/assets/codeagora-wordmark.png',
-  '/assets/social-card.svg',
+  '/assets/social-card.png',
 ];
 
 function parseArgs(argv) {
@@ -139,8 +139,8 @@ function validateProductionResponses({ html, robots, sitemap, icon, wordmark, so
   if (!sitemap.body.includes('<loc>https://codeagora.vercel.app/</loc>')) {
     errors.push('sitemap.xml is missing the canonical landing URL.');
   }
-  if (!socialCard.body.includes('CodeAgora')) {
-    errors.push('social-card.svg is missing CodeAgora brand text.');
+  if (socialCard.sizeBytes <= 1000) {
+    errors.push('social-card.png is unexpectedly small.');
   }
   if (icon.sizeBytes <= 1000) {
     errors.push('codeagora-icon.png is unexpectedly small.');
@@ -166,7 +166,7 @@ export async function buildVercelProductionEvidence(options = {}) {
     fetchText(resolveUrl(url, '/sitemap.xml'), fetchImpl),
     fetchText(resolveUrl(url, '/assets/codeagora-icon.png'), fetchImpl),
     fetchText(resolveUrl(url, '/assets/codeagora-wordmark.png'), fetchImpl),
-    fetchText(resolveUrl(url, '/assets/social-card.svg'), fetchImpl),
+    fetchText(resolveUrl(url, '/assets/social-card.png'), fetchImpl),
   ]);
   const validation = validateProductionResponses({
     html,
@@ -193,7 +193,7 @@ export async function buildVercelProductionEvidence(options = {}) {
       commitMetadataMatches: validation.deployedSha === expectedSha || expectedSha === 'unknown',
       robotsTxt: robots.ok && robots.body.includes('Sitemap: https://codeagora.vercel.app/sitemap.xml'),
       sitemapXml: sitemap.ok && sitemap.body.includes('<loc>https://codeagora.vercel.app/</loc>'),
-      brandAssets: icon.ok && wordmark.ok && socialCard.ok && icon.sizeBytes > 1000 && wordmark.sizeBytes > 1000,
+      brandAssets: icon.ok && wordmark.ok && socialCard.ok && icon.sizeBytes > 1000 && wordmark.sizeBytes > 1000 && socialCard.sizeBytes > 1000,
     },
     errors: validation.errors,
     responses: {

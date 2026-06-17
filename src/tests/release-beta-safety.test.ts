@@ -30,7 +30,7 @@ describe('release channel safety', () => {
     expect(workflow).toContain("`CODEAGORA_DESKTOP_UPDATER_CHANNEL=desktop-${parsed.releaseLine}-rc`");
     expect(workflow).toContain('tag_name: ${{ env.CODEAGORA_DESKTOP_UPDATER_CHANNEL }}');
     expect(workflow).toContain('verify-rc-github-release-assets.mjs');
-    expect(workflow).toContain('Desktop macOS DMG is an unsigned preview build for v0.1.0');
+    expect(workflow).toContain('Desktop macOS DMG is an unsigned preview build for ${{ github.ref_name }}');
   });
 
   it('allows manual prerelease dist-tagging but blocks prereleases from latest', () => {
@@ -49,7 +49,7 @@ describe('release channel safety', () => {
     const tauriConfig = readJson<{ version: string }>('packages/desktop/src-tauri/tauri.conf.json');
     const cargoToml = readText('packages/desktop/src-tauri/Cargo.toml');
 
-    expect(rootVersion).toBe('0.1.0');
+    expect(rootVersion).toBe('0.1.1');
     expect(mcpVersion).toBe(rootVersion);
     expect(desktopVersion).toBe(rootVersion);
     expect(tauriConfig.version).toBe(rootVersion);
