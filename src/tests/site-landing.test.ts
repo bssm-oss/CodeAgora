@@ -94,12 +94,12 @@ describe("CodeAgora landing page", () => {
     expect(js).toContain("[data-pipeline-step]");
   });
 
-  it("provides rc-friendly install and action snippets", () => {
+  it("provides stable install and action snippets", () => {
     expect(html).toContain("npm i -g @codeagora/review");
     expect(html).toContain("bssm-oss/CodeAgora@v0.1.0");
     expect(html).toContain("@codeagora/mcp");
     expect(html).toContain("Desktop app");
-    expect(html).toContain("Desktop 정식 배포는 준비 중");
+    expect(html).toContain("v0.1.0 macOS arm64 unsigned preview DMG");
   });
 
   it("publishes canonical SEO and social preview metadata", () => {
