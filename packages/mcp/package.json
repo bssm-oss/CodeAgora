@@ -23,11 +23,11 @@
   "main": "./dist/index.js",
   "exports": {
     ".": {
-      "development": "./src/index.ts",
+      "development": "./dist/index.js",
       "import": "./dist/index.js"
     },
     "./version.js": {
-      "development": "./src/version.ts",
+      "development": "./dist/version.js",
       "import": "./dist/version.js"
     }
   },
