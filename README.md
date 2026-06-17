@@ -19,12 +19,12 @@ CodeAgora runs multiple LLM reviewers in parallel, lets them challenge each othe
 ### Published CLI
 
 ```bash
-npm i -g @codeagora/review@rc
+npm i -g @codeagora/review
 agora init
 git diff | agora review
 ```
 
-Current release: `0.1.0-rc.6`.
+Current release: `0.1.0`.
 
 ### Source Checkout
 
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: bssm-oss/CodeAgora@v0.1.0-rc.6
+      - uses: bssm-oss/CodeAgora@v0.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
@@ -97,7 +97,7 @@ Use `.ca/config.json` as the default config path. See [GitHub Actions setup](doc
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@rc"]
+      "args": ["-y", "@codeagora/mcp"]
     }
   }
 }

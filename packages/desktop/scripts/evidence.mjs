@@ -38,6 +38,8 @@ function fileEvidence(relativePath) {
 const packageJson = readJson(path.join(packageRoot, 'package.json'));
 const tauriConfig = readJson(path.join(packageRoot, 'src-tauri', 'tauri.conf.json'));
 const main = fs.readFileSync(path.join(packageRoot, 'src-tauri', 'src', 'main.rs'), 'utf8');
+const isRcVersion = String(packageJson.version).includes('-rc.');
+const updaterManifest = isRcVersion ? 'latest-0.1-rc.json' : 'latest-0.1.json';
 const macosArm64Artifact = locateMacosDesktopArtifact({
   cwd: repoRoot,
   bundleRoot: path.join(packageRoot, 'src-tauri', 'target', 'release', 'bundle'),
@@ -118,8 +120,8 @@ const manifest = {
     notarization: macosArm64SigningValidation.valid
       ? 'valid-macos-arm64-release-evidence'
       : 'missing-or-invalid-macos-arm64-release-evidence',
-    updater: 'enabled-for-line-scoped-rc-updates',
-    updaterManifest: 'latest-0.1-rc.json',
+    updater: isRcVersion ? 'enabled-for-line-scoped-rc-updates' : 'enabled-for-line-scoped-stable-updates',
+    updaterManifest,
     packageSmoke: 'pnpm --filter @codeagora/desktop smoke',
     appE2e: 'pnpm --filter @codeagora/desktop app:e2e',
     macosWebdriverE2e: 'pnpm --filter @codeagora/desktop macos:webdriver-e2e (debug .app bundle)',

@@ -54,6 +54,15 @@ export function formatError(error: Error, verbose: boolean): string {
 export function classifyCliErrorExitCode(error: Error): CliExitCode {
   const msg = error.message.toLowerCase();
   if (
+    msg.includes('api key not found') ||
+    msg.includes('no-api-key') ||
+    msg.includes('missing key') ||
+    msg.includes('not set') ||
+    /set [a-z0-9_]+_api_key environment variable/.test(msg)
+  ) {
+    return 2;
+  }
+  if (
     msg.includes('provider/api failures') ||
     msg.includes('all reviewers failed') ||
     msg.includes('forfeited or errored') ||
@@ -74,9 +83,6 @@ export function classifyCliErrorExitCode(error: Error): CliExitCode {
     msg.includes('json') ||
     msg.includes('yaml') ||
     msg.includes('api key') ||
-    msg.includes('no-api-key') ||
-    msg.includes('missing key') ||
-    msg.includes('not set') ||
     msg.includes('credential') ||
     msg.includes('environment variable')
   ) {

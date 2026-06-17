@@ -2,7 +2,7 @@
 
 CodeAgora docs are organized by audience.
 
-Current release: `0.1.0-rc.6`.
+Current release: `0.1.0`.
 
 ## Start here
 
@@ -37,6 +37,7 @@ Current release: `0.1.0-rc.6`.
 | [`for-agents/BENCHMARK_MEASUREMENT_PLAN.md`](./for-agents/BENCHMARK_MEASUREMENT_PLAN.md) | Benchmark measurement dimensions and model matrix. |
 | [`for-agents/BENCHMARK_RESULTS_2026_05_30.md`](./for-agents/BENCHMARK_RESULTS_2026_05_30.md) | Latest live golden-bug benchmark results and model/config comparison. |
 | [`for-agents/PRODUCTION_READINESS_ROADMAP.md`](./for-agents/PRODUCTION_READINESS_ROADMAP.md) | Release readiness gates and roadmap. |
+| [`for-agents/STABLE_READINESS.md`](./for-agents/STABLE_READINESS.md) | Current `v0.1.0` stable readiness audit, blockers, and evidence gates. |
 | [`for-agents/RC6_USABILITY_ROADMAP.md`](./for-agents/RC6_USABILITY_ROADMAP.md) | rc.6 usability-hardening plan for CLI, GitHub Action, MCP, Desktop, docs, and evidence. |
 | [`for-agents/papers/`](./for-agents/papers/) | Topic papers for the system design. |
 

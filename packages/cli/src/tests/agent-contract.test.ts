@@ -236,6 +236,11 @@ describe('CLI exit code classification', () => {
     expect(classifyCliErrorExitCode(new Error('Invalid output format'))).toBe(2);
     expect(classifyCliErrorExitCode(new Error('OPENAI_API_KEY not set'))).toBe(2);
     expect(classifyCliErrorExitCode(new Error('Missing key for provider credential'))).toBe(2);
+    expect(classifyCliErrorExitCode(new Error([
+      'All reviewers failed (forfeited or errored) due to provider/API failures.',
+      "- r1 (openrouter/xiaomi/mimo-v2.5): auth: Auth error (permanent): API key not found for provider 'openrouter'. Set OPENROUTER_API_KEY environment variable.",
+      'Recovery hint: check provider API keys, quota/rate limits, network connectivity, and circuit breaker status with `agora doctor --live`.',
+    ].join('\n')))).toBe(2);
   });
 
   it('classifies runtime errors as exit code 3', () => {

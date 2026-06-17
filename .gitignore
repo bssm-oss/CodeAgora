@@ -94,3 +94,4 @@ benchmarks/.ca/model-quality.json
 
 # E2E test screenshots
 web-e2e-*.png
+.vercel

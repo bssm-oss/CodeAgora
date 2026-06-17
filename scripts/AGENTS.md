@@ -13,6 +13,7 @@ Repository automation for action bundles, release/package smoke, evidence manife
 | Package/release smoke | `beta-smoke.mjs` | Verifies package dry-run, CLI help, MCP initialize/tools-list, and Action bundle path. |
 | Evidence manifest | `evidence-manifest.mjs` | Reads `.sisyphus/evidence/` logs and enforces beta/rc/stable tiers. |
 | Live Action PR smoke evidence | `github-action-pr-smoke-recorder.mjs` | Records the stable live PR smoke markdown from an actual `pull_request` event payload and CodeAgora Action outputs. |
+| Vercel production evidence | `vercel-production-evidence.mjs` | Verifies the production landing page, crawler files, brand assets, and stable commit metadata. |
 | Package contents | `verify-package-contents.mjs` | Checks root/MCP package file sets and runtime data paths. |
 | Golden-bug benchmark | `bench-fn*.ts`, `bench-reference-check.ts` | Keep deterministic validation separate from live provider runs. |
 | Model snapshots | `update-models-snapshot.ts` | Treat provider/model lineup data as time-sensitive. |
@@ -42,6 +43,7 @@ pnpm evidence:github-security
 - `pnpm bench:ci` is deterministic benchmark/reference validation, not live provider evidence.
 - `pnpm evidence:github-security` records token/fork/security policy evidence for RC manifests.
 - `pnpm evidence:github-action-pr-smoke` is valid live Action evidence only from an actual GitHub Actions `pull_request` context with CodeAgora Action outputs.
+- `pnpm evidence:vercel-production` is valid stable production evidence only after Vercel serves the rebuilt Astro landing page from the expected stable SHA.
 - Do not use deterministic tests, skipped provider paths, or local dry-runs as stable live-provider or live-GitHub-posting evidence. Stable or RC promotion claims must follow `docs/archived/RELEASE_EVIDENCE.md`.
 
 ## Anti-Patterns

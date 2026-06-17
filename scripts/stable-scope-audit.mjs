@@ -9,6 +9,8 @@ export const STABLE_SCOPE_ALLOWED_CATEGORIES = Object.freeze([
   'cli',
   'mcp',
   'github_actions',
+  'desktop',
+  'vercel_production_support',
   'shared_support',
   'test_evidence_support',
 ]);
@@ -17,6 +19,8 @@ const STABLE_SCOPE_CATEGORY_SURFACES = Object.freeze({
   cli: 'cli',
   mcp: 'mcp',
   github_actions: 'github-actions',
+  desktop: 'desktop',
+  vercel_production_support: 'vercel-production',
   shared_support: 'shared-support',
   test_evidence_support: 'tests-evidence',
 });
@@ -84,6 +88,13 @@ const GITHUB_ACTION_PATH_PATTERNS = [
   /^docs\/archived\/live-github-action-pr-smoke\.md$/,
 ];
 
+const VERCEL_PRODUCTION_PATH_PATTERNS = [
+  /^packages\/site(?:\/|$)/,
+  /^src\/tests\/site-[^/]+\.test\.tsx?$/,
+  /^vercel\.json$/,
+  /^\.vercelignore$/,
+];
+
 const TEST_EVIDENCE_PATH_PATTERNS = [
   /^src\/tests\/[^/]+\.test\.tsx?$/,
   /^packages\/[^/]+\/src\/tests\/[^/]+\.test\.tsx?$/,
@@ -149,12 +160,7 @@ export function classifyStableScopePath(filePath) {
   const normalized = normalizeRepoPath(filePath);
 
   if (isDesktopScopedPath(normalized)) {
-    return {
-      decision: 'exclude',
-      category: null,
-      surface: 'desktop',
-      reason: 'Desktop/Tauri scope is excluded from the CLI/MCP/GitHub Actions stable candidate.',
-    };
+    return keepClassification('desktop', 'Desktop release surface.');
   }
 
   if (matchesAnyPattern(normalized, CLI_PATH_PATTERNS)) {
@@ -167,6 +173,13 @@ export function classifyStableScopePath(filePath) {
 
   if (matchesAnyPattern(normalized, GITHUB_ACTION_PATH_PATTERNS)) {
     return keepClassification('github_actions', 'GitHub Actions release surface.');
+  }
+
+  if (matchesAnyPattern(normalized, VERCEL_PRODUCTION_PATH_PATTERNS)) {
+    return keepClassification(
+      'vercel_production_support',
+      'Vercel production landing evidence support for stable readiness.',
+    );
   }
 
   if (matchesAnyPattern(normalized, TEST_EVIDENCE_PATH_PATTERNS)) {
@@ -184,7 +197,7 @@ export function classifyStableScopePath(filePath) {
   }
 
   if (matchesAnyPattern(normalized, SHARED_SUPPORT_PATH_PATTERNS)) {
-    return keepClassification('shared_support', 'Shared support required by CLI, MCP, or GitHub Actions.');
+    return keepClassification('shared_support', 'Shared support required by CLI, MCP, GitHub Actions, or Desktop.');
   }
 
   return {
@@ -577,12 +590,6 @@ function buildExclusionSection(id, title, sourceField, entries) {
 export function buildStableScopeAuditExclusionSections(audit) {
   return [
     buildExclusionSection(
-      'desktop',
-      'Desktop exclusions',
-      'removedOrIgnoredDesktopScopedPaths',
-      normalizeRemovedOrIgnoredScopeEntries(audit.removedOrIgnoredDesktopScopedPaths),
-    ),
-    buildExclusionSection(
       'unrelated_provider_matrix',
       'Unrelated provider-matrix exclusions',
       'removedOrIgnoredProviderMatrixPaths',
@@ -753,8 +760,9 @@ export function buildStableScopeAuditArtifact(audit, options = {}) {
   return {
     schemaVersion: audit.schemaVersion ?? STABLE_SCOPE_AUDIT_SCHEMA_VERSION,
     generatedAt: options.generatedAt ?? audit.generatedAt ?? null,
-    stableReleaseSurfaces: ['cli', 'mcp', 'github_actions'],
-    excludedReleaseSurfaces: ['desktop'],
+    stableReleaseSurfaces: ['cli', 'mcp', 'github_actions', 'desktop'],
+    productionEvidenceSurfaces: ['vercel_production'],
+    excludedReleaseSurfaces: [],
     allowedCategories: [...STABLE_SCOPE_ALLOWED_CATEGORIES],
     validatedEntries,
     validatedEntryCount: validatedEntries.length,
@@ -887,7 +895,7 @@ function main() {
   });
   const validation = validateStableScopeAuditArtifact(audit);
   console.log(JSON.stringify(audit, null, 2));
-  if (audit.hasDesktopScope || !validation.valid) {
+  if (audit.unclassifiedChangedPathCount > 0 || !validation.valid) {
     process.exitCode = 1;
   }
 }

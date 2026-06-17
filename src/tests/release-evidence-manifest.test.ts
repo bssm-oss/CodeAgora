@@ -517,6 +517,39 @@ describe('release evidence manifest', () => {
     }
   });
 
+  it('requires stable live, Desktop distribution, GitHub failure-path, MCP, and Vercel evidence', () => {
+    const dir = makeTmpDir();
+    try {
+      const result = spawnSync(process.execPath, [scriptPath, '--evidence-dir', dir, '--require=stable'], {
+        encoding: 'utf-8',
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Missing or invalid required stable evidence');
+      for (const requiredFile of [
+        'cli-packed-install-smoke.json',
+        'mcp-packed-sdk-tool-call-smoke.json',
+        'mcp-packed-invalid-input-smoke.json',
+        'github-action-same-repo-pr-success.json',
+        'github-action-fork-pr-degraded.json',
+        'github-action-missing-secrets-degraded.json',
+        'github-action-stale-head-degraded.json',
+        'github-action-oversized-diff-degraded.json',
+        'github-action-provider-failure-degraded.json',
+        'github-action-posting-failure-degraded.json',
+        'desktop-stable-distribution-evidence.json',
+        'desktop-stable-packaged-app-launch-smoke.json',
+        'desktop-stable-review-flow-smoke.json',
+        'desktop-stable-visual-qa.json',
+        'vercel-production-evidence.json',
+      ]) {
+        expect(result.stderr).toContain(requiredFile);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('keeps sourcePath evidence inside the repository and generated evidence inside the evidence directory', () => {
     const repoRoot = path.resolve('/tmp/codeagora-repo');
     const evidenceDir = path.join(repoRoot, '.sisyphus', 'evidence');

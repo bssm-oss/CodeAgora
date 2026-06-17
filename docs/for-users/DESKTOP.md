@@ -10,9 +10,9 @@ contracts used by the automation surfaces.
 |------|--------------------------|
 | Channel | Official desktop app |
 | Public desktop launch | Included in release readiness |
-| Signing | RC distribution requires Developer ID evidence |
-| Notarization | RC distribution requires accepted notarization and stapled tickets |
-| Updater | RC-only static GitHub Release JSON, scoped to `desktop-X.Y-rc/latest-X.Y-rc.json` for the installed version line |
+| Signing | Stable distribution requires Developer ID evidence |
+| Notarization | Stable distribution requires accepted notarization and stapled tickets |
+| Updater | Static GitHub Release JSON, scoped to `desktop-X.Y/latest-X.Y.json` for stable releases and `desktop-X.Y-rc/latest-X.Y-rc.json` for RC releases |
 | Canonical review engine | Existing CLI/core path |
 | Canonical sessions | Existing `.ca/sessions` artifacts |
 | Canonical config | Existing `.ca/config.*` schema and files |
@@ -25,7 +25,7 @@ Run the desktop gate before cutting an RC:
 pnpm rc:desktop-gate
 ```
 
-Official macOS arm64 Desktop RC distribution also requires:
+Official macOS arm64 Desktop distribution also requires:
 
 ```bash
 pnpm rc:desktop-distribution-gate
@@ -68,7 +68,7 @@ The desktop smoke checks:
 
 - built `dist/index.html` and `dist/main.js`
 - package/Tauri version alignment
-- RC updater configuration and updater artifact generation
+- updater configuration and updater artifact generation
 - Tauri product metadata
 - command bridge coverage for repository, sessions, review progress, config,
   providers, MCP, GitHub Action setup, release evidence, export, and command

@@ -52,12 +52,13 @@ describe('release gate inventory', () => {
     ]);
   });
 
-  it('excludes live-provider and live-GitHub checks from deterministic local gates', () => {
+  it('excludes live-provider, live-GitHub, and live-production checks from deterministic local gates', () => {
     const deterministicGates = deterministicLocalReleaseGates();
     const deterministicNames = deterministicGates.map((entry) => entry.name);
     const deterministicCommands = deterministicGates.map((entry) => entry.command);
 
     expect(deterministicNames).not.toContain('live-benchmark-report');
+    expect(deterministicNames).not.toContain('cli-packed-install-smoke');
     expect(deterministicNames).not.toContain('cli-live-clean-diff-smoke');
     expect(deterministicNames).not.toContain('cli-live-clean-diff-transcript');
     expect(deterministicNames).not.toContain('cli-live-staged-diff-smoke');
@@ -73,6 +74,7 @@ describe('release gate inventory', () => {
     expect(deterministicNames).not.toContain('cli-live-timeout-runtime-smoke');
     expect(deterministicNames).not.toContain('cli-live-timeout-runtime-transcript');
     expect(deterministicNames).not.toContain('live-github-action-pr-smoke');
+    expect(deterministicNames).not.toContain('vercel-production-evidence');
     expect(deterministicCommands).not.toContain('pnpm smoke:cli-clean-diff with provider credentials');
     expect(deterministicCommands).not.toContain('pnpm smoke:cli-staged-diff with provider credentials');
     expect(deterministicCommands).not.toContain('pnpm smoke:cli-patch-file with provider credentials');
@@ -89,10 +91,12 @@ describe('release gate inventory', () => {
         RELEASE_GATE_EXECUTIONS.LIVE_CLI,
         RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
         RELEASE_GATE_EXECUTIONS.LIVE_GITHUB,
+        RELEASE_GATE_EXECUTIONS.LIVE_PRODUCTION,
       ].includes(entry.execution),
     );
     expect(liveExecutions.map((entry) => entry.name)).toEqual([
       'desktop-rc-github-release-assets',
+      'cli-packed-install-smoke',
       'cli-live-clean-diff-smoke',
       'cli-live-clean-diff-transcript',
       'cli-live-staged-diff-smoke',
@@ -107,8 +111,19 @@ describe('release gate inventory', () => {
       'cli-live-provider-failure-transcript',
       'cli-live-timeout-runtime-smoke',
       'cli-live-timeout-runtime-transcript',
+      'mcp-packed-sdk-tool-call-smoke',
+      'mcp-packed-invalid-input-smoke',
       'live-benchmark-report',
       'live-github-action-pr-smoke',
+      'github-action-same-repo-pr-success',
+      'github-action-fork-pr-degraded',
+      'github-action-missing-secrets-degraded',
+      'github-action-stale-head-degraded',
+      'github-action-oversized-diff-degraded',
+      'github-action-provider-failure-degraded',
+      'github-action-posting-failure-degraded',
+      'desktop-stable-review-flow-smoke',
+      'vercel-production-evidence',
     ]);
     expect(deterministicGates.every((entry) => entry.liveOnly !== true)).toBe(true);
   });
@@ -125,6 +140,59 @@ describe('release gate inventory', () => {
       execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
     });
     expect(deterministicLocalReleaseGates()).not.toContain(signingEvidence);
+  });
+
+  it('tracks Desktop stable distribution, launch, review, and visual evidence as stable blockers', () => {
+    const entries = new Map(EXPECTED_EVIDENCE.map((entry) => [entry.name, entry]));
+
+    expect(entries.get('desktop-stable-distribution-evidence')).toMatchObject({
+      filename: 'desktop-stable-distribution-evidence.json',
+      tier: 'stable',
+      redactionStatus: 'safe-to-publish',
+      liveOnly: true,
+      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+    });
+    expect(entries.get('desktop-stable-packaged-app-launch-smoke')).toMatchObject({
+      filename: 'desktop-stable-packaged-app-launch-smoke.json',
+      tier: 'stable',
+      redactionStatus: 'safe-to-publish',
+      liveOnly: true,
+      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+    });
+    expect(entries.get('desktop-stable-review-flow-smoke')).toMatchObject({
+      filename: 'desktop-stable-review-flow-smoke.json',
+      tier: 'stable',
+      redactionStatus: 'redacted-required',
+      liveOnly: true,
+      execution: RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
+    });
+    expect(entries.get('desktop-stable-visual-qa')).toMatchObject({
+      filename: 'desktop-stable-visual-qa.json',
+      tier: 'stable',
+      redactionStatus: 'safe-to-publish',
+      liveOnly: true,
+      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+    });
+  });
+
+  it('tracks Vercel production landing evidence as a stable live-production blocker', () => {
+    const rootPackage = JSON.parse(fs.readFileSync('package.json', 'utf-8')) as {
+      scripts: Record<string, string>;
+    };
+    const evidence = EXPECTED_EVIDENCE.find(
+      (entry) => entry.name === 'vercel-production-evidence',
+    );
+
+    expect(rootPackage.scripts['evidence:vercel-production']).toBe('node scripts/vercel-production-evidence.mjs');
+    expect(evidence).toMatchObject({
+      filename: 'vercel-production-evidence.json',
+      command: 'pnpm evidence:vercel-production after production deployment from the stable SHA',
+      tier: 'stable',
+      redactionStatus: 'safe-to-publish',
+      liveOnly: true,
+      execution: RELEASE_GATE_EXECUTIONS.LIVE_PRODUCTION,
+    });
+    expect(deterministicLocalReleaseGates()).not.toContain(evidence);
   });
 
   it('tracks macOS arm64 Desktop RC distribution as an rc artifact and command gate', () => {

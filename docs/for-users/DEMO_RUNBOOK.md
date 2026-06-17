@@ -161,7 +161,7 @@ Client config:
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@rc"]
+      "args": ["-y", "@codeagora/mcp"]
     }
   }
 }
@@ -239,7 +239,7 @@ jobs:
           fetch-depth: 0
 
       - name: CodeAgora Review
-        uses: bssm-oss/CodeAgora@v0.1.0-rc.6
+        uses: bssm-oss/CodeAgora@v0.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
