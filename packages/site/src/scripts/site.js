@@ -253,7 +253,7 @@ if (heroPanel && !reduceMotion) {
   });
 }
 
-const agentCards = [...document.querySelectorAll(".agent-lanes article")];
+const agentCards = [...document.querySelectorAll("[data-live-agent]")];
 
 if (agentCards.length > 0 && !reduceMotion) {
   let activeAgentIndex = 0;

@@ -84,6 +84,10 @@ img {
   display: block;
 }
 
+.line {
+  display: block;
+}
+
 .scroll-progress {
   position: fixed;
   z-index: 100;
@@ -379,6 +383,225 @@ section[id] {
   background: rgba(246, 196, 83, 0.1);
   font: 800 0.76rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-style: normal;
+}
+
+.app-preview {
+  border-color: rgba(75, 85, 104, 0.78);
+  background: #1a1f29;
+}
+
+.app-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 56px;
+  padding: 11px 14px;
+  border-bottom: 1px solid #343c4b;
+  background: #181c24;
+}
+
+.app-preview-bar div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.app-preview-bar span,
+.app-preview-bar strong,
+.app-eyebrow,
+.app-flow-step span,
+.app-flow-step small,
+.app-metric-card span,
+.app-artifact-list span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.app-preview-bar span,
+.app-eyebrow,
+.app-flow-step span,
+.app-metric-card span,
+.app-artifact-list span {
+  color: #8f99aa;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.app-preview-bar strong {
+  overflow: hidden;
+  color: #b8c0cf;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-pill,
+.app-decision {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid #4b5568;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.app-pill-warn,
+.app-human {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.44);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.app-preview-body {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(243, 246, 251, 0.025), transparent 34%),
+    #1a1f29;
+}
+
+.app-verdict-card,
+.app-flow-step,
+.app-metric-card,
+.app-artifact-list div {
+  border: 1px solid #343c4b;
+  border-radius: 8px;
+  background: rgba(32, 38, 51, 0.92);
+}
+
+.app-verdict-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 13px;
+}
+
+.app-verdict-card.app-warn {
+  border-color: rgba(251, 191, 36, 0.38);
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(32, 38, 51, 0.86) 44%),
+    #202633;
+}
+
+.app-verdict-card h3 {
+  margin-top: 6px;
+  font-size: clamp(1.28rem, 2vw, 1.54rem);
+  line-height: 1.16;
+}
+
+.app-verdict-card p {
+  max-width: 36ch;
+  margin-top: 7px;
+  color: #b8c0cf;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.app-review-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.app-flow-step {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  min-height: 80px;
+  padding: 10px;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.app-flow-step strong {
+  overflow: hidden;
+  color: #f3f6fb;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-flow-step small {
+  color: #8f99aa;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.app-flow-step.app-good {
+  border-color: rgba(134, 239, 172, 0.3);
+  background: rgba(34, 197, 94, 0.11);
+}
+
+.app-flow-step.app-warn {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.app-flow-step.app-info {
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(14, 165, 233, 0.11);
+}
+
+.app-flow-step.is-live {
+  border-color: rgba(123, 230, 239, 0.52);
+  background: rgba(5, 166, 185, 0.16);
+  transform: translateY(-2px);
+}
+
+.app-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.app-metric-card {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 10px;
+}
+
+.app-metric-card strong {
+  overflow: hidden;
+  color: #f3f6fb;
+  font-size: 1.08rem;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-artifact-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.app-artifact-list div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 9px 10px;
+}
+
+.app-artifact-list strong {
+  overflow: hidden;
+  color: #b8c0cf;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .evidence-arena {
@@ -737,6 +960,10 @@ section[id] {
   word-break: keep-all;
 }
 
+.pipeline-panel h3 .line {
+  overflow-wrap: break-word;
+}
+
 .pipeline-panel p {
   max-width: 620px;
   margin-top: 20px;
@@ -1010,7 +1237,7 @@ code {
 .motion-toggle {
   position: fixed;
   z-index: 60;
-  right: 18px;
+  left: 18px;
   bottom: 18px;
   display: inline-flex;
   align-items: center;
@@ -1347,6 +1574,12 @@ code {
     overflow-wrap: break-word;
   }
 
+  .section-heading h2 .line,
+  .pipeline-panel h3 .line,
+  .install-copy h2 .line {
+    display: inline;
+  }
+
   .hero-meta {
     font-size: 0.78rem;
   }
@@ -1361,6 +1594,10 @@ code {
     max-width: 100%;
   }
 
+  .motion-toggle {
+    display: none;
+  }
+
   .hero-panel {
     display: block;
     width: calc(100% - 10px);
@@ -1371,6 +1608,49 @@ code {
   .evidence-arena {
     gap: 10px;
     padding: 14px;
+  }
+
+  .app-preview-bar {
+    align-items: start;
+    padding: 10px 12px;
+  }
+
+  .app-preview-body {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .app-verdict-card,
+  .app-review-flow,
+  .app-metric-grid,
+  .app-artifact-list,
+  .app-artifact-list div {
+    grid-template-columns: 1fr;
+  }
+
+  .app-verdict-card {
+    padding: 13px;
+  }
+
+  .app-verdict-card h3 {
+    font-size: 1.3rem;
+  }
+
+  .app-review-flow {
+    gap: 8px;
+  }
+
+  .app-flow-step {
+    min-height: auto;
+  }
+
+  .app-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-artifact-list div {
+    gap: 5px;
+    align-items: start;
   }
 
   .case-file,

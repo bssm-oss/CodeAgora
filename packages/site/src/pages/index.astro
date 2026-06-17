@@ -103,7 +103,7 @@ const pipelineScenes = [
     id: "diff",
     number: "01",
     label: "Diff intake",
-    title: "먼저 바뀐 부분만 좁힙니다.",
+    title: ["먼저 바뀐 부분만", "좁힙니다."],
     body: "전체 저장소를 다시 읽는 대신, 이번 변경이 건드린 파일과 영향 범위를 먼저 요약합니다.",
     detail: "changed files: 3 · review target: preset behavior",
     verdict: "검토 대상 정리"
@@ -112,7 +112,7 @@ const pipelineScenes = [
     id: "reviewers",
     number: "02",
     label: "Parallel review",
-    title: "여러 리뷰어가 같은 변경을 따로 봅니다.",
+    title: ["여러 리뷰어가", "같은 변경을 따로 봅니다."],
     body: "보안, 안정성, 유지보수 관점이 서로 섞이지 않게 독립적으로 의견을 냅니다.",
     detail: "security: confirmed · reliability: contested",
     verdict: "의견 3개 수집"
@@ -121,7 +121,7 @@ const pipelineScenes = [
     id: "evidence",
     number: "03",
     label: "Evidence check",
-    title: "그럴듯한 말을 실제 근거와 대조합니다.",
+    title: ["그럴듯한 말을", "실제 근거와 대조합니다."],
     body: "파일 존재, 라인 범위, 코드 인용, 반박 여부를 확인해 약한 주장을 걸러냅니다.",
     detail: "quote verified · line range valid · conflict found",
     verdict: "근거 2개 확정"
@@ -130,7 +130,7 @@ const pipelineScenes = [
     id: "verdict",
     number: "04",
     label: "Human verdict",
-    title: "마지막에는 사람이 행동할 판정으로 줄입니다.",
+    title: ["마지막에는 사람이 행동할", "판정으로 줄입니다."],
     body: "승인, 반려, 사람 확인 필요처럼 다음 행동이 분명한 결론으로 정리합니다.",
     detail: "confirmed: 2 · contested: 1 · next action: human",
     verdict: "사람 확인 필요"
@@ -329,38 +329,74 @@ const commandLogs = {
           </div>
         </div>
 
-        <aside class="hero-panel evidence-panel" aria-label="CodeAgora 판정 흐름 미리보기">
-          <div class="panel-top">
-            <span>리뷰 판정 결과</span>
-            <strong>사람 확인 필요</strong>
+        <aside class="hero-panel evidence-panel app-preview" aria-label="CodeAgora Desktop 판정 화면 미리보기">
+          <div class="app-preview-bar">
+            <div>
+              <span>CodeAgora Desktop</span>
+              <strong>session/2026-06-17/demo-rc</strong>
+            </div>
+            <span class="app-pill app-pill-warn">NEEDS_HUMAN</span>
           </div>
-          <div class="evidence-arena">
-            <div class="case-file">
-              <span>검토 대상</span>
-              <h3>코드 변경 24줄</h3>
-              <p>설정 프리셋이 바뀌며 로컬 실행 경로에 영향이 생겼습니다.</p>
+          <div class="app-preview-body">
+            <section class="app-verdict-card app-warn">
+              <div>
+                <span class="app-eyebrow">Final verdict</span>
+                <h3>사람 확인 필요</h3>
+                <p>2개 의견은 일치했고, 1개 쟁점은 로컬 실행 정책 확인이 필요합니다.</p>
+              </div>
+              <span class="app-decision app-human">사람 확인 필요</span>
+            </section>
+
+            <div class="app-review-flow" aria-label="리뷰 상태 흐름">
+              <article class="app-flow-step app-good" data-live-agent>
+                <span>Workspace</span>
+                <strong>Trusted</strong>
+                <small>changed files: 3</small>
+              </article>
+              <article class="app-flow-step app-warn" data-live-agent>
+                <span>Review</span>
+                <strong>Needs human</strong>
+                <small>confirmed: 2 · contested: 1</small>
+              </article>
+              <article class="app-flow-step app-info" data-live-agent>
+                <span>Acceptance</span>
+                <strong>Pending</strong>
+                <small>local backend policy</small>
+              </article>
             </div>
-            <div class="agent-lanes" aria-label="독립 AI 리뷰어 의견">
-              <article>
-                <b>보안 리뷰어</b>
-                <span class="signal confirmed">확인됨</span>
-                <p>실행 가능한 도구만 기본값에 남겨야 합니다.</p>
+
+            <div class="app-metric-grid" aria-label="판정 근거 요약">
+              <article class="app-metric-card">
+                <span>Files</span>
+                <strong>3</strong>
               </article>
-              <article>
-                <b>안정성 리뷰어</b>
-                <span class="signal contested">반박 있음</span>
-                <p>환경마다 결과가 달라질 수 있어 사람 확인이 필요합니다.</p>
+              <article class="app-metric-card">
+                <span>Reviewers</span>
+                <strong>L1 × 3</strong>
               </article>
-              <article>
-                <b>유지보수 리뷰어</b>
-                <span class="signal confirmed">확인됨</span>
-                <p>팀 설정 문서와 실제 동작이 같은지 맞춰야 합니다.</p>
+              <article class="app-metric-card">
+                <span>Confirmed</span>
+                <strong>2</strong>
+              </article>
+              <article class="app-metric-card">
+                <span>Contested</span>
+                <strong>1</strong>
               </article>
             </div>
-            <div class="verdict-card">
-              <span>최종 판정</span>
-              <h3>사람 확인 필요</h3>
-              <p>2개 의견은 일치했고, 1개 쟁점은 근거가 갈렸습니다.</p>
+
+            <div class="app-artifact-list" aria-label="생성된 리뷰 산출물">
+              <div>
+                <span>report.md</span>
+                <strong>decision summary</strong>
+              </div>
+              <div>
+                <span>head-verdict.json</span>
+                <strong>NEEDS_HUMAN</strong>
+              </div>
+              <div>
+                <span>reviews/security.md</span>
+                <strong>verified evidence</strong>
+              </div>
             </div>
           </div>
         </aside>
@@ -369,7 +405,10 @@ const commandLogs = {
       <section class="section-shell plain-section">
         <div class="section-heading compact-heading">
           <p class="eyebrow">한눈에 이해하기</p>
-          <h2>한 명의 AI에게 맡기는 리뷰가 아닙니다.</h2>
+          <h2>
+            <span class="line">한 명의 AI에게 맡기는</span>
+            <span class="line">리뷰가 아닙니다.</span>
+          </h2>
           <p>비개발자가 봐도 핵심은 단순합니다. 여러 검토자에게 나눠 맡기고, 근거가 맞는 의견만 남깁니다.</p>
         </div>
         <div class="plain-grid">
@@ -386,7 +425,10 @@ const commandLogs = {
       <section id="pipeline" class="section-shell pipeline-lab">
         <div class="section-heading">
           <p class="eyebrow">흐름 체험하기</p>
-          <h2>스크롤하면 리뷰가 판정으로 좁혀집니다.</h2>
+          <h2>
+            <span class="line">스크롤하면 리뷰가</span>
+            <span class="line">판정으로 좁혀집니다.</span>
+          </h2>
           <p>CodeAgora가 변경 사항을 받아 여러 의견과 근거를 거쳐 최종 판단 자료로 만드는 과정을 직접 따라갑니다.</p>
         </div>
         <div class="pipeline-demo" data-pipeline-demo>
@@ -422,7 +464,9 @@ const commandLogs = {
                 hidden={index !== 0}
               >
                 <span>{scene.verdict}</span>
-                <h3>{scene.title}</h3>
+                <h3>
+                  {scene.title.map((line) => <span class="line">{line}</span>)}
+                </h3>
                 <p>{scene.body}</p>
                 <code>{scene.detail}</code>
               </article>
@@ -434,7 +478,10 @@ const commandLogs = {
       <section id="review" class="section-shell review-section">
         <div class="section-heading">
           <p class="eyebrow">토론하는 리뷰</p>
-          <h2>결과는 읽는 글이 아니라, 판단 가능한 자료입니다.</h2>
+          <h2>
+            <span class="line">결과는 읽는 글이 아니라,</span>
+            <span class="line">판단 가능한 자료입니다.</span>
+          </h2>
           <p>파일, 라인, 코드 인용, 반박을 한 화면에서 확인합니다.</p>
         </div>
         <div class="review-window">
@@ -485,7 +532,10 @@ const commandLogs = {
       <section id="method" class="section-shell">
         <div class="section-heading">
           <p class="eyebrow">작동 방식</p>
-          <h2>많이 말하는 AI보다, 틀린 말을 거르는 리뷰.</h2>
+          <h2>
+            <span class="line">많이 말하는 AI보다,</span>
+            <span class="line">틀린 말을 거르는 리뷰.</span>
+          </h2>
           <p>CodeAgora는 코드 변경 사항(diff)에서 판정까지 같은 기준으로 좁혀갑니다.</p>
         </div>
         <div class="step-grid">
@@ -502,7 +552,10 @@ const commandLogs = {
       <section id="surfaces" class="section-shell split-section">
         <div class="section-heading">
           <p class="eyebrow">공식 지원 환경</p>
-          <h2>어디서 실행해도 같은 기준으로 판단합니다.</h2>
+          <h2>
+            <span class="line">어디서 실행해도</span>
+            <span class="line">같은 기준으로 판단합니다.</span>
+          </h2>
           <p>CLI, GitHub Action, MCP, Desktop RC가 같은 리뷰 파이프라인을 사용합니다.</p>
         </div>
         <div class="surface-grid">
@@ -519,7 +572,10 @@ const commandLogs = {
       <section class="section-shell trust-section">
         <div class="section-heading">
           <p class="eyebrow">신뢰와 비용</p>
-          <h2>코드는 중개 서버에 쌓지 않고, 비용 구조도 숨기지 않습니다.</h2>
+          <h2>
+            <span class="line">코드는 중개 서버에 쌓지 않고,</span>
+            <span class="line">비용 구조도 숨기지 않습니다.</span>
+          </h2>
           <p>팀이 쓰는 모델 공급자와 로컬 환경을 기준으로 운영합니다.</p>
         </div>
         <div class="trust-row">
@@ -532,7 +588,10 @@ const commandLogs = {
       <section id="install" class="section-shell install-section">
         <div class="install-copy">
           <p class="eyebrow">출시 준비 채널로 시작하기</p>
-          <h2>먼저 CLI로 확인하고, 팀 흐름에 붙입니다.</h2>
+          <h2>
+            <span class="line">먼저 CLI로 확인하고,</span>
+            <span class="line">팀 흐름에 붙입니다.</span>
+          </h2>
           <p>처음에는 터미널에서 결과를 확인하고, 필요하면 GitHub Action, MCP, Desktop RC로 확장합니다.</p>
         </div>
         <div class="command-console">
@@ -576,7 +635,10 @@ const commandLogs = {
       <section id="faq" class="section-shell faq-section">
         <div class="section-heading">
           <p class="eyebrow">자주 묻는 질문</p>
-          <h2>처음 보는 사람도 판단할 수 있게 정리했습니다.</h2>
+          <h2>
+            <span class="line">처음 보는 사람도</span>
+            <span class="line">판단할 수 있게 정리했습니다.</span>
+          </h2>
         </div>
         <div class="faq-tools">
           <label for="faq-search">궁금한 내용을 검색하세요</label>
