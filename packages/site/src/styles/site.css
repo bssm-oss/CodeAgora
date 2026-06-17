@@ -136,6 +136,25 @@ img {
   background: rgba(123, 230, 239, 0.09);
 }
 
+.brand .brand-icon,
+.footer-brand .brand-icon {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  object-fit: contain;
+}
+
+.brand .brand-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.footer-brand .brand-icon {
+  width: 34px;
+  height: 34px;
+}
+
 .brand .brand-wordmark {
   width: 156px;
   height: auto;
@@ -143,6 +162,7 @@ img {
   border: 0;
   border-radius: 0;
   background: transparent;
+  transform: translateY(2px);
 }
 
 .nav-links {
@@ -843,20 +863,42 @@ section[id] {
 }
 
 .pipeline-lab {
-  min-height: 180svh;
+  display: grid;
+  align-items: center;
+  min-height: 140svh;
 }
 
 .pipeline-demo {
   display: grid;
-  grid-template-columns: minmax(260px, 0.7fr) minmax(460px, 1fr);
-  gap: clamp(24px, 5vw, 70px);
-  align-items: start;
-  min-height: 120svh;
+  grid-template-columns: minmax(320px, 0.86fr) minmax(500px, 1fr);
+  gap: clamp(22px, 3.2vw, 42px);
+  align-items: center;
+  width: min(100%, 1180px);
+  min-height: min(760px, calc(100svh - 150px));
+  margin-inline: auto;
+}
+
+.pipeline-rail {
+  position: sticky;
+  top: clamp(108px, 15vh, 150px);
+  display: grid;
+  gap: 28px;
+}
+
+.pipeline-heading {
+  max-width: 760px;
+  margin-bottom: 0;
+}
+
+.pipeline-heading h2 {
+  max-width: 14ch;
+}
+
+.pipeline-heading p:last-child {
+  max-width: 640px;
 }
 
 .pipeline-steps {
-  position: sticky;
-  top: 92px;
   display: grid;
   gap: 10px;
 }
@@ -894,9 +936,9 @@ section[id] {
 
 .pipeline-stage {
   position: sticky;
-  top: 92px;
+  top: clamp(108px, 15vh, 150px);
   overflow: hidden;
-  min-height: 480px;
+  min-height: 440px;
   border: 1px solid rgba(123, 230, 239, 0.2);
   border-radius: 8px;
   background:
@@ -1524,6 +1566,7 @@ code {
     min-height: auto;
   }
 
+  .pipeline-rail,
   .pipeline-steps,
   .pipeline-stage {
     position: static;

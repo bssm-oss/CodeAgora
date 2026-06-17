@@ -271,7 +271,7 @@ const commandLogs = {
     <link rel="canonical" href={canonicalUrl} />
     <link rel="alternate" hreflang="ko" href={canonicalUrl} />
     <link rel="alternate" hreflang="x-default" href={canonicalUrl} />
-    <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+    <link rel="icon" href="/assets/codeagora-icon.png" type="image/png" />
     <meta property="og:site_name" content="CodeAgora" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ko_KR" />
@@ -294,7 +294,7 @@ const commandLogs = {
     <div class="scroll-progress" aria-hidden="true"></div>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="CodeAgora 홈">
-        <img src="/assets/logo.svg" alt="" width="34" height="34" />
+        <img class="brand-icon" src="/assets/codeagora-icon.png" alt="" width="250" height="250" />
         <img class="brand-wordmark" src="/assets/codeagora-wordmark.png" alt="CodeAgora" width="2194" height="467" decoding="async" />
       </a>
       <nav id="site-nav" class="nav-links" aria-label="주요 탐색">
@@ -423,30 +423,32 @@ const commandLogs = {
       </section>
 
       <section id="pipeline" class="section-shell pipeline-lab">
-        <div class="section-heading">
-          <p class="eyebrow">흐름 체험하기</p>
-          <h2>
-            <span class="line">스크롤하면 리뷰가</span>
-            <span class="line">판정으로 좁혀집니다.</span>
-          </h2>
-          <p>CodeAgora가 변경 사항을 받아 여러 의견과 근거를 거쳐 최종 판단 자료로 만드는 과정을 직접 따라갑니다.</p>
-        </div>
         <div class="pipeline-demo" data-pipeline-demo>
-          <div class="pipeline-steps" role="tablist" aria-label="CodeAgora 리뷰 흐름">
-            {pipelineScenes.map((scene, index) => (
-              <button
-                id={`pipeline-tab-${scene.id}`}
-                class={index === 0 ? "active" : ""}
-                type="button"
-                role="tab"
-                aria-selected={index === 0 ? "true" : "false"}
-                aria-controls={`pipeline-panel-${scene.id}`}
-                data-pipeline-step={scene.id}
-              >
-                <span>{scene.number}</span>
-                <strong>{scene.label}</strong>
-              </button>
-            ))}
+          <div class="pipeline-rail">
+            <div class="section-heading pipeline-heading">
+              <p class="eyebrow">흐름 체험하기</p>
+              <h2>
+                <span class="line">스크롤하면 리뷰가</span>
+                <span class="line">판정으로 좁혀집니다.</span>
+              </h2>
+              <p>CodeAgora가 변경 사항을 받아 여러 의견과 근거를 거쳐 최종 판단 자료로 만드는 과정을 직접 따라갑니다.</p>
+            </div>
+            <div class="pipeline-steps" role="tablist" aria-label="CodeAgora 리뷰 흐름">
+              {pipelineScenes.map((scene, index) => (
+                <button
+                  id={`pipeline-tab-${scene.id}`}
+                  class={index === 0 ? "active" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={index === 0 ? "true" : "false"}
+                  aria-controls={`pipeline-panel-${scene.id}`}
+                  data-pipeline-step={scene.id}
+                >
+                  <span>{scene.number}</span>
+                  <strong>{scene.label}</strong>
+                </button>
+              ))}
+            </div>
           </div>
           <div class="pipeline-stage" aria-live="polite">
             <div class="pipeline-map" aria-hidden="true">
@@ -573,15 +575,15 @@ const commandLogs = {
         <div class="section-heading">
           <p class="eyebrow">신뢰와 비용</p>
           <h2>
-            <span class="line">코드는 중개 서버에 쌓지 않고,</span>
-            <span class="line">비용 구조도 숨기지 않습니다.</span>
+            <span class="line">코드는 직접 보내고,</span>
+            <span class="line">비용은 그대로 보입니다.</span>
           </h2>
-          <p>팀이 쓰는 모델 공급자와 로컬 환경을 기준으로 운영합니다.</p>
+          <p>CodeAgora는 코드를 우리 서버에 모으지 않습니다. 팀이 고른 모델 공급자와 로컬 키를 기준으로 실행합니다.</p>
         </div>
         <div class="trust-row">
-          <article><b>로컬 키 관리</b><span>provider key는 로컬 권한 안에 둡니다.</span></article>
-          <article><b>직접 통신</b><span>코드는 사용자가 고른 모델 공급자로 직접 보냅니다.</span></article>
-          <article><b>비용 투명성</b><span>외부 모델 API를 쓰면 해당 공급자 비용이 발생할 수 있습니다.</span></article>
+          <article><b>키는 로컬에</b><span>API 키는 사용자의 로컬 권한 안에 둡니다.</span></article>
+          <article><b>코드는 직접 전송</b><span>선택한 모델 공급자로만 리뷰 요청을 보냅니다.</span></article>
+          <article><b>비용은 공급자 기준</b><span>외부 모델을 쓰면 해당 공급자의 사용량 비용만 발생합니다.</span></article>
         </div>
       </section>
 
@@ -665,7 +667,7 @@ const commandLogs = {
     <footer class="site-footer">
       <div class="footer-intro">
         <a class="footer-brand" href="#top">
-          <img src="/assets/logo.svg" alt="" width="34" height="34" />
+          <img class="brand-icon" src="/assets/codeagora-icon.png" alt="" width="250" height="250" />
           <strong>CodeAgora</strong>
         </a>
         <p>
