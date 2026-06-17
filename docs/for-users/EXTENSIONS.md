@@ -12,6 +12,11 @@ The former web dashboard, terminal TUI, and webhook notification surfaces are no
 
 The replacement surface is the official cross-platform Tauri desktop app for the human-facing local UI: review history, result exploration, configuration, progress, cost visibility, local alerts, and evidence export. See [DESKTOP.md](DESKTOP.md).
 
+The v0.1.0 release includes a macOS arm64 unsigned preview DMG:
+<https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0/CodeAgora_0.1.0_aarch64.dmg>.
+It is not Developer ID signed, not notarized, and does not enable the Tauri
+updater channel; macOS Gatekeeper warning is expected.
+
 ## MCP Server (`@codeagora/mcp`)
 
 Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code, Cursor, Windsurf, and VS Code.

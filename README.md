@@ -109,6 +109,13 @@ See [`packages/mcp/README.md`](packages/mcp/README.md) for tool details.
 
 The desktop app in `packages/desktop` is an official local UI surface for setup, session browsing, review launch, result inspection, and evidence export. It uses the same CLI/core/session/config contracts as the automation surfaces.
 
+The v0.1.0 GitHub Release includes a macOS arm64 DMG:
+[CodeAgora_0.1.0_aarch64.dmg](https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0/CodeAgora_0.1.0_aarch64.dmg).
+This DMG is an unsigned preview build. It is not Developer ID signed, not
+notarized, and does not enable a Tauri updater channel; macOS Gatekeeper warning
+is expected. See [Desktop app](docs/for-users/DESKTOP.md) for the current
+distribution policy.
+
 ## Docs map
 
 | Doc | Purpose |
@@ -121,6 +128,7 @@ The desktop app in `packages/desktop` is an official local UI surface for setup,
 | [Development notes](docs/for-agents/DEVELOPMENT.md) | Setup, checks, release/doc pointers |
 | [Benchmarks](docs/for-agents/BENCHMARKS.md) | Fixture set and benchmark notes |
 | [GitHub Actions setup](docs/for-users/GITHUB_ACTIONS_SETUP.md) | Full action guide |
+| [Desktop app](docs/for-users/DESKTOP.md) | Desktop DMG policy and evidence |
 | [Troubleshooting](docs/for-users/TROUBLESHOOTING.md) | Common errors and fixes |
 
 ## Development and benchmarks

@@ -42,9 +42,15 @@ Stable Desktop distribution, stable updater channels, and npm
 
 ## v0.1.0 Stable Desktop DMG
 
-The v0.1.0 stable release may attach a macOS arm64 Desktop DMG as an unsigned
-preview artifact. That DMG is not Developer ID signed, not notarized, and does
-not enable a Tauri updater channel. macOS Gatekeeper warnings are expected.
+The v0.1.0 stable release attaches a macOS arm64 Desktop DMG as an unsigned
+preview artifact:
+
+```txt
+https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.0/CodeAgora_0.1.0_aarch64.dmg
+```
+
+That DMG is not Developer ID signed, not notarized, and does not enable a Tauri
+updater channel. macOS Gatekeeper warnings are expected.
 
 Stable Desktop release evidence must be explicit about that policy:
 
@@ -64,7 +70,7 @@ Do not describe the v0.1.0 Desktop DMG as signed, notarized, stapled, or
 auto-updatable unless a later release reintroduces those gates with fresh
 evidence.
 
-This runs:
+For RC evidence, `pnpm rc:desktop-gate` runs:
 
 - `pnpm --filter @codeagora/desktop typecheck`
 - `pnpm --filter @codeagora/desktop smoke`

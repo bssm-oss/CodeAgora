@@ -24,6 +24,7 @@ Current release: `0.1.0`.
 | [`for-users/5_GITHUB_INTEGRATION.md`](./for-users/5_GITHUB_INTEGRATION.md) | Deep GitHub integration/spec reference. |
 | [`for-users/DESKTOP.md`](./for-users/DESKTOP.md) | Desktop app setup, gates, and release evidence. |
 | [`for-users/TROUBLESHOOTING.md`](./for-users/TROUBLESHOOTING.md) | Common failures and fixes. |
+| [`archived/release-notes-0.1.0.md`](./archived/release-notes-0.1.0.md) | v0.1.0 stable release notes and evidence links. |
 
 ## Key agent/maintainer docs
 
