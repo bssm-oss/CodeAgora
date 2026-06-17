@@ -2,6 +2,25 @@ const header = document.querySelector(".site-header");
 const menuToggle = document.getElementById("menu-toggle");
 const nav = document.getElementById("site-nav");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const motionToggle = document.querySelector("[data-motion-toggle]");
+const motionLabel = document.querySelector("[data-motion-label]");
+let motionEnabled = !reduceMotion && window.localStorage?.getItem("codeagora-motion") !== "off";
+
+function syncMotionPreference() {
+  document.documentElement.classList.toggle("is-motion-off", !motionEnabled);
+  motionToggle?.setAttribute("aria-pressed", String(motionEnabled));
+  if (motionLabel) {
+    motionLabel.textContent = motionEnabled ? "On" : "Off";
+  }
+}
+
+syncMotionPreference();
+
+motionToggle?.addEventListener("click", () => {
+  motionEnabled = !motionEnabled;
+  window.localStorage?.setItem("codeagora-motion", motionEnabled ? "on" : "off");
+  syncMotionPreference();
+});
 
 function setMenu(open) {
   header?.classList.toggle("is-menu-open", open);
@@ -43,7 +62,7 @@ window.addEventListener("resize", progress, { passive: true });
 progress();
 
 const revealTargets = [
-  ...document.querySelectorAll(".section-shell"),
+  ...document.querySelectorAll(".section-shell:not(.pipeline-lab)"),
   ...document.querySelectorAll(".plain-grid article, .step-grid article, .surface-grid article, .trust-row article, .faq-grid details")
 ];
 
@@ -157,10 +176,66 @@ if (reviewTabs.length > 0) {
   activateReviewStep(reviewTabs.find((tab) => tab.classList.contains("active"))?.dataset.reviewTab ?? reviewTabs[0].dataset.reviewTab);
 }
 
+const pipelineTabs = [...document.querySelectorAll("[data-pipeline-step]")];
+const pipelinePanels = [...document.querySelectorAll("[data-pipeline-panel]")];
+const pipelineNodes = [...document.querySelectorAll("[data-pipeline-node]")];
+const pipelineSection = document.querySelector(".pipeline-lab");
+
+function activatePipelineStep(target) {
+  for (const tab of pipelineTabs) {
+    const active = tab.dataset.pipelineStep === target;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.setAttribute("tabindex", active ? "0" : "-1");
+  }
+  for (const panel of pipelinePanels) {
+    panel.hidden = panel.dataset.pipelinePanel !== target;
+  }
+  for (const node of pipelineNodes) {
+    node.classList.toggle("active", node.dataset.pipelineNode === target);
+  }
+}
+
+for (const tab of pipelineTabs) {
+  tab.addEventListener("click", () => activatePipelineStep(tab.dataset.pipelineStep));
+  tab.addEventListener("keydown", (event) => {
+    const index = pipelineTabs.indexOf(tab);
+    const nextIndex = event.key === "ArrowDown" || event.key === "ArrowRight"
+      ? index + 1
+      : event.key === "ArrowUp" || event.key === "ArrowLeft"
+        ? index - 1
+        : index;
+    if (nextIndex === index) return;
+    event.preventDefault();
+    const next = pipelineTabs[(nextIndex + pipelineTabs.length) % pipelineTabs.length];
+    next.focus();
+    activatePipelineStep(next.dataset.pipelineStep);
+  });
+}
+
+function syncPipelineFromScroll() {
+  if (!pipelineSection || pipelineTabs.length === 0 || window.matchMedia("(max-width: 980px)").matches) return;
+  const rect = pipelineSection.getBoundingClientRect();
+  if (rect.top > window.innerHeight * 0.35 || rect.bottom < window.innerHeight * 0.2) return;
+  const travel = Math.max(1, rect.height - window.innerHeight * 0.7);
+  const progressValue = Math.min(1, Math.max(0, -rect.top / travel));
+  const index = Math.min(pipelineTabs.length - 1, Math.max(0, Math.round(progressValue * (pipelineTabs.length - 1))));
+  activatePipelineStep(pipelineTabs[index].dataset.pipelineStep);
+}
+
+window.addEventListener("scroll", syncPipelineFromScroll, { passive: true });
+window.addEventListener("resize", syncPipelineFromScroll, { passive: true });
+
+if (pipelineTabs.length > 0) {
+  activatePipelineStep(pipelineTabs.find((tab) => tab.classList.contains("active"))?.dataset.pipelineStep ?? pipelineTabs[0].dataset.pipelineStep);
+  syncPipelineFromScroll();
+}
+
 const heroPanel = document.querySelector(".hero-panel");
 
 if (heroPanel && !reduceMotion) {
   heroPanel.addEventListener("pointermove", (event) => {
+    if (!motionEnabled) return;
     const rect = heroPanel.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width;
     const y = (event.clientY - rect.top) / rect.height;
@@ -182,13 +257,61 @@ const agentCards = [...document.querySelectorAll(".agent-lanes article")];
 
 if (agentCards.length > 0 && !reduceMotion) {
   let activeAgentIndex = 0;
-  agentCards[activeAgentIndex].classList.add("is-live");
-  window.setInterval(() => {
-    agentCards[activeAgentIndex].classList.remove("is-live");
-    activeAgentIndex = (activeAgentIndex + 1) % agentCards.length;
+  let agentTimer;
+  const startAgentLoop = () => {
+    if (agentTimer || !motionEnabled) return;
     agentCards[activeAgentIndex].classList.add("is-live");
-  }, 1700);
+    agentTimer = window.setInterval(() => {
+      agentCards[activeAgentIndex].classList.remove("is-live");
+      activeAgentIndex = (activeAgentIndex + 1) % agentCards.length;
+      agentCards[activeAgentIndex].classList.add("is-live");
+    }, 1700);
+  };
+  const stopAgentLoop = () => {
+    window.clearInterval(agentTimer);
+    agentTimer = undefined;
+    for (const card of agentCards) {
+      card.classList.remove("is-live");
+    }
+  };
+  startAgentLoop();
+  motionToggle?.addEventListener("click", () => {
+    if (motionEnabled) {
+      startAgentLoop();
+    } else {
+      stopAgentLoop();
+    }
+  });
 }
+
+const faqSearch = document.querySelector("[data-faq-search]");
+const faqItems = [...document.querySelectorAll("[data-faq-item]")];
+const faqCount = document.querySelector("[data-faq-count]");
+const faqEmpty = document.querySelector("[data-faq-empty]");
+
+function syncFaqSearch() {
+  const query = faqSearch?.value.trim().toLocaleLowerCase("ko-KR") ?? "";
+  let visible = 0;
+  for (const item of faqItems) {
+    const text = item.dataset.faqText?.toLocaleLowerCase("ko-KR") ?? "";
+    const match = !query || text.includes(query);
+    item.hidden = !match;
+    if (match) {
+      visible += 1;
+    } else {
+      item.open = false;
+    }
+  }
+  if (faqCount) {
+    faqCount.textContent = `${visible}개 질문`;
+  }
+  if (faqEmpty) {
+    faqEmpty.hidden = visible > 0;
+  }
+}
+
+faqSearch?.addEventListener("input", syncFaqSearch);
+syncFaqSearch();
 
 for (const button of document.querySelectorAll("[data-copy-target]")) {
   button.addEventListener("click", async () => {

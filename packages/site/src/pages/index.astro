@@ -98,6 +98,45 @@ const reviewSteps = [
   ["04", "최종 판정", "승인, 반려, 사람 확인 필요처럼 사람이 볼 결론을 남깁니다."]
 ];
 
+const pipelineScenes = [
+  {
+    id: "diff",
+    number: "01",
+    label: "Diff intake",
+    title: "먼저 바뀐 부분만 좁힙니다.",
+    body: "전체 저장소를 다시 읽는 대신, 이번 변경이 건드린 파일과 영향 범위를 먼저 요약합니다.",
+    detail: "changed files: 3 · review target: preset behavior",
+    verdict: "검토 대상 정리"
+  },
+  {
+    id: "reviewers",
+    number: "02",
+    label: "Parallel review",
+    title: "여러 리뷰어가 같은 변경을 따로 봅니다.",
+    body: "보안, 안정성, 유지보수 관점이 서로 섞이지 않게 독립적으로 의견을 냅니다.",
+    detail: "security: confirmed · reliability: contested",
+    verdict: "의견 3개 수집"
+  },
+  {
+    id: "evidence",
+    number: "03",
+    label: "Evidence check",
+    title: "그럴듯한 말을 실제 근거와 대조합니다.",
+    body: "파일 존재, 라인 범위, 코드 인용, 반박 여부를 확인해 약한 주장을 걸러냅니다.",
+    detail: "quote verified · line range valid · conflict found",
+    verdict: "근거 2개 확정"
+  },
+  {
+    id: "verdict",
+    number: "04",
+    label: "Human verdict",
+    title: "마지막에는 사람이 행동할 판정으로 줄입니다.",
+    body: "승인, 반려, 사람 확인 필요처럼 다음 행동이 분명한 결론으로 정리합니다.",
+    detail: "confirmed: 2 · contested: 1 · next action: human",
+    verdict: "사람 확인 필요"
+  }
+];
+
 const surfaces = [
   ["CLI", "내 컴퓨터에서 바로 코드 변경을 리뷰합니다.", "터미널"],
   ["GitHub Action", "Pull Request마다 같은 판정 기준을 자동으로 붙입니다.", "팀 리뷰"],
@@ -205,6 +244,13 @@ const desktopCommand = escapeHtml(`Desktop RC
 - local review session viewer
 - same CLI/MCP/GitHub verdict semantics
 - Desktop 정식 배포는 준비 중`);
+
+const commandLogs = {
+  cli: ["resolve package @rc", "load .ca/config", "read git diff", "write verdict artifact"],
+  action: ["checkout pull request", "redact fork secrets", "run reviewers", "post review summary"],
+  mcp: ["start stdio server", "list review tools", "accept diff payload", "return compact verdict"],
+  desktop: ["open local session", "load review history", "inspect evidence", "export decision note"]
+};
 ---
 
 <!doctype html>
@@ -337,6 +383,54 @@ const desktopCommand = escapeHtml(`Desktop RC
         </div>
       </section>
 
+      <section id="pipeline" class="section-shell pipeline-lab">
+        <div class="section-heading">
+          <p class="eyebrow">흐름 체험하기</p>
+          <h2>스크롤하면 리뷰가 판정으로 좁혀집니다.</h2>
+          <p>CodeAgora가 변경 사항을 받아 여러 의견과 근거를 거쳐 최종 판단 자료로 만드는 과정을 직접 따라갑니다.</p>
+        </div>
+        <div class="pipeline-demo" data-pipeline-demo>
+          <div class="pipeline-steps" role="tablist" aria-label="CodeAgora 리뷰 흐름">
+            {pipelineScenes.map((scene, index) => (
+              <button
+                id={`pipeline-tab-${scene.id}`}
+                class={index === 0 ? "active" : ""}
+                type="button"
+                role="tab"
+                aria-selected={index === 0 ? "true" : "false"}
+                aria-controls={`pipeline-panel-${scene.id}`}
+                data-pipeline-step={scene.id}
+              >
+                <span>{scene.number}</span>
+                <strong>{scene.label}</strong>
+              </button>
+            ))}
+          </div>
+          <div class="pipeline-stage" aria-live="polite">
+            <div class="pipeline-map" aria-hidden="true">
+              {pipelineScenes.map((scene, index) => (
+                <span class={`pipeline-node ${index === 0 ? "active" : ""}`} data-pipeline-node={scene.id}>{scene.number}</span>
+              ))}
+            </div>
+            {pipelineScenes.map((scene, index) => (
+              <article
+                id={`pipeline-panel-${scene.id}`}
+                class="pipeline-panel"
+                role="tabpanel"
+                aria-labelledby={`pipeline-tab-${scene.id}`}
+                data-pipeline-panel={scene.id}
+                hidden={index !== 0}
+              >
+                <span>{scene.verdict}</span>
+                <h3>{scene.title}</h3>
+                <p>{scene.body}</p>
+                <code>{scene.detail}</code>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="review" class="section-shell review-section">
         <div class="section-heading">
           <p class="eyebrow">토론하는 리뷰</p>
@@ -451,18 +545,30 @@ const desktopCommand = escapeHtml(`Desktop RC
           <div id="panel-cli" class="command-panel" role="tabpanel" aria-labelledby="tab-cli" data-command-panel="cli">
             <button class="copy-button" type="button" data-copy-target="#cli-command">복사</button>
             <pre><code id="cli-command" set:html={cliCommand}></code></pre>
+            <ol class="command-log" aria-label="CLI 실행 흐름">
+              {commandLogs.cli.map((line) => <li>{line}</li>)}
+            </ol>
           </div>
           <div id="panel-action" class="command-panel" role="tabpanel" aria-labelledby="tab-action" data-command-panel="action" hidden>
             <button class="copy-button" type="button" data-copy-target="#action-command">복사</button>
             <pre><code id="action-command" set:html={actionCommand}></code></pre>
+            <ol class="command-log" aria-label="GitHub Action 실행 흐름">
+              {commandLogs.action.map((line) => <li>{line}</li>)}
+            </ol>
           </div>
           <div id="panel-mcp" class="command-panel" role="tabpanel" aria-labelledby="tab-mcp" data-command-panel="mcp" hidden>
             <button class="copy-button" type="button" data-copy-target="#mcp-command">복사</button>
             <pre><code id="mcp-command" set:html={mcpCommand}></code></pre>
+            <ol class="command-log" aria-label="MCP 실행 흐름">
+              {commandLogs.mcp.map((line) => <li>{line}</li>)}
+            </ol>
           </div>
           <div id="panel-desktop" class="command-panel" role="tabpanel" aria-labelledby="tab-desktop" data-command-panel="desktop" hidden>
             <button class="copy-button" type="button" data-copy-target="#desktop-command">복사</button>
             <pre><code id="desktop-command" set:html={desktopCommand}></code></pre>
+            <ol class="command-log" aria-label="Desktop 실행 흐름">
+              {commandLogs.desktop.map((line) => <li>{line}</li>)}
+            </ol>
           </div>
         </div>
       </section>
@@ -472,16 +578,27 @@ const desktopCommand = escapeHtml(`Desktop RC
           <p class="eyebrow">자주 묻는 질문</p>
           <h2>처음 보는 사람도 판단할 수 있게 정리했습니다.</h2>
         </div>
-        <div class="faq-grid">
+        <div class="faq-tools">
+          <label for="faq-search">궁금한 내용을 검색하세요</label>
+          <input id="faq-search" type="search" placeholder="예: 비용, GitHub Action, Desktop" autocomplete="off" data-faq-search />
+          <span data-faq-count>{faqs.length}개 질문</span>
+        </div>
+        <div class="faq-grid" data-faq-grid>
           {faqs.map(([question, answer]) => (
-            <details>
+            <details data-faq-item data-faq-text={`${question} ${answer}`}>
               <summary>{question}</summary>
               <p>{answer}</p>
             </details>
           ))}
         </div>
+        <p class="faq-empty" data-faq-empty hidden>일치하는 질문이 없습니다. 다른 단어로 검색해보세요.</p>
       </section>
     </main>
+
+    <button class="motion-toggle" type="button" aria-pressed="true" data-motion-toggle>
+      <span>Motion</span>
+      <strong data-motion-label>On</strong>
+    </button>
 
     <footer class="site-footer">
       <div class="footer-intro">
