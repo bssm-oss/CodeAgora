@@ -14,6 +14,13 @@ export interface ProviderCredentialRequirement {
   sourceCount: number;
 }
 
+export interface ProviderCredentialGate {
+  status: 'not-required' | 'unknown' | 'failed' | 'missing' | 'ready';
+  required: boolean;
+  missing: ProviderCredentialRequirement[];
+  error?: string;
+}
+
 export function isEnabledConfigEntry(value: unknown): boolean {
   return typeof value !== 'object' || value === null || Array.isArray(value)
     ? true
@@ -98,6 +105,29 @@ function addAgentListProviders(
   }
 }
 
+function discussionEnabled(value: unknown): boolean {
+  const discussion = asRecord(value);
+  return discussion?.enabled !== false;
+}
+
+function configuredApiProviderMap(parsed: Record<string, unknown>): Map<string, { provider: string; sourceCount: number }> {
+  const providers = new Map<string, { provider: string; sourceCount: number }>();
+  addAgentListProviders(parsed.reviewers, providers);
+
+  if (discussionEnabled(parsed.discussion)) {
+    const supporters = asRecord(parsed.supporters);
+    if (supporters) {
+      addAgentListProviders(supporters.pool, providers);
+      addAgentProvider(supporters.devilsAdvocate, providers);
+    }
+
+    addAgentProvider(parsed.moderator, providers);
+  }
+
+  addAgentProvider(parsed.head, providers);
+  return providers;
+}
+
 export function configuredApiProviders(raw: string): string[] {
   let parsed: Record<string, unknown>;
   try {
@@ -107,19 +137,7 @@ export function configuredApiProviders(raw: string): string[] {
   }
   if (!asRecord(parsed)) return [];
 
-  const providers = new Map<string, { provider: string; sourceCount: number }>();
-  addAgentListProviders(parsed.reviewers, providers);
-
-  const supporters = asRecord(parsed.supporters);
-  if (supporters) {
-    addAgentListProviders(supporters.pool, providers);
-    addAgentProvider(supporters.devilsAdvocate, providers);
-  }
-
-  addAgentProvider(parsed.moderator, providers);
-  addAgentProvider(parsed.head, providers);
-
-  return [...providers.values()].map((entry) => entry.provider);
+  return [...configuredApiProviderMap(parsed).values()].map((entry) => entry.provider);
 }
 
 function providerStatusMatchesProvider(status: ProviderStatus, provider: string, envVar: string): boolean {
@@ -142,19 +160,7 @@ export function providerCredentialRequirements(
   }
   if (!asRecord(parsed)) return [];
 
-  const providers = new Map<string, { provider: string; sourceCount: number }>();
-  addAgentListProviders(parsed.reviewers, providers);
-
-  const supporters = asRecord(parsed.supporters);
-  if (supporters) {
-    addAgentListProviders(supporters.pool, providers);
-    addAgentProvider(supporters.devilsAdvocate, providers);
-  }
-
-  addAgentProvider(parsed.moderator, providers);
-  addAgentProvider(parsed.head, providers);
-
-  return [...providers.values()].map(({ provider, sourceCount }) => {
+  return [...configuredApiProviderMap(parsed).values()].map(({ provider, sourceCount }) => {
     const envVar = getProviderEnvVar(provider);
     return {
       provider,
@@ -167,4 +173,29 @@ export function providerCredentialRequirements(
       ),
     };
   });
+}
+
+export function missingProviderCredentialRequirements(
+  raw: string,
+  statuses: ProviderStatus[],
+): ProviderCredentialRequirement[] {
+  if (statuses.length === 0) return [];
+  return providerCredentialRequirements(raw, statuses).filter((requirement) => !requirement.configured);
+}
+
+export function evaluateProviderCredentialGate(
+  raw: string,
+  statuses: ProviderStatus[],
+  providersLoaded: boolean,
+  providerStatusError?: string,
+): ProviderCredentialGate {
+  const required = configuredApiProviders(raw).length > 0;
+  if (!required) return { status: 'not-required', required, missing: [] };
+  if (providerStatusError) return { status: 'failed', required, missing: [], error: providerStatusError };
+  if (!providersLoaded) return { status: 'unknown', required, missing: [] };
+
+  const missing = providerCredentialRequirements(raw, statuses).filter((requirement) => !requirement.configured);
+  return missing.length > 0
+    ? { status: 'missing', required, missing }
+    : { status: 'ready', required, missing: [] };
 }

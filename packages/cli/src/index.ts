@@ -55,6 +55,15 @@ export function detectBinaryName(argv1: string | undefined): string {
   return base === 'agora' ? 'agora' : 'codeagora';
 }
 
+export function applyCwdOverride(rawCwd: string | undefined): string | undefined {
+  if (!rawCwd) return undefined;
+  const cwd = path.resolve(rawCwd);
+  process.chdir(cwd);
+  return process.cwd();
+}
+
+applyCwdOverride(process.env['CODEAGORA_CWD']);
+
 const displayName = detectBinaryName(process.argv[1]);
 const program = new Command();
 

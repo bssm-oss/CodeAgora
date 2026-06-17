@@ -227,6 +227,7 @@ function inspectVisualState() {
       shellText: document.body.innerText?.replace(/\\s+/g, " ").trim() ?? "",
       cockpitText: cockpit?.textContent?.replace(/\\s+/g, " ").trim() ?? "",
       acceptanceText: acceptance?.textContent?.replace(/\\s+/g, " ").trim() ?? "",
+      cockpitPreferenceMenuVisible: Boolean(document.querySelector(".ca-preferences-menu")),
     };
   })()`;
   return parseMcpTextJson(runTauriMcpJson(['webview-execute-js', '--script', script]));
@@ -301,6 +302,7 @@ try {
   for (const forbidden of ['Tauri 명령 경계', 'Tauri Command Boundary', 'open_repository', 'process-execution']) {
     assert(!visual.shellText.includes(forbidden), `Desktop visual QA found internal command diagnostics on the default surface: ${forbidden}`);
   }
+  assert(visual.cockpitPreferenceMenuVisible === false, 'Desktop cockpit should not render toolbar preference controls in the first viewport');
   assert(visual.acceptanceText.includes('이 리뷰 결과를 받아들일 수 있습니다'), 'Desktop acceptance panel is missing accept-oriented copy');
   assert(visual.acceptanceText.includes('판정 요약 복사'), 'Desktop acceptance panel is missing the decision summary action');
   captureScreenshot(cockpitScreenshotPath);

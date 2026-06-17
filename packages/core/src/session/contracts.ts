@@ -10,6 +10,40 @@
 
 export type SessionReviewDecision = 'ACCEPT' | 'REJECT' | 'NEEDS_HUMAN';
 
+export interface SessionReviewDecisionEvidenceCard {
+  kind: 'must-fix' | 'human-gate';
+  source: 'evidence' | 'discussion';
+  title: string;
+  severity: string;
+  filePath: string;
+  lineRange: [number, number];
+  confidence?: number;
+  diffFact: string;
+  affectedContract: string;
+  check: string;
+  expectedActual?: string;
+  decisionRule: string;
+  complete: boolean;
+  missing: string[];
+}
+
+export interface ReviewDecisionBrief {
+  decision: SessionReviewDecision;
+  reviewedScope: {
+    files: string[];
+    areas: string[];
+    contracts: string[];
+    checks: string[];
+    uncertainty: string;
+  };
+  completedChecks: string[];
+  evidenceCards: SessionReviewDecisionEvidenceCard[];
+  requiredActions: string[];
+  followUpCount: number;
+  auditCount: number;
+  demotedCount: number;
+}
+
 export interface SessionSeverityCounts {
   HARSHLY_CRITICAL?: number;
   CRITICAL?: number;
@@ -31,7 +65,10 @@ export interface SessionSummary {
   sessionId: string;
   status: 'completed' | 'failed' | 'interrupted' | 'in_progress' | 'unknown';
   dirPath?: string;
+  /** Raw/stored verdict from the session artifact. */
   decision?: SessionReviewDecision;
+  /** Public merge decision after evidence-promotion gates. */
+  publicDecision?: SessionReviewDecision;
   reasoning?: string;
   severityCounts?: SessionSeverityCounts;
   topIssues?: SessionTopIssue[];
@@ -48,6 +85,8 @@ export interface SessionCostSummary {
 }
 
 export interface SessionDetailView extends SessionSummary {
+  /** Public decision brief. Contains promoted evidence only, no raw diff text. */
+  decisionBrief?: ReviewDecisionBrief;
   findings?: SessionTopIssue[];
   markdown?: string;
   evidenceCount?: number;

@@ -4,6 +4,8 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -424,6 +426,10 @@ fn spawn_agora(root: &Path, args: &[&str], stdin_input: Option<String>) -> io::R
     if stdin_input.is_some() {
         command.stdin(Stdio::piped());
     }
+    #[cfg(unix)]
+    {
+        command.process_group(0);
+    }
 
     match command.spawn() {
         Ok(mut child) => {
@@ -450,18 +456,24 @@ fn workspace_root() -> PathBuf {
 
 fn spawn_dev_agora(root: &Path, args: &[&str], pipe_stdin: bool) -> io::Result<Child> {
     let workspace = workspace_root().to_string_lossy().to_string();
-    Command::new("pnpm")
+    let mut command = Command::new("pnpm");
+    command
         .args(["--dir", &workspace, "--filter", "@codeagora/cli", "dev"])
         .args(args)
         .current_dir(root)
+        .env("CODEAGORA_CWD", root)
         .stdin(if pipe_stdin {
             Stdio::piped()
         } else {
             Stdio::null()
         })
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        command.process_group(0);
+    }
+    command.spawn()
 }
 
 fn write_child_stdin(child: &mut Child, stdin_input: Option<String>) {
@@ -473,6 +485,29 @@ fn write_child_stdin(child: &mut Child, stdin_input: Option<String>) {
             let _ = stdin.write_all(stdin_input.as_bytes());
         });
     }
+}
+
+#[cfg(unix)]
+fn terminate_child_tree(child: &mut Child) -> io::Result<()> {
+    let group = format!("-{}", child.id());
+    let _ = Command::new("kill").args(["-TERM", &group]).status();
+    for _ in 0..20 {
+        if child.try_wait()?.is_some() {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    let _ = Command::new("kill").args(["-KILL", &group]).status();
+    match child.kill() {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::InvalidInput => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(not(unix))]
+fn terminate_child_tree(child: &mut Child) -> io::Result<()> {
+    child.kill()
 }
 
 fn parse_review_stream_event(line: &str) -> ParsedReviewStreamEvent {
@@ -1056,7 +1091,14 @@ fn bounded_write_workspace_path(root: &Path, path: &Path, label: &str) -> Result
 }
 
 fn read_session_verdict(dir: &Path) -> Option<Value> {
-    read_json(&dir.join("result.json")).or_else(|| read_json(&dir.join("head-verdict.json")))
+    let result = read_json(&dir.join("result.json"));
+    let head_verdict = read_json(&dir.join("head-verdict.json"));
+    if result.as_ref().is_some_and(|value| {
+        value.get("status").and_then(Value::as_str) != Some("error") || head_verdict.is_none()
+    }) {
+        return result;
+    }
+    head_verdict.or(result)
 }
 
 fn session_parts(id: &str) -> Result<(&str, &str), String> {
@@ -1117,16 +1159,28 @@ fn issue_objects(verdict: Option<&Value>) -> Vec<Value> {
     let Some(verdict) = verdict else {
         return Vec::new();
     };
-    ["issues", "findings", "items"]
-        .iter()
-        .find_map(|key| verdict.get(key).and_then(Value::as_array))
-        .or_else(|| {
-            verdict
-                .get("summary")
-                .and_then(|summary| summary.get("topIssues"))
-                .and_then(Value::as_array)
-        })
-        .or_else(|| verdict.get("evidenceDocs").and_then(Value::as_array))
+    if let Some(evidence_docs) = verdict
+        .get("evidenceDocs")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+    {
+        return evidence_docs.clone();
+    }
+
+    if let Some(legacy_issues) = ["issues", "findings", "items"].iter().find_map(|key| {
+        verdict
+            .get(key)
+            .and_then(Value::as_array)
+            .filter(|items| !items.is_empty())
+    }) {
+        return legacy_issues.clone();
+    }
+
+    verdict
+        .get("summary")
+        .and_then(|summary| summary.get("topIssues"))
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
         .cloned()
         .unwrap_or_default()
 }
@@ -1169,6 +1223,15 @@ fn verdict_decision(verdict: Option<&Value>) -> Option<&str> {
     })
 }
 
+fn public_decision(verdict: Option<&Value>) -> Option<&str> {
+    text_field(verdict, &["publicDecision"]).or_else(|| {
+        verdict
+            .and_then(|value| value.get("decisionBrief"))
+            .and_then(|brief| brief.get("decision"))
+            .and_then(Value::as_str)
+    })
+}
+
 fn verdict_reasoning(verdict: Option<&Value>) -> Option<&str> {
     text_field(verdict, &["reasoning", "summary"]).or_else(|| {
         summary_object(verdict)
@@ -1201,6 +1264,7 @@ fn issue_view(issue: &Value) -> Value {
             .unwrap_or("unknown"),
         "lineRange": line_range,
         "title": issue.get("title")
+            .or_else(|| issue.get("issueTitle"))
             .or_else(|| issue.get("description"))
             .or_else(|| issue.get("message"))
             .and_then(Value::as_str)
@@ -1211,11 +1275,15 @@ fn issue_view(issue: &Value) -> Value {
 }
 
 fn finding_views(verdict: Option<&Value>, issues: &[Value], limit: Option<usize>) -> Vec<Value> {
-    let source = summary_object(verdict)
-        .and_then(|summary| summary.get("topIssues"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_else(|| issues.to_vec());
+    let source = if issues.is_empty() {
+        summary_object(verdict)
+            .and_then(|summary| summary.get("topIssues"))
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    } else {
+        issues.to_vec()
+    };
 
     let iter = source.iter().map(issue_view);
     match limit {
@@ -1408,6 +1476,7 @@ fn session_entry(
         "status": status_from_metadata(metadata),
         "dirPath": dir.display().to_string(),
         "decision": verdict_decision(verdict),
+        "publicDecision": public_decision(verdict).or_else(|| verdict_decision(verdict)),
         "reasoning": verdict_reasoning(verdict),
         "severityCounts": severity_counts(verdict, &issues),
         "topIssues": top_issues(verdict, &issues),
@@ -1449,12 +1518,20 @@ fn session_detail_value(root: &Path, id: &str) -> Result<Value, String> {
         telemetry.as_ref(),
         &degraded_reasons,
     );
+    let public_decision_value =
+        public_decision(verdict.as_ref()).or_else(|| verdict_decision(verdict.as_ref()));
+    let decision_brief = verdict
+        .as_ref()
+        .and_then(|value| value.get("decisionBrief"))
+        .cloned();
 
     Ok(json!({
         "entry": session_entry(date, session_id, &dir, metadata.as_ref(), verdict.as_ref()),
         "metadata": metadata,
         "telemetry": telemetry,
         "verdict": verdict,
+        "publicDecision": public_decision_value,
+        "decisionBrief": decision_brief,
         "findings": findings,
         "markdown": markdown,
         "evidenceCount": evidence_count,
@@ -2431,7 +2508,7 @@ fn cancel_review_run(
         .lock()
         .map_err(|_| "Review child lock failed".to_string())?;
     if let Some(child) = child.as_mut() {
-        child.kill().map_err(|error| error.to_string())?;
+        terminate_child_tree(child).map_err(|error| error.to_string())?;
     }
 
     review_snapshot(&handle)
@@ -3458,6 +3535,184 @@ mod tests {
     }
 
     #[test]
+    fn desktop_app_e2e_prefers_pipeline_evidence_docs_for_session_findings() {
+        let root = temp_workspace("pipeline-evidence-priority");
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-001/metadata.json",
+            r#"{ "status": "completed" }"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-001/result.json",
+            r#"{
+  "decision": "REJECT",
+  "issues": [
+    { "title": "Legacy issue should not win", "severity": "SUGGESTION" }
+  ],
+  "summary": {
+    "topIssues": [
+      { "title": "Summary issue should not win", "severity": "WARNING" }
+    ]
+  },
+  "evidenceDocs": [
+    {
+      "issueTitle": "Pipeline evidence blocker",
+      "severity": "CRITICAL",
+      "filePath": "src/auth.ts",
+      "lineRange": [12, 12],
+      "confidence": 91
+    },
+    {
+      "issueTitle": "Pipeline evidence warning",
+      "severity": "WARNING",
+      "filePath": "src/config.ts",
+      "lineRange": [3, 5],
+      "confidence": 70
+    }
+  ]
+}
+"#,
+        );
+
+        let detail = session_detail_value(&root, "2026-05-06/pipeline-001")
+            .expect("session detail");
+        assert_eq!(
+            detail
+                .pointer("/entry/severityCounts/CRITICAL")
+                .and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            detail
+                .pointer("/entry/severityCounts/WARNING")
+                .and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            detail.pointer("/entry/topIssues/0/title").and_then(Value::as_str),
+            Some("Pipeline evidence blocker")
+        );
+        assert_eq!(
+            detail.pointer("/findings/0/title").and_then(Value::as_str),
+            Some("Pipeline evidence blocker")
+        );
+    }
+
+    #[test]
+    fn desktop_app_e2e_falls_back_to_full_findings_when_evidence_docs_empty() {
+        let root = temp_workspace("pipeline-evidence-empty-fallback");
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-002/metadata.json",
+            r#"{ "status": "completed" }"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-002/result.json",
+            r#"{
+  "decision": "REJECT",
+  "evidenceDocs": [],
+  "summary": {
+    "topIssues": [
+      { "title": "Summary fallback only", "severity": "SUGGESTION" }
+    ]
+  },
+  "issues": [
+    {
+      "title": "Full blocker",
+      "severity": "CRITICAL",
+      "filePath": "src/auth.ts",
+      "lineRange": [12, 12],
+      "confidence": 91
+    },
+    {
+      "title": "Full warning",
+      "severity": "WARNING",
+      "filePath": "src/config.ts",
+      "lineRange": [3, 5],
+      "confidence": 70
+    }
+  ]
+}
+"#,
+        );
+
+        let detail = session_detail_value(&root, "2026-05-06/pipeline-002")
+            .expect("session detail");
+        assert_eq!(
+            detail
+                .pointer("/entry/severityCounts/CRITICAL")
+                .and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            detail
+                .pointer("/entry/severityCounts/WARNING")
+                .and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            detail.pointer("/entry/topIssues/0/title").and_then(Value::as_str),
+            Some("Full blocker")
+        );
+        assert_eq!(
+            detail.pointer("/findings/0/title").and_then(Value::as_str),
+            Some("Full blocker")
+        );
+    }
+
+    #[test]
+    fn desktop_app_e2e_prefers_head_verdict_when_result_is_error_artifact() {
+        let root = temp_workspace("pipeline-result-error-fallback");
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-003/metadata.json",
+            r#"{ "status": "failed" }"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-003/head-verdict.json",
+            r#"{
+  "decision": "ACCEPT",
+  "issues": [
+    {
+      "title": "Preserved head verdict warning",
+      "severity": "WARNING",
+      "filePath": "src/auth.ts",
+      "lineRange": [12, 12],
+      "confidence": 80
+    }
+  ]
+}
+"#,
+        );
+        write_file(
+            &root,
+            ".ca/sessions/2026-05-06/pipeline-003/result.json",
+            r#"{
+  "status": "error",
+  "sessionId": "pipeline-003",
+  "date": "2026-05-06",
+  "error": "Post-verdict cache failed"
+}
+"#,
+        );
+
+        let detail = session_detail_value(&root, "2026-05-06/pipeline-003")
+            .expect("session detail");
+        assert_eq!(
+            detail.pointer("/entry/decision").and_then(Value::as_str),
+            Some("ACCEPT")
+        );
+        assert_eq!(
+            detail.pointer("/entry/topIssues/0/title").and_then(Value::as_str),
+            Some("Preserved head verdict warning")
+        );
+        assert!(detail.pointer("/verdict/status").is_none());
+    }
+
+    #[test]
     fn desktop_app_e2e_parses_degraded_stream_events_without_new_status() {
         let parsed = parse_review_stream_event(
             r#"{"type":"progress","degraded":true,"degradedReason":"timeout","sessionId":"2026-05-06/e2e-001"}"#,
@@ -3512,5 +3767,52 @@ mod tests {
         assert_eq!(parsed.event.message, "Review result: ACCEPT");
         assert_eq!(parsed.session_id.as_deref(), Some("2026-05-06/001"));
         assert_eq!(parsed.event.event_type.as_deref(), Some("result"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn desktop_app_e2e_cancel_terminates_review_process_group() {
+        let pid_file = std::env::temp_dir().join(format!(
+            "codeagora-desktop-grandchild-{}.pid",
+            std::process::id()
+        ));
+        let mut child = Command::new("sh");
+        child
+            .arg("-c")
+            .arg(format!("sleep 30 & echo $! > {}; wait", pid_file.display()))
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0);
+        let mut child = child.spawn().expect("spawn process group fixture");
+
+        let started = Instant::now();
+        while !pid_file.exists() && started.elapsed() < Duration::from_secs(2) {
+            thread::sleep(Duration::from_millis(25));
+        }
+        let grandchild_pid = fs::read_to_string(&pid_file)
+            .expect("read grandchild pid")
+            .trim()
+            .to_string();
+        assert!(!grandchild_pid.is_empty());
+
+        terminate_child_tree(&mut child).expect("terminate process group");
+        for _ in 0..20 {
+            let alive = Command::new("kill")
+                .args(["-0", &grandchild_pid])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false);
+            if !alive {
+                let _ = fs::remove_file(&pid_file);
+                return;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+
+        let _ = fs::remove_file(&pid_file);
+        panic!("grandchild process {grandchild_pid} survived desktop cancel termination");
     }
 }

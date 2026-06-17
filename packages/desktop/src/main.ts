@@ -1,6 +1,7 @@
 import { getLocale, setLocale, t } from '@codeagora/shared/i18n/index.js';
 import {
   activeReviewerCount,
+  evaluateProviderCredentialGate,
   evaluateConfigPolicy,
   isEnabledConfigEntry,
   providerCredentialRequirements,
@@ -39,6 +40,7 @@ import {
   type RepoInfo,
   type ReviewRunEvent,
   type ReviewRunSnapshot,
+  type ReviewDecision,
   type SessionDetail,
   type SessionSummary,
 } from './api/desktop-bridge.js';
@@ -157,6 +159,8 @@ interface AppState {
   configDirty: boolean;
   configOriginal: string;
   providers: ProviderStatus[];
+  providersLoaded: boolean;
+  providerStatusError?: string;
   liveDoctorStatus?: LiveDoctorStatus;
   liveDoctorLoading: boolean;
   liveDoctorError?: string;
@@ -189,6 +193,7 @@ const state: AppState = {
   configDirty: false,
   configOriginal: '',
   providers: [],
+  providersLoaded: false,
   liveDoctorLoading: false,
   localePreference: loadLocalePreference(),
   themePreference: loadThemePreference(),
@@ -217,6 +222,7 @@ const maxPollRetries = 5;
 let mediaQuery: MediaQueryList | null = null;
 let lastMobileLayout = isCompactMobileViewport(window.innerWidth);
 let preferencesMenuCleanup: (() => void) | undefined;
+let toastSequence = 0;
 
 function onThemeChange(): void {
   if (state.themePreference === 'system') applyDesktopTheme();
@@ -412,7 +418,7 @@ function sortSessions(sessions: SessionSummary[]): SessionSummary[] {
       return sorted.sort((a, b) => timestampValue(a.updatedAt) - timestampValue(b.updatedAt));
     case 'decision': {
       const order = { ACCEPT: 0, REJECT: 1, NEEDS_HUMAN: 2 };
-      return sorted.sort((a, b) => (order[a.decision as keyof typeof order] ?? 3) - (order[b.decision as keyof typeof order] ?? 3));
+      return sorted.sort((a, b) => (order[publicDecisionOf(a) as keyof typeof order] ?? 3) - (order[publicDecisionOf(b) as keyof typeof order] ?? 3));
     }
     case 'severity': {
       const sev = (s: SessionSummary) =>
@@ -438,6 +444,7 @@ function filteredSessions(): SessionSummary[] {
       return Boolean(
         s.id.toLowerCase().includes(q) ||
         (s.decision ?? '').toLowerCase().includes(q) ||
+        (s.publicDecision ?? '').toLowerCase().includes(q) ||
         s.status.toLowerCase().includes(q) ||
         s.reasoning?.toLowerCase().includes(q) ||
         issueMatch,
@@ -455,6 +462,17 @@ function decisionClass(decision?: string): string {
   if (decision === 'REJECT') return 'ca-decision ca-reject';
   if (decision === 'NEEDS_HUMAN') return 'ca-decision ca-human';
   return 'ca-decision';
+}
+
+function publicDecisionOf(session: Pick<SessionSummary, 'decision' | 'publicDecision'>): ReviewDecision | undefined {
+  return session.publicDecision ?? session.decision;
+}
+
+function publicReasoningOf(session: SessionSummary | SessionDetail, fallback: string): string {
+  const decisionBrief = 'decisionBrief' in session ? session.decisionBrief : undefined;
+  const publicReasoning = decisionBrief?.reviewedScope.uncertainty.trim();
+  const rawReasoning = session.reasoning?.trim();
+  return publicReasoning || rawReasoning || fallback;
 }
 
 type SeverityKey = 'HARSHLY_CRITICAL' | 'CRITICAL' | 'WARNING' | 'SUGGESTION';
@@ -484,6 +502,20 @@ function blockerCount(source: SeveritySource): number {
   return severityCount(source, 'HARSHLY_CRITICAL') + severityCount(source, 'CRITICAL');
 }
 
+function publicBlockerCount(session: SessionSummary | SessionDetail): number {
+  const publicDecision = publicDecisionOf(session);
+  if (publicDecision === 'ACCEPT') return 0;
+  const decisionBrief = 'decisionBrief' in session ? session.decisionBrief : undefined;
+  if (decisionBrief) {
+    const expectedKind = publicDecision === 'REJECT' ? 'must-fix' : publicDecision === 'NEEDS_HUMAN' ? 'human-gate' : undefined;
+    if (expectedKind) {
+      const promotedCount = decisionBrief.evidenceCards.filter((card) => card.complete && card.kind === expectedKind).length;
+      return promotedCount > 0 ? promotedCount : blockerCount(session);
+    }
+  }
+  return blockerCount(session);
+}
+
 function latestSession(): SessionSummary | undefined {
   return [...state.sessions].sort((a, b) => timestampValue(b.updatedAt) - timestampValue(a.updatedAt))[0];
 }
@@ -505,11 +537,12 @@ function plainSessionStatus(status?: SessionSummary['status'] | SessionDetail['s
 }
 
 function sessionDisplayTitle(session: SessionSummary): string {
+  const publicDecision = publicDecisionOf(session);
   if (session.status === 'in_progress') return t('desktop.sessions.rowTitleRunning');
-  if (session.decision === 'ACCEPT') return t('desktop.sessions.rowTitleAccepted');
-  if (session.decision === 'NEEDS_HUMAN') return t('desktop.sessions.rowTitleHuman');
-  const blockers = blockerCount(session);
-  if (session.decision === 'REJECT' || blockers > 0) return t('desktop.sessions.rowTitleBlocked', { count: blockers });
+  if (publicDecision === 'ACCEPT') return t('desktop.sessions.rowTitleAccepted');
+  if (publicDecision === 'NEEDS_HUMAN') return t('desktop.sessions.rowTitleHuman');
+  const blockers = publicBlockerCount(session);
+  if (publicDecision === 'REJECT' || blockers > 0) return t('desktop.sessions.rowTitleBlocked', { count: blockers });
   return t('desktop.sessions.rowTitleReview');
 }
 
@@ -528,10 +561,11 @@ function severityLabel(severity: SeverityKey | string): string {
   }
 }
 
-function decisionTone(session: Pick<SessionSummary, 'decision' | 'status' | 'severityCounts'>): CockpitTone {
-  if (session.decision === 'ACCEPT') return 'good';
-  if (session.decision === 'REJECT' || blockerCount(session) > 0) return 'danger';
-  if (session.decision === 'NEEDS_HUMAN') return 'warn';
+function decisionTone(session: Pick<SessionSummary, 'decision' | 'publicDecision' | 'status' | 'severityCounts'>): CockpitTone {
+  const publicDecision = publicDecisionOf(session);
+  if (publicDecision === 'ACCEPT') return 'good';
+  if (publicDecision === 'REJECT' || (!publicDecision && blockerCount(session) > 0)) return 'danger';
+  if (publicDecision === 'NEEDS_HUMAN') return 'warn';
   if (session.status === 'failed' || session.status === 'interrupted') return 'danger';
   if (session.status === 'in_progress') return 'info';
   return 'warn';
@@ -567,10 +601,23 @@ function runReadiness(): RunReadiness {
       reasons.push(t('desktop.readiness.reason.noActiveReviewers'));
       nextSteps.add(t('desktop.readiness.next.addReviewer'));
     }
-    const providerKeys = providerCredentialRequirements(state.configRaw, state.providers);
-    if (policy.validJson && providerKeys.length > 0 && state.providers.length > 0 && providerKeys.every((item) => !item.configured)) {
-      reasons.push(t('desktop.readiness.reason.providerKeyMissing'));
-      nextSteps.add(t('desktop.readiness.next.providerKey'));
+    if (policy.validJson) {
+      const providerGate = evaluateProviderCredentialGate(
+        state.configRaw,
+        state.providers,
+        state.providersLoaded,
+        state.providerStatusError,
+      );
+      if (providerGate.status === 'failed') {
+        reasons.push(t('desktop.readiness.reason.providerStatusFailed'));
+        nextSteps.add(t('desktop.readiness.next.refreshSetup'));
+      } else if (providerGate.status === 'unknown') {
+        reasons.push(t('desktop.readiness.reason.providerStatusUnknown'));
+        nextSteps.add(t('desktop.readiness.next.refreshSetup'));
+      } else if (providerGate.status === 'missing') {
+        reasons.push(t('desktop.readiness.reason.providerKeyMissing'));
+        nextSteps.add(t('desktop.readiness.next.providerKey'));
+      }
     }
   }
   if (reasons.length > 0) {
@@ -649,12 +696,13 @@ function cockpitStatus(latest: SessionSummary | undefined, readiness: RunReadine
     };
   }
 
-  if (latest.decision === 'ACCEPT') {
+  const latestPublicDecision = publicDecisionOf(latest);
+  if (latestPublicDecision === 'ACCEPT') {
     return {
       tone: 'good',
-      label: plainDecision(latest.decision),
+      label: plainDecision(latestPublicDecision),
       title: t('desktop.cockpit.status.acceptTitle'),
-      body: latest.reasoning ?? t('desktop.cockpit.status.acceptBody'),
+      body: publicReasoningOf(latest, t('desktop.cockpit.status.acceptBody')),
       primaryLabel: t('desktop.action.reviewResults'),
       primaryView: 'sessions',
       secondaryLabel: t('desktop.action.runAgain'),
@@ -662,12 +710,13 @@ function cockpitStatus(latest: SessionSummary | undefined, readiness: RunReadine
     };
   }
 
-  if (latest.decision === 'REJECT' || blockerCount(latest) > 0) {
+  const latestBlockers = publicBlockerCount(latest);
+  if (latestPublicDecision === 'REJECT' || (!latestPublicDecision && latestBlockers > 0)) {
     return {
       tone: 'danger',
-      label: plainDecision(latest.decision, t('desktop.cockpit.status.blockedLabel')),
-      title: t('desktop.cockpit.status.rejectTitle', { count: blockerCount(latest) }),
-      body: latest.reasoning ?? t('desktop.cockpit.status.rejectBody'),
+      label: plainDecision(latestPublicDecision, t('desktop.cockpit.status.blockedLabel')),
+      title: t('desktop.cockpit.status.rejectTitle', { count: latestBlockers }),
+      body: publicReasoningOf(latest, t('desktop.cockpit.status.rejectBody')),
       primaryLabel: t('desktop.action.reviewFindings'),
       primaryView: 'sessions',
       secondaryLabel: t('desktop.action.rerunReview'),
@@ -677,9 +726,9 @@ function cockpitStatus(latest: SessionSummary | undefined, readiness: RunReadine
 
   return {
     tone: 'warn',
-    label: plainDecision(latest.decision),
+    label: plainDecision(latestPublicDecision),
     title: t('desktop.cockpit.status.needsHumanTitle'),
-    body: latest.reasoning ?? t('desktop.cockpit.status.needsHumanBody'),
+    body: publicReasoningOf(latest, t('desktop.cockpit.status.needsHumanBody')),
     primaryLabel: t('desktop.action.reviewFindings'),
     primaryView: 'sessions',
     secondaryLabel: t('desktop.action.exportDecision'),
@@ -902,8 +951,9 @@ function ensureAnnouncer(): HTMLElement {
 }
 
 function pushToast(message: string, type: Toast['type'] = 'info'): void {
-  const id = `toast-${Date.now()}`
-  state.toasts.push({ id, message, type, createdAt: Date.now() })
+  const createdAt = Date.now()
+  const id = `toast-${createdAt}-${toastSequence++}`
+  state.toasts.push({ id, message, type, createdAt })
   if (state.toasts.length > 3) state.toasts.shift()
   window.setTimeout(() => removeToast(id), 4000)
   announce(message)
@@ -1012,6 +1062,9 @@ async function openRepo(path: string): Promise<void> {
     state.attentionCount = 0;
     state.liveDoctorStatus = undefined;
     state.liveDoctorError = undefined;
+    state.providers = [];
+    state.providersLoaded = false;
+    state.providerStatusError = undefined;
     updateBadgeState();
     resetConfigState();
     await refreshSessions(true, true);
@@ -1063,7 +1116,15 @@ async function loadSetup(): Promise<void> {
       getGitHubActionStatus(),
       getEvidenceStatus(),
     ]);
-    state.providers = providers.status === 'fulfilled' ? providers.value : [];
+    if (providers.status === 'fulfilled') {
+      state.providers = providers.value;
+      state.providersLoaded = true;
+      state.providerStatusError = undefined;
+    } else {
+      state.providers = [];
+      state.providersLoaded = false;
+      state.providerStatusError = providers.reason instanceof Error ? providers.reason.message : String(providers.reason);
+    }
     state.mcpStatus = mcp.status === 'fulfilled' ? mcp.value : undefined;
     state.githubActionStatus = githubAction.status === 'fulfilled' ? githubAction.value : undefined;
     state.evidenceStatus = evidence.status === 'fulfilled' ? evidence.value : undefined;
@@ -1196,6 +1257,7 @@ async function startReview(staged: boolean): Promise<void> {
   render();
   try {
     pollRetryCount = 0;
+    window.clearTimeout(reviewPollHandle);
     state.activeRun = await startReviewRun(staged);
     if (isCompactMobileLayout()) state.runMobileStep = 3;
     pushToast(state.activeRun.message, 'success')
@@ -1279,9 +1341,12 @@ function scheduleReviewPoll(): void {
 async function pollReviewRun(runId: string): Promise<void> {
   if (pollInFlight) return;
   pollInFlight = true;
-  window.clearTimeout(reviewPollHandle);
   try {
     const snapshot = await getReviewRun(runId);
+    if (state.activeRun?.runId && state.activeRun.runId !== runId) {
+      return;
+    }
+    window.clearTimeout(reviewPollHandle);
     pollRetryCount = 0;
     state.activeRun = snapshot;
     const terminal = ['completed', 'failed', 'cancelled'];
@@ -1401,6 +1466,7 @@ function renderToolbar(): HTMLElement {
 
   const actions = el('div', 'ca-toolbar-actions');
   const preferences = el('div', 'ca-toolbar-preferences');
+  const showPreferenceMenu = state.view === 'config' || state.view === 'setup';
 
   const localeControl = el('label', 'ca-toolbar-select') as HTMLLabelElement;
   localeControl.append(el('span', 'ca-toolbar-select-label', t('desktop.preferences.language')));
@@ -1500,42 +1566,44 @@ function renderToolbar(): HTMLElement {
     'notification-badge-checkbox',
   );
 
-  preferences.append(localeControl, themeControl, notificationControl, soundControl, badgeControl);
-  const preferenceMenu = el('details', 'ca-preferences-menu') as HTMLDetailsElement;
-  const preferenceSummary = el('summary', 'ca-button', t('desktop.preferences.display'));
-  preferenceSummary.setAttribute('role', 'button');
-  preferenceSummary.setAttribute('aria-label', t('desktop.preferences.display'));
-  preferenceMenu.append(preferenceSummary);
-  preferenceMenu.append(preferences);
-  actions.append(preferenceMenu);
-  const teardownPreferenceMenu = (): void => {
-    document.removeEventListener('click', onOutsideClick, true);
-    document.removeEventListener('keydown', onEscapeKey, true);
-  };
-  const closePreferenceMenu = (): void => {
-    if (!preferenceMenu.open) return;
-    preferenceMenu.open = false;
-    teardownPreferenceMenu();
-  };
-  const onOutsideClick = (event: MouseEvent): void => {
-    if (!preferenceMenu.open) return;
-    const target = event.target as Node | null;
-    if (target && preferenceMenu.contains(target)) return;
-    closePreferenceMenu();
-  };
-  const onEscapeKey = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape' || !preferenceMenu.open) return;
-    closePreferenceMenu();
-  };
-  preferenceMenu.addEventListener('toggle', () => {
-    if (preferenceMenu.open) {
-      document.addEventListener('click', onOutsideClick, true);
-      document.addEventListener('keydown', onEscapeKey, true);
-    } else {
+  if (showPreferenceMenu) {
+    preferences.append(localeControl, themeControl, notificationControl, soundControl, badgeControl);
+    const preferenceMenu = el('details', 'ca-preferences-menu') as HTMLDetailsElement;
+    const preferenceSummary = el('summary', 'ca-button', t('desktop.preferences.display'));
+    preferenceSummary.setAttribute('role', 'button');
+    preferenceSummary.setAttribute('aria-label', t('desktop.preferences.display'));
+    preferenceMenu.append(preferenceSummary);
+    preferenceMenu.append(preferences);
+    actions.append(preferenceMenu);
+    const teardownPreferenceMenu = (): void => {
+      document.removeEventListener('click', onOutsideClick, true);
+      document.removeEventListener('keydown', onEscapeKey, true);
+    };
+    const closePreferenceMenu = (): void => {
+      if (!preferenceMenu.open) return;
+      preferenceMenu.open = false;
       teardownPreferenceMenu();
-    }
-  });
-  preferencesMenuCleanup = teardownPreferenceMenu;
+    };
+    const onOutsideClick = (event: MouseEvent): void => {
+      if (!preferenceMenu.open) return;
+      const target = event.target as Node | null;
+      if (target && preferenceMenu.contains(target)) return;
+      closePreferenceMenu();
+    };
+    const onEscapeKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || !preferenceMenu.open) return;
+      closePreferenceMenu();
+    };
+    preferenceMenu.addEventListener('toggle', () => {
+      if (preferenceMenu.open) {
+        document.addEventListener('click', onOutsideClick, true);
+        document.addEventListener('keydown', onEscapeKey, true);
+      } else {
+        teardownPreferenceMenu();
+      }
+    });
+    preferencesMenuCleanup = teardownPreferenceMenu;
+  }
 
   actions.append(button(t('desktop.action.refresh'), () => void refreshSessions(state.view === 'sessions' && !state.selected, true), 'ca-button', 'button-refresh'));
   const quickReview = button(t('desktop.action.quickReview'), () => void startReview(true), 'ca-button ca-primary', 'button-quick-review');
@@ -1731,6 +1799,7 @@ function renderSessions(): HTMLElement {
     listPanel.append(el('p', 'ca-empty ca-padded', t('desktop.sessions.noFilterMatch')));
   }
   for (const session of visibleSessions) {
+    const publicDecision = publicDecisionOf(session);
     const item = button('', () => {
       if (state.selected?.id === session.id) {
         state.selected = undefined;
@@ -1743,9 +1812,9 @@ function renderSessions(): HTMLElement {
     item.dataset.testid = `session-row-${session.id.replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
     const top = el('div', 'ca-session-row-top');
     top.append(el('strong', '', sessionDisplayTitle(session)));
-    top.append(el('span', decisionClass(session.decision), plainDecision(session.decision, plainSessionStatus(session.status))));
+    top.append(el('span', decisionClass(publicDecision), plainDecision(publicDecision, plainSessionStatus(session.status))));
     item.append(top);
-    item.append(el('span', 'ca-session-meta', t('desktop.sessions.rowMeta', { blockers: blockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
+    item.append(el('span', 'ca-session-meta', t('desktop.sessions.rowMeta', { blockers: publicBlockerCount(session), findings: severityTotal(session), updated: formatTimestamp(session.updatedAt) })));
     item.append(el('span', 'ca-session-meta ca-session-id-inline', t('desktop.sessions.rowId', { id: session.id })));
     listPanel.append(item);
   }
@@ -1828,10 +1897,11 @@ function renderCockpitOverview(): HTMLElement {
   actionPanel.append(el('strong', '', status.primaryLabel));
   actionPanel.append(el('p', '', t('desktop.cockpit.nextActionBody')));
   const flow = el('div', 'ca-review-flow');
+  const latestPublicDecision = latest ? publicDecisionOf(latest) : undefined;
   const flowItems = [
     [t('desktop.flow.workspace'), repo?.trusted ? t('desktop.value.ready') : t('desktop.value.needsFixes'), repo?.trusted ? 'good' : 'warn'],
-    [t('desktop.flow.review'), latest ? plainDecision(latest.decision, plainSessionStatus(latest.status)) : t('desktop.value.notStarted'), latest ? status.tone : 'info'],
-    [t('desktop.flow.acceptance'), latest?.decision === 'ACCEPT' ? t('desktop.value.ready') : t('desktop.value.pending'), latest?.decision === 'ACCEPT' ? 'good' : 'warn'],
+    [t('desktop.flow.review'), latest ? plainDecision(latestPublicDecision, plainSessionStatus(latest.status)) : t('desktop.value.notStarted'), latest ? status.tone : 'info'],
+    [t('desktop.flow.acceptance'), latestPublicDecision === 'ACCEPT' ? t('desktop.value.ready') : t('desktop.value.pending'), latestPublicDecision === 'ACCEPT' ? 'good' : 'warn'],
   ] as const;
   for (const [label, value, tone] of flowItems) {
     const step = el('div', `ca-flow-step ca-${tone}`);
@@ -1847,7 +1917,7 @@ function renderCockpitOverview(): HTMLElement {
   appendMetric(metrics, t('desktop.metric.branch'), repo?.branch || t('desktop.value.unknown'));
   appendMetric(metrics, t('desktop.metric.dirtyFiles'), repo ? String(repo.dirtyFileCount) : '...');
   appendMetric(metrics, t('desktop.metric.sessions'), String(state.sessions.length));
-  appendMetric(metrics, t('desktop.metric.currentBlockers'), latest ? String(blockerCount(latest)) : '0', latest && blockerCount(latest) > 0 ? 'ca-danger' : 'ca-good');
+  appendMetric(metrics, t('desktop.metric.currentBlockers'), latest ? String(publicBlockerCount(latest)) : '0', latest && publicBlockerCount(latest) > 0 ? 'ca-danger' : 'ca-good');
   appendMetric(metrics, t('desktop.metric.latestUpdated'), latest ? formatTimestamp(latest.updatedAt) : t('desktop.value.noSessions'));
   section.append(metrics);
 
@@ -1875,17 +1945,22 @@ function formatTimestamp(value?: string): string {
 }
 
 function decisionSummaryText(selected: SessionDetail): string {
+  const publicDecision = publicDecisionOf(selected);
+  const publicReasoning = publicReasoningOf(selected, t('desktop.detail.noReasoning'));
   const lines = [
     t('desktop.detail.decisionSummaryTitle'),
     '',
     `- Session: ${selected.id}`,
-    `- Verdict: ${plainDecision(selected.decision, plainSessionStatus(selected.status))}`,
-    `- Blockers: ${blockerCount(selected)}`,
+    `- Verdict: ${plainDecision(publicDecision, plainSessionStatus(selected.status))}`,
+    `- Blockers: ${publicBlockerCount(selected)}`,
     `- Findings: ${severityTotal(selected)}`,
     `- Updated: ${formatTimestamp(selected.updatedAt)}`,
     '',
-    selected.reasoning ?? t('desktop.detail.noReasoning'),
+    publicReasoning,
   ];
+  if (publicDecision && selected.decision && publicDecision !== selected.decision) {
+    lines.splice(5, 0, `- ${t('desktop.detail.publicDecisionAdjustmentLabel')}: ${selected.decision} -> ${publicDecision}`);
+  }
   return `${lines.join('\n')}\n`;
 }
 
@@ -1927,14 +2002,22 @@ function renderSessionDetail(): HTMLElement {
     detail.append(mobileHeader);
   }
 
-  const banner = el('div', `ca-verdict-banner ${selected.decision === 'REJECT' ? 'ca-danger' : selected.decision === 'ACCEPT' ? 'ca-good' : 'ca-warn'}`);
+  const selectedPublicDecision = publicDecisionOf(selected);
+  const banner = el('div', `ca-verdict-banner ${selectedPublicDecision === 'REJECT' ? 'ca-danger' : selectedPublicDecision === 'ACCEPT' ? 'ca-good' : 'ca-warn'}`);
   const bannerText = el('div');
-  bannerText.append(el('span', 'ca-eyebrow', t('desktop.detail.finalVerdict')));
-  bannerText.append(el('h2', '', plainDecision(selected.decision, plainSessionStatus(selected.status))));
-  bannerText.append(el('p', '', selected.reasoning ?? t('desktop.detail.noReasoning')));
+  bannerText.append(el('span', 'ca-eyebrow', t('desktop.detail.publicDecision')));
+  bannerText.append(el('h2', '', plainDecision(selectedPublicDecision, plainSessionStatus(selected.status))));
+  bannerText.append(el('p', '', publicReasoningOf(selected, t('desktop.detail.noReasoning'))));
+  if (selectedPublicDecision && selected.decision && selectedPublicDecision !== selected.decision) {
+    bannerText.append(el('p', 'ca-repo-note', t('desktop.detail.publicDecisionAdjusted', {
+      raw: selected.decision,
+      public: selectedPublicDecision,
+    })));
+  }
   banner.append(bannerText);
-  banner.append(el('span', decisionClass(selected.decision), plainDecision(selected.decision, plainSessionStatus(selected.status))));
+  banner.append(el('span', decisionClass(selectedPublicDecision), plainDecision(selectedPublicDecision, plainSessionStatus(selected.status))));
   detail.append(banner);
+  detail.append(renderDecisionBriefPanel(selected));
   detail.append(renderAcceptancePanel(selected));
 
   const detailHeader = el('div', 'ca-detail-header');
@@ -2059,20 +2142,103 @@ function renderSessionDetail(): HTMLElement {
   return detail;
 }
 
+function renderDecisionBriefPanel(selected: SessionDetail): HTMLElement {
+  const publicDecision = publicDecisionOf(selected);
+  const brief = selected.decisionBrief;
+  const panel = el('section', 'ca-decision-brief');
+  panel.dataset.testid = 'decision-brief-panel';
+
+  const decision = el('div', 'ca-brief-section');
+  decision.append(el('span', 'ca-eyebrow', t('desktop.detail.briefDecisionEyebrow')));
+  decision.append(el('strong', '', plainDecision(publicDecision, plainSessionStatus(selected.status))));
+  if (brief?.reviewedScope.uncertainty) {
+    decision.append(el('p', '', brief.reviewedScope.uncertainty));
+  } else if (brief) {
+    decision.append(el('p', '', selected.reasoning ?? t('desktop.detail.noReasoning')));
+  } else {
+    decision.append(el('p', 'ca-empty', t('desktop.detail.briefUnavailable')));
+  }
+  panel.append(decision);
+
+  const why = el('div', 'ca-brief-section');
+  why.append(el('span', 'ca-eyebrow', t('desktop.detail.briefWhyEyebrow')));
+  if (publicDecision === 'ACCEPT') {
+    if (!brief) {
+      why.append(el('p', 'ca-empty', t('desktop.detail.briefUnavailable')));
+    } else {
+      const grid = el('div', 'ca-evidence-grid');
+      appendMetric(grid, t('desktop.detail.reviewedFiles'), String(brief.reviewedScope.files.length));
+      appendMetric(grid, t('desktop.detail.completedChecks'), String(brief.completedChecks.length));
+      appendMetric(grid, t('desktop.detail.mustFixCount'), '0', 'ca-good');
+      appendMetric(grid, t('desktop.detail.humanGateCount'), '0', 'ca-good');
+      why.append(grid);
+    }
+  } else {
+    const cards = promotedDecisionCards(selected);
+    if (cards.length === 0) {
+      why.append(el('p', 'ca-empty', t('desktop.detail.noPromotedEvidence')));
+    } else {
+      const cardGrid = el('div', 'ca-promoted-card-grid');
+      for (const card of cards) {
+        const row = el('div', `ca-issue-row ca-issue-card ${card.kind === 'must-fix' ? 'ca-danger' : 'ca-warn'}`);
+        row.append(el('span', 'ca-issue-severity', card.kind === 'must-fix' ? t('desktop.detail.mustFix') : t('desktop.detail.humanGate')));
+        row.append(el('strong', '', card.title));
+        row.append(el('span', '', `${card.filePath}:${card.lineRange[0]} · ${severityLabel(card.severity)}`));
+        row.append(el('p', '', card.affectedContract));
+        row.append(el('p', '', card.check));
+        cardGrid.append(row);
+      }
+      why.append(cardGrid);
+    }
+  }
+  panel.append(why);
+
+  const action = el('div', 'ca-brief-section');
+  action.append(el('span', 'ca-eyebrow', t('desktop.detail.briefActionEyebrow')));
+  const actions = brief?.requiredActions.filter((item) => item.trim()) ?? [];
+  if (actions.length === 0) {
+    action.append(el('p', '', publicDecision === 'ACCEPT' ? t('desktop.detail.noRequiredAction') : t('desktop.detail.noRequiredActionRecorded')));
+  } else {
+    const list = el('ol', 'ca-next-action-list');
+    for (const item of actions) list.append(el('li', '', item));
+    action.append(list);
+  }
+  if (brief && (brief.followUpCount > 0 || brief.auditCount > 0 || brief.demotedCount > 0)) {
+    const appendix = el('details', 'ca-brief-appendix') as HTMLDetailsElement;
+    appendix.append(el('summary', '', t('desktop.detail.appendixSummary')));
+    appendix.append(el('p', '', t('desktop.detail.appendixCounts', {
+      followUp: brief.followUpCount,
+      audit: brief.auditCount,
+      demoted: brief.demotedCount,
+    })));
+    action.append(appendix);
+  }
+  panel.append(action);
+  return panel;
+}
+
+function promotedDecisionCards(selected: SessionDetail): NonNullable<SessionDetail['decisionBrief']>['evidenceCards'] {
+  const publicDecision = publicDecisionOf(selected);
+  const expectedKind = publicDecision === 'REJECT' ? 'must-fix' : publicDecision === 'NEEDS_HUMAN' ? 'human-gate' : undefined;
+  if (!expectedKind) return [];
+  return selected.decisionBrief?.evidenceCards.filter((card) => card.complete && card.kind === expectedKind) ?? [];
+}
+
 function renderAcceptancePanel(selected: SessionDetail): HTMLElement {
-  const blockers = blockerCount(selected);
+  const publicDecision = publicDecisionOf(selected);
+  const blockers = publicBlockerCount(selected);
   const tone = decisionTone(selected);
   const panel = el('section', `ca-acceptance-panel ca-${tone}`);
   panel.dataset.testid = 'acceptance-panel';
   panel.append(el('span', 'ca-eyebrow', t('desktop.acceptance.eyebrow')));
 
-  if (selected.decision === 'ACCEPT' && blockers === 0) {
+  if (publicDecision === 'ACCEPT' && blockers === 0) {
     panel.append(el('strong', '', t('desktop.acceptance.acceptTitle')));
     panel.append(el('p', '', t('desktop.acceptance.acceptBody')));
-  } else if (selected.decision === 'REJECT' || blockers > 0) {
+  } else if (publicDecision === 'REJECT' || (!publicDecision && blockers > 0)) {
     panel.append(el('strong', '', t('desktop.acceptance.rejectTitle', { count: blockers })));
     panel.append(el('p', '', t('desktop.acceptance.rejectBody')));
-  } else if (selected.decision === 'NEEDS_HUMAN') {
+  } else if (publicDecision === 'NEEDS_HUMAN') {
     panel.append(el('strong', '', t('desktop.acceptance.humanTitle')));
     panel.append(el('p', '', t('desktop.acceptance.humanBody')));
   } else {
@@ -2156,8 +2322,26 @@ function renderRunReview(): HTMLElement {
   panel.append(renderProviderCredentialPanel('run'));
   panel.append(renderRepositoryPicker());
   panel.append(renderRepoFacts());
+  if (!readiness.ready) {
+    panel.append(renderBlockedRunGate(readiness));
+    panel.append(renderReviewRun());
+    return panel;
+  }
   panel.append(renderRunLaunchCards());
   panel.append(renderReviewRun());
+  return panel;
+}
+
+function renderBlockedRunGate(readiness: RunReadiness): HTMLElement {
+  const panel = el('section', 'ca-run-blocked-gate ca-warn');
+  panel.dataset.testid = 'run-blocked-gate';
+  panel.append(el('span', 'ca-eyebrow', t('desktop.readiness.blockedTitle')));
+  panel.append(el('strong', '', readinessBlockedReason(readiness)));
+  panel.append(el('p', '', t('desktop.readiness.blockedBody')));
+  panel.append(button(t('desktop.action.fixSetup'), () => {
+    setView('setup');
+    void loadSetup();
+  }, 'ca-button ca-primary', 'button-fix-setup-blocked-run'));
   return panel;
 }
 
@@ -2494,12 +2678,12 @@ function renderNextActionPanel(selected: SessionDetail): HTMLElement {
   panel.append(el('h3', '', t('desktop.next.title')));
 
   const list = el('ol', 'ca-next-action-list');
-  const blockers = blockerCount(selected);
-  if (blockers > 0 || selected.decision === 'REJECT') {
+  const publicDecision = publicDecisionOf(selected);
+  if (publicDecision === 'REJECT' || (!publicDecision && publicBlockerCount(selected) > 0)) {
     list.append(el('li', '', t('desktop.next.fixBlockers')));
     list.append(el('li', '', t('desktop.next.rerunStaged')));
     list.append(el('li', '', t('desktop.next.exportShare')));
-  } else if (selected.decision === 'NEEDS_HUMAN') {
+  } else if (publicDecision === 'NEEDS_HUMAN') {
     list.append(el('li', '', t('desktop.next.humanReview')));
     list.append(el('li', '', t('desktop.next.captureDecision')));
     list.append(el('li', '', t('desktop.next.exportShare')));
@@ -2572,7 +2756,7 @@ function providerKeyTestId(provider: string): string {
 function renderProviderCredentialPanel(context: 'run' | 'config' | 'setup'): HTMLElement {
   const policy = evaluateConfigPolicy(state.configRaw);
   const requirements = providerCredentialRequirements(state.configRaw, state.providers);
-  const statusKnown = state.providers.length > 0;
+  const statusKnown = state.providersLoaded;
   const configuredCount = requirements.filter((item) => item.configured).length;
   const allConfigured = requirements.length > 0 && configuredCount === requirements.length;
   const noneConfigured = requirements.length > 0 && statusKnown && configuredCount === 0;
@@ -2609,6 +2793,12 @@ function renderProviderCredentialPanel(context: 'run' | 'config' | 'setup'): HTM
   if (!policy.validJson) {
     panel.append(el('p', 'ca-repo-note ca-warn', t('desktop.credentials.invalidConfigBody')));
     return panel;
+  }
+
+  if (state.providerStatusError) {
+    panel.append(el('p', 'ca-repo-note ca-warn', state.providerStatusError));
+  } else if (requirements.length > 0 && !statusKnown) {
+    panel.append(el('p', 'ca-repo-note ca-warn', t('desktop.setup.providerStatusHint')));
   }
 
   if (requirements.length === 0) {
@@ -2698,8 +2888,8 @@ function renderSetup(): HTMLElement {
   }
   if (state.providers.length === 0) {
     const empty = el('div', 'ca-empty-state ca-compact');
-    empty.append(el('strong', '', t('desktop.setup.providerStatusNotLoaded')));
-    empty.append(el('p', '', t('desktop.setup.providerStatusHint')));
+    empty.append(el('strong', '', state.providersLoaded ? t('desktop.setup.providerStatusEmpty') : t('desktop.setup.providerStatusNotLoaded')));
+    empty.append(el('p', '', state.providersLoaded ? t('desktop.setup.providerStatusEmptyHint') : t('desktop.setup.providerStatusHint')));
     empty.append(button(t('desktop.action.refreshSetup'), () => void loadSetup(), 'ca-button ca-subtle', 'button-refresh-setup-empty'));
     grid.append(empty);
   }
@@ -2720,7 +2910,7 @@ function renderSetupOverview(): HTMLElement {
   const overview = el('section', 'ca-setup-overview');
   overview.dataset.testid = 'setup-overview';
   const hasConfiguredProvider = state.providers.some((provider) => provider.configured);
-  const providerKnown = state.providers.length > 0;
+  const providerKnown = state.providersLoaded || state.providers.length > 0;
   const requiredGroup = el('section', 'ca-setup-group');
   const requiredHead = el('div', 'ca-setup-group-head');
   requiredHead.append(el('span', 'ca-eyebrow', t('desktop.setup.requiredGroupTitle')));
@@ -2989,7 +3179,11 @@ function renderToasts(): void {
     const message = el('span', '', toast.message)
     message.dataset.toastMessage = 'true'
     node.append(message)
-    node.append(button(t('desktop.toast.dismiss'), () => removeToast(toast.id), 'ca-ghost', `button-dismiss-toast-${toast.id}`))
+    const dismiss = el('button', 'ca-ghost ca-toast-dismiss', t('desktop.toast.dismiss'))
+    dismiss.type = 'button'
+    dismiss.dataset.testid = `button-dismiss-toast-${toast.id}`
+    dismiss.addEventListener('click', () => removeToast(toast.id))
+    node.append(dismiss)
     container.append(node)
   }
 }

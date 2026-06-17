@@ -68,29 +68,53 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
   }
 }
 
+async function readSessionVerdict(sessionPath: string): Promise<Record<string, unknown> | null> {
+  const result = await readJsonFile(path.join(sessionPath, 'result.json'));
+  const headVerdict = await readJsonFile(path.join(sessionPath, 'head-verdict.json'));
+  if (result && (result['status'] !== 'error' || !headVerdict)) return result;
+  return headVerdict ?? result;
+}
+
 function classifySessionArtifact(metadata: Record<string, unknown> | null): Record<string, unknown> | null {
   if (!metadata) return null;
   if (metadata['schemaVersion'] === SESSION_ARTIFACT_SCHEMA_VERSION) return metadata;
   return { ...metadata, artifactContract: 'legacy/best-effort' };
 }
 
+function issueObjectFromUnknown(item: unknown): { title: string; severity?: string } {
+  if (typeof item === 'object' && item !== null) {
+    const obj = item as Record<string, unknown>;
+    return {
+      title: String(obj['title'] ?? obj['issueTitle'] ?? obj['description'] ?? obj['message'] ?? JSON.stringify(item)),
+      severity: typeof obj['severity'] === 'string' ? obj['severity'] : undefined,
+    };
+  }
+  return { title: String(item) };
+}
+
 function extractIssueObjects(verdict: Record<string, unknown>): Array<{ title: string; severity?: string }> {
+  // PipelineResult/result.json stores promoted review evidence under evidenceDocs.
+  const evidenceDocs = verdict['evidenceDocs'];
+  if (Array.isArray(evidenceDocs) && evidenceDocs.length > 0) {
+    return evidenceDocs.map(issueObjectFromUnknown);
+  }
+
   // Try common verdict shapes: issues[], findings[], items[]
   for (const key of ['issues', 'findings', 'items']) {
     const val = verdict[key];
-    if (Array.isArray(val)) {
-      return val.map((item: unknown) => {
-        if (typeof item === 'object' && item !== null) {
-          const obj = item as Record<string, unknown>;
-          return {
-            title: String(obj['title'] ?? obj['description'] ?? obj['message'] ?? JSON.stringify(item)),
-            severity: typeof obj['severity'] === 'string' ? obj['severity'] : undefined,
-          };
-        }
-        return { title: String(item) };
-      });
+    if (Array.isArray(val) && val.length > 0) {
+      return val.map(issueObjectFromUnknown);
     }
   }
+
+  const summary = verdict['summary'];
+  if (typeof summary === 'object' && summary !== null) {
+    const topIssues = (summary as Record<string, unknown>)['topIssues'];
+    if (Array.isArray(topIssues) && topIssues.length > 0) {
+      return topIssues.map(issueObjectFromUnknown);
+    }
+  }
+
   return [];
 }
 
@@ -185,7 +209,7 @@ export async function listSessions(
     const matched: SessionEntry[] = [];
     for (const entry of filtered) {
       const metadata = await readJsonFile(path.join(entry.dirPath, 'metadata.json'));
-      const verdict = await readJsonFile(path.join(entry.dirPath, 'head-verdict.json'));
+      const verdict = await readSessionVerdict(entry.dirPath);
       const haystack = (
         (metadata ? JSON.stringify(metadata) : '') +
         (verdict ? JSON.stringify(verdict) : '')
@@ -205,7 +229,7 @@ export async function listSessions(
     // Read verdict files to count issues, then sort descending
     const withCounts = await Promise.all(
       filtered.map(async (entry) => {
-        const verdict = await readJsonFile(path.join(entry.dirPath, 'head-verdict.json'));
+        const verdict = await readSessionVerdict(entry.dirPath);
         const count = verdict ? extractIssueObjects(verdict).length : 0;
         return { entry, count };
       })
@@ -286,7 +310,7 @@ export async function getSessionStats(baseDir: string): Promise<SessionStats> {
       else if (status === 'in_progress') inProgress++;
       else if (status === 'interrupted') interrupted++;
 
-      const verdict = await readJsonFile(path.join(sessionPath, 'head-verdict.json'));
+      const verdict = await readSessionVerdict(sessionPath);
       if (verdict) {
         for (const issue of extractIssueObjects(verdict)) {
           const severity = issue.severity ?? 'unknown';
@@ -332,7 +356,7 @@ export async function showSession(
   }
 
   const metadata = classifySessionArtifact(await readJsonFile(path.join(dirPath, 'metadata.json'))) ?? undefined;
-  const verdict = await readJsonFile(path.join(dirPath, 'head-verdict.json')) ?? undefined;
+  const verdict = await readSessionVerdict(dirPath) ?? undefined;
 
   const status = metadata && typeof metadata['status'] === 'string'
     ? metadata['status']

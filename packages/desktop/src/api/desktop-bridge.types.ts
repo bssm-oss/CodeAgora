@@ -1,6 +1,8 @@
 import type {
   SessionCostSummary as CoreSessionCostSummary,
   SessionDetailView,
+  ReviewDecisionBrief as CoreReviewDecisionBrief,
+  SessionReviewDecisionEvidenceCard as CoreReviewDecisionEvidenceCard,
   SessionReviewDecision,
   SessionSeverityCounts,
   SessionSummary as CoreSessionSummary,
@@ -13,6 +15,8 @@ export type TopIssue = SessionTopIssue;
 export type SessionSummary = CoreSessionSummary;
 export type SessionCostSummary = CoreSessionCostSummary;
 export type SessionDetail = SessionDetailView;
+export type ReviewDecisionBrief = CoreReviewDecisionBrief;
+export type ReviewDecisionEvidenceCard = CoreReviewDecisionEvidenceCard;
 
 export interface SessionExport {
   format: string;

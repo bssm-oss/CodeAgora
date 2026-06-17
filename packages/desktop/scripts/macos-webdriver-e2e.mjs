@@ -111,14 +111,25 @@ function fixtureWorkspace() {
 function fakeAgoraBin() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-fake-agora-'));
   const script = path.join(dir, 'agora');
+  const reviewCount = path.join(dir, 'review-count');
   writeFile(script, `#!/bin/sh
 set -eu
 if [ "\${1:-}" = "config" ]; then
   printf '%s\\n' '{"valid":true,"errors":[],"warnings":[]}'
   exit 0
 fi
-if [ -f ".ca/fail-next-review" ]; then
-  rm -f ".ca/fail-next-review"
+if [ "\${1:-}" != "review" ]; then
+  printf '%s\\n' '{}'
+  exit 0
+fi
+count_file=${JSON.stringify(reviewCount)}
+count=0
+if [ -f "$count_file" ]; then
+  count=$(cat "$count_file")
+fi
+next_count=$((count + 1))
+printf '%s\\n' "$next_count" > "$count_file"
+if [ "$count" -ge 1 ]; then
   printf '%s\\n' '{"schemaVersion":"codeagora.review.v1","type":"progress","stage":"review","event":"stage-update","progress":18,"message":"로컬 리뷰 도구 상태를 확인하고 있습니다."}'
   printf '%s\\n' 'review tool unavailable' >&2
   exit 2
@@ -189,13 +200,14 @@ async function click(sessionId, selector) {
   await request('POST', `/session/${sessionId}/element/${id}/click`);
 }
 
+async function enabled(sessionId, selector) {
+  const id = elementId(await findElement(sessionId, selector));
+  return request('GET', `/session/${sessionId}/element/${id}/enabled`);
+}
+
 async function text(sessionId, selector) {
   const id = elementId(await findElement(sessionId, selector));
   return request('GET', `/session/${sessionId}/element/${id}/text`);
-}
-
-async function title(sessionId) {
-  return request('GET', `/session/${sessionId}/title`);
 }
 
 async function pageSource(sessionId) {
@@ -229,16 +241,38 @@ async function waitForText(sessionId, selector, expected) {
   throw new Error(`Timed out waiting for ${selector} to contain ${expected}. Last text: ${lastValue || '<empty>'}. Last error: ${lastError || '<none>'}. Shell text: ${String(shellText).slice(0, 2000)}. Page source: ${source}`);
 }
 
-async function waitForTitle(sessionId, expected) {
+async function waitForEnabled(sessionId, selector) {
   const started = Date.now();
-  let lastValue = '';
+  let lastError = '';
   while (Date.now() - started < 20_000) {
-    const value = String(await title(sessionId));
-    lastValue = value;
-    if (value.includes(expected)) return value;
+    try {
+      if (await enabled(sessionId, selector)) return;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Timed out waiting for title to contain ${expected}. Last title: ${lastValue || '<empty>'}`);
+  throw new Error(`Timed out waiting for ${selector} to become enabled. Last error: ${lastError || '<none>'}`);
+}
+
+async function waitForMissing(sessionId, selector) {
+  const started = Date.now();
+  let lastError = '';
+  while (Date.now() - started < 20_000) {
+    try {
+      await findElement(sessionId, selector);
+    } catch (error) {
+      void error;
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  try {
+    lastError = String(await text(sessionId, selector));
+  } catch {
+    lastError = '<unavailable>';
+  }
+  throw new Error(`Timed out waiting for ${selector} to be removed. Last text: ${lastError}`);
 }
 
 if (process.platform !== 'darwin') {
@@ -298,15 +332,24 @@ try {
   await waitForText(sessionId, '[data-testid="run-panel"]', '리뷰 결과 만들기');
   await waitForText(sessionId, '[data-testid="button-review-staged-changes"]', '커밋할 변경 확인');
   await waitForText(sessionId, '[data-testid="button-review-working-tree"]', '전체 로컬 변경 확인');
+  await waitForEnabled(sessionId, '[data-testid="button-review-staged-changes"]');
   await click(sessionId, '[data-testid="button-review-staged-changes"]');
   await waitForText(sessionId, '[data-testid="desktop-shell"]', '자동 리뷰 완료');
   await waitForText(sessionId, '[data-testid="acceptance-panel"]', '이 리뷰 결과를 받아들일 수 있습니다');
   await waitForText(sessionId, '[data-testid="desktop-shell"]', '원본 리포트 미리보기');
-  writeFile(path.join(workspace, '.ca', 'fail-next-review'), '1\n');
-  await click(sessionId, '[data-testid="button-quick-review"]');
-  await waitForTitle(sessionId, '(1)');
+  await waitForText(sessionId, '.ca-toast', '리뷰 결과');
+  await waitForEnabled(sessionId, '.ca-toast button');
+  await click(sessionId, '.ca-toast button');
+  await waitForMissing(sessionId, '.ca-toast');
+  await click(sessionId, '[data-testid="button-copy-decision-summary"]');
+  await waitForText(sessionId, '.ca-toast', '복사');
+  await waitForEnabled(sessionId, '.ca-toast button');
+  await click(sessionId, '.ca-toast button');
+  await waitForMissing(sessionId, '.ca-toast');
   await click(sessionId, '[data-testid="button-run-review"]');
   await waitForText(sessionId, '[data-testid="run-panel"]', '리뷰 결과 만들기');
+  await waitForEnabled(sessionId, '[data-testid="button-review-staged-changes"]');
+  await click(sessionId, '[data-testid="button-review-staged-changes"]');
   await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '리뷰를 완료하지 못했습니다');
   await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '다시 실행');
   await waitForText(sessionId, '[data-testid="review-outcome-panel"]', '셋업 확인');

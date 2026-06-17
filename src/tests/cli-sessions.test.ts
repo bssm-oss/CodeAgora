@@ -16,6 +16,7 @@ import {
   formatSessionDetail,
   formatSessionDetailJson,
   formatSessionDiff,
+  exportSession,
   type SessionEntry,
   type SessionDetail,
   type SessionDiff,
@@ -32,6 +33,7 @@ async function makeSession(
   options?: {
     status?: string;
     verdict?: Record<string, unknown>;
+    result?: Record<string, unknown>;
   }
 ): Promise<string> {
   const sessionDir = path.join(baseDir, '.ca', 'sessions', date, sessionId);
@@ -51,6 +53,13 @@ async function makeSession(
     await fs.writeFile(
       path.join(sessionDir, 'head-verdict.json'),
       JSON.stringify(options.verdict)
+    );
+  }
+
+  if (options?.result) {
+    await fs.writeFile(
+      path.join(sessionDir, 'result.json'),
+      JSON.stringify(options.result)
     );
   }
 
@@ -428,12 +437,200 @@ describe('formatSessionDetail()', () => {
     expect(output).toContain('2');
   });
 
+  it('includes issue count from pipeline result evidence documents', () => {
+    const detail: SessionDetail = {
+      entry: { id: '2026-03-13/001', date: '2026-03-13', sessionId: '001', status: 'completed', dirPath: '/tmp/x' },
+      verdict: {
+        summary: { topIssues: [{ title: 'Summary warning', severity: 'WARNING' }] },
+        evidenceDocs: [
+          { issueTitle: 'Pipeline blocker', severity: 'CRITICAL' },
+          { issueTitle: 'Pipeline warning', severity: 'WARNING' },
+        ],
+      },
+    };
+    const output = formatSessionDetail(detail);
+    expect(output).toContain('Issues:');
+    expect(output).toContain('2');
+    expect(output).toContain('Pipeline blocker');
+    expect(output).not.toContain('Summary warning');
+  });
+
+  it('falls back to full issue arrays when pipeline evidence docs are empty', () => {
+    const detail: SessionDetail = {
+      entry: { id: '2026-03-13/001', date: '2026-03-13', sessionId: '001', status: 'completed', dirPath: '/tmp/x' },
+      verdict: {
+        evidenceDocs: [],
+        summary: { topIssues: [{ title: 'Summary fallback only', severity: 'SUGGESTION' }] },
+        issues: [
+          { title: 'Full blocker', severity: 'CRITICAL' },
+          { title: 'Full warning', severity: 'WARNING' },
+        ],
+      },
+    };
+    const output = formatSessionDetail(detail);
+    expect(output).toContain('Issues:');
+    expect(output).toContain('2');
+    expect(output).toContain('Full blocker');
+    expect(output).toContain('Full warning');
+    expect(output).not.toContain('Summary fallback only');
+  });
+
   it('works without metadata or verdict', () => {
     const detail: SessionDetail = {
       entry: { id: '2026-03-13/001', date: '2026-03-13', sessionId: '001', status: 'unknown', dirPath: '/tmp/x' },
     };
     const output = formatSessionDetail(detail);
     expect(output).toContain('Session: 2026-03-13/001');
+  });
+});
+
+// ============================================================================
+// exportSession
+// ============================================================================
+
+describe('exportSession()', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ca-sessions-test-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('exports SARIF results from pipeline result evidence documents', async () => {
+    await makeSession(tmpDir, '2026-03-13', '001', {
+      verdict: { issues: [] },
+      result: {
+        summary: { topIssues: [{ title: 'Summary-only issue', severity: 'SUGGESTION' }] },
+        evidenceDocs: [
+          {
+            issueTitle: 'Pipeline blocker',
+            problem: 'The public export loses result.json evidence.',
+            evidence: ['result.json contains evidenceDocs'],
+            severity: 'CRITICAL',
+            suggestion: 'Read pipeline evidence docs first.',
+            filePath: 'packages/cli/src/commands/sessions.ts',
+            lineRange: [1, 1],
+          },
+          {
+            issueTitle: 'Pipeline warning',
+            problem: 'A warning should also be exported.',
+            evidence: [],
+            severity: 'WARNING',
+            suggestion: '',
+            filePath: 'packages/core/src/session/queries.ts',
+            lineRange: [2, 4],
+          },
+        ],
+      },
+    });
+
+    const exported = await exportSession(tmpDir, '2026-03-13/001', 'sarif');
+    const sarif = JSON.parse(exported.content) as { runs: Array<{ results: Array<{ message: { text: string } }> }> };
+
+    expect(exported.fileName).toBe('codeagora-session-2026-03-13-001.sarif');
+    expect(sarif.runs[0]?.results.map((result) => result.message.text)).toEqual([
+      'Pipeline blocker',
+      'Pipeline warning',
+    ]);
+  });
+
+  it('exports SARIF from full issue arrays when pipeline evidence docs are empty', async () => {
+    await makeSession(tmpDir, '2026-03-13', '002', {
+      result: {
+        evidenceDocs: [],
+        summary: { topIssues: [{ title: 'Summary fallback only', severity: 'SUGGESTION' }] },
+        issues: [
+          {
+            title: 'Full legacy blocker',
+            problem: 'The fallback source contains complete issue data.',
+            severity: 'CRITICAL',
+            filePath: 'packages/core/src/session/queries.ts',
+            lineRange: [3, 3],
+          },
+          {
+            title: 'Full legacy warning',
+            severity: 'WARNING',
+            filePath: 'packages/desktop/src-tauri/src/main.rs',
+            lineRange: [4, 4],
+          },
+        ],
+      },
+    });
+
+    const exported = await exportSession(tmpDir, '2026-03-13/002', 'sarif');
+    const sarif = JSON.parse(exported.content) as { runs: Array<{ results: Array<{ message: { text: string } }> }> };
+
+    expect(sarif.runs[0]?.results.map((result) => result.message.text)).toEqual([
+      'Full legacy blocker',
+      'Full legacy warning',
+    ]);
+  });
+
+  it('exports SARIF from head verdict when result.json is a terminal error artifact', async () => {
+    await makeSession(tmpDir, '2026-03-13', '003', {
+      verdict: {
+        decision: 'ACCEPT',
+        evidenceDocs: [
+          {
+            issueTitle: 'Preserved head verdict warning',
+            severity: 'WARNING',
+            filePath: 'packages/core/src/session/queries.ts',
+            lineRange: [5, 5],
+          },
+        ],
+      },
+      result: {
+        status: 'error',
+        sessionId: '003',
+        date: '2026-03-13',
+        error: 'Post-verdict cache failed',
+      },
+    });
+
+    const exported = await exportSession(tmpDir, '2026-03-13/003', 'sarif');
+    const sarif = JSON.parse(exported.content) as { runs: Array<{ results: Array<{ message: { text: string } }> }> };
+
+    expect(sarif.runs[0]?.results.map((result) => result.message.text)).toEqual([
+      'Preserved head verdict warning',
+    ]);
+  });
+
+  it('preserves evidence provenance metadata in SARIF exports', async () => {
+    await makeSession(tmpDir, '2026-03-13', '004', {
+      result: {
+        evidenceDocs: [
+          {
+            issueTitle: 'Provenance-rich finding',
+            problem: 'The export should keep reviewer metadata.',
+            evidence: ['metadata exists'],
+            severity: 'WARNING',
+            suggestion: 'Preserve optional metadata.',
+            filePath: 'packages/cli/src/commands/sessions.ts',
+            lineRange: [7, 9],
+            reviewerId: 'r1',
+            source: 'llm',
+            confidence: 73,
+            confidenceTrace: { raw: 90, final: 73 },
+            suggestionVerified: 'passed',
+          },
+        ],
+      },
+    });
+
+    const exported = await exportSession(tmpDir, '2026-03-13/004', 'sarif');
+    const sarif = JSON.parse(exported.content) as {
+      runs: Array<{ results: Array<{ properties?: Record<string, unknown> }> }>;
+    };
+
+    expect(sarif.runs[0]?.results[0]?.properties).toMatchObject({
+      reviewerId: 'r1',
+      confidence: 73,
+      confidenceTrace: { raw: 90, final: 73 },
+      suggestionVerified: 'passed',
+    });
   });
 });
 

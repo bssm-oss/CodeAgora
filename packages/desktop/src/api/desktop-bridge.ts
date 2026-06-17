@@ -19,6 +19,9 @@ import type {
   SeverityCounts,
   TopIssue,
   SessionCostSummary,
+  ReviewDecision,
+  ReviewDecisionBrief,
+  ReviewDecisionEvidenceCard,
 } from './desktop-bridge.types.js';
 export type * from './desktop-bridge.types.js';
 import {
@@ -81,15 +84,160 @@ function asObject(value: unknown): JsonObject | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as JsonObject : undefined;
 }
 
+function redactDesktopString(value: string): string {
+  return value
+    .replace(/(["'])([A-Z][A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)|(?:api[_-]?key|token|secret|password))\1\s*:\s*(["'])([^"'\r\n,}\]]+)\3/gi, (_match, keyQuote: string, key: string, valueQuote: string) => `${keyQuote}${key}${keyQuote}: ${valueQuote}[REDACTED]${valueQuote}`)
+    .replace(/\b([A-Z][A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)|(?:api[_-]?key|token|secret|password))\s*[:=]\s*(["']?)([^\s"']+)\2/gi, (_match, key: string) => `${key}=[REDACTED]`)
+    .replace(/\b(Authorization\s*:\s*Bearer\s+)([^\s"']+)/gi, (_match, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(/\b(Bearer\s+)([A-Za-z0-9._~+/=-]+)/gi, (_match, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9_]{8,}|xox[baprs]-[A-Za-z0-9-]{8,}|AIza[0-9A-Za-z_-]{12,})\b/g, '[REDACTED]');
+}
+
+function redactDesktopValue<T>(value: T): T {
+  if (typeof value === 'string') return redactDesktopString(value) as T;
+  if (Array.isArray(value)) return value.map((item) => redactDesktopValue(item)) as T;
+  if (value && typeof value === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      output[key] = redactDesktopValue(item);
+    }
+    return output as T;
+  }
+  return value;
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function normalizeDecision(value: unknown): ReviewDecision | undefined {
+  return value === 'ACCEPT' || value === 'REJECT' || value === 'NEEDS_HUMAN'
+    ? value
+    : undefined;
+}
+
+function normalizeLineRange(value: unknown): [number, number] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const start = Number(value[0] ?? 0);
+  const end = Number(value[1] ?? value[0] ?? 0);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end < start) {
+    return undefined;
+  }
+  return [start, end];
+}
+
+function normalizeEvidenceCard(value: unknown): ReviewDecisionEvidenceCard | undefined {
+  const card = asObject(value);
+  if (!card) return undefined;
+  const kind = card.kind === 'must-fix' || card.kind === 'human-gate' ? card.kind : undefined;
+  const source = card.source === 'evidence' || card.source === 'discussion' ? card.source : undefined;
+  const title = asString(card.title).trim();
+  const filePath = asString(card.filePath).trim();
+  const diffFact = asString(card.diffFact).trim();
+  const affectedContract = asString(card.affectedContract).trim();
+  const check = asString(card.check).trim();
+  const decisionRule = asString(card.decisionRule).trim();
+  const lineRange = normalizeLineRange(card.lineRange);
+  const missing = asStringArray(card.missing);
+  if (
+    card.complete !== true ||
+    missing.length > 0 ||
+    !kind ||
+    !source ||
+    !title ||
+    !filePath ||
+    !lineRange ||
+    !diffFact ||
+    !affectedContract ||
+    !check ||
+    !decisionRule
+  ) {
+    return undefined;
+  }
+  return redactDesktopValue({
+    kind,
+    source,
+    title,
+    severity: asString(card.severity, 'SUGGESTION'),
+    filePath,
+    lineRange,
+    confidence: asNumber(card.confidence),
+    diffFact,
+    affectedContract,
+    check,
+    expectedActual: asString(card.expectedActual) || undefined,
+    decisionRule,
+    complete: true,
+    missing,
+  });
+}
+
+function normalizeDecisionBrief(value: unknown): ReviewDecisionBrief | undefined {
+  const brief = asObject(value);
+  const decision = normalizeDecision(brief?.decision);
+  const scope = asObject(brief?.reviewedScope);
+  if (!brief || !decision || !scope) return undefined;
+  const evidenceCards = Array.isArray(brief.evidenceCards)
+    ? brief.evidenceCards.map(normalizeEvidenceCard).filter((card): card is ReviewDecisionEvidenceCard => Boolean(card))
+    : [];
+  return redactDesktopValue({
+    decision,
+    reviewedScope: {
+      files: asStringArray(scope.files),
+      areas: asStringArray(scope.areas),
+      contracts: asStringArray(scope.contracts),
+      checks: asStringArray(scope.checks),
+      uncertainty: asString(scope.uncertainty),
+    },
+    completedChecks: asStringArray(brief.completedChecks),
+    evidenceCards,
+    requiredActions: asStringArray(brief.requiredActions),
+    followUpCount: asNumber(brief.followUpCount) ?? 0,
+    auditCount: asNumber(brief.auditCount) ?? 0,
+    demotedCount: asNumber(brief.demotedCount) ?? 0,
+  });
+}
+
+function resolvePublicDecision(input: {
+  publicDecision?: unknown;
+  decisionBrief?: ReviewDecisionBrief;
+  rawDecision?: ReviewDecision;
+}): ReviewDecision | undefined {
+  return normalizeDecision(input.publicDecision) ?? input.decisionBrief?.decision ?? input.rawDecision;
+}
+
+function verdictDecision(verdict?: JsonObject): ReviewDecision | undefined {
+  const summary = asObject(verdict?.summary);
+  return normalizeDecision(verdict?.decision ?? verdict?.verdict ?? summary?.decision);
+}
+
+function verdictReasoning(verdict?: JsonObject): string {
+  const summary = asObject(verdict?.summary);
+  return asString(verdict?.reasoning ?? summary?.reasoning ?? verdict?.summary);
+}
+
 type CliSessionList = { sessions?: CliSessionEntry[] };
 type CliSessionEntry = Record<string, unknown>;
 type CliSessionDetail = Record<string, unknown>;
 
 function extractIssues(verdict?: JsonObject): JsonObject[] {
   if (!verdict) return [];
+  const evidenceDocs = verdict.evidenceDocs;
+  if (Array.isArray(evidenceDocs) && evidenceDocs.length > 0) {
+    return evidenceDocs.filter((item): item is JsonObject => typeof item === 'object' && item !== null);
+  }
+
   for (const key of ['issues', 'findings', 'items']) {
     const value = verdict[key];
-    if (Array.isArray(value)) return value.filter((item): item is JsonObject => typeof item === 'object' && item !== null);
+    if (Array.isArray(value) && value.length > 0) {
+      return value.filter((item): item is JsonObject => typeof item === 'object' && item !== null);
+    }
+  }
+
+  const summary = asObject(verdict.summary);
+  const topIssues = summary?.topIssues;
+  if (Array.isArray(topIssues) && topIssues.length > 0) {
+    return topIssues.filter((item): item is JsonObject => typeof item === 'object' && item !== null);
   }
   return [];
 }
@@ -138,15 +286,22 @@ function normalizeEntry(entry: CliSessionEntry): SessionSummary {
   const sessionId = asString(entry.sessionId);
   const id = asString(entry.id, date && sessionId ? `${date}/${sessionId}` : 'unknown');
   const verdict = asObject(entry['verdict']);
-  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as SessionSummary['decision'] | '';
+  const decisionBrief = normalizeDecisionBrief(entry.decisionBrief ?? verdict?.['decisionBrief']);
+  const decision = normalizeDecision(entry.decision) ?? verdictDecision(verdict);
+  const publicDecision = resolvePublicDecision({
+    publicDecision: entry.publicDecision ?? verdict?.['publicDecision'],
+    decisionBrief,
+    rawDecision: decision,
+  });
   return {
     id,
     date,
     sessionId,
     status: asString(entry.status, 'unknown') as SessionSummary['status'],
     dirPath: asString(entry.dirPath) || undefined,
-    decision: decision || undefined,
-    reasoning: asString(entry.reasoning ?? verdict?.['reasoning'] ?? verdict?.['summary']) || undefined,
+    decision,
+    publicDecision,
+    reasoning: asString(entry.reasoning) || verdictReasoning(verdict) || undefined,
     severityCounts: severityCountsFromValue(entry.severityCounts, verdict),
     topIssues: normalizeTopIssues(entry.topIssues, verdict),
     updatedAt: asString(entry.updatedAt) || undefined,
@@ -161,15 +316,24 @@ function timestampFromMetadata(metadata?: JsonObject): string | undefined {
 }
 
 function normalizeDetail(detail: CliSessionDetail): SessionDetail {
-  const entry = normalizeEntry(asObject(detail['entry']) ?? {});
+  const rawEntry = asObject(detail['entry']) ?? {};
+  const entry = normalizeEntry(rawEntry);
   const verdict = asObject(detail['verdict']);
   const metadata = asObject(detail['metadata']);
   const issues = extractIssues(verdict);
-  const decision = asString(entry.decision ?? verdict?.['decision'] ?? verdict?.['verdict']) as SessionDetail['decision'] | '';
-  const reasoning = asString(entry.reasoning ?? verdict?.['reasoning'] ?? verdict?.['summary']);
+  const decisionBrief = normalizeDecisionBrief(detail['decisionBrief'] ?? verdict?.['decisionBrief'] ?? rawEntry.decisionBrief);
+  const decision = normalizeDecision(entry.decision) ?? verdictDecision(verdict);
+  const publicDecision = resolvePublicDecision({
+    publicDecision: detail['publicDecision'] ?? entry.publicDecision ?? verdict?.['publicDecision'],
+    decisionBrief,
+    rawDecision: decision,
+  });
+  const reasoning = asString(entry.reasoning) || verdictReasoning(verdict);
   return {
     ...entry,
-    decision: decision || undefined,
+    decision,
+    publicDecision,
+    decisionBrief,
     reasoning,
     severityCounts: entry.severityCounts ?? severityCountsFromVerdict(verdict),
     topIssues: entry.topIssues?.length ? entry.topIssues : normalizeTopIssues(undefined, verdict),
@@ -183,7 +347,7 @@ function normalizeDetail(detail: CliSessionDetail): SessionDetail {
     markdown: asString(detail['markdown']) || [
       `# Review ${entry.id}`,
       '',
-      `Decision: ${decision || entry.status}`,
+      `Decision: ${publicDecision || decision || entry.status}`,
       '',
       reasoning || 'No reasoning available.',
     ].join('\n'),

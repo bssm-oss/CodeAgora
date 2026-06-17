@@ -19,6 +19,7 @@ export function fallbackSessions(): SessionSummary[] {
       sessionId: '001',
       status: 'completed',
       decision: 'REJECT',
+      publicDecision: 'ACCEPT',
       reasoning: 'Two high-confidence findings need changes before merge.',
       severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 1, WARNING: 2, SUGGESTION: 1 },
       topIssues: [
@@ -38,6 +39,7 @@ export function fallbackSessions(): SessionSummary[] {
       sessionId: '003',
       status: 'completed',
       decision: 'ACCEPT',
+      publicDecision: 'ACCEPT',
       reasoning: 'No blocking issues found across reviewers.',
       severityCounts: { HARSHLY_CRITICAL: 0, CRITICAL: 0, WARNING: 0, SUGGESTION: 2 },
       topIssues: [],
@@ -48,14 +50,31 @@ export function fallbackSessions(): SessionSummary[] {
 
 export function fallbackSessionDetail(id: string, sessions: SessionSummary[]): SessionDetail {
   const session = sessions.find((item) => item.id === id) ?? sessions[0]!;
+  const publicDecision = session.publicDecision ?? session.decision ?? 'NEEDS_HUMAN';
   return {
     ...session,
+    decisionBrief: {
+      decision: publicDecision,
+      reviewedScope: {
+        files: session.topIssues?.map((issue) => issue.filePath) ?? [],
+        areas: ['browser preview'],
+        contracts: ['desktop public decision contract'],
+        checks: ['fallback evidence normalization'],
+        uncertainty: 'Browser preview data is deterministic and cannot prove live provider behavior.',
+      },
+      completedChecks: ['fallback evidence normalization'],
+      evidenceCards: [],
+      requiredActions: session.publicDecision === 'ACCEPT' ? [] : ['Review promoted evidence before acting.'],
+      followUpCount: session.publicDecision === 'ACCEPT' ? 1 : 0,
+      auditCount: session.publicDecision === 'ACCEPT' ? 1 : 0,
+      demotedCount: session.publicDecision === 'ACCEPT' && session.decision !== 'ACCEPT' ? 1 : 0,
+    },
     evidenceCount: session.topIssues?.length ?? 0,
     discussionsCount: 1,
     markdown: [
       `# Review ${session.id}`,
       '',
-      `Decision: ${session.decision ?? 'unknown'}`,
+      `Decision: ${publicDecision}`,
       '',
       session.reasoning ?? 'No reasoning available.',
     ].join('\n'),

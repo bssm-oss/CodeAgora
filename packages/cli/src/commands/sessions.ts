@@ -63,22 +63,38 @@ function colorStatus(status: string): string {
   return status;
 }
 
+function recordFromUnknown(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : undefined;
+}
+
+function issueObjectFromUnknown(item: unknown): { title: string; severity?: string } {
+  const obj = recordFromUnknown(item);
+  if (!obj) return { title: String(item) };
+  return {
+    title: String(obj['title'] ?? obj['issueTitle'] ?? obj['description'] ?? obj['message'] ?? JSON.stringify(item)),
+    severity: typeof obj['severity'] === 'string' ? obj['severity'] : undefined,
+  };
+}
+
 function extractIssueObjects(verdict: Record<string, unknown>): Array<{ title: string; severity?: string }> {
+  const evidenceDocs = verdict['evidenceDocs'];
+  if (Array.isArray(evidenceDocs) && evidenceDocs.length > 0) {
+    return evidenceDocs.map(issueObjectFromUnknown);
+  }
+
   for (const key of ['issues', 'findings', 'items']) {
     const val = verdict[key];
-    if (Array.isArray(val)) {
-      return val.map((item: unknown) => {
-        if (typeof item === 'object' && item !== null) {
-          const obj = item as Record<string, unknown>;
-          return {
-            title: String(obj['title'] ?? obj['description'] ?? obj['message'] ?? JSON.stringify(item)),
-            severity: typeof obj['severity'] === 'string' ? obj['severity'] : undefined,
-          };
-        }
-        return { title: String(item) };
-      });
+    if (Array.isArray(val) && val.length > 0) {
+      return val.map(issueObjectFromUnknown);
     }
   }
+
+  const summary = recordFromUnknown(verdict['summary']);
+  const topIssues = summary?.['topIssues'];
+  if (Array.isArray(topIssues) && topIssues.length > 0) {
+    return topIssues.map(issueObjectFromUnknown);
+  }
+
   return [];
 }
 
@@ -111,6 +127,13 @@ async function readOptionalJson(filePath: string): Promise<Record<string, unknow
   }
 }
 
+async function readSessionVerdict(dirPath: string): Promise<Record<string, unknown> | undefined> {
+  const result = await readOptionalJson(path.join(dirPath, 'result.json'));
+  const headVerdict = await readOptionalJson(path.join(dirPath, 'head-verdict.json'));
+  if (result && (result['status'] !== 'error' || !headVerdict)) return result;
+  return headVerdict ?? result;
+}
+
 function normalizedSeverity(value: unknown): Severity {
   return typeof value === 'string' && (REVIEW_SEVERITIES as readonly string[]).includes(value)
     ? value as Severity
@@ -131,25 +154,54 @@ function lineRangeFrom(value: Record<string, unknown>): [number, number] {
   return [Math.max(1, line || 1), Math.max(1, line || 1)];
 }
 
+function evidenceDocumentFromUnknown(item: unknown): EvidenceDocument {
+  const record = recordFromUnknown(item) ?? { title: String(item) };
+  const title = String(record['title'] ?? record['issueTitle'] ?? record['description'] ?? record['message'] ?? 'CodeAgora finding');
+  const confidence = typeof record['confidence'] === 'number'
+    ? Math.max(0, Math.min(100, record['confidence']))
+    : undefined;
+  const source = record['source'] === 'llm' || record['source'] === 'rule' ? record['source'] : undefined;
+  const suggestionVerified = record['suggestionVerified'] === 'passed'
+    || record['suggestionVerified'] === 'failed'
+    || record['suggestionVerified'] === 'skipped'
+    ? record['suggestionVerified']
+    : undefined;
+  const confidenceTrace = recordFromUnknown(record['confidenceTrace']) as EvidenceDocument['confidenceTrace'];
+  return {
+    issueTitle: title,
+    problem: String(record['problem'] ?? record['description'] ?? record['message'] ?? title),
+    evidence: stringArray(record['evidence']),
+    severity: normalizedSeverity(record['severity']),
+    suggestion: String(record['suggestion'] ?? record['fix'] ?? record['recommendation'] ?? ''),
+    filePath: String(record['filePath'] ?? record['file'] ?? record['path'] ?? 'unknown'),
+    lineRange: lineRangeFrom(record),
+    ...(typeof record['reviewerId'] === 'string' ? { reviewerId: record['reviewerId'] } : {}),
+    ...(source ? { source } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
+    ...(confidenceTrace ? { confidenceTrace } : {}),
+    ...(suggestionVerified ? { suggestionVerified } : {}),
+  };
+}
+
 function evidenceDocumentsFromVerdict(verdict: Record<string, unknown> | undefined): EvidenceDocument[] {
   if (!verdict) return [];
+  const evidenceDocs = verdict['evidenceDocs'];
+  if (Array.isArray(evidenceDocs) && evidenceDocs.length > 0) {
+    return evidenceDocs.map(evidenceDocumentFromUnknown);
+  }
+
   for (const key of ['issues', 'findings', 'items']) {
     const value = verdict[key];
-    if (!Array.isArray(value)) continue;
-    return value.map((item): EvidenceDocument => {
-      const record = typeof item === 'object' && item !== null ? item as Record<string, unknown> : { title: String(item) };
-      const title = String(record['title'] ?? record['issueTitle'] ?? record['description'] ?? record['message'] ?? 'CodeAgora finding');
-      return {
-        issueTitle: title,
-        problem: String(record['problem'] ?? record['description'] ?? record['message'] ?? title),
-        evidence: stringArray(record['evidence']),
-        severity: normalizedSeverity(record['severity']),
-        suggestion: String(record['suggestion'] ?? record['fix'] ?? record['recommendation'] ?? ''),
-        filePath: String(record['filePath'] ?? record['file'] ?? record['path'] ?? 'unknown'),
-        lineRange: lineRangeFrom(record),
-      };
-    });
+    if (!Array.isArray(value) || value.length === 0) continue;
+    return value.map(evidenceDocumentFromUnknown);
   }
+
+  const summary = recordFromUnknown(verdict['summary']);
+  const topIssues = summary?.['topIssues'];
+  if (Array.isArray(topIssues) && topIssues.length > 0) {
+    return topIssues.map(evidenceDocumentFromUnknown);
+  }
+
   return [];
 }
 
@@ -353,8 +405,7 @@ export async function exportSession(
   }
 
   if (normalized === 'sarif') {
-    const verdict = await readOptionalJson(path.join(dirPath, 'result.json'))
-      ?? detail.verdict;
+    const verdict = await readSessionVerdict(dirPath) ?? detail.verdict;
     const report = buildSarifReport(evidenceDocumentsFromVerdict(verdict), sessionId, date);
     return { format: 'sarif', fileName: `${fileBase}.sarif`, content: serializeSarif(report) };
   }

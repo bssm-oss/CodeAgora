@@ -2,8 +2,17 @@
  * CLI Binary Name Detection Tests
  */
 
-import { describe, it, expect } from 'vitest';
-import { detectBinaryName } from '@codeagora/cli/index.js';
+import { mkdtemp, realpath } from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { afterEach, describe, it, expect } from 'vitest';
+import { applyCwdOverride, detectBinaryName } from '@codeagora/cli/index.js';
+
+const originalCwd = process.cwd();
+
+afterEach(() => {
+  process.chdir(originalCwd);
+});
 
 describe('detectBinaryName()', () => {
   it('returns "agora" when argv1 basename is "agora"', () => {
@@ -40,5 +49,21 @@ describe('detectBinaryName()', () => {
 
   it('handles paths where agora is a substring of the basename', () => {
     expect(detectBinaryName('/bin/codeagora-extra')).toBe('codeagora');
+  });
+});
+
+describe('applyCwdOverride()', () => {
+  it('switches CLI commands back to the repository selected by Desktop dev fallback', async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), 'codeagora-cli-cwd-'));
+    const canonicalRoot = await realpath(repoRoot);
+    const returned = applyCwdOverride(repoRoot);
+
+    expect(returned).toBe(canonicalRoot);
+    expect(process.cwd()).toBe(canonicalRoot);
+  });
+
+  it('does nothing when no override is provided', () => {
+    expect(applyCwdOverride(undefined)).toBeUndefined();
+    expect(process.cwd()).toBe(originalCwd);
   });
 });

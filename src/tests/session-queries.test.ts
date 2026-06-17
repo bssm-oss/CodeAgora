@@ -20,13 +20,17 @@ async function createSession(
   date: string,
   sessionId: string,
   metadata: Record<string, unknown>,
-  verdict?: Record<string, unknown>
+  verdict?: Record<string, unknown>,
+  result?: Record<string, unknown>,
 ): Promise<void> {
   const sessionDir = path.join(TEST_BASE, '.ca', 'sessions', date, sessionId);
   await fs.mkdir(sessionDir, { recursive: true });
   await fs.writeFile(path.join(sessionDir, 'metadata.json'), JSON.stringify(metadata), 'utf-8');
   if (verdict) {
     await fs.writeFile(path.join(sessionDir, 'head-verdict.json'), JSON.stringify(verdict), 'utf-8');
+  }
+  if (result) {
+    await fs.writeFile(path.join(sessionDir, 'result.json'), JSON.stringify(result), 'utf-8');
   }
 }
 
@@ -144,6 +148,26 @@ describe('listSessions', () => {
     expect(detail.metadata?.['artifactContract']).toBe('legacy/best-effort');
   });
 
+  it('prefers result.json over legacy head-verdict.json in session details', async () => {
+    await createSession(
+      '2026-01-22',
+      '001',
+      { status: 'completed' },
+      { decision: 'ACCEPT', issues: [] },
+      {
+        decision: 'REJECT',
+        decisionBrief: { decision: 'REJECT' },
+        issues: [{ title: 'Promoted blocker', severity: 'CRITICAL' }],
+      },
+    );
+
+    const detail = await showSession(TEST_BASE, '2026-01-22/001');
+
+    expect(detail.verdict?.['decision']).toBe('REJECT');
+    expect(detail.verdict?.['decisionBrief']).toEqual({ decision: 'REJECT' });
+    expect(detail.verdict?.['issues']).toEqual([{ title: 'Promoted blocker', severity: 'CRITICAL' }]);
+  });
+
   it('sorts by status when sort=status', async () => {
     await createSession('2026-01-10', '001', { status: 'failed' });
     await createSession('2026-01-11', '001', { status: 'completed' });
@@ -153,6 +177,99 @@ describe('listSessions', () => {
     expect(result[0].status).toBe('completed');
     expect(result[1].status).toBe('failed');
     expect(result[2].status).toBe('failed');
+  });
+
+  it('uses result.json for issue sorting and keyword search', async () => {
+    await createSession('2026-01-23', '001', { status: 'completed' }, { issues: [] }, {
+      issues: [{ title: 'Result-only blocker', severity: 'CRITICAL' }],
+    });
+    await createSession('2026-01-24', '001', { status: 'completed' }, { issues: [] });
+
+    const byIssues = await listSessions(TEST_BASE, { sort: 'issues', limit: 10 });
+    const searched = await listSessions(TEST_BASE, { keyword: 'result-only blocker', limit: 10 });
+
+    expect(byIssues[0].id).toBe('2026-01-23/001');
+    expect(searched.map((entry) => entry.id)).toEqual(['2026-01-23/001']);
+  });
+
+  it('extracts issue data from pipeline result artifacts', async () => {
+    await createSession('2026-01-23', '001', { status: 'completed' }, { issues: [] }, {
+      summary: {
+        decision: 'NEEDS_HUMAN',
+        topIssues: [
+          { title: 'Summary-only warning', severity: 'WARNING' },
+        ],
+      },
+    });
+    await createSession('2026-01-24', '001', { status: 'completed' }, { issues: [] }, {
+      summary: {
+        decision: 'REJECT',
+        topIssues: [
+          { title: 'Lower priority summary issue', severity: 'SUGGESTION' },
+        ],
+      },
+      evidenceDocs: [
+        { issueTitle: 'Pipeline evidence blocker', severity: 'CRITICAL' },
+        { issueTitle: 'Pipeline evidence warning', severity: 'WARNING' },
+      ],
+    });
+
+    const byIssues = await listSessions(TEST_BASE, { sort: 'issues', limit: 10 });
+    const searched = await listSessions(TEST_BASE, { keyword: 'pipeline evidence blocker', limit: 10 });
+    const stats = await getSessionStats(TEST_BASE);
+
+    expect(byIssues[0].id).toBe('2026-01-24/001');
+    expect(searched.map((entry) => entry.id)).toEqual(['2026-01-24/001']);
+    expect(stats.severityDistribution['CRITICAL']).toBe(1);
+    expect(stats.severityDistribution['WARNING']).toBe(2);
+    expect(stats.severityDistribution['SUGGESTION']).toBeUndefined();
+  });
+
+  it('falls back to complete legacy issue arrays when pipeline evidence docs are empty', async () => {
+    await createSession('2026-01-25', '001', { status: 'completed' }, { issues: [] }, {
+      summary: {
+        decision: 'REJECT',
+        topIssues: [
+          { title: 'Summary issue is only a fallback', severity: 'SUGGESTION' },
+        ],
+      },
+      evidenceDocs: [],
+      issues: [
+        { title: 'Legacy blocker survives empty evidence docs', severity: 'CRITICAL' },
+        { title: 'Legacy warning survives empty evidence docs', severity: 'WARNING' },
+      ],
+    });
+
+    const searched = await listSessions(TEST_BASE, { keyword: 'legacy blocker survives', limit: 10 });
+    const stats = await getSessionStats(TEST_BASE);
+
+    expect(searched.map((entry) => entry.id)).toEqual(['2026-01-25/001']);
+    expect(stats.severityDistribution['CRITICAL']).toBe(1);
+    expect(stats.severityDistribution['WARNING']).toBe(1);
+    expect(stats.severityDistribution['SUGGESTION']).toBeUndefined();
+  });
+
+  it('falls back to head verdict when result.json is a terminal error artifact', async () => {
+    await createSession('2026-01-26', '001', { status: 'failed' }, {
+      decision: 'ACCEPT',
+      issues: [
+        { title: 'Preserved head verdict issue', severity: 'WARNING' },
+      ],
+    }, {
+      status: 'error',
+      sessionId: '001',
+      date: '2026-01-26',
+      error: 'Post-verdict telemetry failed',
+    });
+
+    const detail = await showSession(TEST_BASE, '2026-01-26/001');
+    const searched = await listSessions(TEST_BASE, { keyword: 'preserved head verdict', limit: 10 });
+    const stats = await getSessionStats(TEST_BASE);
+
+    expect(detail.verdict?.['decision']).toBe('ACCEPT');
+    expect(detail.verdict?.['status']).toBeUndefined();
+    expect(searched.map((entry) => entry.id)).toEqual(['2026-01-26/001']);
+    expect(stats.severityDistribution['WARNING']).toBe(1);
   });
 });
 

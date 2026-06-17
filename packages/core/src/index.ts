@@ -8,4 +8,13 @@ export * from './l0/index.js';
 export * from './plugins/index.js';
 export * from './session/manager.js';
 export * from './session/queries.js';
-export * from './session/contracts.js';
+export type {
+  SessionReviewDecision,
+  SessionReviewDecisionEvidenceCard,
+  ReviewDecisionBrief,
+  SessionSeverityCounts,
+  SessionTopIssue,
+  SessionSummary,
+  SessionCostSummary,
+  SessionDetailView,
+} from './session/contracts.js';

@@ -715,6 +715,37 @@ h3 {
   gap: var(--space-2);
 }
 
+.ca-decision-brief,
+.ca-run-blocked-gate {
+  display: grid;
+  gap: var(--space-4);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-soft);
+}
+
+.ca-run-blocked-gate.ca-warn {
+  border-color: color-mix(in srgb, var(--warn) 44%, var(--border));
+  background: var(--warn-soft);
+}
+
+.ca-brief-section {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ca-promoted-card-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ca-brief-appendix {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .ca-review-flow {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1933,13 +1964,12 @@ summary {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  left: 24px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  max-width: min(360px, calc(100vw - 48px));
+  width: min(360px, calc(100vw - 48px));
   pointer-events: none;
 }
 
@@ -1961,6 +1991,16 @@ summary {
   line-height: 1.4;
   box-shadow: var(--shadow-soft);
   animation: toast-in 0.28s ease-out;
+}
+
+.ca-toast-dismiss {
+  flex: 0 0 auto;
+}
+
+.ca-toast-dismiss:hover,
+.ca-toast-dismiss:focus-visible {
+  background: var(--surface);
+  outline: 1px solid var(--border-strong);
 }
 
 .ca-toast--info    { border-color: color-mix(in srgb, var(--info) 40%, var(--border)); background: var(--info-soft); }
