@@ -2,55 +2,104 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const siteRoot = resolve(process.cwd(), "packages/site");
-const html = readFileSync(resolve(siteRoot, "index.html"), "utf8");
-const css = readFileSync(resolve(siteRoot, "src/styles.css"), "utf8");
-const js = readFileSync(resolve(siteRoot, "src/main.js"), "utf8");
-const robots = readFileSync(resolve(siteRoot, "robots.txt"), "utf8");
-const sitemap = readFileSync(resolve(siteRoot, "sitemap.xml"), "utf8");
+const repoRoot = process.cwd();
+const siteRoot = resolve(repoRoot, "packages/site");
+const html = readFileSync(resolve(siteRoot, "dist/index.html"), "utf8");
+const css = readFileSync(resolve(siteRoot, "src/styles/site.css"), "utf8");
+const js = readFileSync(resolve(siteRoot, "src/scripts/site.js"), "utf8");
+const robots = readFileSync(resolve(siteRoot, "dist/robots.txt"), "utf8");
+const sitemap = readFileSync(resolve(siteRoot, "dist/sitemap.xml"), "utf8");
 const socialCard = readFileSync(resolve(siteRoot, "assets/social-card.svg"), "utf8");
 const wordmark = readFileSync(resolve(siteRoot, "assets/codeagora-wordmark.png"));
-const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), "vercel.json"), "utf8")) as {
+const icon = readFileSync(resolve(siteRoot, "assets/codeagora-icon.png"));
+const rootPackage = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8")) as {
+  devDependencies?: Record<string, string>;
+  engines?: Record<string, string>;
+};
+const vercelConfig = JSON.parse(readFileSync(resolve(repoRoot, "vercel.json"), "utf8")) as {
   framework?: string | null;
   installCommand?: string;
   buildCommand?: string;
   outputDirectory?: string;
   cleanUrls?: boolean;
 };
-const vercelIgnore = readFileSync(resolve(process.cwd(), ".vercelignore"), "utf8");
+const vercelIgnore = readFileSync(resolve(repoRoot, ".vercelignore"), "utf8");
 const siteUrl = "https://codeagora.vercel.app/";
+
+const structuredData = (() => {
+  const match = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  expect(match?.[1]).toBeTruthy();
+  return JSON.parse(match?.[1] ?? "{}") as {
+    "@context"?: string;
+    "@graph"?: Array<Record<string, unknown>>;
+  };
+})();
 
 describe("CodeAgora landing page", () => {
   it("keeps public claims aligned with supported product surfaces", () => {
-    expect(html).toContain("CLI");
-    expect(html).toContain("GitHub Action");
-    expect(html).toContain("MCP");
-    expect(html).toContain("Desktop");
-    expect(html).toContain("공식 지원 환경");
-    expect(html).toContain("중개 서버 없이");
-    expect(html).toContain("검증 가능한 품질");
-    expect(html).toContain("어디서 실행해도 같은 기준");
-    expect(html).toContain("AI 코드 리뷰 도구");
-    expect(html).toContain("GitHub Action 코드 리뷰 자동화");
-    expect(html).toContain("MCP 코드 리뷰");
-    expect(html).toContain("Desktop RC");
-    expect(html).toContain("자주 묻는 질문");
-    expect(html).toContain("AI가 코드를 쏟아낼수록,");
-    expect(html).toContain("검증은 더 치밀해져야 합니다.");
+    for (const copy of [
+      "CLI",
+      "GitHub Action",
+      "MCP",
+      "Desktop RC",
+      "공식 지원 환경",
+      "AI 코드 리뷰 도구",
+      "여러 AI가 검토하고",
+      "근거로 판단합니다.",
+      "한 명의 AI에게 맡기는",
+      "리뷰가 아닙니다.",
+      "결과는 읽는 글이 아니라,",
+      "판단 가능한 자료입니다.",
+      "코드는 직접 보내고,",
+      "비용은 그대로 보입니다.",
+      "자주 묻는 질문"
+    ]) {
+      expect(html).toContain(copy);
+    }
+
     expect(html).not.toContain("3114 황준혁 | Justn");
-    expect(html).not.toContain("qr-grid");
-    expect(html).toContain("현재 RC 채널입니다.");
-    expect(html).toContain("data-command-status");
     expect(html).not.toMatch(/web dashboard/i);
     expect(html).not.toMatch(/stable desktop/i);
     expect(html).not.toMatch(/90%|85%/);
     expect(html).not.toContain("코드가 기기를 떠나지");
   });
 
+  it("renders the current branded shell and desktop-like review preview", () => {
+    expect(html).toContain('class="brand-icon" src="/assets/codeagora-icon.png"');
+    expect(html).toContain('class="brand-wordmark" src="/assets/codeagora-wordmark.png"');
+    expect(html).toContain('href="/assets/codeagora-icon.png" type="image/png"');
+    expect(html).toContain("CodeAgora Desktop");
+    expect(html).toContain("NEEDS_HUMAN");
+    expect(html).toContain("head-verdict.json");
+    expect(html).toContain("reviews/security.md");
+    expect(css).toContain(".app-preview");
+    expect(css).toContain(".brand .brand-icon");
+    expect(css).toContain("transform: translateY(2px)");
+  });
+
+  it("keeps the interactive pipeline grouped as a central workbench", () => {
+    expect(html).toContain('class="pipeline-rail"');
+    expect(html).toContain('data-pipeline-demo');
+    expect(html).toContain('data-pipeline-step="diff"');
+    expect(html).toContain('data-pipeline-step="reviewers"');
+    expect(html).toContain('data-pipeline-step="evidence"');
+    expect(html).toContain('data-pipeline-step="verdict"');
+    expect(html).toContain("스크롤하면 리뷰가");
+    expect(html).toContain("판정으로 좁혀집니다.");
+    expect(css).toContain(".pipeline-demo");
+    expect(css).toContain("width: min(100%, 1180px)");
+    expect(css).toContain(".pipeline-rail");
+    expect(css).toContain("position: sticky");
+    expect(js).toContain("syncPipelineFromScroll");
+    expect(js).toContain("[data-pipeline-step]");
+  });
+
   it("provides rc-friendly install and action snippets", () => {
     expect(html).toContain("npm i -g @codeagora/review@rc");
     expect(html).toContain("bssm-oss/CodeAgora@v0.1.0-rc.6");
     expect(html).toContain("@codeagora/mcp@rc");
+    expect(html).toContain("Desktop RC");
+    expect(html).toContain("Desktop 정식 배포는 준비 중");
   });
 
   it("publishes canonical SEO and social preview metadata", () => {
@@ -65,17 +114,12 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain('<meta property="og:image:height" content="630">');
     expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain('<meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정">');
-    expect(html).toContain('<meta name="theme-color" content="#111318">');
+    expect(html).toContain('<meta name="theme-color" content="#080d18">');
     expect(html).toContain('<meta name="application-name" content="CodeAgora">');
-    expect(html).toContain('<meta name="format-detection" content="telephone=no">');
     expect(html).not.toContain("90%");
   });
 
   it("keeps structured data valid and aligned with supported surfaces", () => {
-    const match = html.match(/<script type="application\/ld\+json">\s*([\s\S]*?)\s*<\/script>/);
-    expect(match?.[1]).toBeTruthy();
-    const structuredData = JSON.parse(match?.[1] ?? "{}");
-
     expect(structuredData["@context"]).toBe("https://schema.org");
     expect(structuredData["@graph"]).toEqual(
       expect.arrayContaining([
@@ -83,13 +127,6 @@ describe("CodeAgora landing page", () => {
           "@type": "WebSite",
           url: siteUrl,
           inLanguage: "ko-KR"
-        }),
-        expect.objectContaining({
-          "@type": "WebPage",
-          "@id": `${siteUrl}#webpage`,
-          about: {
-            "@id": `${siteUrl}#software`
-          }
         }),
         expect.objectContaining({
           "@type": "SoftwareApplication",
@@ -115,7 +152,7 @@ describe("CodeAgora landing page", () => {
             }),
             expect.objectContaining({
               "@type": "Question",
-              name: "GitHub Action 코드 리뷰 자동화에 쓸 수 있나요?"
+              name: "비개발자도 이해할 수 있나요?"
             }),
             expect.objectContaining({
               "@type": "Question",
@@ -133,7 +170,7 @@ describe("CodeAgora landing page", () => {
     expect(JSON.stringify(structuredData)).not.toMatch(/stable Desktop|web dashboard/i);
   });
 
-  it("ships crawler files and social card assets", () => {
+  it("ships crawler files and social/brand assets", () => {
     expect(robots).toContain("User-agent: *");
     expect(robots).toContain("Allow: /");
     expect(robots).toContain("Sitemap: https://codeagora.vercel.app/sitemap.xml");
@@ -143,6 +180,7 @@ describe("CodeAgora landing page", () => {
     expect(socialCard).toContain("CodeAgora");
     expect(socialCard).toContain("토론하는 리뷰");
     expect(wordmark.byteLength).toBeGreaterThan(1000);
+    expect(icon.byteLength).toBeGreaterThan(1000);
   });
 
   it("configures Vercel to deploy only the static site package", () => {
@@ -160,121 +198,35 @@ describe("CodeAgora landing page", () => {
     expect(vercelIgnore).toContain("!assets/logo.svg");
   });
 
-  it("keeps static asset paths portable for subpath hosting", () => {
-    expect(html).toContain('href="./assets/logo.svg"');
-    expect(html).toContain('src="./assets/logo.svg"');
-    expect(html).toContain('src="./assets/codeagora-wordmark.png"');
-    expect(html).not.toContain('href="/assets/logo.svg"');
-    expect(html).not.toContain('src="/assets/logo.svg"');
-  });
-
-  it("wires install tabs with accessible tabpanel semantics and keyboard support", () => {
+  it("wires accessible tabs, motion controls, search, and copy helpers", () => {
     for (const tab of ["cli", "action", "mcp", "desktop"]) {
-      expect(html).toContain(`id="command-tab-${tab}"`);
-      expect(html).toContain(`aria-controls="command-panel-${tab}"`);
-      expect(html).toContain(`id="command-panel-${tab}"`);
+      expect(html).toContain(`id="tab-${tab}"`);
+      expect(html).toContain(`aria-controls="panel-${tab}"`);
+      expect(html).toContain(`id="panel-${tab}"`);
       expect(html).toContain('role="tabpanel"');
-      expect(html).toContain(`aria-labelledby="command-tab-${tab}"`);
+      expect(html).toContain(`data-command-panel="${tab}"`);
     }
 
-    expect(js).toContain("activateCommandTab");
+    expect(html).toContain("data-motion-toggle");
+    expect(html).toContain("data-faq-search");
+    expect(html).toContain("data-copy-target");
+    expect(js).toContain("activateCommand");
     expect(js).toContain('event.key === "ArrowRight"');
     expect(js).toContain('event.key === "ArrowLeft"');
-    expect(js).toContain('event.key === "Home"');
-    expect(js).toContain('event.key === "End"');
+    expect(js).toContain("IntersectionObserver");
+    expect(js).toContain("navigator.clipboard.writeText");
+    expect(js).toContain("window.localStorage");
+    expect(js).toContain("[data-live-agent]");
   });
 
-  it("copies runnable snippets instead of terminal prompts or output", () => {
-    expect(js).toContain("commandTextFromCode");
-    expect(js).toContain('clone.querySelectorAll(".result").forEach((node) => node.remove())');
-    expect(js).toContain('replace(/^\\s*\\$\\s?/u, "")');
-    expect(js).toContain("복사 실패");
-    expect(js).toContain("await navigator.clipboard.writeText(text)");
-  });
-
-  it("keeps theme storage optional so page interactions survive restricted browsers", () => {
-    expect(js).toContain("function readLocalTheme");
-    expect(js).toContain("function writeLocalTheme");
-    expect(js).toContain("try");
-    expect(js).toContain("catch {");
-    expect(html).toContain("savedTheme = null");
-    expect(html).toContain("try {");
-  });
-
-  it("uses Korean app-console copy with responsive progressive motion", () => {
-    expect(html).toContain('lang="ko"');
-    expect(html).toContain("토론하는 리뷰");
-    expect(html).toContain("여러 AI가 토론하고 사람이 결정하는 코드 리뷰");
-    expect(html).toContain("그럴듯한 오답");
-    expect(html).toContain("무엇을 해야 하는지");
-    expect(html).toContain("결정 자료");
-    expect(html).toContain("긴 코멘트보다 결정이 먼저입니다.");
-    expect(html).toContain("ACCEPT");
-    expect(html).toContain("REJECT");
-    expect(html).toContain("NEEDS_HUMAN");
-    expect(html).toContain("scroll-progress");
-    expect(html).toContain("CodeAgora 리뷰 아레나 데모");
-    expect(html).toContain("poster-wordmark");
-    expect(html).toContain('data-arena-file="init"');
-    expect(html).toContain('data-arena-file="orchestrator"');
-    expect(html).toContain('data-filter-step="quote"');
-    expect(html).toContain("packages/cli/src/commands/init.ts");
-    expect(html).toContain("CLI_PRESET_EXCLUDED_BACKENDS");
-    expect(html).toContain("검토 범위");
-    expect(html).toContain("근거 대조");
-    expect(html).toContain("파일 확인");
-    expect(html).toContain("인용 검증");
-    expect(html).toContain("Head Verdict");
-    expect(html).toContain("로컬 diff를 바로 리뷰합니다");
-    expect(html).toContain("→ ACCEPT / REJECT / NEEDS_HUMAN verdict with evidence");
-    expect(html).toContain("AI IDE와 코딩 에이전트");
-    expect(html).toContain("<details open>");
-    expect(html).toContain("API 키와 코드는 어디에 저장되나요?");
+  it("keeps the site static, responsive, and Node 20-compatible", () => {
+    expect(rootPackage.engines?.node).toBe(">=20");
+    expect(rootPackage.devDependencies?.astro).toMatch(/^\^?5\./);
     expect(css).toContain("@media");
     expect(css).toContain("prefers-reduced-motion");
-    expect(css).toContain("--brand: #05a6b9");
-    expect(css).toContain("--brand-strong: #191a51");
-    expect(css).toContain(".review-arena");
-    expect(css).toContain(".poster-logo-type");
-    expect(css).toContain(".brand-wordmark");
+    expect(css).toContain("overflow: auto");
+    expect(css).not.toContain("word-break: break-all");
     expect(css).not.toContain(".poster-qr");
     expect(css).not.toContain(".poster-metrics");
-    expect(css).toContain(".arena-files");
-    expect(css).toContain(".plain-summary");
-    expect(css).toContain(".explain-grid");
-    expect(css).toContain(".decision-grid");
-    expect(css).toContain(".verdict-guide");
-    expect(css).toContain(".diff-insight-row");
-    expect(css).toContain(".faq-list");
-    expect(css).toContain(".scroll-progress");
-    expect(css).toContain(".reveal-on-scroll");
-    expect(css).toContain(".is-tilting");
-    expect(css).toContain("copy-pulse");
-    expect(css).toContain("--cursor-x");
-    expect(js).toContain("updateScrollProgress");
-    expect(js).toContain("updatePointerGlow");
-    expect(js).toContain("supportsFinePointer");
-    expect(js).toContain("syncRevealTargets");
-    expect(js).toContain("syncActiveSectionLink");
-    expect(js).toContain("IntersectionObserver");
-    expect(js).toContain("attachTiltEffect");
-    expect(js).toContain("prefersReducedMotion");
-    expect(js).toContain("data-command-tab");
-    expect(js).toContain("commandStatusLabels");
-    expect(js).toContain("arenaScenarios");
-    expect(js).toContain("renderArena");
-    expect(js).toContain("data-arena-file");
-    expect(js).toContain("data-filter-step");
-    expect(js).toContain("판정 정리");
-    expect(js).toContain("navigator.clipboard");
-    expect(js).toContain("reviewSteps");
-  });
-
-  it("keeps mobile code snippets readable instead of clipped", () => {
-    expect(css).not.toContain("max-height: 78px");
-    expect(css).not.toContain("word-break: break-all");
-    expect(css).toContain("word-break: normal");
-    expect(css).toContain("overflow: auto");
-    expect(css).toContain("scrollbar-width: thin");
   });
 });

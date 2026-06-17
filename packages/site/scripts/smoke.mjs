@@ -8,6 +8,7 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const requiredFiles = [
   "dist/index.html",
   "dist/assets/logo.svg",
+  "dist/assets/codeagora-icon.png",
   "dist/assets/codeagora-wordmark.png",
   "dist/assets/social-card.svg",
   "dist/robots.txt",
