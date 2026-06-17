@@ -56,7 +56,7 @@
     "desktop:visual-qa": "pnpm --filter @codeagora/desktop visual:qa",
     "rc:desktop-gate": "node scripts/desktop-release-gate-runner.mjs",
     "rc:desktop-distribution-gate": "node scripts/desktop-rc-distribution-gate.mjs",
-    "stable:desktop-distribution-gate": "node scripts/desktop-stable-distribution-gate.mjs",
+    "desktop:unsigned-dmg-gate": "node scripts/desktop-unsigned-dmg-gate.mjs",
     "evidence:manifest": "node scripts/evidence-manifest.mjs",
     "evidence:gate-status": "node scripts/release-gate-evaluator.mjs",
     "evidence:security-smoke": "node scripts/security-evidence-smoke.mjs",

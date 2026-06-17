@@ -4,12 +4,12 @@ import path from 'path';
 import { execFileSync, spawnSync } from 'child_process';
 import { describe, expect, it } from 'vitest';
 import {
-  RELEASE_TIERS,
   RELEASE_GATE_EXECUTIONS,
   deterministicLocalReleaseGates,
 } from '../../scripts/release-gates.mjs';
 import {
   artifactEvidenceMode,
+  evidenceEntryIncludedForRequiredTier,
   resolveEvidenceArtifactPath,
 } from '../../scripts/evidence-manifest.mjs';
 
@@ -20,13 +20,9 @@ function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-evidence-'));
 }
 
-function tierIncluded(entryTier: string, requiredTier: string): boolean {
-  return RELEASE_TIERS.indexOf(entryTier) <= RELEASE_TIERS.indexOf(requiredTier);
-}
-
 function writeGateLedger(dir: string, requiredTier: string, overrides: Record<string, number> = {}): void {
   const entries = deterministicLocalReleaseGates()
-    .filter((gate) => tierIncluded(gate.tier, requiredTier))
+    .filter((gate) => evidenceEntryIncludedForRequiredTier(gate, requiredTier))
     .map((gate) => ({
       schemaVersion: 'codeagora.release-gate-command-evidence.v1',
       name: gate.name,
@@ -517,7 +513,7 @@ describe('release evidence manifest', () => {
     }
   });
 
-  it('requires stable live, Desktop distribution, GitHub failure-path, MCP, and Vercel evidence', () => {
+  it('requires stable live, unsigned Desktop DMG, GitHub failure-path, MCP, and Vercel evidence', () => {
     const dir = makeTmpDir();
     try {
       const result = spawnSync(process.execPath, [scriptPath, '--evidence-dir', dir, '--require=stable'], {
@@ -537,14 +533,14 @@ describe('release evidence manifest', () => {
         'github-action-oversized-diff-degraded.json',
         'github-action-provider-failure-degraded.json',
         'github-action-posting-failure-degraded.json',
-        'desktop-stable-distribution-evidence.json',
-        'desktop-stable-packaged-app-launch-smoke.json',
-        'desktop-stable-review-flow-smoke.json',
-        'desktop-stable-visual-qa.json',
+        'desktop-unsigned-dmg-evidence.json',
+        'desktop-unsigned-dmg-gate.log',
         'vercel-production-evidence.json',
       ]) {
         expect(result.stderr).toContain(requiredFile);
       }
+      expect(result.stderr).not.toContain('desktop-rc-distribution-evidence.json');
+      expect(result.stderr).not.toContain('desktop-stable-distribution-evidence.json');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

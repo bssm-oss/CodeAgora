@@ -8,6 +8,8 @@ import {
   DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME,
   DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION,
   DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_FILENAME,
+  DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION,
+  DESKTOP_UNSIGNED_DMG_EVIDENCE_FILENAME,
   DESKTOP_RC_UPDATER_PLATFORM,
   DESKTOP_STABLE_UPDATER_PLATFORM,
   assertMacosArm64NotarizationEvidence,
@@ -27,6 +29,7 @@ import {
   validateDesktopRcUpdaterManifest,
   validateDesktopStableDistributionEvidence,
   validateDesktopStableUpdaterManifest,
+  validateDesktopUnsignedDmgEvidence,
   validateMacosArm64NotarizationEvidence,
   validateMacosArm64SigningEvidence,
   validateMacosArm64ArtifactMetadata,
@@ -563,6 +566,77 @@ describe('macOS desktop artifact locator', () => {
       updaterManifestFilename: 'latest-0.1.json',
       errors: [],
     });
+  });
+
+  it('validates v0.1.0 Desktop unsigned preview DMG evidence without signing or updater claims', () => {
+    const evidence = {
+      schemaVersion: DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION,
+      evidenceMode: 'real',
+      version: '0.1.0',
+      gitTag: 'v0.1.0',
+      npmDistTag: 'latest',
+      target: {
+        platform: 'macos',
+        arch: 'arm64',
+      },
+      app: {
+        path: 'packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/CodeAgora.app',
+        sha256: 'a'.repeat(64),
+        bundleIdentifier: 'dev.codeagora.desktop',
+        infoPlist: {
+          CFBundleShortVersionString: '0.1.0',
+          CFBundleVersion: '0.1.0',
+        },
+      },
+      dmg: {
+        path: 'packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/CodeAgora_0.1.0_aarch64.dmg',
+        sha256: 'b'.repeat(64),
+      },
+      distributionPolicy: {
+        signed: false,
+        notarized: false,
+        updaterEnabled: false,
+        gatekeeperWarning: true,
+        supportTier: 'preview',
+      },
+      githubRelease: {
+        tag: 'v0.1.0',
+        prerelease: false,
+        assets: [
+          'CodeAgora_0.1.0_aarch64.dmg',
+          DESKTOP_UNSIGNED_DMG_EVIDENCE_FILENAME,
+        ],
+      },
+    };
+
+    expect(validateDesktopUnsignedDmgEvidence(evidence)).toMatchObject({
+      valid: true,
+      version: '0.1.0',
+      releaseLine: '0.1',
+      errors: [],
+    });
+
+    const invalid = validateDesktopUnsignedDmgEvidence({
+      ...evidence,
+      distributionPolicy: {
+        signed: true,
+        notarized: true,
+        updaterEnabled: true,
+        gatekeeperWarning: false,
+        supportTier: 'stable',
+      },
+      codesign: { status: 'accepted' },
+      updater: { publicKey: 'unexpected' },
+    });
+    expect(invalid.valid).toBe(false);
+    expect(invalid.errors).toEqual(expect.arrayContaining([
+      'distributionPolicy.signed must be false for the v0.1.0 unsigned DMG path',
+      'distributionPolicy.notarized must be false for the v0.1.0 unsigned DMG path',
+      'distributionPolicy.updaterEnabled must be false for the v0.1.0 unsigned DMG path',
+      'distributionPolicy.gatekeeperWarning must be true for unsigned macOS DMGs',
+      'distributionPolicy.supportTier must be preview',
+      'unsigned DMG evidence must not include codesign, notarization, or updater claims',
+    ]));
   });
 
   it('rejects unsafe Desktop RC distribution evidence failure modes', () => {

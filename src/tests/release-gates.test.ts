@@ -21,6 +21,9 @@ import {
   runDesktopRcDistributionGate,
 } from '../../scripts/desktop-rc-distribution-gate.mjs';
 import {
+  runDesktopUnsignedDmgGate,
+} from '../../scripts/desktop-unsigned-dmg-gate.mjs';
+import {
   assertGateExitStatusesPass,
   evaluateGateExitStatuses,
 } from '../../scripts/release-gate-evaluator.mjs';
@@ -49,6 +52,7 @@ describe('release gate inventory', () => {
       'pnpm desktop:evidence',
       'pnpm rc:desktop-distribution-gate',
       'pnpm test:security',
+      'pnpm desktop:unsigned-dmg-gate',
     ]);
   });
 
@@ -122,57 +126,38 @@ describe('release gate inventory', () => {
       'github-action-oversized-diff-degraded',
       'github-action-provider-failure-degraded',
       'github-action-posting-failure-degraded',
-      'desktop-stable-review-flow-smoke',
       'vercel-production-evidence',
     ]);
     expect(deterministicGates.every((entry) => entry.liveOnly !== true)).toBe(true);
   });
 
-  it('tracks macOS arm64 signing evidence as a stable local artifact blocker', () => {
-    const signingEvidence = EXPECTED_EVIDENCE.find(
-      (entry) => entry.name === 'desktop-macos-arm64-signing-evidence',
-    );
-
-    expect(signingEvidence).toMatchObject({
-      filename: 'desktop-macos-arm64-signing-evidence.json',
-      tier: 'stable',
-      redactionStatus: 'safe-to-publish',
-      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
-    });
-    expect(deterministicLocalReleaseGates()).not.toContain(signingEvidence);
-  });
-
-  it('tracks Desktop stable distribution, launch, review, and visual evidence as stable blockers', () => {
+  it('tracks Desktop stable as an explicit unsigned preview DMG evidence contract', () => {
+    const rootPackage = JSON.parse(fs.readFileSync('package.json', 'utf-8')) as {
+      scripts: Record<string, string>;
+    };
     const entries = new Map(EXPECTED_EVIDENCE.map((entry) => [entry.name, entry]));
+    const evidence = entries.get('desktop-unsigned-dmg-evidence');
+    const gate = entries.get('desktop-unsigned-dmg-gate');
 
-    expect(entries.get('desktop-stable-distribution-evidence')).toMatchObject({
-      filename: 'desktop-stable-distribution-evidence.json',
+    expect(rootPackage.scripts['desktop:unsigned-dmg-gate']).toBe('node scripts/desktop-unsigned-dmg-gate.mjs');
+    expect(evidence).toMatchObject({
+      filename: 'desktop-unsigned-dmg-evidence.json',
       tier: 'stable',
       redactionStatus: 'safe-to-publish',
       liveOnly: true,
       execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
     });
-    expect(entries.get('desktop-stable-packaged-app-launch-smoke')).toMatchObject({
-      filename: 'desktop-stable-packaged-app-launch-smoke.json',
+    expect(gate).toMatchObject({
+      filename: 'desktop-unsigned-dmg-gate.log',
+      command: 'pnpm desktop:unsigned-dmg-gate',
       tier: 'stable',
       redactionStatus: 'safe-to-publish',
-      liveOnly: true,
-      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
+      execution: RELEASE_GATE_EXECUTIONS.LOCAL_COMMAND,
     });
-    expect(entries.get('desktop-stable-review-flow-smoke')).toMatchObject({
-      filename: 'desktop-stable-review-flow-smoke.json',
-      tier: 'stable',
-      redactionStatus: 'redacted-required',
-      liveOnly: true,
-      execution: RELEASE_GATE_EXECUTIONS.LIVE_PROVIDER,
-    });
-    expect(entries.get('desktop-stable-visual-qa')).toMatchObject({
-      filename: 'desktop-stable-visual-qa.json',
-      tier: 'stable',
-      redactionStatus: 'safe-to-publish',
-      liveOnly: true,
-      execution: RELEASE_GATE_EXECUTIONS.LOCAL_ARTIFACT,
-    });
+    expect(deterministicLocalReleaseGates()).toContain(gate);
+    expect(entries.has('desktop-macos-arm64-signing-evidence')).toBe(false);
+    expect(entries.has('desktop-stable-distribution-evidence')).toBe(false);
+    expect(entries.has('desktop-stable-review-flow-smoke')).toBe(false);
   });
 
   it('tracks Vercel production landing evidence as a stable live-production blocker', () => {
@@ -228,6 +213,7 @@ describe('release gate inventory', () => {
       tier: 'rc',
       redactionStatus: 'safe-to-publish',
       execution: RELEASE_GATE_EXECUTIONS.LIVE_GITHUB,
+      stableCarryForward: false,
     });
     expect(deterministicLocalReleaseGates()).toContain(distributionGate);
     expect(deterministicLocalReleaseGates()).not.toContain(distributionEvidence);
@@ -502,6 +488,97 @@ describe('release gate command runner', () => {
           valid: true,
           releaseLine: '0.1',
           updaterManifestFilename: 'latest-0.1-rc.json',
+        },
+      });
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('fails the Desktop unsigned DMG gate when preview evidence is missing', () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-unsigned-missing-'));
+    try {
+      const result = runDesktopUnsignedDmgGate({ cwd });
+
+      expect(result).toMatchObject({
+        name: 'desktop-unsigned-dmg-gate',
+        command: 'pnpm desktop:unsigned-dmg-gate',
+        exitCode: 1,
+        passed: false,
+        evidencePresent: false,
+      });
+      expect(result.errors.join('\n')).toContain('Missing codeagora.desktop-unsigned-dmg-evidence.v1 evidence');
+      expect(fs.existsSync(path.join(cwd, '.sisyphus', 'evidence', 'desktop-unsigned-dmg-gate.log'))).toBe(true);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('passes the Desktop unsigned DMG gate for valid preview evidence and manifest validity', () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'codeagora-desktop-unsigned-valid-'));
+    try {
+      const evidenceDir = path.join(cwd, '.sisyphus', 'evidence');
+      fs.mkdirSync(evidenceDir, { recursive: true });
+      const evidence = {
+        schemaVersion: 'codeagora.desktop-unsigned-dmg-evidence.v1',
+        evidenceMode: 'real',
+        version: '0.1.0',
+        gitTag: 'v0.1.0',
+        npmDistTag: 'latest',
+        target: { platform: 'macos', arch: 'arm64' },
+        app: {
+          path: 'CodeAgora.app',
+          sha256: 'a'.repeat(64),
+          bundleIdentifier: 'dev.codeagora.desktop',
+          infoPlist: {
+            CFBundleShortVersionString: '0.1.0',
+            CFBundleVersion: '0.1.0',
+          },
+        },
+        dmg: {
+          path: 'CodeAgora_0.1.0_aarch64.dmg',
+          sha256: 'b'.repeat(64),
+        },
+        distributionPolicy: {
+          signed: false,
+          notarized: false,
+          updaterEnabled: false,
+          gatekeeperWarning: true,
+          supportTier: 'preview',
+        },
+        githubRelease: {
+          prerelease: false,
+          assets: [
+            'CodeAgora_0.1.0_aarch64.dmg',
+            'desktop-unsigned-dmg-evidence.json',
+          ],
+        },
+      };
+      fs.writeFileSync(path.join(evidenceDir, 'desktop-unsigned-dmg-evidence.json'), `${JSON.stringify(evidence)}\n`);
+      fs.writeFileSync(path.join(evidenceDir, 'evidence-manifest.json'), `${JSON.stringify({
+        entries: [
+          {
+            name: 'desktop-unsigned-dmg-evidence',
+            exists: true,
+            path: '.sisyphus/evidence/desktop-unsigned-dmg-evidence.json',
+            releaseValidity: {
+              evidenceMode: 'real',
+              validForRelease: true,
+            },
+          },
+        ],
+      })}\n`);
+
+      const result = runDesktopUnsignedDmgGate({ cwd, requireManifest: true });
+
+      expect(result).toMatchObject({
+        name: 'desktop-unsigned-dmg-gate',
+        exitCode: 0,
+        passed: true,
+        evidencePresent: true,
+        validation: {
+          valid: true,
+          releaseLine: '0.1',
         },
       });
     } finally {

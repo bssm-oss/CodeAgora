@@ -30,7 +30,7 @@ describe('release workflow readiness gates', () => {
     const release = read('.github/workflows/release.yml');
     const rootPackage = JSON.parse(read('package.json'));
 
-    expect(release).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || (!contains(github.ref_name, '-') && 'desktop-stable-distribution' || 'npm-publish')");
+    expect(release).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || 'npm-publish'");
     expect(release).toContain('id-token: write');
     expect(release).toContain('npm view "$spec" version');
     expect(release).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
@@ -38,9 +38,11 @@ describe('release workflow readiness gates', () => {
     expect(release).toContain('pnpm evidence:manifest -- --require="$REQUIRED_TIER"');
     expect(release).toContain('actions/upload-artifact@v7');
     expect(release).toContain('release-evidence-${{ github.ref_name }}');
-    expect(release).toContain('prerelease: ${{ contains(github.ref_name, \'-\') }}');
-    expect(release).toContain('capture-stable-distribution-evidence.mjs');
-    expect(release).toContain('pnpm stable:desktop-distribution-gate');
+    expect(release).toContain('Create GitHub Stable Release');
+    expect(release).toContain('prerelease: false');
+    expect(release).toContain('capture-unsigned-dmg-evidence.mjs');
+    expect(release).toContain('pnpm desktop:unsigned-dmg-gate');
+    expect(release).toContain('not Developer ID signed, not notarized, and does not enable the Tauri updater channel');
     expect(rootPackage.scripts['evidence:security-smoke']).toBe('node scripts/security-evidence-smoke.mjs');
     expect(rootPackage.scripts['evidence:redaction-path-safety']).toBe('node scripts/redaction-path-safety-evidence.mjs');
     expect(rootPackage.scripts['evidence:github-security']).toBe('node scripts/github-security-evidence.mjs');

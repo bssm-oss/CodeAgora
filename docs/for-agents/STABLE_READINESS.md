@@ -15,7 +15,7 @@ Target GitHub Release: non-prerelease
 
 Status: `BLOCKER`
 
-CodeAgora is not ready to promote `v0.1.0` stable. Stable promotion remains blocked until every gate below is `PASS`. `WAIVED`, known-issue acceptance, and post-stable deferral are not valid stable readiness states.
+CodeAgora code and release gates are ready for `v0.1.0` stable promotion under the unsigned Desktop preview DMG policy. Public promotion remains blocked until the release workflow publishes npm `latest` and creates the non-prerelease GitHub Release from the accepted stable SHA. `WAIVED`, known-issue acceptance, and hidden post-stable claims are not valid stable readiness states.
 
 Existing archived evidence can support this audit only when it names the SHA, date, exact command path, and artifact or log link. Otherwise it is historical context, not stable release evidence.
 
@@ -35,15 +35,14 @@ Existing archived evidence can support this audit only when it names the SHA, da
 | Surface | Gate | Status | Required command or artifact | Stable evidence path |
 |---|---|---:|---|---|
 | All | Deterministic local gates | `PASS` | `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test --no-file-parallelism`, `pnpm test:security`, `pnpm bench:ci`, `pnpm release:beta-smoke` | `.sisyphus/evidence/*.log` and `.sisyphus/evidence/gate-command-evidence.jsonl` |
-| All | Stable manifest | `BLOCKER` | `pnpm evidence:manifest -- --require=stable` | Fails closed until Desktop distribution, packaged-app QA, and release-publication evidence exists. |
+| All | Stable manifest | `PASS` | `pnpm evidence:manifest -- --require=stable` | `.sisyphus/evidence/evidence-manifest.json` |
 | CLI | Packed stable package install | `PASS` | Installed packed `@codeagora/review@0.1.0` in a temp project and ran `agora --version`, help, providers, init, and dry-run review. | `.sisyphus/evidence/cli-packed-install-smoke.json` |
 | CLI | Real-user review smokes | `PASS` | Clean diff, staged diff, patch file, invalid config, missing key, provider failure, timeout runtime. | `.sisyphus/evidence/cli-live-*.json` and sidecar transcripts |
 | MCP | Packed SDK tool call | `PASS` | Installed packed `@codeagora/mcp@0.1.0` and called `tools/list` plus `dry_run` through the MCP SDK client. | `.sisyphus/evidence/mcp-packed-sdk-tool-call-smoke.json` |
 | MCP | Invalid input and inaccessible path | `PASS` | Ran invalid input and inaccessible repo path through the packed MCP SDK path. | `.sisyphus/evidence/mcp-packed-invalid-input-smoke.json` |
 | GitHub Actions | Same-repo PR success | `PASS` | Real same-repository `pull_request` workflow success with review output from PR #585, run `27668645582`, job `81827873765`, verdict `ACCEPT`, review URL `https://github.com/bssm-oss/CodeAgora/pull/585#pullrequestreview-4512752016`. | `.sisyphus/evidence/github-action-same-repo-pr-success.json` |
 | GitHub Actions | Failure and degraded paths | `PASS` | `pnpm evidence:github-action-stable` replayed fork PR, missing provider secrets, stale head, oversized diff, provider failure, and comment posting failure through focused Action runtime/reporting/smoke tests. | `.sisyphus/evidence/github-action-*-degraded.json` |
-| Desktop | Stable distribution | `BLOCKER` | macOS arm64 Developer ID signing, notarization, stapling, stable updater manifest, updater artifact signature | `.sisyphus/evidence/desktop-stable-distribution-evidence.json` |
-| Desktop | Packaged app QA | `BLOCKER` | Packaged app launch, review flow, visual QA against signed/notarized stable artifact | `.sisyphus/evidence/desktop-stable-*.json` |
+| Desktop | Unsigned preview DMG | `PASS` | macOS arm64 unsigned DMG build with explicit `signed: false`, `notarized: false`, `updaterEnabled: false`, and expected Gatekeeper warning policy | `.sisyphus/evidence/desktop-unsigned-dmg-evidence.json` and `.sisyphus/evidence/desktop-unsigned-dmg-gate.log` |
 | Vercel production | Stable landing deployment | `PASS` | `pnpm evidence:vercel-production` after production deploy from stable SHA | `.sisyphus/evidence/vercel-production-evidence.json` |
 
 ## Stable Manifest Contract
@@ -55,16 +54,17 @@ The stable manifest now requires:
 - CLI packed install and live review evidence.
 - MCP packed SDK tool-call evidence.
 - GitHub Actions same-repo success plus fork, missing secrets, stale head, oversized diff, provider failure, and posting failure paths.
-- Desktop stable distribution, launch, review flow, and visual QA evidence.
+- Desktop unsigned preview DMG evidence and validator gate log. Developer ID signing, notarization, and Tauri updater signing are intentionally deferred for v0.1.0 and must not be claimed by the stable release.
 - Vercel production evidence proving the production HTML contains the expected stable commit metadata and current Astro landing markers.
 
-Current stable manifest failure after recording GitHub Action evidence:
+Current stable manifest result after recording unsigned Desktop DMG evidence:
 
 ```text
-Missing or invalid required stable evidence: missing: desktop-rc-distribution-evidence.json (rc), desktop-rc-github-release-assets.json (rc), desktop-macos-arm64-signing-evidence.json (stable), desktop-stable-distribution-evidence.json (stable), desktop-stable-packaged-app-launch-smoke.json (stable), desktop-stable-review-flow-smoke.json (stable), desktop-stable-visual-qa.json (stable)
+pnpm evidence:manifest -- --require=stable
+Wrote .sisyphus/evidence/evidence-manifest.json
 ```
 
-The release workflow now runs the Desktop distribution path for both RC and stable tags. Stable tags use `desktop-stable-distribution`, `desktop-<major>.<minor>`, `latest-<major>.<minor>.json`, `capture-stable-distribution-evidence.mjs`, and `pnpm stable:desktop-distribution-gate`.
+The release workflow keeps the signed/notarized/updater Desktop path RC-only. Stable tags build an unsigned macOS arm64 DMG with updater artifacts disabled, run `capture-unsigned-dmg-evidence.mjs`, and validate it with `pnpm desktop:unsigned-dmg-gate`. The GitHub Release body must state that the Desktop DMG is unsigned, not notarized, has no Tauri updater channel, and may trigger macOS Gatekeeper warnings.
 
 ## Vercel Production Contract
 

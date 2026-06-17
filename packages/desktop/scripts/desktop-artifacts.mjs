@@ -13,6 +13,8 @@ export const DESKTOP_RC_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION = 'codeagora.deskto
 export const DESKTOP_RC_DISTRIBUTION_EVIDENCE_FILENAME = 'desktop-rc-distribution-evidence.json';
 export const DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_SCHEMA_VERSION = 'codeagora.desktop-stable-distribution-evidence.v1';
 export const DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_FILENAME = 'desktop-stable-distribution-evidence.json';
+export const DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION = 'codeagora.desktop-unsigned-dmg-evidence.v1';
+export const DESKTOP_UNSIGNED_DMG_EVIDENCE_FILENAME = 'desktop-unsigned-dmg-evidence.json';
 export const DESKTOP_RC_UPDATER_PLATFORM = 'darwin-aarch64';
 export const DESKTOP_STABLE_UPDATER_PLATFORM = DESKTOP_RC_UPDATER_PLATFORM;
 
@@ -800,10 +802,122 @@ export function validateDesktopStableDistributionEvidence(evidence = {}, options
   };
 }
 
+export function validateDesktopUnsignedDmgEvidence(evidence = {}, options = {}) {
+  const errors = [];
+  if (!evidence || typeof evidence !== 'object') {
+    return {
+      schemaVersion: DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION,
+      valid: false,
+      errors: [`Missing ${DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION} evidence`],
+    };
+  }
+  if (evidence.schemaVersion !== DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION) {
+    errors.push(
+      `Expected unsigned DMG evidence schema ${DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION}, received ${String(evidence.schemaVersion ?? 'missing')}`,
+    );
+  }
+  if (evidence.evidenceMode !== 'real') {
+    errors.push(`evidenceMode must be real, received ${String(evidence.evidenceMode ?? 'missing')}`);
+  }
+
+  let expected;
+  try {
+    expected = parseDesktopStableVersion(options.version ?? evidence.version);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    expected = null;
+  }
+  if (expected && evidence.gitTag !== expected.gitTag) {
+    errors.push(`gitTag must be ${expected.gitTag}, received ${String(evidence.gitTag ?? 'missing')}`);
+  }
+  if (expected && evidence.npmDistTag !== 'latest') {
+    errors.push(`npmDistTag must be latest for ${expected.version}`);
+  }
+  if (expected && evidence.githubRelease?.prerelease !== false) {
+    errors.push('githubRelease.prerelease must be false');
+  }
+  if (evidence.target?.platform !== MACOS_DESKTOP_PLATFORM || evidence.target?.arch !== MACOS_ARM64_ARCH) {
+    errors.push('target must be macOS arm64 only for unsigned Desktop stable DMG');
+  }
+
+  errors.push(...collectHashErrors(evidence.app, 'app'));
+  errors.push(...collectHashErrors(evidence.dmg, 'dmg'));
+  if (!isNonEmptyString(evidence.app?.bundleIdentifier)) {
+    errors.push('app.bundleIdentifier is required');
+  }
+  if (!isNonEmptyString(evidence.app?.infoPlist?.CFBundleShortVersionString)) {
+    errors.push('app.infoPlist.CFBundleShortVersionString is required');
+  }
+  if (!isNonEmptyString(evidence.app?.infoPlist?.CFBundleVersion)) {
+    errors.push('app.infoPlist.CFBundleVersion is required');
+  }
+  if (expected && evidence.app?.infoPlist?.CFBundleShortVersionString !== expected.version) {
+    errors.push('app Info.plist CFBundleShortVersionString must match the stable semver version');
+  }
+  if (expected && evidence.app?.infoPlist?.CFBundleVersion !== expected.version) {
+    errors.push('app Info.plist CFBundleVersion must match the stable semver version');
+  }
+
+  const policy = evidence.distributionPolicy ?? {};
+  if (policy.signed !== false) {
+    errors.push('distributionPolicy.signed must be false for the v0.1.0 unsigned DMG path');
+  }
+  if (policy.notarized !== false) {
+    errors.push('distributionPolicy.notarized must be false for the v0.1.0 unsigned DMG path');
+  }
+  if (policy.updaterEnabled !== false) {
+    errors.push('distributionPolicy.updaterEnabled must be false for the v0.1.0 unsigned DMG path');
+  }
+  if (policy.gatekeeperWarning !== true) {
+    errors.push('distributionPolicy.gatekeeperWarning must be true for unsigned macOS DMGs');
+  }
+  if (policy.supportTier !== 'preview') {
+    errors.push('distributionPolicy.supportTier must be preview');
+  }
+  if (evidence.codesign || evidence.notarization || evidence.updater) {
+    errors.push('unsigned DMG evidence must not include codesign, notarization, or updater claims');
+  }
+
+  const releaseAssets = Array.isArray(evidence.githubRelease?.assets)
+    ? evidence.githubRelease.assets
+    : [];
+  for (const requiredAsset of [
+    evidence.dmg?.path,
+    DESKTOP_UNSIGNED_DMG_EVIDENCE_FILENAME,
+  ].filter(Boolean)) {
+    const basename = path.basename(requiredAsset);
+    if (!releaseAssets.some((asset) => asset === basename || asset?.name === basename)) {
+      errors.push(`githubRelease.assets must include ${basename}`);
+    }
+  }
+
+  const secretLeaks = collectSecretLeaks(evidence);
+  if (secretLeaks.length > 0) {
+    errors.push(`unsigned DMG evidence contains secret-looking values at: ${secretLeaks.join(', ')}`);
+  }
+
+  return {
+    schemaVersion: DESKTOP_UNSIGNED_DMG_EVIDENCE_SCHEMA_VERSION,
+    valid: errors.length === 0,
+    version: evidence.version ?? null,
+    gitTag: evidence.gitTag ?? null,
+    releaseLine: expected?.releaseLine ?? null,
+    errors,
+  };
+}
+
 export function assertDesktopRcDistributionEvidence(params = {}) {
   const result = validateDesktopRcDistributionEvidence(params.evidence, params);
   if (!result.valid) {
     throw new Error(`Invalid Desktop RC distribution evidence: ${result.errors.join('; ')}`);
+  }
+  return result;
+}
+
+export function assertDesktopUnsignedDmgEvidence(params = {}) {
+  const result = validateDesktopUnsignedDmgEvidence(params.evidence, params);
+  if (!result.valid) {
+    throw new Error(`Invalid Desktop unsigned DMG evidence: ${result.errors.join('; ')}`);
   }
   return result;
 }
@@ -864,6 +978,31 @@ export function readDesktopStableDistributionEvidence(options = {}) {
   const evidencePath = path.resolve(
     cwd,
     options.evidencePath ?? path.join(evidenceRoot, DESKTOP_STABLE_DISTRIBUTION_EVIDENCE_FILENAME),
+  );
+
+  if (!fs.existsSync(evidencePath)) {
+    return {
+      present: false,
+      path: evidencePath,
+      relativePath: path.relative(cwd, evidencePath),
+      evidence: null,
+    };
+  }
+
+  return {
+    present: true,
+    path: evidencePath,
+    relativePath: path.relative(cwd, evidencePath),
+    evidence: JSON.parse(fs.readFileSync(evidencePath, 'utf8')),
+  };
+}
+
+export function readDesktopUnsignedDmgEvidence(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const evidenceRoot = path.resolve(cwd, options.evidenceRoot ?? path.join('.sisyphus', 'evidence'));
+  const evidencePath = path.resolve(
+    cwd,
+    options.evidencePath ?? path.join(evidenceRoot, DESKTOP_UNSIGNED_DMG_EVIDENCE_FILENAME),
   );
 
   if (!fs.existsSync(evidencePath)) {
