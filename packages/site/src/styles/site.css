@@ -864,19 +864,20 @@ section[id] {
 
 .pipeline-lab {
   --pipeline-sticky-offset: clamp(156px, 22svh, 220px);
+  --pipeline-top-padding: clamp(104px, 12vw, 156px);
+  --pipeline-scroll-height: 195svh;
   display: grid;
   align-items: start;
-  min-height: 165svh;
-  padding-top: clamp(104px, 12vw, 156px);
+  padding-top: var(--pipeline-top-padding);
 }
 
 .pipeline-demo {
   display: grid;
   grid-template-columns: minmax(320px, 0.86fr) minmax(500px, 1fr);
   gap: clamp(22px, 3.2vw, 42px);
-  align-items: center;
+  align-items: start;
   width: min(100%, 1180px);
-  min-height: min(760px, calc(100svh - 150px));
+  min-height: var(--pipeline-scroll-height);
   margin-inline: auto;
 }
 
@@ -1031,7 +1032,8 @@ section[id] {
 @media (min-width: 981px) and (min-height: 760px) {
   .pipeline-lab {
     --pipeline-sticky-offset: clamp(220px, 28svh, 300px);
-    padding-top: clamp(132px, 15vw, 200px);
+    --pipeline-top-padding: clamp(132px, 15vw, 200px);
+    --pipeline-scroll-height: 175svh;
   }
 }
 

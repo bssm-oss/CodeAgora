@@ -217,9 +217,9 @@ function syncPipelineFromScroll() {
   if (!pipelineSection || pipelineTabs.length === 0 || window.matchMedia("(max-width: 980px)").matches) return;
   const rect = pipelineSection.getBoundingClientRect();
   if (rect.top > window.innerHeight * 0.35 || rect.bottom < window.innerHeight * 0.2) return;
-  const travel = Math.max(1, rect.height - window.innerHeight * 0.7);
+  const travel = Math.max(1, rect.height - window.innerHeight);
   const progressValue = Math.min(1, Math.max(0, -rect.top / travel));
-  const index = Math.min(pipelineTabs.length - 1, Math.max(0, Math.round(progressValue * (pipelineTabs.length - 1))));
+  const index = Math.min(pipelineTabs.length - 1, Math.max(0, Math.floor(progressValue * pipelineTabs.length)));
   activatePipelineStep(pipelineTabs[index].dataset.pipelineStep);
 }
 
