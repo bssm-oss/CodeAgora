@@ -6,6 +6,8 @@ node_modules/
 dist/*
 !dist/action.js
 packages/*/dist/
+packages/site/.astro/
+packages/site/public/
 *.tsbuildinfo
 
 # Environment & Secrets

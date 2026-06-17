@@ -1,28 +1,23 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import "./prepare-assets.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(packageRoot, "../..");
-const distDir = resolve(packageRoot, "dist");
+const execFileAsync = promisify(execFile);
 
-const files = [
-  ["index.html", "index.html"],
-  ["src/styles.css", "src/styles.css"],
-  ["src/main.js", "src/main.js"],
-  ["../../assets/logo.svg", "assets/logo.svg"],
-  ["assets/codeagora-wordmark.png", "assets/codeagora-wordmark.png"],
-  ["assets/social-card.svg", "assets/social-card.svg"],
-  ["robots.txt", "robots.txt"],
-  ["sitemap.xml", "sitemap.xml"]
-];
+await execFileAsync(
+  "pnpm",
+  [
+    "exec",
+    "astro",
+    "build",
+    "--root",
+    packageRoot
+  ],
+  { cwd: repoRoot }
+);
 
-await rm(distDir, { force: true, recursive: true });
-
-for (const [from, to] of files) {
-  const target = resolve(distDir, to);
-  await mkdir(dirname(target), { recursive: true });
-  await copyFile(resolve(packageRoot, from), target);
-}
-
-console.log(`Built CodeAgora site at ${distDir.replace(repoRoot, ".")}`);
+console.log("Built CodeAgora Astro site at ./packages/site/dist");
