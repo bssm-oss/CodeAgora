@@ -49,7 +49,7 @@ describe('release channel safety', () => {
     const tauriConfig = readJson<{ version: string }>('packages/desktop/src-tauri/tauri.conf.json');
     const cargoToml = readText('packages/desktop/src-tauri/Cargo.toml');
 
-    expect(rootVersion).toBe('0.1.1');
+    expect(rootVersion).toBe('0.1.2');
     expect(mcpVersion).toBe(rootVersion);
     expect(desktopVersion).toBe(rootVersion);
     expect(tauriConfig.version).toBe(rootVersion);

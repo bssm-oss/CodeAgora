@@ -96,10 +96,10 @@ describe("CodeAgora landing page", () => {
 
   it("provides stable install and action snippets", () => {
     expect(html).toContain("npm i -g @codeagora/review");
-    expect(html).toContain("bssm-oss/CodeAgora@v0.1.1");
+    expect(html).toContain("bssm-oss/CodeAgora@v0.1.2");
     expect(html).toContain("@codeagora/mcp");
     expect(html).toContain("Desktop app");
-    expect(html).toContain("v0.1.1 macOS arm64 unsigned preview DMG");
+    expect(html).toContain("v0.1.2 macOS arm64 unsigned preview DMG");
   });
 
   it("publishes canonical SEO and social preview metadata", () => {
@@ -134,7 +134,7 @@ describe("CodeAgora landing page", () => {
           "@type": "SoftwareApplication",
           applicationCategory: "DeveloperApplication",
           applicationSubCategory: "AI code review",
-          softwareVersion: "0.1.1",
+          softwareVersion: "0.1.2",
           isAccessibleForFree: true,
           codeRepository: "https://github.com/bssm-oss/CodeAgora",
           downloadUrl: "https://www.npmjs.com/package/@codeagora/review",

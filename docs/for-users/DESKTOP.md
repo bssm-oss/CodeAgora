@@ -10,9 +10,9 @@ contracts used by the automation surfaces.
 |------|--------------------------|
 | Channel | Official desktop app |
 | Public desktop launch | Included in release readiness |
-| Signing | v0.1.1 stable ships as an unsigned preview DMG |
-| Notarization | v0.1.1 stable is not notarized; macOS Gatekeeper warning is expected |
-| Updater | Disabled for the v0.1.1 unsigned preview DMG; RC updater JSON remains scoped to `desktop-X.Y-rc/latest-X.Y-rc.json` |
+| Signing | v0.1.2 stable ships as an unsigned preview DMG |
+| Notarization | v0.1.2 stable is not notarized; macOS Gatekeeper warning is expected |
+| Updater | Disabled for the v0.1.2 unsigned preview DMG; RC updater JSON remains scoped to `desktop-X.Y-rc/latest-X.Y-rc.json` |
 | Canonical review engine | Existing CLI/core path |
 | Canonical sessions | Existing `.ca/sessions` artifacts |
 | Canonical config | Existing `.ca/config.*` schema and files |
@@ -40,13 +40,13 @@ prerelease assets.
 Stable Desktop distribution, stable updater channels, and npm
 `latest` promotion are out of scope for this RC gate.
 
-## v0.1.1 Stable Desktop DMG
+## v0.1.2 Stable Desktop DMG
 
-The v0.1.1 stable release attaches a macOS arm64 Desktop DMG as an unsigned
+The v0.1.2 stable release attaches a macOS arm64 Desktop DMG as an unsigned
 preview artifact:
 
 ```txt
-https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.1/CodeAgora_0.1.1_aarch64.dmg
+https://github.com/bssm-oss/CodeAgora/releases/download/v0.1.2/CodeAgora_0.1.2_aarch64.dmg
 ```
 
 That DMG is not Developer ID signed, not notarized, and does not enable a Tauri
@@ -66,7 +66,7 @@ The required evidence files are:
 .sisyphus/evidence/desktop-unsigned-dmg-gate.log
 ```
 
-Do not describe the v0.1.1 Desktop DMG as signed, notarized, stapled, or
+Do not describe the v0.1.2 Desktop DMG as signed, notarized, stapled, or
 auto-updatable unless a later release reintroduces those gates with fresh
 evidence.
 

@@ -239,7 +239,7 @@ jobs:
           fetch-depth: 0
 
       - name: CodeAgora Review
-        uses: bssm-oss/CodeAgora@v0.1.1
+        uses: bssm-oss/CodeAgora@v0.1.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fail-on-reject: 'true'
