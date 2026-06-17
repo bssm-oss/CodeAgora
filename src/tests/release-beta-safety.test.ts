@@ -20,7 +20,7 @@ describe('release channel safety', () => {
 
     expect(workflow).toContain('PUBLISH_TAG=$(node -e');
     expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'latest'");
-    expect(workflow).toContain("version.includes('-rc.') ? 'rc' : version.includes('-') ? 'beta' : 'stable'");
+    expect(workflow).toContain("version.includes('-rc.') ? 'rc' : 'beta'");
     expect(workflow).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
     expect(workflow).toContain('cd packages/mcp && npm publish --provenance --access public --tag "$PUBLISH_TAG"');
     expect(workflow).toContain("contains(github.ref_name, '-rc.') && 'desktop-rc-distribution' || 'npm-publish'");
