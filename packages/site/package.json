@@ -1,0 +1,12 @@
+{
+  "name": "@codeagora/site",
+  "version": "0.1.0-rc.6",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev-server.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  }
+}
+

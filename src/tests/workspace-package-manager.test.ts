@@ -217,6 +217,7 @@ describe('workspace package manager contract', () => {
       'packages/github',
       'packages/mcp',
       'packages/shared',
+      'packages/site',
     ];
 
     expect(locations).toEqual(expectedWorkspaceLocations);

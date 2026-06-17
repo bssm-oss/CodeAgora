@@ -1,0 +1,724 @@
+---
+import "../styles/site.css";
+import siteScriptUrl from "../scripts/site.js?url";
+
+const version = "0.1.0-rc.6";
+const canonicalUrl = "https://codeagora.vercel.app/";
+const schema = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${canonicalUrl}#website`,
+      name: "CodeAgora",
+      url: canonicalUrl,
+      inLanguage: "ko-KR",
+      description: "CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 따로 검토하고, 근거를 대조한 뒤, 사람이 결정하기 쉬운 최종 판정으로 정리하는 AI 코드 리뷰 도구입니다.",
+      publisher: { "@id": "https://github.com/bssm-oss#organization" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${canonicalUrl}#software`,
+      name: "CodeAgora",
+      applicationCategory: "DeveloperApplication",
+      applicationSubCategory: "AI code review",
+      operatingSystem: "macOS, Windows, Linux",
+      softwareVersion: version,
+      url: canonicalUrl,
+      codeRepository: "https://github.com/bssm-oss/CodeAgora",
+      downloadUrl: "https://www.npmjs.com/package/@codeagora/review",
+      license: "https://github.com/bssm-oss/CodeAgora/blob/main/LICENSE",
+      description: "CLI, GitHub Action, MCP, Desktop 환경에서 같은 리뷰 파이프라인을 실행하는 멀티 LLM 코드 리뷰 도구입니다.",
+      isAccessibleForFree: true,
+      featureList: [
+        "parallel AI code reviewers",
+        "evidence-backed review verdicts",
+        "GitHub Action pull request automation",
+        "MCP server for AI IDEs and coding agents",
+        "CLI diff review",
+        "Desktop RC local review UI"
+      ],
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      sameAs: [
+        "https://github.com/bssm-oss/CodeAgora",
+        "https://www.npmjs.com/package/@codeagora/review"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": `${canonicalUrl}#faq`,
+      inLanguage: "ko-KR",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "CodeAgora는 무엇인가요?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 근거를 확인한 뒤, 승인, 반려, 사람 확인 필요 같은 판정으로 정리하는 AI 코드 리뷰 도구입니다."
+          }
+        },
+        {
+          "@type": "Question",
+          name: "비개발자도 이해할 수 있나요?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "네. CodeAgora는 코드 변경을 여러 검토자에게 나눠 확인시키고, 서로 다른 의견과 근거를 비교해 최종 판단 자료로 정리합니다."
+          }
+        },
+        {
+          "@type": "Question",
+          name: "Desktop은 안정판인가요?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "현재 Desktop은 RC 경로입니다. 이 랜딩 페이지는 안정판 Desktop 배포나 안정판 업데이트 채널을 약속하지 않습니다."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": `${canonicalUrl}#breadcrumb`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "CodeAgora", item: canonicalUrl }
+      ]
+    }
+  ]
+};
+
+const plainSteps = [
+  ["1", "여러 AI가 따로 봅니다", "한 명의 답을 그대로 믿지 않고, 같은 코드 변경을 여러 리뷰어가 독립적으로 확인합니다."],
+  ["2", "서로 다른 의견을 맞춥니다", "누가 무엇을 문제라고 봤는지, 어떤 근거가 있는지 한곳에 모읍니다."],
+  ["3", "사람이 판단할 결론으로 줄입니다", "승인, 반려, 사람 확인 필요처럼 바로 행동할 수 있는 판정으로 정리합니다."]
+];
+
+const reviewSteps = [
+  ["01", "변경 사항 접수", "수정된 코드와 영향 범위를 먼저 정리합니다."],
+  ["02", "독립 리뷰", "보안, 안정성, 유지보수 관점의 AI 리뷰어가 따로 봅니다."],
+  ["03", "근거 검증", "파일 존재, 라인 범위, 코드 인용, 충돌 의견을 확인합니다."],
+  ["04", "최종 판정", "승인, 반려, 사람 확인 필요처럼 사람이 볼 결론을 남깁니다."]
+];
+
+const pipelineScenes = [
+  {
+    id: "diff",
+    number: "01",
+    label: "Diff intake",
+    title: ["먼저 바뀐 부분만", "좁힙니다."],
+    body: "전체 저장소를 다시 읽는 대신, 이번 변경이 건드린 파일과 영향 범위를 먼저 요약합니다.",
+    detail: "changed files: 3 · review target: preset behavior",
+    verdict: "검토 대상 정리"
+  },
+  {
+    id: "reviewers",
+    number: "02",
+    label: "Parallel review",
+    title: ["여러 리뷰어가", "같은 변경을 따로 봅니다."],
+    body: "보안, 안정성, 유지보수 관점이 서로 섞이지 않게 독립적으로 의견을 냅니다.",
+    detail: "security: confirmed · reliability: contested",
+    verdict: "의견 3개 수집"
+  },
+  {
+    id: "evidence",
+    number: "03",
+    label: "Evidence check",
+    title: ["그럴듯한 말을", "실제 근거와 대조합니다."],
+    body: "파일 존재, 라인 범위, 코드 인용, 반박 여부를 확인해 약한 주장을 걸러냅니다.",
+    detail: "quote verified · line range valid · conflict found",
+    verdict: "근거 2개 확정"
+  },
+  {
+    id: "verdict",
+    number: "04",
+    label: "Human verdict",
+    title: ["마지막에는 사람이 행동할", "판정으로 줄입니다."],
+    body: "승인, 반려, 사람 확인 필요처럼 다음 행동이 분명한 결론으로 정리합니다.",
+    detail: "confirmed: 2 · contested: 1 · next action: human",
+    verdict: "사람 확인 필요"
+  }
+];
+
+const surfaces = [
+  ["CLI", "내 컴퓨터에서 바로 코드 변경을 리뷰합니다.", "터미널"],
+  ["GitHub Action", "Pull Request마다 같은 판정 기준을 자동으로 붙입니다.", "팀 리뷰"],
+  ["MCP", "Cursor, Antigravity 같은 AI 개발 환경이 CodeAgora를 도구로 호출합니다.", "AI IDE"],
+  ["Desktop RC", "로컬 리뷰 세션과 결과를 화면에서 확인하는 출시 준비 버전입니다.", "로컬 UI"]
+];
+
+const faqs = [
+  ["CodeAgora는 한 문장으로 무엇인가요?", "여러 AI가 같은 코드 변경을 따로 보고, 서로 다른 의견과 근거를 비교해 최종 판단 자료로 정리하는 AI 코드 리뷰 도구입니다."],
+  ["비개발자는 어떻게 이해하면 되나요?", "중요한 문서를 여러 명에게 검토시키고, 누가 어떤 근거로 찬성하거나 반대했는지 정리받는 흐름과 비슷합니다."],
+  ["하나의 AI 리뷰와 무엇이 다른가요?", "한 모델의 답을 그대로 믿지 않고 여러 주장과 근거를 비교합니다. 그래서 그럴듯하지만 틀린 지적을 줄이는 데 초점을 둡니다."],
+  ["비용은 어떻게 되나요?", "CodeAgora 자체는 MIT 오픈소스입니다. OpenAI, Anthropic, OpenRouter 같은 외부 모델을 쓰면 해당 공급자의 API 비용이 발생할 수 있습니다."],
+  ["GitHub Action에 쓸 수 있나요?", "네. Pull Request마다 같은 리뷰 기준을 자동으로 붙일 수 있습니다."],
+  ["Desktop은 안정판인가요?", "현재 데스크톱 앱은 RC, 즉 출시 준비 단계입니다. 안정적인 팀 흐름은 CLI와 GitHub Action부터 시작하는 것을 권장합니다."]
+];
+
+const escapeHtml = (value) =>
+  value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+const reviewPanels = [
+  {
+    id: "change",
+    label: "1. 변경 사항",
+    eyebrow: "변경 요약",
+    title: "무엇이 바뀌었는지 먼저 정리합니다.",
+    status: "요약",
+    code: escapeHtml(`changed files: 3
+review target: preset behavior
+risk: local execution path can differ by environment`),
+    notes: [
+      ["범위", "코드 변경 24줄과 설정 문서 1개가 함께 바뀌었습니다."],
+      ["영향", "팀마다 다른 로컬 도구 환경에 영향을 줄 수 있습니다."],
+      ["다음 단계", "여러 리뷰어가 같은 변경을 독립적으로 확인합니다."]
+    ]
+  },
+  {
+    id: "reviewers",
+    label: "2. 독립 리뷰어",
+    eyebrow: "독립 검토",
+    title: "서로 다른 관점의 AI 리뷰어가 따로 봅니다.",
+    status: "진행",
+    code: escapeHtml(`보안 리뷰어: 확인됨
+안정성 리뷰어: 반박 있음
+유지보수 리뷰어: 확인됨`),
+    notes: [
+      ["보안 리뷰어", "실행 가능한 도구만 기본값에 남겨야 한다고 봤습니다."],
+      ["안정성 리뷰어", "환경마다 결과가 달라질 수 있다고 반박했습니다."],
+      ["유지보수 리뷰어", "팀 설정 문서와 실제 동작을 맞춰야 한다고 봤습니다."]
+    ]
+  },
+  {
+    id: "evidence",
+    label: "3. 근거 확인",
+    eyebrow: "근거 대조",
+    title: "그럴듯한 말보다 실제 근거를 먼저 봅니다.",
+    status: "확인",
+    code: escapeHtml(`file exists: true
+line range valid: true
+quote verified: true
+claim conflict: 1 contested`),
+    notes: [
+      ["파일", "언급된 파일이 실제 변경 범위 안에 있는지 확인합니다."],
+      ["라인", "지적한 줄이 실제 코드 위치와 맞는지 확인합니다."],
+      ["인용", "AI가 없는 코드를 꾸며 말하지 않았는지 대조합니다."]
+    ]
+  },
+  {
+    id: "verdict",
+    label: "4. 최종 판정",
+    eyebrow: "판정",
+    title: "사람이 바로 판단할 결론으로 줄입니다.",
+    status: "사람 확인 필요",
+    code: escapeHtml(`final verdict: needs human
+confirmed: 2
+contested: 1
+next action: review local backend policy`),
+    notes: [
+      ["결론", "두 의견은 일치했고 한 쟁점은 근거가 갈렸습니다."],
+      ["행동", "자동 승인 대신 사람이 로컬 실행 정책을 확인합니다."],
+      ["효과", "긴 AI 답변을 판단 가능한 자료로 줄입니다."]
+    ]
+  }
+];
+
+const cliCommand = escapeHtml(`$ npm i -g @codeagora/review@rc
+$ agora init
+$ git diff | agora review`);
+
+const actionCommand = escapeHtml(`uses: bssm-oss/CodeAgora@v0.1.0-rc.6
+with:
+  github-token: secrets.GITHUB_TOKEN
+env:
+  OPENROUTER_API_KEY: secrets.OPENROUTER_API_KEY`);
+
+const mcpCommand = escapeHtml(`{
+  "mcpServers": {
+    "codeagora": {
+      "command": "npx",
+      "args": ["-y", "@codeagora/mcp@rc"]
+    }
+  }
+}`);
+
+const desktopCommand = escapeHtml(`Desktop RC
+- local review session viewer
+- same CLI/MCP/GitHub verdict semantics
+- Desktop 정식 배포는 준비 중`);
+
+const commandLogs = {
+  cli: ["resolve package @rc", "load .ca/config", "read git diff", "write verdict artifact"],
+  action: ["checkout pull request", "redact fork secrets", "run reviewers", "post review summary"],
+  mcp: ["start stdio server", "list review tools", "accept diff payload", "return compact verdict"],
+  desktop: ["open local session", "load review history", "inspect evidence", "export decision note"]
+};
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CodeAgora - 근거를 남기는 AI 코드 리뷰</title>
+    <meta name="description" content="CodeAgora는 여러 AI 리뷰어가 같은 코드 변경을 따로 확인하고 서로 반박한 뒤, 사람이 결정하기 쉬운 판정표와 근거를 남기는 코드 리뷰 도구입니다." />
+    <meta name="keywords" content="CodeAgora, AI 코드 리뷰, LLM 코드 리뷰, GitHub Action 코드 리뷰, MCP 코드 리뷰, CLI 코드 리뷰, 멀티 에이전트 리뷰" />
+    <meta name="author" content="bssm-oss" />
+    <meta name="creator" content="bssm-oss" />
+    <meta name="publisher" content="bssm-oss" />
+    <meta name="application-name" content="CodeAgora" />
+    <meta name="apple-mobile-web-app-title" content="CodeAgora" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#080d18" />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" hreflang="ko" href={canonicalUrl} />
+    <link rel="alternate" hreflang="x-default" href={canonicalUrl} />
+    <link rel="icon" href="/assets/codeagora-icon.png" type="image/png" />
+    <meta property="og:site_name" content="CodeAgora" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content="CodeAgora - 근거를 남기는 AI 코드 리뷰" />
+    <meta property="og:description" content="여러 AI 리뷰어가 같은 코드 변경을 독립적으로 검토하고, 서로 반박한 뒤, 사람이 결정하기 쉬운 최종 판정표와 근거를 남깁니다." />
+    <meta property="og:image" content={`${canonicalUrl}assets/social-card.svg`} />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CodeAgora - 근거를 남기는 AI 코드 리뷰" />
+    <meta name="twitter:description" content="여러 AI 리뷰어가 같은 코드 변경을 따로 보고 서로 검증한 뒤, 사람이 바로 판단할 수 있는 판정표를 남깁니다." />
+    <meta name="twitter:image" content={`${canonicalUrl}assets/social-card.svg`} />
+    <meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정" />
+    <script type="application/ld+json" set:html={JSON.stringify(schema)}></script>
+  </head>
+  <body>
+    <div class="scroll-progress" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="CodeAgora 홈">
+        <img class="brand-icon" src="/assets/codeagora-icon.png" alt="" width="250" height="250" />
+        <img class="brand-wordmark" src="/assets/codeagora-wordmark.png" alt="CodeAgora" width="2194" height="467" decoding="async" />
+      </a>
+      <nav id="site-nav" class="nav-links" aria-label="주요 탐색">
+        <a href="#review">리뷰 화면</a>
+        <a href="#method">작동 방식</a>
+        <a href="#surfaces">사용 위치</a>
+        <a href="#install">설치</a>
+        <a href="https://github.com/bssm-oss/CodeAgora">GitHub</a>
+      </nav>
+      <button id="menu-toggle" class="menu-toggle-btn" type="button" aria-label="메뉴 열기" aria-expanded="false" aria-controls="site-nav">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <main id="top">
+      <section class="hero section-shell">
+        <div class="hero-copy">
+          <p class="badge">오픈소스 AI 코드 리뷰 · MIT</p>
+          <h1>
+            <span>여러 AI가 검토하고</span>
+            <span>근거로 판단합니다.</span>
+          </h1>
+          <p class="hero-lede">
+            AI가 코드를 쏟아낼수록, 검증은 더 치밀해져야 합니다.
+            CodeAgora는 같은 코드 변경 사항을 여러 AI 리뷰어에게 나눠 맡기고,
+            서로 다른 의견과 근거를 비교해 사람이 결정할 수 있는 최종 판단 자료로 정리합니다.
+          </p>
+          <p class="hero-meta" aria-label="CodeAgora 핵심 흐름">독립 리뷰어 · 근거 대조 · 최종 판정</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#install">리뷰 시작하기</a>
+            <a class="button secondary" href="#method">작동 방식 보기</a>
+          </div>
+        </div>
+
+        <aside class="hero-panel evidence-panel app-preview" aria-label="CodeAgora Desktop 판정 화면 미리보기">
+          <div class="app-preview-bar">
+            <div>
+              <span>CodeAgora Desktop</span>
+              <strong>session/2026-06-17/demo-rc</strong>
+            </div>
+            <span class="app-pill app-pill-warn">NEEDS_HUMAN</span>
+          </div>
+          <div class="app-preview-body">
+            <section class="app-verdict-card app-warn">
+              <div>
+                <span class="app-eyebrow">Final verdict</span>
+                <h3>사람 확인 필요</h3>
+                <p>2개 의견은 일치했고, 1개 쟁점은 로컬 실행 정책 확인이 필요합니다.</p>
+              </div>
+              <span class="app-decision app-human">사람 확인 필요</span>
+            </section>
+
+            <div class="app-review-flow" aria-label="리뷰 상태 흐름">
+              <article class="app-flow-step app-good" data-live-agent>
+                <span>Workspace</span>
+                <strong>Trusted</strong>
+                <small>changed files: 3</small>
+              </article>
+              <article class="app-flow-step app-warn" data-live-agent>
+                <span>Review</span>
+                <strong>Needs human</strong>
+                <small>confirmed: 2 · contested: 1</small>
+              </article>
+              <article class="app-flow-step app-info" data-live-agent>
+                <span>Acceptance</span>
+                <strong>Pending</strong>
+                <small>local backend policy</small>
+              </article>
+            </div>
+
+            <div class="app-metric-grid" aria-label="판정 근거 요약">
+              <article class="app-metric-card">
+                <span>Files</span>
+                <strong>3</strong>
+              </article>
+              <article class="app-metric-card">
+                <span>Reviewers</span>
+                <strong>L1 × 3</strong>
+              </article>
+              <article class="app-metric-card">
+                <span>Confirmed</span>
+                <strong>2</strong>
+              </article>
+              <article class="app-metric-card">
+                <span>Contested</span>
+                <strong>1</strong>
+              </article>
+            </div>
+
+            <div class="app-artifact-list" aria-label="생성된 리뷰 산출물">
+              <div>
+                <span>report.md</span>
+                <strong>decision summary</strong>
+              </div>
+              <div>
+                <span>head-verdict.json</span>
+                <strong>NEEDS_HUMAN</strong>
+              </div>
+              <div>
+                <span>reviews/security.md</span>
+                <strong>verified evidence</strong>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section-shell plain-section">
+        <div class="section-heading compact-heading">
+          <p class="eyebrow">한눈에 이해하기</p>
+          <h2>
+            <span class="line">한 명의 AI에게 맡기는</span>
+            <span class="line">리뷰가 아닙니다.</span>
+          </h2>
+          <p>비개발자가 봐도 핵심은 단순합니다. 여러 검토자에게 나눠 맡기고, 근거가 맞는 의견만 남깁니다.</p>
+        </div>
+        <div class="plain-grid">
+          {plainSteps.map(([number, title, text]) => (
+            <article>
+              <span>{number}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="pipeline" class="section-shell pipeline-lab">
+        <div class="pipeline-demo" data-pipeline-demo>
+          <div class="pipeline-rail">
+            <div class="section-heading pipeline-heading">
+              <p class="eyebrow">흐름 체험하기</p>
+              <h2>
+                <span class="line">스크롤하면 리뷰가</span>
+                <span class="line">판정으로 좁혀집니다.</span>
+              </h2>
+              <p>CodeAgora가 변경 사항을 받아 여러 의견과 근거를 거쳐 최종 판단 자료로 만드는 과정을 직접 따라갑니다.</p>
+            </div>
+            <div class="pipeline-steps" role="tablist" aria-label="CodeAgora 리뷰 흐름">
+              {pipelineScenes.map((scene, index) => (
+                <button
+                  id={`pipeline-tab-${scene.id}`}
+                  class={index === 0 ? "active" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={index === 0 ? "true" : "false"}
+                  aria-controls={`pipeline-panel-${scene.id}`}
+                  data-pipeline-step={scene.id}
+                >
+                  <span>{scene.number}</span>
+                  <strong>{scene.label}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div class="pipeline-stage" aria-live="polite">
+            <div class="pipeline-map" aria-hidden="true">
+              {pipelineScenes.map((scene, index) => (
+                <span class={`pipeline-node ${index === 0 ? "active" : ""}`} data-pipeline-node={scene.id}>{scene.number}</span>
+              ))}
+            </div>
+            {pipelineScenes.map((scene, index) => (
+              <article
+                id={`pipeline-panel-${scene.id}`}
+                class="pipeline-panel"
+                role="tabpanel"
+                aria-labelledby={`pipeline-tab-${scene.id}`}
+                data-pipeline-panel={scene.id}
+                hidden={index !== 0}
+              >
+                <span>{scene.verdict}</span>
+                <h3>
+                  {scene.title.map((line) => <span class="line">{line}</span>)}
+                </h3>
+                <p>{scene.body}</p>
+                <code>{scene.detail}</code>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="review" class="section-shell review-section">
+        <div class="section-heading">
+          <p class="eyebrow">토론하는 리뷰</p>
+          <h2>
+            <span class="line">결과는 읽는 글이 아니라,</span>
+            <span class="line">판단 가능한 자료입니다.</span>
+          </h2>
+          <p>파일, 라인, 코드 인용, 반박을 한 화면에서 확인합니다.</p>
+        </div>
+        <div class="review-window">
+          <div class="window-bar"><span></span><span></span><span></span><strong>CodeAgora evidence review</strong></div>
+          <div class="review-grid">
+            <aside role="tablist" aria-label="리뷰 단계">
+              {reviewPanels.map(({ id, label }, index) => (
+                <button
+                  id={`review-tab-${id}`}
+                  class={index === 0 ? "active" : ""}
+                  type="button"
+                  role="tab"
+                  aria-selected={index === 0 ? "true" : "false"}
+                  aria-controls={`review-panel-${id}`}
+                  data-review-tab={id}
+                >
+                  {label}
+                </button>
+              ))}
+            </aside>
+            <div class="review-content">
+              {reviewPanels.map(({ id, eyebrow, title, status, code, notes }, index) => (
+                <section
+                  id={`review-panel-${id}`}
+                  class="review-step-panel"
+                  role="tabpanel"
+                  aria-labelledby={`review-tab-${id}`}
+                  data-review-panel={id}
+                  hidden={index !== 0}
+                >
+                  <div class="review-title">
+                    <div><span>{eyebrow}</span><strong>{title}</strong></div>
+                    <em>{status}</em>
+                  </div>
+                  <pre><code set:html={code}></code></pre>
+                  <div class="comment-stack">
+                    {notes.map(([noteTitle, noteText]) => (
+                      <article><b>{noteTitle}</b><p>{noteText}</p></article>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="method" class="section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">작동 방식</p>
+          <h2>
+            <span class="line">많이 말하는 AI보다,</span>
+            <span class="line">틀린 말을 거르는 리뷰.</span>
+          </h2>
+          <p>CodeAgora는 코드 변경 사항(diff)에서 판정까지 같은 기준으로 좁혀갑니다.</p>
+        </div>
+        <div class="step-grid">
+          {reviewSteps.map(([number, title, text]) => (
+            <article>
+              <span>{number}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="surfaces" class="section-shell split-section">
+        <div class="section-heading">
+          <p class="eyebrow">공식 지원 환경</p>
+          <h2>
+            <span class="line">어디서 실행해도</span>
+            <span class="line">같은 기준으로 판단합니다.</span>
+          </h2>
+          <p>CLI, GitHub Action, MCP, Desktop RC가 같은 리뷰 파이프라인을 사용합니다.</p>
+        </div>
+        <div class="surface-grid">
+          {surfaces.map(([title, text, meta]) => (
+            <article>
+              <span>{meta}</span>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section class="section-shell trust-section">
+        <div class="section-heading">
+          <p class="eyebrow">신뢰와 비용</p>
+          <h2>
+            <span class="line">코드는 직접 보내고,</span>
+            <span class="line">비용은 그대로 보입니다.</span>
+          </h2>
+          <p>CodeAgora는 코드를 우리 서버에 모으지 않습니다. 팀이 고른 모델 공급자와 로컬 키를 기준으로 실행합니다.</p>
+        </div>
+        <div class="trust-row">
+          <article><b>키는 로컬에</b><span>API 키는 사용자의 로컬 권한 안에 둡니다.</span></article>
+          <article><b>코드는 직접 전송</b><span>선택한 모델 공급자로만 리뷰 요청을 보냅니다.</span></article>
+          <article><b>비용은 공급자 기준</b><span>외부 모델을 쓰면 해당 공급자의 사용량 비용만 발생합니다.</span></article>
+        </div>
+      </section>
+
+      <section id="install" class="section-shell install-section">
+        <div class="install-copy">
+          <p class="eyebrow">출시 준비 채널로 시작하기</p>
+          <h2>
+            <span class="line">먼저 CLI로 확인하고,</span>
+            <span class="line">팀 흐름에 붙입니다.</span>
+          </h2>
+          <p>처음에는 터미널에서 결과를 확인하고, 필요하면 GitHub Action, MCP, Desktop RC로 확장합니다.</p>
+        </div>
+        <div class="command-console">
+          <div class="tabs" role="tablist" aria-label="설치 명령">
+            <button id="tab-cli" class="active" type="button" role="tab" aria-selected="true" aria-controls="panel-cli" data-command-tab="cli">CLI</button>
+            <button id="tab-action" type="button" role="tab" aria-selected="false" aria-controls="panel-action" data-command-tab="action">Action</button>
+            <button id="tab-mcp" type="button" role="tab" aria-selected="false" aria-controls="panel-mcp" data-command-tab="mcp">MCP</button>
+            <button id="tab-desktop" type="button" role="tab" aria-selected="false" aria-controls="panel-desktop" data-command-tab="desktop">Desktop</button>
+          </div>
+          <div id="panel-cli" class="command-panel" role="tabpanel" aria-labelledby="tab-cli" data-command-panel="cli">
+            <button class="copy-button" type="button" data-copy-target="#cli-command">복사</button>
+            <pre><code id="cli-command" set:html={cliCommand}></code></pre>
+            <ol class="command-log" aria-label="CLI 실행 흐름">
+              {commandLogs.cli.map((line) => <li>{line}</li>)}
+            </ol>
+          </div>
+          <div id="panel-action" class="command-panel" role="tabpanel" aria-labelledby="tab-action" data-command-panel="action" hidden>
+            <button class="copy-button" type="button" data-copy-target="#action-command">복사</button>
+            <pre><code id="action-command" set:html={actionCommand}></code></pre>
+            <ol class="command-log" aria-label="GitHub Action 실행 흐름">
+              {commandLogs.action.map((line) => <li>{line}</li>)}
+            </ol>
+          </div>
+          <div id="panel-mcp" class="command-panel" role="tabpanel" aria-labelledby="tab-mcp" data-command-panel="mcp" hidden>
+            <button class="copy-button" type="button" data-copy-target="#mcp-command">복사</button>
+            <pre><code id="mcp-command" set:html={mcpCommand}></code></pre>
+            <ol class="command-log" aria-label="MCP 실행 흐름">
+              {commandLogs.mcp.map((line) => <li>{line}</li>)}
+            </ol>
+          </div>
+          <div id="panel-desktop" class="command-panel" role="tabpanel" aria-labelledby="tab-desktop" data-command-panel="desktop" hidden>
+            <button class="copy-button" type="button" data-copy-target="#desktop-command">복사</button>
+            <pre><code id="desktop-command" set:html={desktopCommand}></code></pre>
+            <ol class="command-log" aria-label="Desktop 실행 흐름">
+              {commandLogs.desktop.map((line) => <li>{line}</li>)}
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="section-shell faq-section">
+        <div class="section-heading">
+          <p class="eyebrow">자주 묻는 질문</p>
+          <h2>
+            <span class="line">처음 보는 사람도</span>
+            <span class="line">판단할 수 있게 정리했습니다.</span>
+          </h2>
+        </div>
+        <div class="faq-tools">
+          <label for="faq-search">궁금한 내용을 검색하세요</label>
+          <input id="faq-search" type="search" placeholder="예: 비용, GitHub Action, Desktop" autocomplete="off" data-faq-search />
+          <span data-faq-count>{faqs.length}개 질문</span>
+        </div>
+        <div class="faq-grid" data-faq-grid>
+          {faqs.map(([question, answer]) => (
+            <details data-faq-item data-faq-text={`${question} ${answer}`}>
+              <summary>{question}</summary>
+              <p>{answer}</p>
+            </details>
+          ))}
+        </div>
+        <p class="faq-empty" data-faq-empty hidden>일치하는 질문이 없습니다. 다른 단어로 검색해보세요.</p>
+      </section>
+    </main>
+
+    <button class="motion-toggle" type="button" aria-pressed="true" data-motion-toggle>
+      <span>Motion</span>
+      <strong data-motion-label>On</strong>
+    </button>
+
+    <footer class="site-footer">
+      <div class="footer-intro">
+        <a class="footer-brand" href="#top">
+          <img class="brand-icon" src="/assets/codeagora-icon.png" alt="" width="250" height="250" />
+          <strong>CodeAgora</strong>
+        </a>
+        <p>
+          CodeAgora reviews both AI-written and human-written code through multiple independent perspectives.
+          It does not replace the final decision; it organizes the evidence and disagreements needed to make one.
+        </p>
+        <div class="footer-badges" aria-label="Project status">
+          <span>MIT open source</span>
+          <span>npm rc channel</span>
+          <span>CLI · GitHub Action · MCP · Desktop RC</span>
+        </div>
+      </div>
+      <div class="footer-columns">
+        <nav aria-label="Product links">
+          <h2>Product</h2>
+          <a href="#review">Review view</a>
+          <a href="#method">How it works</a>
+          <a href="#surfaces">Surfaces</a>
+          <a href="#install">Install</a>
+        </nav>
+        <nav aria-label="Supported surfaces">
+          <h2>Surfaces</h2>
+          <a href="#install">CLI</a>
+          <a href="#install">GitHub Action</a>
+          <a href="#install">MCP</a>
+          <a href="#install">Desktop RC</a>
+        </nav>
+        <nav aria-label="Project links">
+          <h2>Project</h2>
+          <a href="https://github.com/bssm-oss/CodeAgora">GitHub</a>
+          <a href="https://www.npmjs.com/package/@codeagora/review">npm</a>
+          <a href="https://github.com/bssm-oss/CodeAgora/blob/main/LICENSE">License</a>
+          <a href="https://github.com/bssm-oss/CodeAgora/issues">Issues</a>
+        </nav>
+      </div>
+      <div class="footer-note" aria-label="Additional notes">
+        <article>
+          <strong>Release status</strong>
+          <p>Desktop is currently distributed through the RC path. For team adoption, start with the CLI or GitHub Action.</p>
+        </article>
+        <article>
+          <strong>Cost note</strong>
+          <p>Connecting external LLM APIs may incur usage costs from the selected model provider.</p>
+        </article>
+        <article>
+          <strong>Principle</strong>
+          <p>CodeAgora does not make the decision for you. It turns multiple opinions into evidence a human can judge.</p>
+        </article>
+      </div>
+    </footer>
+
+    <script type="module" src={siteScriptUrl}></script>
+  </body>
+</html>

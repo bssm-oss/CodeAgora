@@ -77,7 +77,10 @@
     "bench:fn:compare": "tsx scripts/bench-fn-compare.ts",
     "bench:reference": "tsx scripts/bench-reference-check.ts",
     "bench:ci": "pnpm bench:fn -- --validate-only && pnpm bench:reference -- --validate-only",
-    "bench:rate-limit": "tsx scripts/bench-rate-limit-sim.ts"
+    "bench:rate-limit": "tsx scripts/bench-rate-limit-sim.ts",
+    "site:build": "pnpm --filter @codeagora/site build",
+    "site:dev": "pnpm --filter @codeagora/site dev",
+    "site:smoke": "pnpm --filter @codeagora/site smoke"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
@@ -99,6 +102,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.11.5",
     "@vitest/coverage-v8": "^1.6.1",
+    "astro": "^5.18.2",
     "esbuild": "^0.27.4",
     "eslint": "^10.0.3",
     "tsup": "^8.0.1",
