@@ -21,6 +21,8 @@ Current release: `0.1.2`.
 | [`for-users/PROVIDERS.md`](./for-users/PROVIDERS.md) | Provider setup and status. |
 | [`for-users/GITHUB_ACTIONS_SETUP.md`](./for-users/GITHUB_ACTIONS_SETUP.md) | Quick-start/current GitHub Actions setup guide. |
 | [`for-users/DEMO_RUNBOOK.md`](./for-users/DEMO_RUNBOOK.md) | High-end demo script for CLI, MCP, Desktop, and GitHub Action. |
+| [`for-users/DEMO_PRESENTATION_PACKAGE.md`](./for-users/DEMO_PRESENTATION_PACKAGE.md) | Five-minute and 10+ minute CodeAgora demo/presentation script, cue card, fallback card, and Q&A. |
+| [`for-users/DEMO_ASSET_MANIFEST.md`](./for-users/DEMO_ASSET_MANIFEST.md) | Fillable manifest for live demo assets, fallback evidence, and rehearsal readiness. |
 | [`for-users/5_GITHUB_INTEGRATION.md`](./for-users/5_GITHUB_INTEGRATION.md) | Deep GitHub integration/spec reference. |
 | [`for-users/DESKTOP.md`](./for-users/DESKTOP.md) | Desktop app setup, gates, and release evidence. |
 | [`for-users/TROUBLESHOOTING.md`](./for-users/TROUBLESHOOTING.md) | Common failures and fixes. |

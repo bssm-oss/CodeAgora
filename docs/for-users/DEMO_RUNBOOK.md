@@ -4,6 +4,8 @@ This page is the shortest path to a strong live demo of CodeAgora across the CLI
 
 Use `examples/vulnerable-api/` as the demo target. It already contains obvious review material, so the output is easy to explain without inventing a synthetic bug set on the spot.
 
+For a timed booth script, cue card, fallback card, Q&A sheet, and fillable rehearsal manifest, use [Demo Presentation Package](./DEMO_PRESENTATION_PACKAGE.md) and [Demo Asset Manifest](./DEMO_ASSET_MANIFEST.md) alongside this runbook.
+
 ## Recommended demo stack
 
 Use one OpenRouter key when you want the smoothest setup path. The models below are intentionally high-end so the demo feels like the real product, not a toy.
