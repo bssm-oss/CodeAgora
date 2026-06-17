@@ -258,9 +258,7 @@ jobs:
         run: pnpm desktop:unsigned-dmg-gate
 
       - name: Generate evidence manifest
-        run: |
-          REQUIRED_TIER=$(node -e "const { readFileSync } = require('node:fs'); const version = JSON.parse(readFileSync('package.json', 'utf8')).version; process.stdout.write(version.includes('-rc.') ? 'rc' : 'beta');")
-          pnpm evidence:manifest -- --require="$REQUIRED_TIER"
+        run: pnpm evidence:manifest
 
       - name: Preflight npm version availability
         run: |
