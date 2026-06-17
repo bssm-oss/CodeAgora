@@ -42,6 +42,8 @@ describe('release workflow readiness gates', () => {
     expect(release).toContain('prerelease: false');
     expect(release).toContain('capture-unsigned-dmg-evidence.mjs');
     expect(release).toContain('pnpm desktop:unsigned-dmg-gate');
+    expect(release).toContain("- name: Desktop release evidence\n        if: contains(github.ref_name, '-rc.')\n        run: pnpm rc:desktop-gate");
+    expect(release).toContain("- name: Install desktop automation tools\n        if: contains(github.ref_name, '-rc.')");
     expect(release).toContain('not Developer ID signed, not notarized, and does not enable the Tauri updater channel');
     expect(rootPackage.scripts['evidence:security-smoke']).toBe('node scripts/security-evidence-smoke.mjs');
     expect(rootPackage.scripts['evidence:redaction-path-safety']).toBe('node scripts/redaction-path-safety-evidence.mjs');

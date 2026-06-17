@@ -83,7 +83,7 @@ jobs:
           pnpm --filter @codeagora/mcp pack --dry-run 2>&1 | tee .sisyphus/evidence/package-mcp-dry-run.log
 
       - name: Install desktop automation tools
-        if: contains(github.ref_name, '-rc.') || !contains(github.ref_name, '-')
+        if: contains(github.ref_name, '-rc.')
         run: |
           set -euo pipefail
           export PNPM_HOME="$HOME/.local/share/pnpm"
@@ -96,7 +96,7 @@ jobs:
           fi
 
       - name: Desktop release evidence
-        if: contains(github.ref_name, '-rc.') || !contains(github.ref_name, '-')
+        if: contains(github.ref_name, '-rc.')
         run: pnpm rc:desktop-gate
 
       - name: Validate Desktop release version contract

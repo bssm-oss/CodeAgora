@@ -540,6 +540,11 @@ describe('release evidence manifest', () => {
         expect(result.stderr).toContain(requiredFile);
       }
       expect(result.stderr).not.toContain('desktop-rc-distribution-evidence.json');
+      expect(result.stderr).not.toContain('desktop-app-e2e.log');
+      expect(result.stderr).not.toContain('desktop-macos-webdriver-e2e.log');
+      expect(result.stderr).not.toContain('desktop-visual-qa.json');
+      expect(result.stderr).not.toContain('desktop-gate.log');
+      expect(result.stderr).not.toContain('desktop-evidence-manifest.json');
       expect(result.stderr).not.toContain('desktop-stable-distribution-evidence.json');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
