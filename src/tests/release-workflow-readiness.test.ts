@@ -34,7 +34,7 @@ describe('release workflow readiness gates', () => {
     expect(release).toContain('id-token: write');
     expect(release).toContain('npm view "$spec" version');
     expect(release).toContain('npm publish --provenance --access public --tag "$PUBLISH_TAG"');
-    expect(release).toContain("version.includes('-') ? 'beta' : 'stable'");
+    expect(release).toContain("version.includes('-rc.') ? 'rc' : 'beta'");
     expect(release).toContain('pnpm evidence:manifest -- --require="$REQUIRED_TIER"');
     expect(release).toContain('actions/upload-artifact@v7');
     expect(release).toContain('release-evidence-${{ github.ref_name }}');
