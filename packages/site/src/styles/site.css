@@ -863,9 +863,11 @@ section[id] {
 }
 
 .pipeline-lab {
+  --pipeline-sticky-offset: clamp(156px, 22svh, 220px);
   display: grid;
-  align-items: center;
-  min-height: 140svh;
+  align-items: start;
+  min-height: 165svh;
+  padding-top: clamp(104px, 12vw, 156px);
 }
 
 .pipeline-demo {
@@ -880,7 +882,7 @@ section[id] {
 
 .pipeline-rail {
   position: sticky;
-  top: clamp(108px, 15vh, 150px);
+  top: var(--pipeline-sticky-offset);
   display: grid;
   gap: 28px;
 }
@@ -936,7 +938,7 @@ section[id] {
 
 .pipeline-stage {
   position: sticky;
-  top: clamp(108px, 15vh, 150px);
+  top: var(--pipeline-sticky-offset);
   overflow: hidden;
   min-height: 440px;
   border: 1px solid rgba(123, 230, 239, 0.2);
@@ -1024,6 +1026,13 @@ section[id] {
   background: #070b12;
   color: var(--text);
   line-height: 1.55;
+}
+
+@media (min-width: 981px) and (min-height: 760px) {
+  .pipeline-lab {
+    --pipeline-sticky-offset: clamp(220px, 28svh, 300px);
+    padding-top: clamp(132px, 15vw, 200px);
+  }
 }
 
 .review-grid {
@@ -1560,6 +1569,7 @@ code {
 
   .pipeline-lab {
     min-height: auto;
+    padding-top: 52px;
   }
 
   .pipeline-demo {
