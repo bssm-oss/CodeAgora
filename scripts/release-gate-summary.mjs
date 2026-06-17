@@ -4,11 +4,21 @@ function tierIncluded(entryTier, requiredTier) {
   return RELEASE_TIERS.indexOf(entryTier) <= RELEASE_TIERS.indexOf(requiredTier);
 }
 
+function entryIncludedForRequiredTier(entry, requiredTier) {
+  if (requiredTier === 'stable' && entry.stableCarryForward === false) {
+    return false;
+  }
+  return tierIncluded(entry.tier, requiredTier);
+}
+
 function requiredEvidenceEntries(entries, requiredTier) {
   if (!requiredTier) {
     return [];
   }
-  return entries.filter((entry) => entry.requiredForRelease !== false && tierIncluded(entry.tier, requiredTier));
+  return entries.filter((entry) => (
+    entry.requiredForRelease !== false
+    && entryIncludedForRequiredTier(entry, requiredTier)
+  ));
 }
 
 export function summarizeReleaseGates({ entries, gateExitStatus, requiredTier }) {

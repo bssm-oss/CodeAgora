@@ -27,9 +27,9 @@ pnpm dev review path/to/diff.patch
 
 ## Release / docs pointers
 
-- Current release line: `0.1.0-rc.6`
-- Install examples should stay on `@codeagora/review@rc` and `@codeagora/mcp@rc`
-- GitHub Actions examples should keep the action tag at `v0.1.0-rc.6`
+- Current release line: `0.1.0`
+- Install examples should stay on `@codeagora/review` and `@codeagora/mcp`
+- GitHub Actions examples should keep the action tag at `v0.1.0`
 - User-facing setup details live in `docs/for-users/`
 - Architecture and contract references live in `ARCHITECTURE.md` and `AGENT_CONTRACT.md`
 - Move dated reports and superseded notes to `docs/archived/`

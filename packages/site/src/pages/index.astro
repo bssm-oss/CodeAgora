@@ -2,8 +2,12 @@
 import "../styles/site.css";
 import siteScriptUrl from "../scripts/site.js?url";
 
-const version = "0.1.0-rc.6";
+const version = "0.1.0";
 const canonicalUrl = "https://codeagora.vercel.app/";
+const rawDeploymentCommitSha = (process.env.CODEAGORA_STABLE_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "").trim();
+const deploymentCommitSha = /^[0-9a-f]{40}$/i.test(rawDeploymentCommitSha)
+  ? rawDeploymentCommitSha.toLowerCase()
+  : "unknown";
 const schema = {
   "@context": "https://schema.org",
   "@graph": [
@@ -36,7 +40,7 @@ const schema = {
         "GitHub Action pull request automation",
         "MCP server for AI IDEs and coding agents",
         "CLI diff review",
-        "Desktop RC local review UI"
+        "Desktop app local review UI"
       ],
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       sameAs: [
@@ -70,7 +74,7 @@ const schema = {
           name: "Desktop은 안정판인가요?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "현재 Desktop은 RC 경로입니다. 이 랜딩 페이지는 안정판 Desktop 배포나 안정판 업데이트 채널을 약속하지 않습니다."
+            text: "Desktop은 공식 지원 표면이지만, macOS 서명, 공증, 업데이트 채널 evidence가 통과해야 stable 배포로 판정합니다."
           }
         }
       ]
@@ -141,7 +145,7 @@ const surfaces = [
   ["CLI", "내 컴퓨터에서 바로 코드 변경을 리뷰합니다.", "터미널"],
   ["GitHub Action", "Pull Request마다 같은 판정 기준을 자동으로 붙입니다.", "팀 리뷰"],
   ["MCP", "Cursor, Antigravity 같은 AI 개발 환경이 CodeAgora를 도구로 호출합니다.", "AI IDE"],
-  ["Desktop RC", "로컬 리뷰 세션과 결과를 화면에서 확인하는 출시 준비 버전입니다.", "로컬 UI"]
+  ["Desktop app", "로컬 리뷰 세션과 결과를 화면에서 확인하는 공식 UI입니다.", "로컬 UI"]
 ];
 
 const faqs = [
@@ -150,7 +154,7 @@ const faqs = [
   ["하나의 AI 리뷰와 무엇이 다른가요?", "한 모델의 답을 그대로 믿지 않고 여러 주장과 근거를 비교합니다. 그래서 그럴듯하지만 틀린 지적을 줄이는 데 초점을 둡니다."],
   ["비용은 어떻게 되나요?", "CodeAgora 자체는 MIT 오픈소스입니다. OpenAI, Anthropic, OpenRouter 같은 외부 모델을 쓰면 해당 공급자의 API 비용이 발생할 수 있습니다."],
   ["GitHub Action에 쓸 수 있나요?", "네. Pull Request마다 같은 리뷰 기준을 자동으로 붙일 수 있습니다."],
-  ["Desktop은 안정판인가요?", "현재 데스크톱 앱은 RC, 즉 출시 준비 단계입니다. 안정적인 팀 흐름은 CLI와 GitHub Action부터 시작하는 것을 권장합니다."]
+  ["Desktop은 안정판인가요?", "Desktop은 공식 지원 표면입니다. 다만 stable 배포 판정은 macOS 서명, 공증, 업데이트 채널 evidence가 모두 통과해야 합니다."]
 ];
 
 const escapeHtml = (value) =>
@@ -221,11 +225,11 @@ next action: review local backend policy`),
   }
 ];
 
-const cliCommand = escapeHtml(`$ npm i -g @codeagora/review@rc
+const cliCommand = escapeHtml(`$ npm i -g @codeagora/review
 $ agora init
 $ git diff | agora review`);
 
-const actionCommand = escapeHtml(`uses: bssm-oss/CodeAgora@v0.1.0-rc.6
+const actionCommand = escapeHtml(`uses: bssm-oss/CodeAgora@v0.1.0
 with:
   github-token: secrets.GITHUB_TOKEN
 env:
@@ -235,18 +239,18 @@ const mcpCommand = escapeHtml(`{
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@rc"]
+      "args": ["-y", "@codeagora/mcp"]
     }
   }
 }`);
 
-const desktopCommand = escapeHtml(`Desktop RC
+const desktopCommand = escapeHtml(`Desktop app
 - local review session viewer
 - same CLI/MCP/GitHub verdict semantics
 - Desktop 정식 배포는 준비 중`);
 
 const commandLogs = {
-  cli: ["resolve package @rc", "load .ca/config", "read git diff", "write verdict artifact"],
+  cli: ["resolve package latest", "load .ca/config", "read git diff", "write verdict artifact"],
   action: ["checkout pull request", "redact fork secrets", "run reviewers", "post review summary"],
   mcp: ["start stdio server", "list review tools", "accept diff payload", "return compact verdict"],
   desktop: ["open local session", "load review history", "inspect evidence", "export decision note"]
@@ -265,6 +269,7 @@ const commandLogs = {
     <meta name="creator" content="bssm-oss" />
     <meta name="publisher" content="bssm-oss" />
     <meta name="application-name" content="CodeAgora" />
+    <meta name="codeagora:commit" content={deploymentCommitSha} />
     <meta name="apple-mobile-web-app-title" content="CodeAgora" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="theme-color" content="#080d18" />
@@ -290,7 +295,7 @@ const commandLogs = {
     <meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정" />
     <script type="application/ld+json" set:html={JSON.stringify(schema)}></script>
   </head>
-  <body>
+  <body data-codeagora-site="astro" data-codeagora-commit={deploymentCommitSha}>
     <div class="scroll-progress" aria-hidden="true"></div>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="CodeAgora 홈">
@@ -558,7 +563,7 @@ const commandLogs = {
             <span class="line">어디서 실행해도</span>
             <span class="line">같은 기준으로 판단합니다.</span>
           </h2>
-          <p>CLI, GitHub Action, MCP, Desktop RC가 같은 리뷰 파이프라인을 사용합니다.</p>
+          <p>CLI, GitHub Action, MCP, Desktop이 같은 리뷰 파이프라인을 사용합니다.</p>
         </div>
         <div class="surface-grid">
           {surfaces.map(([title, text, meta]) => (
@@ -589,12 +594,12 @@ const commandLogs = {
 
       <section id="install" class="section-shell install-section">
         <div class="install-copy">
-          <p class="eyebrow">출시 준비 채널로 시작하기</p>
+          <p class="eyebrow">stable 채널로 시작하기</p>
           <h2>
             <span class="line">먼저 CLI로 확인하고,</span>
             <span class="line">팀 흐름에 붙입니다.</span>
           </h2>
-          <p>처음에는 터미널에서 결과를 확인하고, 필요하면 GitHub Action, MCP, Desktop RC로 확장합니다.</p>
+          <p>처음에는 터미널에서 결과를 확인하고, 필요하면 GitHub Action, MCP, Desktop으로 확장합니다.</p>
         </div>
         <div class="command-console">
           <div class="tabs" role="tablist" aria-label="설치 명령">
@@ -676,8 +681,8 @@ const commandLogs = {
         </p>
         <div class="footer-badges" aria-label="Project status">
           <span>MIT open source</span>
-          <span>npm rc channel</span>
-          <span>CLI · GitHub Action · MCP · Desktop RC</span>
+          <span>npm latest channel</span>
+          <span>CLI · GitHub Action · MCP · Desktop app</span>
         </div>
       </div>
       <div class="footer-columns">
@@ -693,7 +698,7 @@ const commandLogs = {
           <a href="#install">CLI</a>
           <a href="#install">GitHub Action</a>
           <a href="#install">MCP</a>
-          <a href="#install">Desktop RC</a>
+          <a href="#install">Desktop app</a>
         </nav>
         <nav aria-label="Project links">
           <h2>Project</h2>
@@ -706,7 +711,7 @@ const commandLogs = {
       <div class="footer-note" aria-label="Additional notes">
         <article>
           <strong>Release status</strong>
-          <p>Desktop is currently distributed through the RC path. For team adoption, start with the CLI or GitHub Action.</p>
+          <p>Desktop stable distribution requires signed, notarized, stapled macOS artifacts and updater evidence.</p>
         </article>
         <article>
           <strong>Cost note</strong>

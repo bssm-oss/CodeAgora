@@ -83,7 +83,7 @@ jobs:
           pnpm --filter @codeagora/mcp pack --dry-run 2>&1 | tee .sisyphus/evidence/package-mcp-dry-run.log
 
       - name: Install desktop automation tools
-        if: contains(github.ref_name, '-rc.')
+        if: contains(github.ref_name, '-rc.') || !contains(github.ref_name, '-')
         run: |
           set -euo pipefail
           export PNPM_HOME="$HOME/.local/share/pnpm"
@@ -95,19 +95,24 @@ jobs:
             cargo install tauri-webdriver-automation --version 0.1.3
           fi
 
-      - name: Desktop RC evidence
-        if: contains(github.ref_name, '-rc.')
+      - name: Desktop release evidence
+        if: contains(github.ref_name, '-rc.') || !contains(github.ref_name, '-')
         run: pnpm rc:desktop-gate
 
-      - name: Validate Desktop RC version contract
-        if: contains(github.ref_name, '-rc.')
+      - name: Validate Desktop release version contract
+        if: contains(github.ref_name, '-rc.') || !contains(github.ref_name, '-')
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          import { parseDesktopRcTag, desktopRcUpdaterManifestFilename } from './packages/desktop/scripts/desktop-artifacts.mjs';
+          import {
+            desktopRcUpdaterManifestFilename,
+            parseDesktopRcTag,
+            parseDesktopStableTag,
+          } from './packages/desktop/scripts/desktop-artifacts.mjs';
 
           const tag = process.env.GITHUB_REF_NAME;
-          const parsed = parseDesktopRcTag(tag);
+          const isRc = tag.includes('-rc.');
+          const parsed = isRc ? parseDesktopRcTag(tag) : parseDesktopStableTag(tag);
           const packageFiles = [
             'package.json',
             'packages/core/package.json',
@@ -132,14 +137,17 @@ jobs:
             throw new Error(`Cargo.toml version does not match ${parsed.version}`);
           }
           const endpoint = tauriConfig.plugins?.updater?.endpoints?.[0] ?? '';
-          const expectedManifest = desktopRcUpdaterManifestFilename(parsed.version);
-          if (!endpoint.endsWith(`/${expectedManifest}`)) {
+          const expectedManifest = isRc ? desktopRcUpdaterManifestFilename(parsed.version) : '';
+          if (isRc && !endpoint.endsWith(`/${expectedManifest}`)) {
             throw new Error(`Updater endpoint must end with ${expectedManifest}, received ${endpoint}`);
           }
           fs.appendFileSync(process.env.GITHUB_ENV, [
-            `CODEAGORA_DESKTOP_RC_RELEASE_LINE=${parsed.releaseLine}`,
-            `CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL=desktop-${parsed.releaseLine}-rc`,
-            `CODEAGORA_DESKTOP_RC_UPDATER_MANIFEST=${expectedManifest}`,
+            `CODEAGORA_DESKTOP_RELEASE_KIND=${isRc ? 'rc' : 'stable'}`,
+            `CODEAGORA_DESKTOP_RELEASE_LINE=${parsed.releaseLine}`,
+            ...(isRc ? [
+              `CODEAGORA_DESKTOP_UPDATER_CHANNEL=desktop-${parsed.releaseLine}-rc`,
+              `CODEAGORA_DESKTOP_UPDATER_MANIFEST=${expectedManifest}`,
+            ] : []),
             '',
           ].join('\n'));
           NODE
@@ -152,9 +160,9 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          KEYCHAIN_PATH="$RUNNER_TEMP/codeagora-desktop-rc.keychain-db"
+          KEYCHAIN_PATH="$RUNNER_TEMP/codeagora-desktop-${CODEAGORA_DESKTOP_RELEASE_KIND}.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-          CERTIFICATE_PATH="$RUNNER_TEMP/codeagora-desktop-rc.p12"
+          CERTIFICATE_PATH="$RUNNER_TEMP/codeagora-desktop-${CODEAGORA_DESKTOP_RELEASE_KIND}.p12"
           printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security default-keychain -s "$KEYCHAIN_PATH"
@@ -163,7 +171,7 @@ jobs:
           security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY"
-          echo "CODEAGORA_DESKTOP_RC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "CODEAGORA_DESKTOP_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
       - name: Prepare App Store Connect API key
         if: contains(github.ref_name, '-rc.')
@@ -185,7 +193,7 @@ jobs:
             echo "APPLE_API_KEY_PATH=$API_KEY_FILE" >> "$GITHUB_ENV"
           fi
 
-      - name: Build signed notarized Desktop RC DMG
+      - name: Build signed notarized Desktop DMG
         if: contains(github.ref_name, '-rc.')
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -198,6 +206,13 @@ jobs:
           set -euo pipefail
           rustup target add aarch64-apple-darwin
           pnpm --filter @codeagora/desktop exec tauri build --target aarch64-apple-darwin --bundles app,dmg
+
+      - name: Build unsigned Desktop preview DMG
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-darwin
+          pnpm --filter @codeagora/desktop exec tauri build --target aarch64-apple-darwin --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       - name: Capture Desktop RC distribution evidence
         if: contains(github.ref_name, '-rc.')
@@ -220,9 +235,27 @@ jobs:
             --updater "$UPDATER_PATH" \
             --updater-sig "$SIG_PATH"
 
+      - name: Capture Desktop unsigned DMG evidence
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          GITHUB_RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle -name 'CodeAgora.app' -type d -print -quit)"
+          DMG_PATH="$(find packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -name 'CodeAgora_*_aarch64.dmg' -type f -print -quit)"
+          node packages/desktop/scripts/capture-unsigned-dmg-evidence.mjs \
+            --tag "${{ github.ref_name }}" \
+            --release-url "$GITHUB_RELEASE_URL" \
+            --app "$APP_PATH" \
+            --dmg "$DMG_PATH"
+
       - name: Desktop RC distribution gate
         if: contains(github.ref_name, '-rc.')
         run: pnpm rc:desktop-distribution-gate
+
+      - name: Desktop unsigned DMG gate
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: pnpm desktop:unsigned-dmg-gate
 
       - name: Generate evidence manifest
         run: |
@@ -255,34 +288,64 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
+      - name: Create GitHub RC Release
+        if: contains(github.ref_name, '-rc.')
         uses: softprops/action-gh-release@v3
         with:
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: true
           generate_release_notes: true
-          fail_on_unmatched_files: ${{ contains(github.ref_name, '-rc.') && 'true' || 'false' }}
+          fail_on_unmatched_files: true
           files: |
             packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.tar.gz
             packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.sig
-            .sisyphus/evidence/latest-*-rc.json
+            .sisyphus/evidence/latest-*.json
             .sisyphus/evidence/desktop-rc-distribution-evidence.json
             .sisyphus/evidence/desktop-rc-distribution-gate.log
             .sisyphus/evidence/evidence-manifest.json
           body: |
             Release evidence artifact: `release-evidence-${{ github.ref_name }}`
 
-      - name: Update Desktop RC updater channel
+      - name: Create GitHub Beta Release
+        if: ${{ contains(github.ref_name, '-') && !contains(github.ref_name, '-rc.') }}
+        uses: softprops/action-gh-release@v3
+        with:
+          prerelease: true
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: |
+            .sisyphus/evidence/evidence-manifest.json
+          body: |
+            Release evidence artifact: `release-evidence-${{ github.ref_name }}`
+
+      - name: Create GitHub Stable Release
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: softprops/action-gh-release@v3
+        with:
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            packages/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            .sisyphus/evidence/desktop-unsigned-dmg-evidence.json
+            .sisyphus/evidence/desktop-unsigned-dmg-gate.log
+            .sisyphus/evidence/evidence-manifest.json
+          body: |
+            Release evidence artifact: `release-evidence-${{ github.ref_name }}`
+
+            Desktop macOS DMG is an unsigned preview build for v0.1.0. It is not Developer ID signed, not notarized, and does not enable the Tauri updater channel; macOS Gatekeeper warning is expected.
+
+      - name: Update Desktop updater channel
         if: contains(github.ref_name, '-rc.')
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ env.CODEAGORA_DESKTOP_RC_UPDATER_CHANNEL }}
-          name: Desktop ${{ env.CODEAGORA_DESKTOP_RC_RELEASE_LINE }} RC updater channel
-          prerelease: true
+          tag_name: ${{ env.CODEAGORA_DESKTOP_UPDATER_CHANNEL }}
+          name: Desktop ${{ env.CODEAGORA_DESKTOP_RELEASE_LINE }} ${{ env.CODEAGORA_DESKTOP_RELEASE_KIND }} updater channel
+          prerelease: ${{ env.CODEAGORA_DESKTOP_RELEASE_KIND == 'rc' }}
           fail_on_unmatched_files: true
-          files: .sisyphus/evidence/${{ env.CODEAGORA_DESKTOP_RC_UPDATER_MANIFEST }}
+          files: .sisyphus/evidence/${{ env.CODEAGORA_DESKTOP_UPDATER_MANIFEST }}
           body: |
-            Line-scoped updater manifest for the ${{ env.CODEAGORA_DESKTOP_RC_RELEASE_LINE }}.x Desktop RC channel.
+            Line-scoped updater manifest for the ${{ env.CODEAGORA_DESKTOP_RELEASE_LINE }}.x Desktop ${{ env.CODEAGORA_DESKTOP_RELEASE_KIND }} channel.
             Distribution artifacts remain attached to `${{ github.ref_name }}`.
 
       - name: Verify Desktop RC GitHub release assets

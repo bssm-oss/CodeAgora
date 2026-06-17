@@ -22,6 +22,8 @@ const tauriConfig = readJson('src-tauri/tauri.conf.json');
 const capabilities = readJson('src-tauri/capabilities/default.json');
 const cargoToml = readText('src-tauri/Cargo.toml');
 const main = readText('src-tauri/src/main.rs');
+const isRcVersion = String(packageJson.version).includes('-rc.');
+const expectedUpdaterManifest = isRcVersion ? 'latest-0.1-rc.json' : 'latest-0.1.json';
 
 assert(fs.existsSync(path.join(root, 'dist/index.html')), 'dist/index.html is missing');
 assert(fs.existsSync(path.join(root, 'dist/main.js')), 'dist/main.js is missing');
@@ -45,10 +47,13 @@ assert(tauriConfig.version === packageJson.version, 'Tauri config version does n
 assert(tauriConfig.productName === 'CodeAgora', 'Unexpected Tauri product name');
 assert(tauriConfig.app?.withGlobalTauri === true, 'Tauri global API must be enabled for the MCP bridge');
 assert(typeof tauriConfig.app?.security?.csp === 'string' && tauriConfig.app.security.csp.includes("default-src 'self'"), 'Tauri CSP must be enabled for desktop RC gates');
-assert(tauriConfig.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be generated for Desktop RC distribution');
-assert(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes('dmg'), 'Desktop RC distribution must build a macOS DMG target');
-assert(tauriConfig.plugins?.updater?.endpoints?.[0]?.endsWith('/latest-0.1-rc.json'), 'Desktop RC updater endpoint must be scoped to latest-0.1-rc.json');
-assert(typeof tauriConfig.plugins?.updater?.pubkey === 'string' && tauriConfig.plugins.updater.pubkey.length > 40, 'Desktop RC updater public key is missing');
+assert(tauriConfig.bundle?.createUpdaterArtifacts === true, 'Tauri updater artifacts must be generated for Desktop distribution');
+assert(Array.isArray(tauriConfig.bundle?.targets) && tauriConfig.bundle.targets.includes('dmg'), 'Desktop distribution must build a macOS DMG target');
+assert(
+  tauriConfig.plugins?.updater?.endpoints?.[0]?.endsWith(`/${expectedUpdaterManifest}`),
+  `Desktop updater endpoint must be scoped to ${expectedUpdaterManifest}`,
+);
+assert(typeof tauriConfig.plugins?.updater?.pubkey === 'string' && tauriConfig.plugins.updater.pubkey.length > 40, 'Desktop updater public key is missing');
 assert(capabilities[0]?.permissions?.includes('mcp-bridge:default'), 'MCP bridge permission is missing');
 assert(capabilities[0]?.permissions?.includes('updater:allow-check'), 'Updater check permission is missing');
 assert(capabilities[0]?.permissions?.includes('updater:allow-download-and-install'), 'Updater install permission is missing');

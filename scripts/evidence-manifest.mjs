@@ -76,6 +76,14 @@ function tierIncluded(entryTier, requiredTier) {
   return RELEASE_TIERS.indexOf(entryTier) <= RELEASE_TIERS.indexOf(requiredTier);
 }
 
+export function evidenceEntryIncludedForRequiredTier(entry, requiredTier) {
+  if (!requiredTier) return true;
+  if (requiredTier === 'stable' && entry.stableCarryForward === false) {
+    return false;
+  }
+  return tierIncluded(entry.tier, requiredTier);
+}
+
 function isDesktopEvidence(entry) {
   return entry.name?.startsWith('desktop-') || entry.command?.startsWith('pnpm desktop:') || entry.command === 'pnpm rc:desktop-gate';
 }
@@ -95,7 +103,7 @@ function deterministicLocalGatesForManifest(entries, requiredTier) {
     if (entry.execution !== RELEASE_GATE_EXECUTIONS.LOCAL_COMMAND) {
       return false;
     }
-    return requiredTier ? tierIncluded(entry.tier, requiredTier) : true;
+    return evidenceEntryIncludedForRequiredTier(entry, requiredTier);
   });
 }
 
@@ -283,10 +291,14 @@ function buildManifest(options) {
 
 function enforceRequired(manifest, requiredTier) {
   if (!requiredTier) return;
-  const missing = manifest.entries.filter((entry) => entry.requiredForRelease !== false && tierIncluded(entry.tier, requiredTier) && !entry.exists);
+  const missing = manifest.entries.filter((entry) => (
+    entry.requiredForRelease !== false
+    && evidenceEntryIncludedForRequiredTier(entry, requiredTier)
+    && !entry.exists
+  ));
   const invalid = manifest.entries.filter((entry) => (
     entry.requiredForRelease !== false
-    && tierIncluded(entry.tier, requiredTier)
+    && evidenceEntryIncludedForRequiredTier(entry, requiredTier)
     && entry.exists
     && entry.releaseValidity?.validForRelease !== true
   ));

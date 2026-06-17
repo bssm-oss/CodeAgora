@@ -14,7 +14,7 @@ pnpm --filter @codeagora/mcp pack --dry-run
 For published installs, users can run the package with:
 
 ```bash
-npx -y @codeagora/mcp@rc
+npx -y @codeagora/mcp
 ```
 
 ## Client Configuration
@@ -24,7 +24,7 @@ npx -y @codeagora/mcp@rc
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@rc"]
+      "args": ["-y", "@codeagora/mcp"]
     }
   }
 }

@@ -38,7 +38,7 @@ const css = (
 
 const requiredCopy = [
   "CodeAgora",
-  "npm i -g @codeagora/review@rc",
+  "npm i -g @codeagora/review",
   "GitHub Action",
   "MCP",
   "Desktop",
@@ -68,6 +68,9 @@ const requiredSeo = [
   'property="og:image:width"',
   'name="twitter:card"',
   'name="application-name"',
+  'name="codeagora:commit"',
+  'data-codeagora-site="astro"',
+  'data-codeagora-commit=',
   '"@type":"FAQPage"',
   '"@type":"BreadcrumbList"',
   'type="application/ld+json"',

@@ -41,7 +41,7 @@ describe("CodeAgora landing page", () => {
       "CLI",
       "GitHub Action",
       "MCP",
-      "Desktop RC",
+      "Desktop app",
       "공식 지원 환경",
       "AI 코드 리뷰 도구",
       "여러 AI가 검토하고",
@@ -95,10 +95,10 @@ describe("CodeAgora landing page", () => {
   });
 
   it("provides rc-friendly install and action snippets", () => {
-    expect(html).toContain("npm i -g @codeagora/review@rc");
-    expect(html).toContain("bssm-oss/CodeAgora@v0.1.0-rc.6");
-    expect(html).toContain("@codeagora/mcp@rc");
-    expect(html).toContain("Desktop RC");
+    expect(html).toContain("npm i -g @codeagora/review");
+    expect(html).toContain("bssm-oss/CodeAgora@v0.1.0");
+    expect(html).toContain("@codeagora/mcp");
+    expect(html).toContain("Desktop app");
     expect(html).toContain("Desktop 정식 배포는 준비 중");
   });
 
@@ -116,6 +116,8 @@ describe("CodeAgora landing page", () => {
     expect(html).toContain('<meta name="twitter:image:alt" content="CodeAgora - 토론하는 리뷰, 근거 있는 판정">');
     expect(html).toContain('<meta name="theme-color" content="#080d18">');
     expect(html).toContain('<meta name="application-name" content="CodeAgora">');
+    expect(html).toMatch(/<meta name="codeagora:commit" content="(unknown|[0-9a-f]{40})">/);
+    expect(html).toMatch(/<body data-codeagora-site="astro" data-codeagora-commit="(unknown|[0-9a-f]{40})">/);
     expect(html).not.toContain("90%");
   });
 
@@ -132,14 +134,14 @@ describe("CodeAgora landing page", () => {
           "@type": "SoftwareApplication",
           applicationCategory: "DeveloperApplication",
           applicationSubCategory: "AI code review",
-          softwareVersion: "0.1.0-rc.6",
+          softwareVersion: "0.1.0",
           isAccessibleForFree: true,
           codeRepository: "https://github.com/bssm-oss/CodeAgora",
           downloadUrl: "https://www.npmjs.com/package/@codeagora/review",
           featureList: expect.arrayContaining([
             "GitHub Action pull request automation",
             "MCP server for AI IDEs and coding agents",
-            "Desktop RC local review UI"
+            "Desktop app local review UI"
           ])
         }),
         expect.objectContaining({
@@ -186,7 +188,7 @@ describe("CodeAgora landing page", () => {
   it("configures Vercel to deploy only the static site package", () => {
     expect(vercelConfig).toMatchObject({
       framework: null,
-      installCommand: "pnpm install --frozen-lockfile",
+      installCommand: "pnpm install --frozen-lockfile --ignore-scripts",
       buildCommand: "pnpm --filter @codeagora/site build",
       outputDirectory: "packages/site/dist",
       cleanUrls: true

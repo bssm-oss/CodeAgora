@@ -10,9 +10,9 @@ contracts used by the automation surfaces.
 |------|--------------------------|
 | Channel | Official desktop app |
 | Public desktop launch | Included in release readiness |
-| Signing | RC distribution requires Developer ID evidence |
-| Notarization | RC distribution requires accepted notarization and stapled tickets |
-| Updater | RC-only static GitHub Release JSON, scoped to `desktop-X.Y-rc/latest-X.Y-rc.json` for the installed version line |
+| Signing | v0.1.0 stable ships as an unsigned preview DMG |
+| Notarization | v0.1.0 stable is not notarized; macOS Gatekeeper warning is expected |
+| Updater | Disabled for the v0.1.0 unsigned preview DMG; RC updater JSON remains scoped to `desktop-X.Y-rc/latest-X.Y-rc.json` |
 | Canonical review engine | Existing CLI/core path |
 | Canonical sessions | Existing `.ca/sessions` artifacts |
 | Canonical config | Existing `.ca/config.*` schema and files |
@@ -25,7 +25,7 @@ Run the desktop gate before cutting an RC:
 pnpm rc:desktop-gate
 ```
 
-Official macOS arm64 Desktop RC distribution also requires:
+Official macOS arm64 Desktop distribution also requires:
 
 ```bash
 pnpm rc:desktop-distribution-gate
@@ -39,6 +39,30 @@ release for its version line; the JSON points at the versioned `vX.Y.Z-rc.N`
 prerelease assets.
 Stable Desktop distribution, stable updater channels, and npm
 `latest` promotion are out of scope for this RC gate.
+
+## v0.1.0 Stable Desktop DMG
+
+The v0.1.0 stable release may attach a macOS arm64 Desktop DMG as an unsigned
+preview artifact. That DMG is not Developer ID signed, not notarized, and does
+not enable a Tauri updater channel. macOS Gatekeeper warnings are expected.
+
+Stable Desktop release evidence must be explicit about that policy:
+
+```bash
+node packages/desktop/scripts/capture-unsigned-dmg-evidence.mjs
+pnpm desktop:unsigned-dmg-gate
+```
+
+The required evidence files are:
+
+```txt
+.sisyphus/evidence/desktop-unsigned-dmg-evidence.json
+.sisyphus/evidence/desktop-unsigned-dmg-gate.log
+```
+
+Do not describe the v0.1.0 Desktop DMG as signed, notarized, stapled, or
+auto-updatable unless a later release reintroduces those gates with fresh
+evidence.
 
 This runs:
 
@@ -68,7 +92,7 @@ The desktop smoke checks:
 
 - built `dist/index.html` and `dist/main.js`
 - package/Tauri version alignment
-- RC updater configuration and updater artifact generation
+- updater configuration and updater artifact generation
 - Tauri product metadata
 - command bridge coverage for repository, sessions, review progress, config,
   providers, MCP, GitHub Action setup, release evidence, export, and command

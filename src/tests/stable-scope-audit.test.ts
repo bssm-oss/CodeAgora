@@ -53,6 +53,23 @@ const POSITIVE_CATEGORY_FIXTURES = [
     ],
   },
   {
+    category: 'desktop',
+    paths: [
+      'packages/desktop/src/main.ts',
+      'src/tests/desktop-readiness.test.ts',
+      'scripts/desktop-release-gate-runner.mjs',
+    ],
+  },
+  {
+    category: 'vercel_production_support',
+    paths: [
+      'packages/site/src/pages/index.astro',
+      'src/tests/site-landing.test.ts',
+      'vercel.json',
+      '.vercelignore',
+    ],
+  },
+  {
     category: 'shared_support',
     paths: [
       'package.json',
@@ -82,6 +99,8 @@ describe('stable scope audit', () => {
       'cli',
       'mcp',
       'github_actions',
+      'desktop',
+      'vercel_production_support',
       'shared_support',
       'test_evidence_support',
     ]);
@@ -122,6 +141,8 @@ describe('stable scope audit', () => {
       'packages/desktop/src/main.ts',
       'D',
       'scripts/desktop-release-gate-runner.mjs',
+      'M',
+      'packages/site/src/pages/index.astro',
       'R100',
       'docs/for-users/OLD_GITHUB_ACTIONS.md',
       'docs/for-users/GITHUB_ACTIONS_SETUP.md',
@@ -135,6 +156,9 @@ describe('stable scope audit', () => {
       'scripts/release-gate-runner.mjs',
       'docs/for-users/GITHUB_ACTIONS_SETUP.md',
       'src/tests/github-actions-runtime.test.ts',
+      'packages/desktop/src/main.ts',
+      'scripts/desktop-release-gate-runner.mjs',
+      'packages/site/src/pages/index.astro',
       'docs/for-users/OLD_GITHUB_ACTIONS.md',
     ];
     const keptPaths = audit.keptChangedPathAuditEntries.map((entry: { path: string }) => entry.path);
@@ -148,15 +172,12 @@ describe('stable scope audit', () => {
       {
         path: 'docs/for-users/GITHUB_ACTIONS_SETUP.md',
         firstAuditIndex: 5,
-        duplicateChangeIndex: 9,
+        duplicateChangeIndex: 10,
         status: 'R100',
         changeType: 'renamed',
       },
     ]);
-    expect(audit.excludedChangedPathAuditEntries.map((entry: { path: string }) => entry.path)).toEqual([
-      'packages/desktop/src/main.ts',
-      'scripts/desktop-release-gate-runner.mjs',
-    ]);
+    expect(audit.excludedChangedPathAuditEntries).toEqual([]);
     expect(audit.keptChangedPathAuditEntries.map((entry: { surface: string }) => entry.surface)).toEqual([
       'cli',
       'mcp',
@@ -165,6 +186,9 @@ describe('stable scope audit', () => {
       'tests-evidence',
       'github-actions',
       'github-actions',
+      'desktop',
+      'desktop',
+      'vercel-production',
       'github-actions',
     ]);
     expect(audit.keptChangedPathAuditEntries.map((entry: { category: string }) => entry.category)).toEqual([
@@ -175,6 +199,9 @@ describe('stable scope audit', () => {
       'test_evidence_support',
       'github_actions',
       'github_actions',
+      'desktop',
+      'desktop',
+      'vercel_production_support',
       'github_actions',
     ]);
     for (const entry of audit.keptChangedPathAuditEntries) {
@@ -202,6 +229,8 @@ describe('stable scope audit', () => {
       'scripts/stable-scope-audit.mjs',
       'M',
       'packages/desktop/src/main.ts',
+      'M',
+      'packages/site/src/pages/index.astro',
       'A',
       'for-antigravity.md',
     ]));
@@ -219,6 +248,10 @@ describe('stable scope audit', () => {
           category: 'cli',
         },
         {
+          path: 'packages/desktop/src/main.ts',
+          category: 'desktop',
+        },
+        {
           path: 'packages/github/src/action.ts',
           category: 'github_actions',
         },
@@ -229,6 +262,10 @@ describe('stable scope audit', () => {
         {
           path: 'packages/shared/src/contracts/stable.ts',
           category: 'shared_support',
+        },
+        {
+          path: 'packages/site/src/pages/index.astro',
+          category: 'vercel_production_support',
         },
         {
           path: 'scripts/stable-scope-audit.mjs',
@@ -255,12 +292,11 @@ describe('stable scope audit', () => {
       }
       expect(writtenArtifact.validatedEntries.map((entry: { path: string }) => entry.path)).not.toEqual(
         expect.arrayContaining([
-          'packages/desktop/src/main.ts',
           'for-antigravity.md',
         ]),
       );
-      expect(writtenArtifact.changedPathCount).toBe(7);
-      expect(writtenArtifact.excludedChangedPathCount).toBe(1);
+      expect(writtenArtifact.changedPathCount).toBe(8);
+      expect(writtenArtifact.excludedChangedPathCount).toBe(0);
       expect(writtenArtifact.unclassifiedChangedPathCount).toBe(1);
       expect(writtenArtifact.hasDesktopScope).toBe(true);
       expect(writtenArtifact.removedOrIgnoredProviderMatrixPaths).toEqual([]);
@@ -340,7 +376,7 @@ describe('stable scope audit', () => {
     });
 
     const unknownCategoryAudit = JSON.parse(JSON.stringify(validAudit));
-    unknownCategoryAudit.keptChangedPathAuditEntries[0].category = 'desktop';
+    unknownCategoryAudit.keptChangedPathAuditEntries[0].category = 'unknown_surface';
     const unknownCategoryResult = validateStableScopeAuditArtifact(unknownCategoryAudit);
 
     expect(unknownCategoryResult.valid).toBe(false);
@@ -349,7 +385,7 @@ describe('stable scope audit', () => {
         expect.objectContaining({
           code: 'unknown_category',
           path: 'packages/cli/src/commands/review.ts',
-          category: 'desktop',
+          category: 'unknown_surface',
         }),
       ]),
     );
@@ -462,7 +498,7 @@ describe('stable scope audit', () => {
       const result = spawnSync(process.execPath, [scriptPath, '--cwd', repoDir], {
         encoding: 'utf-8',
       });
-      expect(result.status).toBe(1);
+      expect(result.status).toBe(0);
       expect(result.stderr).toBe('');
 
       const audit = JSON.parse(result.stdout);
@@ -767,7 +803,7 @@ describe('stable scope audit', () => {
     expect(parsedArtifact.hasProviderMatrixRemovalOrIgnored).toBe(true);
   });
 
-  it('renders Desktop and unrelated provider-matrix collector outputs into separate artifact sections', () => {
+  it('renders unrelated provider-matrix collector outputs into artifact exclusion sections', () => {
     const audit = buildStableScopeAuditFromNameStatus(nameStatusZ([
       'D',
       'packages/desktop/src/main.ts',
@@ -789,12 +825,6 @@ describe('stable scope audit', () => {
         '!! packages/shared/src/data/model-rankings.json',
       ]),
     });
-    const expectedDesktopPaths = [
-      'desktop-ux-audit-artifacts/',
-      'packages/desktop/dist/',
-      'packages/desktop/src/main.ts',
-      'scripts/desktop-release-gate-runner.mjs',
-    ];
     const expectedProviderMatrixPaths = [
       'packages/shared/src/data/model-rankings.json',
       'packages/shared/src/data/models-dev-snapshot.json',
@@ -807,11 +837,6 @@ describe('stable scope audit', () => {
     const sectionsById = new Map(
       renderedArtifact.exclusionSections.map((section: { id: string }) => [section.id, section]),
     );
-    const desktopSection = sectionsById.get('desktop') as {
-      sourceField: string;
-      entryCount: number;
-      entries: Array<{ path: string }>;
-    };
     const providerMatrixSection = sectionsById.get('unrelated_provider_matrix') as {
       sourceField: string;
       entryCount: number;
@@ -819,26 +844,23 @@ describe('stable scope audit', () => {
     };
 
     expect(renderedArtifact.exclusionSections).toEqual(directSections);
-    expect([...sectionsById.keys()]).toEqual(['desktop', 'unrelated_provider_matrix']);
-    expect(desktopSection.sourceField).toBe('removedOrIgnoredDesktopScopedPaths');
+    expect([...sectionsById.keys()]).toEqual(['unrelated_provider_matrix']);
+    expect(renderedArtifact.removedOrIgnoredDesktopScopedPaths.map((entry: { path: string }) => entry.path)).toEqual([
+      'desktop-ux-audit-artifacts/',
+      'packages/desktop/dist/',
+      'packages/desktop/src/main.ts',
+      'scripts/desktop-release-gate-runner.mjs',
+    ]);
     expect(providerMatrixSection.sourceField).toBe('removedOrIgnoredProviderMatrixPaths');
-    expect(desktopSection.entryCount).toBe(expectedDesktopPaths.length);
     expect(providerMatrixSection.entryCount).toBe(expectedProviderMatrixPaths.length);
-    expect(desktopSection.entries.map((entry) => entry.path)).toEqual(expectedDesktopPaths);
     expect(providerMatrixSection.entries.map((entry) => entry.path)).toEqual(expectedProviderMatrixPaths);
 
     const allSectionPaths = renderedArtifact.exclusionSections.flatMap(
       (section: { entries: Array<{ path: string }> }) => section.entries.map((entry) => entry.path),
     );
 
-    for (const expectedPath of [...expectedDesktopPaths, ...expectedProviderMatrixPaths]) {
+    for (const expectedPath of expectedProviderMatrixPaths) {
       expect(allSectionPaths.filter((pathEntry: string) => pathEntry === expectedPath)).toHaveLength(1);
-    }
-    for (const pathEntry of expectedDesktopPaths) {
-      expect(providerMatrixSection.entries.map((entry) => entry.path)).not.toContain(pathEntry);
-    }
-    for (const pathEntry of expectedProviderMatrixPaths) {
-      expect(desktopSection.entries.map((entry) => entry.path)).not.toContain(pathEntry);
     }
   });
 

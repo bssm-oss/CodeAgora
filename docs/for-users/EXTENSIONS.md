@@ -3,7 +3,7 @@
 Optional packages installed separately from the core `codeagora` CLI.
 
 ```bash
-npm i -g @codeagora/mcp@rc         # MCP server (Claude Code, Cursor, etc.)
+npm i -g @codeagora/mcp         # MCP server (Claude Code, Cursor, etc.)
 ```
 
 ## Desktop App
@@ -23,7 +23,7 @@ Exposes the full CodeAgora pipeline as an MCP server compatible with Claude Code
   "mcpServers": {
     "codeagora": {
       "command": "npx",
-      "args": ["-y", "@codeagora/mcp@rc"]
+      "args": ["-y", "@codeagora/mcp"]
     }
   }
 }

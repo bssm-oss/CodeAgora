@@ -73,13 +73,13 @@ The PR diff exceeds the configured limit (default: 5000 lines). Options:
      "mcpServers": {
        "codeagora": {
          "command": "npx",
-         "args": ["-y", "@codeagora/mcp@rc"]
+         "args": ["-y", "@codeagora/mcp"]
        }
      }
    }
    ```
 2. Restart Claude Code
-3. Check that `npx -y @codeagora/mcp@rc` starts without errors
+3. Check that `npx -y @codeagora/mcp` starts without errors
 
 ### "repo_path is outside the allowed repository boundary"
 - `repo_path` is optional, but when provided it must point to the exact workspace root or a real directory inside the current repository checkout.
